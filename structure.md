@@ -62,7 +62,9 @@ No tkinter anywhere in here.
   list changed. Reads `Scan` for the ground, and `FSSBodySignals` /
   `SAASignalsFound` for how many mining locations a body carries - the FSS
   already knows, no probes needed. Counts are kept beside the bodies because a
-  signal can arrive before its scan. One system at a time: arriving asks
+  signal can arrive before its scan, and the system name is taken from any
+  line EDMC hands over rather than only from a jump. One system at a time:
+  arriving asks
   `on_arrive` what is already known and starts from that, every change goes
   straight to `on_change`, and what came off disk is never written back.
 - **[store.py](rs_core/store.py)** - one JSON file per system under

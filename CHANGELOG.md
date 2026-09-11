@@ -10,6 +10,14 @@ because a lat and a lon on one line is a single long number that has to be
 read twice to be split. They are the one thing on the card that cannot be
 worked out again afterwards.
 
+**The plugin knows where you are as soon as EDMC does.** Start EDMC with the
+game already running and it replays the journal, naming the system on every
+line it hands over - but the register only learned the name from a jump or a
+scan, so a session started while docked knew nothing until the next jump. The
+name is taken from any line now. Learning it is not the same as arriving:
+arriving throws away what was held, and a location count can reach us before
+any line names the system.
+
 **The material picks what the scan window shows.** The dropdown carries an
 "All" under the placeholder; choose anything else and RhinoScan lists only the
 ground that has ever carried it, each group leading with its rate for that

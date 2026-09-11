@@ -3,7 +3,12 @@
 No tkinter and no network, so it can be checked without EDMC in the way. See
 rs_tests/test_bodies.py.
 
-EDMC hands every journal line to journal_entry. Three events matter:
+EDMC hands every journal line to journal_entry, and names the system it
+believes you are in on each one. That name is taken as it comes: waiting for an
+arrival event meant a plugin started while docked knew nothing until the next
+jump.
+
+Three events carry the rest:
 
     Scan              PlanetClass, Landable, Volcanism - everything the ground
                       classification needs. Emitted when the FSS resolves a
@@ -100,15 +105,22 @@ class Register:
         """
         if not entry:
             return False
-        event = entry.get('event')
 
+        # EDMC names the system it believes you are in on every line it hands
+        # over, including the replay it does at startup. Waiting for an arrival
+        # event instead meant the plugin knew nothing in a system EDMC could
+        # name - start it while docked, and the next hundred journal lines were
+        # Music and ShipLocker, none of which said where you were.
+        changed = self._arrive(system) if system else False
+
+        event = entry.get('event')
         if event in ARRIVAL_EVENTS:
-            changed = self._arrive(entry.get('StarSystem') or system)
+            changed = self._arrive(entry.get('StarSystem') or system) or changed
         elif event in SIGNAL_EVENTS:
-            changed = self._signals(entry)
+            changed = self._signals(entry) or changed
         elif event == 'Scan':
-            changed = self._scan(entry, system)
-        else:
+            changed = self._scan(entry, system) or changed
+        elif not changed:
             return False
 
         # Nothing is written back on the way in. What was just read off disk
@@ -120,17 +132,28 @@ class Register:
         return changed
 
     def _arrive(self, name):
-        # Location fires on game start for the system you are already in, so
-        # only an actual change may throw the list away.
-        if name and name != self.system:
-            self.clear(name)
+        if not name or name == self.system:
+            return False
+
+        # Learning the name is not arriving. EDMC starts with the game already
+        # running and replays the journal, so signals and scans can reach us
+        # before any line names the system - clearing here would throw away
+        # what those lines just told us.
+        if self.system is None:
+            self.system = name
             known = self.on_arrive(name) if self.on_arrive else None
-            if known:
+            if known and not self._bodies:
                 self.adopt(name, known)
                 self._from_cache = True
             return True
-        self.system = name or self.system
-        return False
+
+        # An actual change of system. Everything held is about the old one.
+        self.clear(name)
+        known = self.on_arrive(name) if self.on_arrive else None
+        if known:
+            self.adopt(name, known)
+            self._from_cache = True
+        return True
 
     def _persist(self):
         """Every change goes to disk at once, so nothing is lost to a crash.

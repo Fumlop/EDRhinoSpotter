@@ -30,6 +30,7 @@ class TestTracking:
 
     def test_unlandable_bodies_never_enter(self, make_scan):
         register = bodies.Register()
+        register.track({"event": "Location", "StarSystem": "Andel"})
         assert not register.track(make_scan("Andel 2", "Gas giant", landable=False),
                                   system="Andel")
         assert not register.track({"event": "Scan", "BodyName": "Andel", "StarType": "M"},
@@ -38,6 +39,7 @@ class TestTracking:
 
     def test_a_scan_without_a_name_is_dropped(self, make_scan):
         register = bodies.Register()
+        register.track({"event": "Location", "StarSystem": "Andel"})
         entry = make_scan("x", "Rocky body")
         del entry["BodyName"]
         assert not register.track(entry, system="Andel")
@@ -47,6 +49,39 @@ class TestTracking:
         assert not register.track({"event": "Music", "MusicTrack": "Exploration"})
         assert not register.track(None)
         assert not register.track({})
+
+
+class TestLearningTheSystem:
+    """EDMC starts with the game already running, replays the journal, and
+    names the system on every line it hands over."""
+
+    def test_any_line_names_the_system(self):
+        register = bodies.Register()
+        assert register.track({"event": "Music", "MusicTrack": "DockingComputer"},
+                              system="Andel")
+        assert register.system == "Andel"
+
+    def test_learning_the_name_keeps_what_arrived_first(self, make_scan):
+        """A count can reach us before any line names the system. Treating
+        that as an arrival threw it away."""
+        register = bodies.Register()
+        register.track({"event": "FSSBodySignals", "BodyName": "Andel 1 a",
+                        "Signals": [{"Type": "$PlanetaryMiningLocation_Name;",
+                                     "Count": 17}]})
+        register.track(make_scan("Andel 1 a", "Rocky body"), system="Andel")
+        assert register.system == "Andel"
+        assert register.bodies()[0]["locations"] == 17
+
+    def test_learning_the_name_still_loads_the_cache(self):
+        register = bodies.Register(on_arrive=lambda system: [
+            {"name": "Andel 1 a", "ground": "rocky", "distance": 1.0, "locations": 5}])
+        register.track({"event": "Music"}, system="Andel")
+        assert len(register) == 1
+
+    def test_the_same_name_again_changes_nothing(self):
+        register = bodies.Register()
+        assert register.track({"event": "Music"}, system="Andel")
+        assert not register.track({"event": "Music"}, system="Andel")
 
 
 class TestArrival:
