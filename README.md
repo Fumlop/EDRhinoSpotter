@@ -102,5 +102,5 @@ and RhinoScan has something real to draw.
 
     pytest
 
-152 checks, no network, no game, no display. See `structure.md` for how the
+164 checks, no network, no game, no display. See `structure.md` for how the
 code is laid out and why.

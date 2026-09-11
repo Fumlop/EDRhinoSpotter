@@ -1,14 +1,18 @@
 """Render one marked mining spot as a PNG card.
 
-Same palette as lab/mining_cards so a card dropped in chat matches the local
-notebook. PIL ships inside EDMC, so nothing extra is vendored for this.
+Same palette as the scan window - see rs_core/palette.py - so a card dropped
+into a chat beside a screenshot of the window looks like the same tool. PIL
+ships inside EDMC, so nothing extra is vendored for this.
 
 The card is the whole record: what was marked is what it shows. Nothing is
 looked up, so it renders with the database down or EDIntel not mounted.
 """
 
 import os
+
 from PIL import Image, ImageDraw, ImageFont
+
+from rs_core import palette
 
 # Outside the plugin folder on purpose: cards outlive a plugin reinstall, and
 # %LOCALAPPDATA% is somewhere Explorer opens without hunting for it.
@@ -25,14 +29,16 @@ def card_dir(system):
 W, H = 880, 360
 PAD = 34
 
-PAPER = (18, 22, 15)
-SHEET = (26, 31, 25)
-INK = (227, 232, 222)
-INK_SOFT = (176, 184, 172)
-MUTED = (131, 140, 129)
-RULE = (46, 53, 44)
-ACCENT = (224, 145, 72)
-SECOND = (121, 171, 170)
+# The window's palette, converted once. A card dropped into a chat beside a
+# screenshot of the scan window has to look like the same tool.
+PAPER = palette.rgb(palette.BG)
+SHEET = palette.rgb(palette.PANEL)
+INK = palette.rgb(palette.FG)
+INK_SOFT = palette.rgb(palette.FG_SOFT)
+MUTED = palette.rgb(palette.MUTED)
+RULE = palette.rgb(palette.RULE)
+ACCENT = palette.rgb(palette.ACCENT)
+SECOND = palette.rgb(palette.GOOD)
 
 FONTS = r"C:\Windows\Fonts"
 

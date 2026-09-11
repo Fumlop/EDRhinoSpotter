@@ -11,7 +11,7 @@ so pressing the button twice costs nothing and the card flow is untouched.
 
 import tkinter as tk
 
-from rs_core import grounds
+from rs_core import grounds, palette
 
 try:
     from theme import theme
@@ -23,12 +23,12 @@ except ImportError:      # running outside EDMC
 TOP_MATERIALS = 4
 MIN_PCT = 2.0
 
-BG = "#0f1419"
-FG = "#e8f2ff"
-DIM = "#7c95b8"
-ACCENT = "#87ceeb"
-GOOD = "#69db7c"
-WARN = "#ffd43b"
+BG = palette.BG
+FG = palette.FG
+DIM = palette.MUTED
+ACCENT = palette.ACCENT
+GOOD = palette.GOOD
+WARN = palette.WARN
 
 _window = None           # only ever one, so the button cannot bury the panel
 

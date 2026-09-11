@@ -14,7 +14,7 @@ import subprocess
 import threading
 import tkinter as tk
 
-from rs_core import bodies, grounds, screenshots, spotcard, spotmark, store, update
+from rs_core import bodies, grounds, palette, screenshots, spotcard, spotmark, store, update
 from rs_core.logging import logger
 from rs_ui import scan
 
@@ -98,7 +98,7 @@ def build(parent):
         theme.update(_frame)
     # After the theme, which paints every label the same - the link has to stay
     # visibly a link.
-    link.config(fg="#4a95eb")
+    link.config(fg=palette.ACCENT)
 
     # Test mode fills the register before the panel exists, and EDMC may also
     # start mid-session with a system already tracked. Either way the count
@@ -244,7 +244,7 @@ def _show_update(tag, newer):
     # "Update", not "Update v2.1.0": the tag would be the one string wider
     # than the button, and widening the panel is what this design avoids. The
     # version it is going to goes in the status line instead.
-    _card_button.config(text="Update", fg="#ffd43b", command=_install_update)
+    _card_button.config(text="Update", fg=palette.WARN, command=_install_update)
     _set_status(f"{tag} is out")
 
 
@@ -271,10 +271,10 @@ def _report_update(ok, message):
     if ok:
         # The new code is on disk and the old code is what is running. Nothing
         # this button could do now would be the thing the commander expects.
-        _card_button.config(text="Restart EDMC", state="disabled", fg="#69db7c")
+        _card_button.config(text="Restart EDMC", state="disabled", fg=palette.GOOD)
     else:
         # Left pressable on purpose: a failed download is usually a retry.
-        _card_button.config(text="Retry update", state="normal", fg="#ff8080")
+        _card_button.config(text="Retry update", state="normal", fg=palette.ALERT)
 
 
 def _refresh_scan_count():

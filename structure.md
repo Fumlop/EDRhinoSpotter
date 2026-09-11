@@ -17,7 +17,7 @@ RhinoSpotter/
 ├── load.py              EDMC lifecycle hooks, and nothing else
 ├── rs_core/             everything that is not a widget
 ├── rs_ui/               everything that is
-├── rs_tests/            pytest suite, 152 checks
+├── rs_tests/            pytest suite, 164 checks
 ├── ground_rules.json    the EDIntel mining sheet, frozen at export time
 ├── cards/               rendered cards (gitignored)
 ├── data/                screenshots and sidecars (gitignored)
@@ -81,6 +81,10 @@ No tkinter anywhere in here.
   half a plugin behind. `KEEP` names what an update may not overwrite -
   `ground_rules.json` above all, because the commander exported it from their
   own EDIntel and the release copy is by definition older.
+- **[palette.py](rs_core/palette.py)** - the colours, once. Hex for tkinter,
+  RGB tuples for PIL, one conversion function between them so the window and
+  the cards cannot drift apart. They used to be two schemes and looked like
+  two tools.
 - **[logging.py](rs_core/logging.py)** - one logger, named so EDMC picks it up.
 
 ## UI (`rs_ui/`)
@@ -100,7 +104,7 @@ Everything in here imports tkinter.
 
 ## Tests (`rs_tests/`)
 
-`pytest` from the plugin folder. 152 checks, no network, no game, no display.
+`pytest` from the plugin folder. 164 checks, no network, no game, no display.
 
 - **conftest.py** - puts the plugin folder on `sys.path`, and builds Scan
   events carrying only the fields the code reads. The `sheet` fixture is a
@@ -116,6 +120,9 @@ Everything in here imports tkinter.
 - **test_bodies.py** also covers arriving: a known system arrives filled, new
   scans add to it rather than replace it, and what came off disk is not
   written straight back.
+- **test_palette.py** - that the card and the window draw the same black, and
+  that a colour which is not six hex digits raises rather than silently
+  becoming black.
 - **test_replay.py** - which files count as recent, that a second visit does
   not lose the first, and that a ground the sheet never measured is worth
   nothing rather than guessed at.

@@ -40,7 +40,14 @@ resizable. And every body row repeated the system name, which pushed the
 distance and the location count off the right edge - the name is in the title
 and the header already.
 
-**Tests.** 152 of them, replacing the one hand-rolled script. Two that were
+**One palette.** The cards kept a warm olive-and-orange scheme from the
+notebook they were prototyped in, while the scan window used EDIntel's dark
+blue. Side by side they looked like two tools, which is exactly what a card
+dropped into a chat next to a screenshot is not. Both draw from
+rs_core/palette.py now - hex for tkinter, RGB for PIL, one conversion between
+them so they cannot drift.
+
+**Tests.** 164 of them, replacing the one hand-rolled script. Two that were
 easy to get wrong and are now pinned: `Location` on game start must not empty
 the body list, and a scan from another system must reset it even if the
 arrival event was missed.
