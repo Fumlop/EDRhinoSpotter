@@ -10,6 +10,18 @@ because a lat and a lon on one line is a single long number that has to be
 read twice to be split. They are the one thing on the card that cannot be
 worked out again afterwards.
 
+**The material dropdown looks like the rest of the panel.** Tk gives a
+Menubutton a two-pixel raised border and centred text, and with an empty value
+in it the whole thing drew as a blank sunken box with a marker floating in the
+middle - it read as a broken text field. It has a one-pixel solid border and
+left-aligned text now, and says "select material" until you pick one.
+
+**A worker thread could throw a traceback into the log on shutdown.** Every
+hop from a thread back to the panel goes through one guarded helper. `after`
+raises once the mainloop has gone, which is exactly what happens when EDMC is
+closed while an update check is still in flight - and there is nothing left to
+update by then anyway.
+
 **The empty scan window leads with the instruction.** "FSS the system, or the
 planet you are heading for", then the reason under it.
 

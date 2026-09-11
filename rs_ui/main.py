@@ -5,8 +5,8 @@ variables that only make sense while a window is open. Everything that can be
 answered without a screen is in rs_core, which is why rs_tests can run it.
 
 Threads: the card render and the update check both run off the UI thread and
-come back through _frame.after. Tk is not thread-safe, and a widget written
-from a worker fails minutes later somewhere unrelated.
+come back through _on_ui. Tk is not thread-safe, and a widget written from a
+worker fails minutes later somewhere unrelated.
 """
 
 import os
@@ -36,6 +36,11 @@ _frame = None
 _status = None
 _done = None             # "completed" beside the button, once a card is on disk
 _scan_count = None       # how many landable bodies the current system has
+# What the dropdown says before anything is picked. A real string rather than
+# an empty one: an OptionMenu with "" in it draws as a blank sunken box with a
+# marker floating in it, which reads as a broken text field.
+NO_MATERIAL = "select material"
+
 _card_button = None      # MiningCard, until there is an update to install
 _loc = None              # tk.StringVar - mining location index
 _rigs = None             # tk.StringVar - rigs on the patch
@@ -73,10 +78,11 @@ def build(parent):
     tk.Spinbox(_frame, from_=0, to=12, textvariable=_rigs, width=4).grid(
         row=1, column=3, sticky="w", padx=2)
 
-    _material = tk.StringVar(value="")
+    _material = tk.StringVar(value=NO_MATERIAL)
     tk.Label(_frame, text="Material", anchor="w").grid(row=2, column=0, sticky="w", padx=2)
-    tk.OptionMenu(_frame, _material, "", *spotmark.MATERIALS).grid(
-        row=2, column=1, columnspan=3, sticky="we", padx=2)
+    _menu = tk.OptionMenu(_frame, _material, NO_MATERIAL, *spotmark.MATERIALS)
+    _style_menu(_menu)
+    _menu.grid(row=2, column=1, columnspan=3, sticky="we", padx=2)
 
     # Own frame: column 1 stretches, and the buttons have to sit against each
     # other rather than spread to the far edge of the panel. Both are one
@@ -114,6 +120,43 @@ def build(parent):
     _refresh_scan_count()
     update.check_async(_on_update_checked)
     return _frame
+
+
+def _style_menu(menu):
+    """Make an OptionMenu look like the rest of the panel.
+
+    Tk gives it a two-pixel raised border, centred text and a fat indicator -
+    next to EDMC's flat entry fields it looked like a different toolkit. The
+    menu it drops down is a separate widget and has to be told the same
+    things.
+    """
+    # A solid one-pixel border, so it sits beside the Location entry as the
+    # same kind of thing. Tk gives a Menubutton a two-pixel raised border and
+    # centred text by default, which next to EDMC's flat fields looked like a
+    # different toolkit.
+    #
+    # The indicator stays on. Writing a caret into the text instead does
+    # nothing - an OptionMenu binds textvariable, and that wins over text.
+    menu.config(relief="solid", borderwidth=1, highlightthickness=0,
+                anchor="w", padx=6, pady=1, indicatoron=True)
+    menu["menu"].config(borderwidth=1, activeborderwidth=0, tearoff=False)
+
+
+def _on_ui(function, *args):
+    """Run something on the UI thread, or drop it.
+
+    Every worker in here comes back through this. `after` is how you get from
+    a thread to Tk, and it raises if the mainloop has gone - which is exactly
+    what happens when EDMC is closing while an update check is still in
+    flight. A daemon thread throwing a traceback into the log on the way out
+    is noise, and there is nothing left to update anyway.
+    """
+    if not _frame:
+        return
+    try:
+        _frame.after(0, function, *args)
+    except (RuntimeError, tk.TclError):
+        pass
 
 
 def _folder_link(parent):
@@ -182,7 +225,7 @@ def make_card():
     global _card_token, _last_index
 
     _set_done("")
-    if not _material.get():
+    if _material.get() in ("", NO_MATERIAL):
         _set_status("pick a material first")
         return
 
@@ -219,8 +262,7 @@ def _render_card(spot, token):
         message = None
     except Exception as err:
         message = f"no card: {err}"
-    if _frame:
-        _frame.after(0, _report, message, token)
+    _on_ui(_report, message, token)
 
 
 def _report(message, token):
@@ -233,9 +275,7 @@ def _report(message, token):
 
 def _on_update_checked(tag, newer):
     """Called on a worker thread - bounce to Tk before touching a widget."""
-    if not _frame:
-        return
-    _frame.after(0, _show_update, tag, newer)
+    _on_ui(_show_update, tag, newer)
 
 
 def _show_update(tag, newer):
@@ -268,8 +308,7 @@ def _install_update():
 
 def _on_update_installed(ok, message):
     """Called on a worker thread - bounce to Tk before touching a widget."""
-    if _frame:
-        _frame.after(0, _report_update, ok, message)
+    _on_ui(_report_update, ok, message)
 
 
 def _report_update(ok, message):
@@ -321,5 +360,4 @@ def _convert_shot(entry, mark_location, body_names):
         message = "shot: " + os.path.basename(path)
     except Exception as err:
         message = f"screenshot not saved: {err}"
-    if _frame:
-        _frame.after(0, _set_status, message)
+    _on_ui(_set_status, message)
