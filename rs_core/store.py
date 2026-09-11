@@ -1,4 +1,4 @@
-"""A system you have already seen, kept, so you do not have to honk it twice.
+r"""A system you have already seen, kept, so you do not have to honk it twice.
 
 EDMC replays the journal file it is watching and nothing older. Every game
 restart opens a new file, so a system honked last week is gone from the
@@ -8,11 +8,19 @@ So each system is written out as one small JSON file and read back when you
 arrive there again. No network, no EDSM, no database: this is the commander's
 own scan data going to disk and coming back.
 
-    <plugin>/data/systems/<System>.json
+    %LOCALAPPDATA%\RhinoSpotter\data\<System>.json
+
+Beside the cards, and outside the plugin folder for the same reason they are:
+a reinstall replaces the plugin, and nobody expects it to take their scans
+with it.
 
 One file per system rather than a folder per body. A body is a handful of
-fields; a folder holding four of them costs four inode reads to answer one
+fields; a folder holding four of them costs four directory reads to answer one
 question about the system.
+
+Written on every change rather than when you leave. A system you never leave -
+because the game crashed, or EDMC was closed on the pad - is exactly the one
+you would rather not scan twice.
 
 No tkinter, so it can be checked without EDMC in the way. See
 rs_tests/test_store.py.
@@ -24,8 +32,11 @@ import tempfile
 
 from rs_core.logging import logger
 
-STORE_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                          "data", "systems")
+# Beside the cards, and outside the plugin folder for the same reason: scans
+# outlive a plugin reinstall, and %LOCALAPPDATA% is somewhere Explorer opens
+# without hunting for it.
+STORE_ROOT = os.path.join(os.environ.get("LOCALAPPDATA")
+                          or os.path.expanduser("~"), "RhinoSpotter", "data")
 BAD = r'<>:"/\|?*'
 VERSION = 1
 

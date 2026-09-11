@@ -21,9 +21,14 @@ Signals can arrive before or after the Scan for the same body, so counts are
 kept beside the bodies and merged on the way out rather than written into a
 row that may not exist yet.
 
-The register holds one system at a time. Arriving somewhere clears it, and
-what was there is handed to rs_core.store so the next visit does not need a
-second honk.
+The register holds one system at a time. Arriving somewhere clears it and asks
+`on_arrive` whether this system has been seen before; whatever comes back is
+the starting point, and the scans that follow add to it rather than replace it.
+
+Every change is handed straight to `on_change`, which is where the cache write
+hangs - not at the point you leave. A system you never leave, because the game
+crashed or EDMC was closed on the pad, is exactly the one you would rather not
+scan a second time.
 """
 
 from rs_core import grounds
@@ -59,14 +64,18 @@ class Register:
     the system map shows, and two scans of one body must not become two rows.
     """
 
-    def __init__(self, on_leave=None):
-        """`on_leave(system, bodies)` fires when a system is left with bodies
-        in it - that is where the cache write hangs, so this file never has to
-        know that a cache exists."""
+    def __init__(self, on_change=None, on_arrive=None):
+        """`on_change(system, bodies)` fires on every scan, count and jump that
+        changes the list. `on_arrive(system)` is asked for what is already
+        known about a system on the way in, and returns a list of bodies or
+        nothing. Both are where the cache hangs, so this file never has to know
+        a cache exists."""
         self.system = None
-        self.on_leave = on_leave
+        self.on_change = on_change
+        self.on_arrive = on_arrive
         self._bodies = {}
         self._locations = {}
+        self._from_cache = False
 
     def clear(self, system=None):
         self.system = system
@@ -93,26 +102,45 @@ class Register:
         event = entry.get('event')
 
         if event in ARRIVAL_EVENTS:
-            return self._arrive(entry.get('StarSystem') or system)
-        if event in SIGNAL_EVENTS:
-            return self._signals(entry)
-        if event != 'Scan':
+            changed = self._arrive(entry.get('StarSystem') or system)
+        elif event in SIGNAL_EVENTS:
+            changed = self._signals(entry)
+        elif event == 'Scan':
+            changed = self._scan(entry, system)
+        else:
             return False
-        return self._scan(entry, system)
+
+        # Nothing is written back on the way in. What was just read off disk
+        # is already on disk, and rewriting it on every jump would turn a
+        # lookup into a write.
+        if changed and not self._from_cache:
+            self._persist()
+        self._from_cache = False
+        return changed
 
     def _arrive(self, name):
         # Location fires on game start for the system you are already in, so
         # only an actual change may throw the list away.
         if name and name != self.system:
-            self._leave()
             self.clear(name)
+            known = self.on_arrive(name) if self.on_arrive else None
+            if known:
+                self.adopt(name, known)
+                self._from_cache = True
             return True
         self.system = name or self.system
         return False
 
-    def _leave(self):
-        if self.on_leave and self.system and self._bodies:
-            self.on_leave(self.system, self.bodies())
+    def _persist(self):
+        """Every change goes to disk at once, so nothing is lost to a crash.
+
+        A honk is a burst of these - one write per body, each a few kilobytes
+        through a temp file and a rename. That is the price of never scanning a
+        system twice, and it is not a price worth optimising until somebody
+        notices it.
+        """
+        if self.on_change and self.system and self._bodies:
+            self.on_change(self.system, self.bodies())
 
     def _signals(self, entry):
         count = mining_locations(entry)
@@ -128,7 +156,6 @@ class Register:
 
     def _scan(self, entry, system):
         if system and self.system and system != self.system:
-            self._leave()
             self.clear(system)
         elif system and not self.system:
             self.system = system

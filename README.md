@@ -27,10 +27,12 @@ flying out there, and a detailed surface scan confirms it. A body nobody has
 counted says `unprobed` rather than `0 loc` - none found and none looked for
 are not the same thing.
 
-Systems are remembered. EDMC replays the journal file it is watching and
-nothing older, so each system is written to `data/systems/` when you leave and
-read back when you return. Nothing is asked of EDSM or anyone else's server:
-this is your own scan data going to disk and coming back.
+Systems are remembered. Every scan, count and jump is written to
+`%LOCALAPPDATA%\RhinoSpotter\data\<System>.json` the moment it happens, so a
+crash costs nothing. Jump back in later and the system arrives already filled;
+anything you scan after that is added to it. Nothing is asked of EDSM or
+anyone else's server - this is your own scan data going to disk and coming
+back.
 
 The percentages come from `ground_rules.json`, exported from the EDIntel
 mining sheet. Neither half touches the network. Losing the JSON costs the
@@ -80,5 +82,5 @@ That rewrites `ground_rules.json` in this folder from the current mining sheet.
 
     pytest
 
-107 checks, no network, no game, no display. See `structure.md` for how the
+116 checks, no network, no game, no display. See `structure.md` for how the
 code is laid out and why.

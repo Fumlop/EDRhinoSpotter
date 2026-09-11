@@ -30,7 +30,7 @@ _last_index = None       # the location the last press saw, for the sidecar
 _card_token = 0          # only the newest render may write to the status line
 _body_names = {}         # BodyID -> name, so a targeted location can be placed
 
-_register = bodies.Register(on_leave=store.save)
+_register = bodies.Register(on_change=store.save, on_arrive=store.load)
 _sheet = None            # rs_core.grounds.Sheet, read once at startup
 
 _frame = None
@@ -150,14 +150,10 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     if body_id is not None and body_name:
         _body_names[body_id] = body_name
 
+    # Arriving in a system scanned before fills the list straight from disk -
+    # EDMC replays one journal file, and last week's honk is in an older one.
+    # The register does that itself through on_arrive; this only redraws.
     if _register.track(entry, system=system):
-        # Arriving in a system we have scanned before fills the list straight
-        # from disk - EDMC replays one journal file, and last week's honk is in
-        # an older one.
-        if not len(_register) and _register.system:
-            cached = store.load(_register.system)
-            if cached:
-                _register.adopt(_register.system, cached)
         _refresh_scan_count()
 
     if entry.get("event") == "Screenshot":

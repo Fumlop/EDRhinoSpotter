@@ -199,25 +199,57 @@ class TestMiningLocations:
         assert register.bodies()[0]["locations"] is None
 
 
-class TestLeaving:
-    def test_leaving_hands_over_what_was_found(self, make_scan):
-        """This is where the cache write hangs, so bodies.py never has to know
-        a cache exists."""
-        seen = []
-        register = bodies.Register(on_leave=lambda system, found: seen.append((system, found)))
-        register.track(make_scan("Andel 1 a", "Rocky body"), system="Andel")
-        register.track({"event": "FSDJump", "StarSystem": "Loha"})
-        assert len(seen) == 1
-        assert seen[0][0] == "Andel"
-        assert [body["name"] for body in seen[0][1]] == ["Andel 1 a"]
+class TestPersisting:
+    """Every change goes to disk at once. A system you never leave - the game
+    crashed, EDMC was closed on the pad - is exactly the one you would rather
+    not scan a second time."""
 
-    def test_an_empty_system_hands_over_nothing(self):
+    def test_every_scan_is_written(self, make_scan):
         seen = []
-        register = bodies.Register(on_leave=lambda system, found: seen.append(system))
+        register = bodies.Register(on_change=lambda system, found: seen.append((system, found)))
+        register.track(make_scan("Andel 1 a", "Rocky body"), system="Andel")
+        register.track(make_scan("Andel 4 c", "Icy body", distance=1016.0), system="Andel")
+        assert len(seen) == 2
+        assert seen[-1][0] == "Andel"
+        assert [body["name"] for body in seen[-1][1]] == ["Andel 1 a", "Andel 4 c"]
+
+    def test_a_location_count_is_written_too(self, make_scan):
+        seen = []
+        register = bodies.Register(on_change=lambda system, found: seen.append(found))
+        register.track(make_scan("Andel 1 a", "Rocky body"), system="Andel")
+        register.track({"event": "SAASignalsFound", "BodyName": "Andel 1 a",
+                        "Signals": [{"Type": "$PlanetaryMiningLocation_Name;", "Count": 17}]})
+        assert len(seen) == 2
+        assert seen[-1][0]["locations"] == 17
+
+    def test_a_repeat_scan_writes_nothing(self, make_scan):
+        """Nothing changed, so nothing is written. The game rescans on every
+        approach and each one would otherwise be a disk write."""
+        seen = []
+        register = bodies.Register(on_change=lambda system, found: seen.append(found))
+        body = make_scan("Andel 1 a", "Rocky body")
+        register.track(body, system="Andel")
+        register.track(dict(body), system="Andel")
+        assert len(seen) == 1
+
+    def test_an_empty_system_writes_nothing(self):
+        """A jump clears the list. Writing the empty result would replace a
+        good cache file with an empty one."""
+        seen = []
+        register = bodies.Register(on_change=lambda system, found: seen.append(system))
         register.track({"event": "FSDJump", "StarSystem": "Andel"})
         register.track({"event": "FSDJump", "StarSystem": "Loha"})
         assert seen == []
 
+    def test_the_old_system_is_already_on_disk_before_the_jump(self, make_scan):
+        seen = []
+        register = bodies.Register(on_change=lambda system, found: seen.append(system))
+        register.track(make_scan("Andel 1 a", "Rocky body"), system="Andel")
+        register.track({"event": "FSDJump", "StarSystem": "Loha"})
+        assert seen == ["Andel"]
+
+
+class TestAdopting:
     def test_adopting_a_cached_system(self):
         register = bodies.Register()
         count = register.adopt("Andel", [
@@ -240,3 +272,57 @@ class TestLeaving:
         body = register.bodies()[0]
         assert body["ground"] == "volcanic magma"
         assert body["locations"] == 17
+
+
+class TestArriving:
+    """Jumping in loads what is known and the scans that follow add to it."""
+
+    def cached(self, *names):
+        return [{"name": name, "ground": "rocky", "distance": float(index),
+                 "locations": 5, "volcanism": "", "planet_class": "Rocky body"}
+                for index, name in enumerate(names)]
+
+    def test_a_known_system_arrives_filled(self):
+        register = bodies.Register(on_arrive=lambda system: self.cached("Andel 1 a"))
+        register.track({"event": "FSDJump", "StarSystem": "Andel"})
+        assert len(register) == 1
+        assert register.bodies()[0]["locations"] == 5
+
+    def test_an_unknown_system_arrives_empty(self):
+        register = bodies.Register(on_arrive=lambda system: [])
+        register.track({"event": "FSDJump", "StarSystem": "Nowhere"})
+        assert len(register) == 0
+
+    def test_new_scans_add_to_what_was_loaded(self, make_scan):
+        register = bodies.Register(on_arrive=lambda system: self.cached("Andel 1 a"))
+        register.track({"event": "FSDJump", "StarSystem": "Andel"})
+        register.track(make_scan("Andel 4 c", "Icy body", distance=1016.0), system="Andel")
+        assert [body["name"] for body in register.bodies()] == ["Andel 1 a", "Andel 4 c"]
+
+    def test_a_new_scan_updates_a_loaded_body(self, make_scan):
+        """The cache said rocky because that is all the honk knew. A proper
+        scan later has to win, and must not cost the location count."""
+        register = bodies.Register(on_arrive=lambda system: self.cached("Andel 1 a"))
+        register.track({"event": "FSDJump", "StarSystem": "Andel"})
+        register.track(make_scan("Andel 1 a", "Rocky body", "major metallic magma"),
+                       system="Andel")
+        body = register.bodies()[0]
+        assert body["ground"] == "volcanic magma"
+        assert body["locations"] == 5
+
+    def test_arriving_does_not_write_back_what_it_just_read(self):
+        """What came off disk is already on disk. Writing it again would turn
+        every jump into a write."""
+        written = []
+        register = bodies.Register(on_change=lambda system, found: written.append(system),
+                                   on_arrive=lambda system: self.cached("Andel 1 a"))
+        register.track({"event": "FSDJump", "StarSystem": "Andel"})
+        assert written == []
+
+    def test_the_first_new_scan_after_arriving_does_write(self, make_scan):
+        written = []
+        register = bodies.Register(on_change=lambda system, found: written.append(system),
+                                   on_arrive=lambda system: self.cached("Andel 1 a"))
+        register.track({"event": "FSDJump", "StarSystem": "Andel"})
+        register.track(make_scan("Andel 4 c", "Icy body"), system="Andel")
+        assert written == ["Andel"]

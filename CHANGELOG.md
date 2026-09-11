@@ -19,11 +19,16 @@ suite run under a bare interpreter with no EDMC, no game and no display.
 Planetary Mining Locations a body carries straight from the FSS, and
 SAASignalsFound confirms it after a surface scan, so the count is in the
 journal and no external service is asked for it. A body nobody counted reads
-unprobed, not 0 loc. Each system is written to data/systems/ when you leave it
-and read back when you return, because EDMC replays one journal file and last
-week's honk is in an older one.
+unprobed, not 0 loc.
 
-**Tests.** 107 of them, replacing the one hand-rolled script. Two that were
+Each system is written to %LOCALAPPDATA%\RhinoSpotter\data\ on every scan,
+count and jump - the moment it happens, not when you leave, so a crash on the
+pad costs nothing. Jump back in and the system arrives already filled, with
+anything scanned afterwards added to it. Beside the cards and outside the
+plugin folder, for the same reason the cards are: a reinstall replaces the
+plugin and should not take your scans with it.
+
+**Tests.** 116 of them, replacing the one hand-rolled script. Two that were
 easy to get wrong and are now pinned: `Location` on game start must not empty
 the body list, and a scan from another system must reset it even if the
 arrival event was missed.
