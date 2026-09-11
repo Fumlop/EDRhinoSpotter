@@ -68,7 +68,13 @@ def build(parent):
     tk.Label(_frame, text=f"RhinoSpotter {update.RUNNING}", anchor="w").grid(
         row=0, column=0, sticky="w", padx=2, pady=(4, 2))
     link = _folder_link(_frame)
-    link.grid(row=0, column=1, columnspan=3, sticky="w", padx=2, pady=(4, 2))
+    link.grid(row=0, column=1, sticky="w", padx=2, pady=(4, 2))
+
+    # Up here with the system-level things, not down beside the button. How
+    # many bodies are in this system is true before anyone presses anything,
+    # and it was the only line in the panel that moved on its own.
+    _scan_count = tk.Label(_frame, text="", anchor="e", fg=palette.MUTED)
+    _scan_count.grid(row=0, column=2, columnspan=2, sticky="e", padx=2, pady=(4, 2))
 
     # Location and Rigs are both four characters wide, so they share a row and
     # set how far the panel runs. Material goes underneath and stretches to the
@@ -99,8 +105,6 @@ def build(parent):
     _done = tk.Label(row, text="", anchor="w")
     _done.pack(side="left", padx=(8, 0))
     tk.Button(row, text="RhinoScan", width=13, command=open_scan).pack(side="left", padx=(16, 0))
-    _scan_count = tk.Label(row, text="", anchor="w")
-    _scan_count.pack(side="left", padx=(8, 0))
 
     # The one thing RhinoScan cannot do for you, and the thing everyone gets
     # wrong first: the honk finds the bodies, it does not describe them. Only
