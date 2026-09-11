@@ -37,9 +37,11 @@ arrival event was missed.
 to the same right edge - the names are long enough that a narrow dropdown cut
 Low Temp Diamonds in half. Both buttons sit on one line.
 
-**Update button.** The third button says the version until there is something
-to do, then becomes "Update to vX.Y.Z". One press fetches the release, unpacks
-it in place and reads "Restart EDMC". The zipball goes to a temp folder first
+**Update button.** MiningCard reads "Update" when a release is out, with the
+version in the status line. One press fetches it, unpacks it in place and the
+button reads "Restart EDMC". No third button and no version label: the panel
+measures the same 250px in every state, which a permanent version button did
+not. The zipball goes to a temp folder first
 and is copied in a second pass, so a truncated download cannot leave half a
 plugin behind, and a zip that is not ours is refused before anything is
 touched. ground_rules.json is kept: you exported it from your own EDIntel, so

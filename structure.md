@@ -82,10 +82,10 @@ No tkinter anywhere in here.
 Everything in here imports tkinter.
 
 - **[main.py](rs_ui/main.py)** - the panel EDMC draws, and the handful of
-  variables that only make sense while a window is open. All three buttons
-  live here. The third says the version until there is something to do and
-  becomes "Update to ..." when a release is out; a separate "check for
-  updates" button would be a button that answers no all year. The card render and the update check run off the UI thread and come
+  variables that only make sense while a window is open. Both buttons live
+  here. MiningCard doubles as the update button: it reads "Update" when a
+  release is out, then "Restart EDMC" once it is in. A third button would
+  widen the panel on the one day it matters, and a permanent one every day. The card render and the update check run off the UI thread and come
   back through `_frame.after`, because Tk is not thread-safe and a widget
   written from a worker fails minutes later somewhere unrelated.
 - **[scan.py](rs_ui/scan.py)** - the RhinoScan window. Read-only and

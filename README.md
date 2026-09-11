@@ -69,11 +69,14 @@ The target panel is the only place a location's materials are written down.
 Drop the folder into `%LOCALAPPDATA%\EDMarketConnector\plugins\` and restart
 EDMC.
 
-The third button in the panel says the version. When a newer release is out it
-turns into **Update to vX.Y.Z**; press it and the release is fetched and
-unpacked in place, then the button reads **Restart EDMC**. Your exported
-`ground_rules.json` is kept, and cards and scans are never touched - they live
-under `%LOCALAPPDATA%\RhinoSpotter\`, not in the plugin folder.
+When a newer release is out, **MiningCard** reads **Update** instead and the
+status line names the version. Press it and the release is fetched and
+unpacked in place, then it reads **Restart EDMC**. There is no third button:
+the panel stays the same width in every state.
+
+Your exported `ground_rules.json` is kept, and cards and scans are never
+touched - they live under `%LOCALAPPDATA%\RhinoSpotter\`, not in the plugin
+folder.
 
 ## Refreshing the rates
 
