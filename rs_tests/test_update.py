@@ -30,6 +30,24 @@ class TestParse:
         assert not update.is_newer(tag, "1.0.0")
 
 
+class TestVersion:
+    """The number lives in rs_core/update.py and is repeated as the top
+    heading of the changelog. Two places drift; this notices."""
+
+    def test_the_changelog_leads_with_the_shipped_version(self):
+        changelog = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                 "CHANGELOG.md")
+        with open(changelog, encoding="utf-8") as handle:
+            headings = [line.strip() for line in handle if line.startswith("## ")]
+        assert headings, "changelog has no version headings"
+        assert headings[0] == f"## {update.VERSION}", (
+            f"changelog leads with {headings[0]!r}, code says {update.VERSION}")
+
+    def test_the_version_is_three_numbers(self):
+        assert update.parse(update.VERSION) != (0, 0, 0)
+        assert len(update.VERSION.split(".")) == 3
+
+
 class TestIsNewer:
     def test_newer(self):
         assert update.is_newer("v2.1.0", "2.0.0")

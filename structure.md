@@ -77,8 +77,11 @@ No tkinter anywhere in here.
   system is worth the sum, because the question is not "is there something
   here" but "is there enough here". `--testmode` writes the winner to the
   cache - see below.
-- **[update.py](rs_core/update.py)** - is there a newer release, and put it in
-  place if there is. The zipball is extracted to a temp folder inside the
+- **[update.py](rs_core/update.py)** - the version number, and whether there
+  is a newer release. `VERSION` here is the one source; the changelog repeats
+  it as its top heading and a test fails if the two drift. Releases are tagged
+  on GitHub, and the update check compares against the newest tag there. Also
+  puts a release in place, if there is one. The zipball is extracted to a temp folder inside the
   plugin and copied in a second pass, so a truncated download cannot leave
   half a plugin behind. `KEEP` names what an update may not overwrite -
   `ground_rules.json` above all, because a locally refreshed sheet is newer

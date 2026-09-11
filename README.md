@@ -2,13 +2,23 @@
 
 EDMC plugin for Elite Dangerous surface mining. Two buttons.
 
+<p align="center">
+  <img src="docs/plugin.png" alt="The RhinoSpotter panel in EDMC">
+</p>
+
 ## RhinoScan - which bodies here are worth landing on
 
 Press **RhinoScan**. A window opens listing the landable bodies of the system
 you are in, grouped by what kind of body they are, with what that kind has
-been found to hold underneath.
+been found to hold above it.
 
-![The scan window](docs/rhinoscan.png)
+<p align="center">
+  <img src="docs/rhinoscan.png" width="620"
+       alt="The scan window over an example system, four grounds and ten landable bodies">
+</p>
+
+*Example system. Percentages are the share of that ground's mining locations
+that carried the material; `unprobed` means nobody has counted that body yet.*
 
 The bodies come from the journal. **The honk alone is not enough**: it finds
 the bodies but does not describe them, and only a body the FSS has resolved
@@ -37,7 +47,12 @@ what you will find.
 
 ## MiningCard - the patch you are standing on, as a PNG
 
-![A card](docs/miningcard.png)
+<p align="center">
+  <img src="docs/miningcard.png" width="620"
+       alt="A mining card: body, material, rigs, location, heading, altitude and coordinates">
+</p>
+
+*Example card. Everything on it was read from `Status.json` at the press.*
 
 1. Land and put the rigs down.
 2. Pick the **Material**, set **Rigs**. `Location` fills itself when a mining
