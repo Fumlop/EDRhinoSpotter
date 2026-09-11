@@ -244,6 +244,11 @@ def _on_material_changed(*_):
 # driving by eye, and cheap enough to run for as long as it takes.
 MEASURE_POLL_MS = 1000
 
+# How far from the starting rig still counts as having come back to it. The
+# SRV is about 5 m long and Status.json is a second behind, so ten metres is
+# "you closed it"; a hundred is a side the shoelace formula invented.
+CLOSE_ENOUGH_M = 10.0
+
 
 def toggle_measure():
     """Start driving the border, or stop and keep what was driven."""
@@ -252,6 +257,7 @@ def toggle_measure():
     if _track is not None:
         _measure_after = _cancel_poll()
         _report_measure(final=True)
+        _log_measurement(_track)
         _track = None
         if _measure_button:
             _measure_button.config(text="MeasureSpot", fg=palette.ACCENT)
@@ -264,6 +270,9 @@ def toggle_measure():
 
     _track = measure.Track()
     _track.add(status)
+    logger.info(f"measure: started on {_track.body} "
+                f"at {status['Latitude']:.6f} / {status['Longitude']:.6f}, "
+                f"radius {_track.radius:,.0f} m")
     if _measure_button:
         _measure_button.config(text="Stop", fg=palette.WARN)
     # The three things that decide whether the number is worth anything. A rig
@@ -280,7 +289,16 @@ def _poll_measure():
     global _measure_after
     if _track is None or not _frame:
         return
-    _track.add(spotmark.read_status())
+    before = len(_track)
+    status = spotmark.read_status()
+    if _track.add(status) and len(_track) > before:
+        # Every point that made it in, so a reading that looks wrong can be
+        # walked back through the log rather than argued about.
+        point = _track.polygon()[-1]
+        logger.debug(f"measure: point {len(_track):>3} "
+                     f"{status.get('Latitude'):.6f} / {status.get('Longitude'):.6f}"
+                     f"  ->  x {point[0]:>8.1f}  y {point[1]:>8.1f}"
+                     f"  area {_track.area():>10,.0f} m2")
     _report_measure()
     _measure_after = _frame.after(MEASURE_POLL_MS, _poll_measure)
 
@@ -292,6 +310,22 @@ def _cancel_poll():
         except (ValueError, tk.TclError):
             pass
     return None
+
+
+def _log_measurement(track):
+    """The whole measurement, once, when it is finished.
+
+    Including every point in degrees: the area is derived, and a derived
+    number nobody can re-derive is a number nobody can check.
+    """
+    summary = track.summary()
+    logger.info("measure: " + "  ".join(f"{key}={value}"
+                                        for key, value in summary.items()))
+    if summary["points"] >= 3 and summary["closure_m"] > CLOSE_ENOUGH_M:
+        logger.warning(f"measure: border left open by {summary['closure_m']:,.0f} m - "
+                       "the area includes a side that was never driven")
+    for index, (lat, lon) in enumerate(track.points, start=1):
+        logger.debug(f"measure: {index:>3}  {lat:.6f}  {lon:.6f}")
 
 
 def _report_measure(final=False):
@@ -309,8 +343,15 @@ def _report_measure(final=False):
             fg=palette.MUTED)
         return
     rigs = _track.rigs()
+    gap = _track.closure()
     text = (f"{_track.area():,.0f} m²   ·   {rigs} rig{'' if rigs == 1 else 's'}"
             f"   ·   {len(_track)} points")
+    # The gap is the one thing that says whether the number is worth anything,
+    # so it is said where the number is, not only in the log.
+    if final and gap > CLOSE_ENOUGH_M:
+        text += f"   ·   border open by {gap:,.0f} m"
+        _measure_status.config(text=text, fg=palette.ALERT)
+        return
     _measure_status.config(text=text, fg=palette.GOOD if final else palette.WARN)
 
 

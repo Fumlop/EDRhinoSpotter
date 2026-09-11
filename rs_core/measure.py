@@ -156,6 +156,42 @@ class Track:
     def polygon(self):
         return to_metres(self.points, self.radius) if self.radius else []
 
+    def perimeter(self):
+        """How far you drove, in metres. Only the border, not the way there."""
+        polygon = self.polygon()
+        if len(polygon) < 2:
+            return 0.0
+        return sum(math.hypot(polygon[i][0] - polygon[i - 1][0],
+                              polygon[i][1] - polygon[i - 1][1])
+                   for i in range(1, len(polygon)))
+
+    def closure(self):
+        """How far the last point is from the first, in metres.
+
+        The one number that says whether the shape is worth anything. A border
+        you drove right round closes within a few metres; a gap of two hundred
+        is a shape with a side the shoelace formula invented, and the area will
+        look perfectly reasonable.
+        """
+        polygon = self.polygon()
+        if len(polygon) < 2:
+            return 0.0
+        return math.hypot(polygon[-1][0] - polygon[0][0],
+                          polygon[-1][1] - polygon[0][1])
+
+    def summary(self):
+        """Everything worth writing to a log, in one dict."""
+        return {
+            "body": self.body,
+            "radius_m": self.radius,
+            "points": len(self.points),
+            "perimeter_m": round(self.perimeter(), 1),
+            "closure_m": round(self.closure(), 1),
+            "area_m2": round(self.area(), 1),
+            "rigs": self.rigs(),
+            "spacing_m": self.spacing,
+        }
+
     def area(self):
         return area(self.polygon())
 

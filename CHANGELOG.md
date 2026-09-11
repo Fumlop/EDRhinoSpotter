@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.4.0
+
+**A measurement can be checked now.** The panel says how far the border was
+left open, in red, when you did not come back to the starting rig. That is the
+number that matters: a shape which does not close still gets an area, because
+the formula joins the last point to the first and measures a side nobody drove
+- and the figure looks perfectly reasonable.
+
+EDMC's log gets a line when a measurement starts and a summary when it stops:
+body, radius, points, perimeter, closure, area, rigs and the spacing used. With
+RHINOSPOTTER_DEBUG=1 it also logs every point in degrees and in metres. The
+area is derived, and a derived number nobody can re-derive is a number nobody
+can check.
+
 ## 2.3.2
 
 **The panel says how to measure.** Place a rig where you start, drive the

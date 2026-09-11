@@ -100,6 +100,29 @@ thrown away. **It is an estimate and means to be read as one:** the ground is
 not flat, you did not drive the border exactly, and two rigs 76 m apart on a
 map are not 76 m apart on a slope.
 
+### Checking a measurement
+
+If you do not come back to the starting rig, the line says so and turns red:
+
+```
+20,000 m2   .   6 rigs   .   3 points   .   border open by 283 m
+```
+
+That is the one number worth watching. A shape that does not close still gets
+an area - the formula joins the last point to the first and measures a side
+you never drove - and the figure looks perfectly reasonable.
+
+EDMC's log has the rest. One line when you start, one when you stop:
+
+```
+measure: body=Andel 1 a  radius_m=1480764.9  points=5  perimeter_m=800.0
+         closure_m=0.0  area_m2=40000.0  rigs=9  spacing_m=76.0
+```
+
+With `RHINOSPOTTER_DEBUG=1` it also logs every point that went in, in degrees
+and in metres, so a reading that looks wrong can be walked back rather than
+argued about.
+
 ## Create Card - the patch you are standing on, as a PNG
 
 <p align="center">

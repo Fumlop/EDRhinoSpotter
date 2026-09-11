@@ -158,3 +158,50 @@ class TestTrack:
         assert track.area() == 0.0
         assert track.rigs() == 0
         assert track.polygon() == []
+
+
+class TestChecking:
+    """The numbers that say whether a measurement is worth anything."""
+
+    def test_perimeter_is_how_far_you_drove(self):
+        track = measure.Track()
+        for lat, lon in square(200):
+            track.add(status(lat, lon))
+        # Three sides driven; the fourth is the closing gap, not a drive.
+        assert track.perimeter() == pytest.approx(600, rel=0.02)
+
+    def test_a_closed_border_closes(self):
+        """Back where you started, so the gap is nothing."""
+        track = measure.Track()
+        corners = square(200)
+        for lat, lon in corners + [corners[0]]:
+            track.add(status(lat, lon))
+        assert track.closure() == pytest.approx(0, abs=1.0)
+
+    def test_an_open_border_says_how_open(self):
+        """The number that matters: the area of a shape with an invented side
+        looks perfectly reasonable, and only this says it is not.
+
+        Three corners of a square leaves the diagonal open, so 200 * sqrt(2).
+        """
+        track = measure.Track()
+        for lat, lon in square(200)[:3]:
+            track.add(status(lat, lon))
+        assert track.closure() == pytest.approx(200 * math.sqrt(2), rel=0.02)
+
+    def test_summary_carries_what_a_log_needs(self):
+        track = measure.Track()
+        for lat, lon in square(200):
+            track.add(status(lat, lon))
+        found = track.summary()
+        assert found["body"] == "Andel 1 a"
+        assert found["points"] == 4
+        assert found["rigs"] == 9
+        assert found["area_m2"] == pytest.approx(40_000, rel=0.02)
+        assert found["spacing_m"] == measure.RIG_SPACING
+
+    def test_nothing_driven_summarises_to_nothing(self):
+        found = measure.Track().summary()
+        assert found["points"] == 0
+        assert found["area_m2"] == 0
+        assert found["closure_m"] == 0

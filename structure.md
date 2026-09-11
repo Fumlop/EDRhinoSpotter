@@ -94,7 +94,9 @@ No tkinter anywhere in here.
   driven in the SRV. Shoelace for the area, ray casting for what is inside,
   and a 76 m grid for the rigs. Flat earth on purpose: a spot is a few hundred
   metres across on a body a thousand kilometres in radius, and that error is
-  smaller than the error of having driven the border by eye.
+  smaller than the error of having driven the border by eye. `closure()` is
+  what says whether a reading is worth anything - a border that does not close
+  still gets a plausible-looking area.
 - **[palette.py](rs_core/palette.py)** - the colours, once. Hex for tkinter,
   RGB tuples for PIL, one conversion function between them so the window and
   the cards cannot drift apart. They used to be two schemes and looked like
