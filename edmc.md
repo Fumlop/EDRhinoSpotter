@@ -20,42 +20,25 @@ Checked 2026-09-11 against EDMC 6.1.2 as installed.
 | | RhinoSpotter | EliteMeritTracker |
 |---|---|---|
 | Public repo | yes | yes |
-| Licence, GPL v2+ compatible | **missing** | GPL-3.0 |
-| `VERSION` or `__version__` in the plugin | in `rs_core/update.py`, not `load.py` | **none anywhere** |
-| Semantic version | 2.1.0 | **`v0.4.400.3.004`** - four parts and a `v` |
-| Published release to link a zip to | `v2.0.0` | yes |
+| Licence, GPL v2+ compatible | GPL-3.0 | GPL-3.0 |
+| `VERSION` and `__version__` on `load.py` | yes, 2.1.1 | yes, `v0.4.400.3.005` |
+| Semantic version | 2.1.1 | **no** - four parts and a leading `v` |
+| Ships only what it needs | `lib/` is gitignored | `backup_legacy/` untracked |
+| Published release to point a zip at | **not yet for 2.1.1** | yes |
 
-### RhinoSpotter, before submitting
+RhinoSpotter is submittable. The only thing missing is a published release for
+the current version, and that is only needed to fill `pluginZip` and
+`pluginHash`, both of which are recommended rather than required.
 
-1. **Add a LICENSE file.** GPL v2 or v3, BSD-2, BSD-3, LGPL or MIT. The
-   registry calls plugins derivative works of EDMC, so this is not optional.
-2. **Expose the version from `load.py`.** The standard asks for a `VERSION`
-   constant or a `__version__` dunder on the plugin. Ours lives one module
-   down; re-exporting it is one line:
+### EliteMeritTracker, one thing left
 
-   ```python
-   from rs_core.update import VERSION   # noqa: F401  - the registry reads this
-   ```
-3. **Consider deleting `lib/`.** 3.2 MB of vendored pg8000 that nothing
-   imports, left from a database path that no longer exists. It is gitignored
-   so it never reaches a release zip, but "bundle only resources necessary for
-   core functions" is a listed rule and a reviewer looking at the working tree
-   will see it.
+`pluginVer` is specified as a semantic version string and `v0.4.400.3.005` is
+not one: four components, and a leading `v`. STANDARDS says enforcement is
+deferred until EDMC supports auto-update - the manual review is not deferred.
 
-### EliteMeritTracker, before submitting
-
-1. **Add a `VERSION` constant.** The version is an attribute on
-   `configPlugin` in `emt_core/config.py`. The registry wants it on the
-   plugin, so `load.py` needs something it can read.
-2. **Decide what to put in `pluginVer`.** `v0.4.400.3.004` is not semantic
-   versioning: four components, and a leading `v`. The JSON field is specified
-   as a semantic version string. STANDARDS says enforcement is deferred until
-   EDMC supports auto-update - the manual review is not deferred. Either map
-   it (`0.4.400` with the rest as build metadata) or renumber.
-3. **`backup_legacy/` is in the repo**, 17 files, described in its own
-   `structure.md` as "Legacy code backup (pre-refactor)". Under "least
-   privilege" that is the first thing a reviewer will ask about. `system_data/`
-   is 45 MB but already untracked, which is right.
+Either map it for the registry entry (`0.4.400`, with the rest as build
+metadata) or renumber the scheme. That is a call about the plugin's own
+history, not about the registry, which is why it is still open.
 
 ---
 
