@@ -14,7 +14,7 @@ import subprocess
 import threading
 import tkinter as tk
 
-from rs_core import bodies, grounds, palette, screenshots, spotcard, spotmark, store, update
+from rs_core import bodies, grounds, palette, spotcard, spotmark, store, update
 from rs_core.logging import logger
 from rs_ui import scan
 
@@ -253,12 +253,6 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     if _register.track(entry, system=system):
         _refresh_scan_count()
 
-    if entry.get("event") == "Screenshot":
-        # Off the main thread: a 1080p bmp read plus a PNG write is long enough
-        # to stutter the panel, and nothing here needs an answer.
-        threading.Thread(target=_convert_shot,
-                         args=(entry, _location(), dict(_body_names)),
-                         daemon=True).start()
 
 
 def make_card():
@@ -387,18 +381,3 @@ def _int(value):
         return int(str(value).strip())
     except (TypeError, ValueError):
         return None
-
-
-def _location():
-    """The mining location this session believes it is on, for the sidecar."""
-    typed = _int(_loc.get()) if _loc else None
-    return typed if typed else _last_index
-
-
-def _convert_shot(entry, mark_location, body_names):
-    try:
-        path = screenshots.convert(entry, mark_location, body_names)
-        message = "shot: " + os.path.basename(path)
-    except Exception as err:
-        message = f"screenshot not saved: {err}"
-    _on_ui(_set_status, message)

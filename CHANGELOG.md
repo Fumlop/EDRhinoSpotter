@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.2.0
+
+**Screenshot conversion has moved out**, into RhinoAnalysis - its own plugin,
+with a settings page and nothing in the main window. It converted the game's
+.bmp into a cropped .jpg and filed it by system and body, which is a different
+job from "which body here is worth landing on" and was only ever in the same
+folder because it was written on the same afternoon. Splitting it means
+RhinoSpotter bundles only what it needs, which the plugin registry asks for,
+and the conversion gets settings instead of constants.
+
+Nothing you have is touched. Cards, scanned systems and ground_rules.json all
+stay where they are; only the .bmp conversion left.
+
 ## 2.1.1
 
 **GPL-3.0.** There was no licence file at all, which is the one thing the EDMC

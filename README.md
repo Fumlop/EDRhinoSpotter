@@ -98,13 +98,6 @@ for the same material twice gives you two cards, not one overwritten.
 Cards land in `%LOCALAPPDATA%\RhinoSpotter\cards\<System>\`. The **cards
 folder** link in the panel header opens it in Explorer.
 
-## Screenshots
-
-Screenshots taken while the plugin is loaded are cropped to the target panel
-and filed under `data/planetScreener/<System>/<Body>/`, each with a JSON
-sidecar holding the body, the coordinates and the selected mining location.
-The target panel is the only place a location's materials are written down.
-
 ## Install
 
 See [INSTALL.md](INSTALL.md). Short version: unpack into

@@ -21,10 +21,10 @@ Checked 2026-09-11 against EDMC 6.1.2 as installed.
 |---|---|---|
 | Public repo | yes | yes |
 | Licence, GPL v2+ compatible | GPL-3.0 | GPL-3.0 |
-| `VERSION` and `__version__` on `load.py` | yes, 2.1.1 | yes, `v0.4.400.3.005` |
-| Semantic version | 2.1.1 | **no** - four parts and a leading `v` |
+| `VERSION` and `__version__` on `load.py` | yes, 2.2.0 | yes, `v0.4.400.3.005` |
+| Semantic version | 2.2.0 | **no** - four parts and a leading `v` |
 | Ships only what it needs | `lib/` is gitignored | `backup_legacy/` untracked |
-| Published release to point a zip at | **not yet for 2.1.1** | yes |
+| Published release to point a zip at | **not yet for 2.2.0** | yes |
 
 RhinoSpotter is submittable. The only thing missing is a published release for
 the current version, and that is only needed to fill `pluginZip` and
@@ -63,8 +63,8 @@ filling in.
 ```json
 {
   "pluginName": "RhinoSpotter",
-  "pluginVer": "2.1.0",
-  "pluginZip": "https://github.com/Fumlop/EDRhinoSpotter/releases/download/v2.1.0/RhinoSpotter-2.1.0.zip",
+  "pluginVer": "2.2.0",
+  "pluginZip": "https://github.com/Fumlop/EDRhinoSpotter/releases/download/v2.2.0/RhinoSpotter-2.2.0.zip",
   "autoUpdateEnabled": false,
   "autoInstallEnabled": false,
   "pluginAuthors": ["Fumlop"],
@@ -103,7 +103,7 @@ Notes on the fiddly ones:
 `pluginHash` is the SHA256 of the zip named in `pluginZip`.
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\RhinoSpotter-2.1.0.zip
+Get-FileHash -Algorithm SHA256 .\RhinoSpotter-2.2.0.zip
 ```
 
 The zip has to be the one attached to the release, not a fresh one built
@@ -142,9 +142,9 @@ to exist first.
 3. **Commit, tag, push both.**
 
    ```bash
-   git tag -a v2.1.0 -m "RhinoSpotter 2.1.0 - what changed in a line"
+   git tag -a v2.2.0 -m "RhinoSpotter 2.2.0 - what changed in a line"
    git push origin main
-   git push origin v2.1.0
+   git push origin v2.2.0
    ```
 4. **Publish the release on GitHub** from that tag. A tag alone is not a
    release: `releases/latest` returns nothing for it, so neither the registry

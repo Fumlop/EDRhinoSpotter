@@ -49,9 +49,6 @@ No tkinter anywhere in here.
   nothing up, so it renders with nothing else running and no network.
   `render()`, `filename()`, `_free()` (a repeat mark is a second card, not a
   replacement), `CARDS_ROOT`.
-- **[screenshots.py](rs_core/screenshots.py)** - the game's .bmp -> a cropped
-  .jpg of the target panel plus a sidecar naming where it was taken. The panel
-  lists a location's materials, which is in no journal event and on no feed.
 - **[grounds.py](rs_core/grounds.py)** - what a body is, and what that kind of
   body holds. `classify()` turns a journal Scan into one of eight grounds;
   `Sheet` reads `ground_rules.json`. The classifier mirrors the CASE in
