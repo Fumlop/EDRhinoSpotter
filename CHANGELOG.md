@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.3.1
+
+**A patch too small for the grid read as room for no rigs.** 4,000 m2 is 63 m
+square and obviously holds one. The grid was laid from the shape's corner, a
+corner sits on the boundary, and a point on the boundary counts as outside -
+so the only point a small patch got was thrown away.
+
+The grid is offset half a cell now, which is where a rig would stand anyway:
+in the middle of its square rather than on the fence. And a shape with area in
+it reports at least one rig whatever the grid says, because a long thin patch
+can miss every grid point and still be somewhere you can put one down.
+
 ## 2.3.0
 
 **MeasureSpot.** Press it, drive the border of a patch in the SRV, press Stop.

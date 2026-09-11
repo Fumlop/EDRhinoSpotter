@@ -79,21 +79,32 @@ def rigs(polygon, spacing=RIG_SPACING):
 
     A grid rather than anything cleverer: rigs go where you drive to, and the
     best packing of a shape you measured roughly is a precision the input does
-    not carry. The grid starts at the shape's own corner, so the answer does
-    not depend on where on the planet it is.
+    not carry. It is laid from the shape's own bounding box, so the answer does
+    not depend on where on the planet the shape is.
     """
     if len(polygon) < 3 or spacing <= 0:
         return 0
     xs = [x for x, _ in polygon]
     ys = [y for _, y in polygon]
+
+    # Half a cell in from the corner, so a rig sits in the middle of its square
+    # rather than on the fence. Starting on the corner put the only point of a
+    # small patch exactly on its own boundary, which counts as outside - a
+    # 4,000 m2 spot came back as room for no rigs at all.
     count = 0
     steps_x = int((max(xs) - min(xs)) // spacing) + 1
     steps_y = int((max(ys) - min(ys)) // spacing) + 1
     for row in range(steps_y):
         for column in range(steps_x):
-            if inside(polygon, min(xs) + column * spacing, min(ys) + row * spacing):
+            x = min(xs) + (column + 0.5) * spacing
+            y = min(ys) + (row + 0.5) * spacing
+            if inside(polygon, x, y):
                 count += 1
-    return count
+
+    # A shape with area in it holds a rig somewhere, whatever the grid says. A
+    # long thin patch can miss every grid point and still be somewhere you can
+    # put one down.
+    return count if count else (1 if area(polygon) > 0 else 0)
 
 
 class Track:

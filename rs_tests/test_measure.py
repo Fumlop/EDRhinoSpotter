@@ -70,10 +70,24 @@ class TestRigs:
         box = [(0, 0), (200, 0), (200, 200), (0, 200)]
         assert measure.rigs(box, spacing=76.0) == 9
 
-    def test_a_patch_smaller_than_one_rig(self):
-        """Too small to place a second. One is still one."""
-        box = [(0, 0), (40, 0), (40, 40), (0, 40)]
-        assert measure.rigs(box, spacing=76.0) <= 1
+    def test_a_patch_smaller_than_the_spacing_still_holds_one(self):
+        """4,000 m2 is 63 m square - obviously room for a rig, and it read as
+        none. The grid started on the corner, and a corner is on the boundary,
+        which counts as outside."""
+        box = [(0, 0), (63, 0), (63, 63), (0, 63)]
+        assert measure.area(box) == pytest.approx(3_969)
+        assert measure.rigs(box, spacing=76.0) == 1
+
+    def test_a_sliver_that_misses_every_grid_point(self):
+        """Long and thin: no grid point lands in it, and you can still put a
+        rig down somewhere along it."""
+        sliver = [(0, 0), (800, 0), (800, 5), (0, 5)]
+        assert measure.rigs(sliver, spacing=76.0) >= 1
+
+    def test_no_area_is_no_rigs(self):
+        """The floor is one rig for a shape with area, not one rig for
+        anything at all."""
+        assert measure.rigs([(0, 0), (100, 0), (200, 0)], spacing=76.0) == 0
 
     def test_a_bigger_patch_holds_more(self):
         small = [(0, 0), (200, 0), (200, 200), (0, 200)]
