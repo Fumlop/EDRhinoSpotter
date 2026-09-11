@@ -98,6 +98,23 @@ Notes on the fiddly ones:
 - **`pluginCategory`** takes one or more. Overstating what a plugin does is
   listed under things that get you removed, so pick the one that is true.
 
+### The optional keys
+
+`pluginZip`, `pluginHash`, `pluginVT`, `pluginIcon` and `pluginRequirements`
+must be **present**, because the shape is fixed, but may be **empty**. Counted
+across the 26 entries already merged:
+
+| key | filled | empty |
+|---|---|---|
+| `pluginZip` | 22 | 4 |
+| `pluginHash` | 18 | 8 |
+| `pluginVT` | 8 | 18 |
+| `pluginIcon` | 6 | 20 |
+
+So an empty `pluginVT` is normal - it is a VirusTotal report URL, and most
+listings do not have one. `pluginHash` is worth filling because it is what
+proves the zip a user downloads is the zip that was reviewed.
+
 ### The hash
 
 `pluginHash` is the SHA256 of the zip named in `pluginZip`.
@@ -153,6 +170,25 @@ to exist first.
    auto-generated zipball wraps everything in `Fumlop-EDRhinoSpotter-<sha>`,
    which is not a folder EDMC can load - our own updater handles that, a
    person unpacking by hand does not.
+
+   Build it from what git tracks, so the zip and the tag cannot disagree:
+
+   ```bash
+   python - <<'EOF'
+   import subprocess, zipfile, hashlib
+   from rs_core.update import VERSION
+   out = f"RhinoSpotter-{VERSION}.zip"
+   tracked = subprocess.run(["git", "ls-files"], capture_output=True,
+                            text=True).stdout.split()
+   with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
+       for rel in sorted(tracked):
+           archive.write(rel, f"RhinoSpotter/{rel}")
+   print(hashlib.sha256(open(out, "rb").read()).hexdigest())
+   EOF
+   ```
+
+   Unpack it once and check `load.py` sits directly inside a folder called
+   `RhinoSpotter`. That is the whole contract with EDMC.
 6. **Update the registry entry.** Edit the same JSON: `pluginVer`,
    `pluginZip`, `pluginHash`, `pluginLastUpdate`, and `pluginLastTestedEDMC`
    if EDMC moved. One more PR, same rules.
