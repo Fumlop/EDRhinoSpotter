@@ -86,9 +86,21 @@ From an EDIntel checkout:
 
 That rewrites `ground_rules.json` in this folder from the current mining sheet.
 
+## Seeing it without flying anywhere
+
+    python -m rs_core.replay --days 3
+
+Ranks the systems in your recent journals by how much good ground they hold,
+so you can argue with the scoring before it ends up on a panel.
+
+    set RHINOSPOTTER_TESTMODE=1
+
+Starts the plugin standing in the best of them. RhinoScan then has something
+real to draw. Nothing is written to the cache in test mode.
+
 ## Tests
 
     pytest
 
-136 checks, no network, no game, no display. See `structure.md` for how the
+152 checks, no network, no game, no display. See `structure.md` for how the
 code is laid out and why.

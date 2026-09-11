@@ -17,7 +17,7 @@ RhinoSpotter/
 ├── load.py              EDMC lifecycle hooks, and nothing else
 ├── rs_core/             everything that is not a widget
 ├── rs_ui/               everything that is
-├── rs_tests/            pytest suite, 136 checks
+├── rs_tests/            pytest suite, 152 checks
 ├── ground_rules.json    the EDIntel mining sheet, frozen at export time
 ├── cards/               rendered cards (gitignored)
 ├── data/                screenshots and sidecars (gitignored)
@@ -69,6 +69,11 @@ No tkinter anywhere in here.
   is watching and nothing older, so a system honked last week is otherwise
   gone. Written through a temp file and a rename: EDMC can be closed at any
   moment, and a half-written cache that still parses is worse than none.
+- **[replay.py](rs_core/replay.py)** - recent journals through the same
+  Register the live plugin uses, and a score for what they found. Every
+  landable body is worth the best rate its ground has ever shown and the
+  system is worth the sum, because the question is not "is there something
+  here" but "is there enough here". Also the test mode - see below.
 - **[update.py](rs_core/update.py)** - is there a newer release, and put it in
   place if there is. The zipball is extracted to a temp folder inside the
   plugin and copied in a second pass, so a truncated download cannot leave
@@ -94,7 +99,7 @@ Everything in here imports tkinter.
 
 ## Tests (`rs_tests/`)
 
-`pytest` from the plugin folder. 136 checks, no network, no game, no display.
+`pytest` from the plugin folder. 152 checks, no network, no game, no display.
 
 - **conftest.py** - puts the plugin folder on `sys.path`, and builds Scan
   events carrying only the fields the code reads. The `sheet` fixture is a
@@ -110,6 +115,9 @@ Everything in here imports tkinter.
 - **test_bodies.py** also covers arriving: a known system arrives filled, new
   scans add to it rather than replace it, and what came off disk is not
   written straight back.
+- **test_replay.py** - which files count as recent, that a second visit does
+  not lose the first, and that a ground the sheet never measured is worth
+  nothing rather than guessed at.
 - **test_store.py** - round trip, system names Explorer refuses, an older
   cache shape, and that no temporary file survives a save.
 - **test_update.py** - version comparison, that every network failure is the
@@ -128,6 +136,22 @@ Everything in here imports tkinter.
 | What a location holds | nothing - it is in no feed | screenshot and read by eye |
 
 The last row is the whole reason this plugin exists.
+
+## Test mode
+
+    set RHINOSPOTTER_TESTMODE=1
+
+The plugin starts standing in the best system of the last three days of
+journals, so RhinoScan has something real to draw without anyone flying
+anywhere. It is the only way to look at that window over a system with four
+grounds in it without waiting to find one.
+
+Nothing is written: the register is filled by hand rather than tracked, so a
+test-mode session cannot put a replayed system into the cache.
+
+The same scoring, as a tool, with no EDMC involved:
+
+    python -m rs_core.replay --days 3 --top 5
 
 ## lib/
 
