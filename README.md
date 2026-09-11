@@ -20,13 +20,34 @@ been found to hold above it.
 *Example system. Percentages are the share of that ground's mining locations
 that carried the material; `unprobed` means nobody has counted that body yet.*
 
-Pick a material in the panel and the window filters to the ground that carries
-it, with its rate on top of each group. **All** puts everything back.
+### Filtering to one material
+
+The **Material** dropdown does two jobs. It names what goes on a card, and it
+decides what RhinoScan shows.
+
+Leave it on **All** and the window answers "what is here". Pick a material and
+it answers "where is the monazite" instead: only the ground that has ever
+carried it is listed, and that material leads every group in blue, with its
+rate for that ground.
 
 <p align="center">
   <img src="docs/rhinoscan-filtered.png" width="600"
        alt="The same system filtered to Monazite: the metal ground is gone, and every remaining group leads with its monazite rate">
 </p>
+
+The metal-rich ground has gone - no monazite has ever been read on it. What is
+left reads 45.6% on magma, 7.9% on silicate and 2.4% on quiet rocky ground,
+which is the whole reason those three are separate groups rather than one
+"rocky".
+
+A ground listed because it carries something still says so at 2.4%. The rate is
+what you decide on, and a low one you can see beats a low one that was hidden
+for being low. A system where nothing carries it tells you that, rather than
+opening empty.
+
+**All** puts everything back.
+
+### Where the data comes from
 
 The bodies come from the journal. **The honk alone is not enough**: it finds
 the bodies but does not describe them, and only a body the FSS has resolved
