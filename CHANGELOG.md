@@ -1,22 +1,16 @@
 # Changelog
 
-## 2.0.1
+## 2.0.2
 
-**The card carries coordinates instead of altitude.** You are landed when you
-press the button, so altitude was the ship's height above a patch of ground
-measured from that same patch of ground - always about zero, and it never told
-anyone anything. The latitude and longitude take its place, one per line,
-because a lat and a lon on one line is a single long number that has to be
-read twice to be split. They are the one thing on the card that cannot be
-worked out again afterwards.
-
-**The plugin knows where you are as soon as EDMC does.** Start EDMC with the
-game already running and it replays the journal, naming the system on every
-line it hands over - but the register only learned the name from a jump or a
-scan, so a session started while docked knew nothing until the next jump. The
-name is taken from any line now. Learning it is not the same as arriving:
-arriving throws away what was held, and a location count can reach us before
-any line names the system.
+**The plugin knows where you are as soon as EDMC does.** The game writes a
+Location event when you load in, and EDMC reads the journal from the top on
+startup, so it can name the system straight away. The register waited for a
+jump or a scan instead, and a session started with the game already running
+knew nothing until the next jump - the lines in between are Music and
+ShipLocker, and none of them say where you are. The name is taken from any
+line EDMC hands over now. Learning it is not the same as arriving: arriving
+throws away what is held, and a location count can reach us before any line
+names the system.
 
 **The material picks what the scan window shows.** The dropdown carries an
 "All" under the placeholder; choose anything else and RhinoScan lists only the
@@ -31,14 +25,26 @@ in it the whole thing drew as a blank sunken box with a marker floating in the
 middle - it read as a broken text field. It has a one-pixel solid border and
 left-aligned text now, and says "select material" until you pick one.
 
-**A worker thread could throw a traceback into the log on shutdown.** Every
-hop from a thread back to the panel goes through one guarded helper. `after`
-raises once the mainloop has gone, which is exactly what happens when EDMC is
-closed while an update check is still in flight - and there is nothing left to
-update by then anyway.
+**The landable count moved to the top row.** It sat beside RhinoScan, which
+read as a fact about the button. It is a fact about the system.
+
+**A worker thread could throw a traceback into the log on shutdown.** Every hop
+from a thread back to the panel goes through one guarded helper. `after` raises
+once the mainloop has gone, which is exactly what happens when EDMC is closed
+while an update check is still in flight.
 
 **The empty scan window leads with the instruction.** "FSS the system, or the
 planet you are heading for", then the reason under it.
+
+## 2.0.1
+
+**The card carries coordinates instead of altitude.** You are landed when you
+press the button, so altitude was the ship's height above a patch of ground
+measured from that same patch of ground - always about zero, and it never told
+anyone anything. The latitude and longitude take its place, one per line,
+because a lat and a lon on one line is a single long number that has to be
+read twice to be split. They are the one thing on the card that cannot be
+worked out again afterwards.
 
 ## 2.0.0
 
