@@ -30,6 +30,7 @@ MIN_PCT = 2.0
 NAME_WIDTH = 8
 
 BG = palette.BG
+PANEL = palette.PANEL
 FG = palette.FG
 DIM = palette.MUTED
 ACCENT = palette.ACCENT
@@ -39,13 +40,23 @@ WARN = palette.WARN
 _window = None           # only ever one, so the button cannot bury the panel
 
 
-def show(parent, register, sheet, focus=None):
+def is_open():
+    return _window is not None and bool(_window.winfo_exists())
+
+
+def show(parent, register, sheet, focus=None, variable=None, materials=()):
     """Open the window, or raise the one already open.
 
     `focus` is one material. Given one, only the grounds that have ever
     carried it are listed, and it leads every material line whatever its rate
     - the question has changed from "what is here" to "where is the jadeite",
     and a ground that answers it at 4% still answers it.
+
+    `variable` is the panel's own material StringVar, not a copy. The picker
+    under the system name writes to it, so choosing here is the same act as
+    choosing down in the panel and the two can never disagree. Watching that
+    variable is the panel's job - one watcher, added once, rather than another
+    one on every open.
     """
     global _window
 
@@ -60,7 +71,7 @@ def show(parent, register, sheet, focus=None):
     outer = tk.Frame(_window, bg=BG)
     outer.pack(fill="both", expand=True, padx=14, pady=12)
 
-    _header(outer, register, sheet, focus)
+    _header(outer, register, sheet, focus, variable, materials)
 
     listing, wrap = _scrollable(outer)
     groups = register.by_ground()
@@ -156,17 +167,45 @@ def _fit(window, listing, wrapped=()):
     window.minsize(480, 240)
 
 
-def _header(parent, register, sheet, focus=None):
+def _header(parent, register, sheet, focus=None, variable=None, materials=()):
     tk.Label(parent, text=register.system or "no system yet", bg=BG, fg=FG,
              font=("Segoe UI", 15, "bold"), anchor="w").pack(fill="x")
+
+    if variable is not None and materials:
+        _picker(parent, variable, materials)
+
     count = len(register)
     line = f"{count} landable {'body' if count == 1 else 'bodies'} scanned"
-    if focus:
-        line += f"  -  showing ground that carries {focus}"
     if not sheet.loaded:
         line += "  -  no ground_rules.json, types only"
     tk.Label(parent, text=line, bg=BG, fg=DIM, anchor="w",
              font=("Segoe UI", 9)).pack(fill="x", pady=(0, 10))
+
+
+def _picker(parent, variable, materials):
+    """The material picker, under the system name.
+
+    Bound to the panel's own variable rather than a copy of its value, so
+    choosing here is the same act as choosing down in the panel. Two pickers
+    that can disagree are worse than one picker in the wrong place.
+
+    Nothing is watched from here. A trace added on every open is a trace added
+    three times by the third open, and then one pick redraws the window three
+    times.
+    """
+    row = tk.Frame(parent, bg=BG)
+    row.pack(fill="x", pady=(6, 2))
+    tk.Label(row, text="Showing", bg=BG, fg=DIM, font=("Segoe UI", 9)).pack(side="left")
+
+    picker = tk.OptionMenu(row, variable, *materials)
+    picker.config(relief="solid", borderwidth=1, highlightthickness=0,
+                  bg=PANEL, fg=FG, activebackground=PANEL, activeforeground=ACCENT,
+                  anchor="w", padx=6, pady=0, font=("Segoe UI", 9))
+    picker["menu"].config(bg=PANEL, fg=FG, activebackground=ACCENT,
+                          activeforeground=BG, borderwidth=1,
+                          activeborderwidth=0, tearoff=False,
+                          font=("Segoe UI", 9))
+    picker.pack(side="left", padx=8)
 
 
 def _empty(parent, register, focus=None):

@@ -126,6 +126,10 @@ def build(parent):
     # Test mode fills the register before the panel exists, and EDMC may also
     # start mid-session with a system already tracked. Either way the count
     # beside RhinoScan has to say so without waiting for the next journal line.
+    # One watcher for the whole session. The picker in the scan window writes
+    # to this same variable, so this fires for either of them.
+    _material.trace_add("write", _on_material_changed)
+
     _refresh_scan_count()
     update.check_async(_on_update_checked)
     return _frame
@@ -190,14 +194,36 @@ def open_cards():
 
 
 def open_scan():
-    """The RhinoScan window for the system the journal last named."""
+    """The RhinoScan window for the system the journal last named.
+
+    The window gets the panel's own material variable, not a copy of its
+    value: the picker it draws under the system name writes straight back
+    here, so the two can never disagree about what is being shown.
+    """
     if not _frame:
         return
     try:
-        scan.show(_frame.winfo_toplevel(), _register, _sheet, _focus())
+        scan.show(_frame.winfo_toplevel(), _register, _sheet, _focus(),
+                  variable=_material,
+                  materials=(ALL_MATERIALS,) + tuple(spotmark.MATERIALS))
     except Exception as err:                       # a broken window must not
         logger.exception("RhinoScan failed")       # take the card flow with it
         _set_status(f"no scan window: {err}")
+
+
+def _on_material_changed(*_):
+    """Redraw the scan window for the material that was just picked.
+
+    One watcher, added once when the panel is built. The filter changes which
+    groups exist and how tall the window is, so it is drawn again rather than
+    updated in place - it is a dozen labels.
+
+    Deferred by one idle tick: the write happens while the menu that caused it
+    is still on screen, and destroying that menu's parent from underneath it is
+    how Tk is told to close a window in the middle of closing itself.
+    """
+    if _frame and scan.is_open():
+        _frame.after_idle(open_scan)
 
 
 def _focus():

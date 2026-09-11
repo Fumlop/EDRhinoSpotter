@@ -99,8 +99,11 @@ def main_images():
     panel.destroy()
 
     found = register()
+    picker = ("All",) + tuple(("Alexandrite", "Jadeite", "Monazite", "Olivine"))
     for focus, name in ((None, "rhinoscan.png"), ("Monazite", "rhinoscan-filtered.png")):
-        window = scan.show(root, found, sheet, focus)
+        main._material.set(focus or "All")
+        window = scan.show(root, found, sheet, focus,
+                           variable=main._material, materials=picker)
         window.attributes("-topmost", True)
         window.deiconify()
         window.lift()
