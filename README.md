@@ -1,6 +1,6 @@
 # RhinoSpotter
 
-EDMC plugin for Elite Dangerous surface mining. Two buttons.
+EDMC plugin for Elite Dangerous surface mining. Three buttons.
 
 <p align="center">
   <img src="docs/plugin.png" alt="The RhinoSpotter panel in EDMC">
@@ -75,6 +75,25 @@ percentages, not the body list.
 **These are rates, not contents.** What a mining location actually holds is in
 no journal event and on no feed. This says where to prospect; it cannot say
 what you will find.
+
+## MeasureSpot - how big is this patch, and how many rigs
+
+Press **MeasureSpot**, drive the border of the spot in the SRV, press **Stop**.
+The line above the note reads the area and the rig count as you go.
+
+```
+31,200 m2   .   8 rigs   .   6 points
+```
+
+The shape is whatever you drove - not a circle, not a rectangle, and usually
+neither. Position comes from `Status.json` once a second, and two samples
+closer than four metres are the same place, so parking at the fence does not
+add a hundred points that say nothing.
+
+The rig count is a 76 m grid laid over the shape with everything outside it
+thrown away. **It is an estimate and means to be read as one:** the ground is
+not flat, you did not drive the border exactly, and two rigs 76 m apart on a
+map are not 76 m apart on a slope.
 
 ## Create Card - the patch you are standing on, as a PNG
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.3.0
+
+**MeasureSpot.** Press it, drive the border of a patch in the SRV, press Stop.
+It reads the area and how many rigs will fit, live, on a line of its own above
+the note.
+
+The shape is whatever you drove. Not a circle, not a rectangle, and usually
+neither - which is the whole reason for driving it rather than pacing a radius.
+Area by the shoelace formula, rigs by laying a 76 m grid over the shape and
+throwing away everything outside it.
+
+It is an estimate and reads as one. The ground is not flat, nobody drives a
+border exactly, and two rigs 76 m apart on a map are not 76 m apart on a slope.
+
+Position comes from Status.json once a second. Two samples closer than four
+metres are the same place, so parking at the fence does not add a hundred
+points that say nothing, and a sample from another body is refused rather than
+bending the shape across a planet.
+
 ## 2.2.1
 
 **Replaying two visits to one system kept only the last.** Two sessions

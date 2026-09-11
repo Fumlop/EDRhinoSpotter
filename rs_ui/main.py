@@ -14,7 +14,7 @@ import subprocess
 import threading
 import tkinter as tk
 
-from rs_core import bodies, grounds, palette, spotcard, spotmark, store, update
+from rs_core import bodies, grounds, measure, palette, spotcard, spotmark, store, update
 from rs_core.logging import logger
 from rs_ui import scan
 
@@ -46,6 +46,10 @@ NO_MATERIAL = "select material"
 ALL_MATERIALS = "All"
 
 _card_button = None      # Create Card, until there is an update to install
+_measure_button = None   # MeasureSpot, and Stop while one is being driven
+_measure_status = None   # what the tape measure reads, while it reads
+_track = None            # rs_core.measure.Track while measuring, else None
+_measure_after = None    # the pending poll, so stopping actually stops
 _loc = None              # tk.StringVar - mining location index
 _rigs = None             # tk.StringVar - rigs on the patch
 _material = None         # tk.StringVar - the material this spot is mined for
@@ -60,7 +64,8 @@ def start(plugin_dir):
 
 
 def build(parent):
-    global _frame, _status, _done, _scan_count, _card_button, _loc, _rigs, _material
+    global _frame, _status, _done, _scan_count, _card_button, _measure_button
+    global _measure_status, _loc, _rigs, _material
 
     _frame = tk.Frame(parent)
     _frame.columnconfigure(1, weight=1)
@@ -104,18 +109,26 @@ def build(parent):
     _card_button.pack(side="left")
     _done = tk.Label(row, text="", anchor="w")
     _done.pack(side="left", padx=(8, 0))
-    tk.Button(row, text="RhinoScan", width=13, command=open_scan).pack(side="left", padx=(16, 0))
+    tk.Button(row, text="RhinoScan", width=13, command=open_scan).pack(side="left", padx=(8, 0))
+    _measure_button = tk.Button(row, text="MeasureSpot", width=13, command=toggle_measure)
+    _measure_button.pack(side="left", padx=(16, 0))
+
+    # What the tape measure is reading, while it reads. Its own line above the
+    # note, because it changes every second while you drive and the status
+    # line below is where the card and the update talk.
+    _measure_status = tk.Label(_frame, text="", anchor="w", fg=palette.GOOD)
+    _measure_status.grid(row=4, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 0))
 
     # The one thing RhinoScan cannot do for you, and the thing everyone gets
     # wrong first: the honk finds the bodies, it does not describe them. Only
     # a resolved body carries PlanetClass and Volcanism, which is all this
     # reads. Said here, before you press the button and wonder.
     tk.Label(_frame, text="FSS unknown systems", anchor="w",
-             fg=palette.MUTED).grid(row=4, column=0, columnspan=4,
+             fg=palette.MUTED).grid(row=5, column=0, columnspan=4,
                                     sticky="w", padx=2, pady=(0, 2))
 
     _status = tk.Label(_frame, text="", anchor="w", wraplength=320, justify="left")
-    _status.grid(row=5, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
+    _status.grid(row=6, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
 
     if theme:
         theme.update(_frame)
@@ -224,6 +237,75 @@ def _on_material_changed(*_):
     """
     if _frame and scan.is_open():
         _frame.after_idle(open_scan)
+
+
+# How often Status.json is read while measuring. The SRV does about 30 m/s
+# flat out, so a second is thirty metres of border - fine for a shape you are
+# driving by eye, and cheap enough to run for as long as it takes.
+MEASURE_POLL_MS = 1000
+
+
+def toggle_measure():
+    """Start driving the border, or stop and keep what was driven."""
+    global _track, _measure_after
+
+    if _track is not None:
+        _measure_after = _cancel_poll()
+        _report_measure(final=True)
+        _track = None
+        if _measure_button:
+            _measure_button.config(text="MeasureSpot", fg=palette.ACCENT)
+        return
+
+    status = spotmark.read_status()
+    if status.get("Latitude") is None:
+        _set_status("no position in Status.json - get out in the SRV first")
+        return
+
+    _track = measure.Track()
+    _track.add(status)
+    if _measure_button:
+        _measure_button.config(text="Stop", fg=palette.WARN)
+    _set_status("drive the border, then press Stop")
+    _poll_measure()
+
+
+def _poll_measure():
+    """Read Status.json, keep the point if it moved, say what it adds up to."""
+    global _measure_after
+    if _track is None or not _frame:
+        return
+    _track.add(spotmark.read_status())
+    _report_measure()
+    _measure_after = _frame.after(MEASURE_POLL_MS, _poll_measure)
+
+
+def _cancel_poll():
+    if _measure_after and _frame:
+        try:
+            _frame.after_cancel(_measure_after)
+        except (ValueError, tk.TclError):
+            pass
+    return None
+
+
+def _report_measure(final=False):
+    """Area and rig count, or why there is not one yet.
+
+    Three points is the first shape that encloses anything, so below that it
+    says how far round you are rather than an area of zero.
+    """
+    if not _measure_status or _track is None:
+        return
+    if len(_track) < 3:
+        _measure_status.config(
+            text=f"measuring - {len(_track)} point{'' if len(_track) == 1 else 's'}",
+            fg=palette.MUTED)
+        return
+    rigs = _track.rigs()
+    text = (f"{_track.area():,.0f} m²   ·   {rigs} rig{'' if rigs == 1 else 's'}"
+            f"   ·   {len(_track)} points")
+    _measure_status.config(text=text, fg=palette.GOOD if final else palette.WARN)
 
 
 def _focus():

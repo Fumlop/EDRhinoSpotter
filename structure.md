@@ -90,6 +90,11 @@ No tkinter anywhere in here.
   had its spaces replaced and its material lowercased, so reading a body back
   out of one is a guess; a PNG without a sidecar is skipped rather than
   guessed at.
+- **[measure.py](rs_core/measure.py)** - area and rig count for a border
+  driven in the SRV. Shoelace for the area, ray casting for what is inside,
+  and a 76 m grid for the rigs. Flat earth on purpose: a spot is a few hundred
+  metres across on a body a thousand kilometres in radius, and that error is
+  smaller than the error of having driven the border by eye.
 - **[palette.py](rs_core/palette.py)** - the colours, once. Hex for tkinter,
   RGB tuples for PIL, one conversion function between them so the window and
   the cards cannot drift apart. They used to be two schemes and looked like
@@ -101,8 +106,8 @@ No tkinter anywhere in here.
 Everything in here imports tkinter.
 
 - **[main.py](rs_ui/main.py)** - the panel EDMC draws, and the handful of
-  variables that only make sense while a window is open. Both buttons live
-  here. Create Card doubles as the update button: it reads "Update" when a
+  variables that only make sense while a window is open. All three buttons
+  live here. Create Card doubles as the update button: it reads "Update" when a
   release is out, then "Restart EDMC" once it is in. A third button would
   widen the panel on the one day it matters, and a permanent one every day. The card render and the update check run off the UI thread and come
   back through `_frame.after`, because Tk is not thread-safe and a widget
@@ -132,6 +137,8 @@ Everything in here imports tkinter.
 - **test_bodies.py** also covers arriving: a known system arrives filled, new
   scans add to it rather than replace it, and what came off disk is not
   written straight back.
+- **test_measure.py** - a square of known size, an L to prove the shape is
+  the shape and not its bounding box, and a parked SRV adding nothing.
 - **test_palette.py** - that the card and the window draw the same black, and
   that a colour which is not six hex digits raises rather than silently
   becoming black.
