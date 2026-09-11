@@ -58,11 +58,15 @@ def _fmt(value, suffix="", dash="—"):
     return str(value)
 
 
-def _coords(spot):
-    lat, lon = spot.get("latitude"), spot.get("longitude")
-    if lat is None or lon is None:
-        return "not on the surface when marked"
-    return f"{float(lat):.6f} / {float(lon):.6f}"
+def _degrees(value):
+    """One coordinate, or a dash.
+
+    Six decimals, which is what the game gives and roughly a metre - enough to
+    put the ship back on the same patch.
+    """
+    if value is None:
+        return "-"
+    return f"{float(value):.6f}"
 
 
 def _fit(draw, text, font, width):
@@ -109,32 +113,45 @@ def render(spot, out_path=None):
     draw.text((x, y), _fit(draw, spot.get("commodity") or "no material", huge, 300),
               font=huge, fill=ACCENT)
 
-    cells = [
-        ("Rigs", _fmt(spot.get("rigs"))),
-        ("Location", _fmt(spot.get("location_index"))),
-        ("Heading", _fmt(spot.get("heading"), "°")),
-        ("Altitude", _fmt(f"{float(spot['altitude']):.0f}" if spot.get("altitude") is not None else None, " m")),
-    ]
+    # Altitude used to sit in the fourth cell. You are landed when you press
+    # the button, so it was the ship's height above a patch of ground measured
+    # from that same patch of ground - always about zero, and it never told
+    # anyone anything. The coordinates take its place: they are the one thing
+    # on the card you cannot work out again afterwards.
+    #
+    # Two columns. The left is what you set before you pressed, the right is
+    # where you were, one coordinate per line - a lat and a lon on one line is
+    # a single long number that has to be read twice to be split.
     grid_x = x + 340
-    for index, (key, value) in enumerate(cells):
-        col, line = index % 2, index // 2
-        cx = grid_x + col * 250
-        cy = y + line * 34
-        draw.text((cx, cy), key.upper(), font=mono_small, fill=MUTED)
-        draw.text((cx + 96, cy - 2), value, font=mono, fill=INK)
+    settings = [
+        ("Rigs", _fmt(spot.get("rigs")), INK),
+        ("Location", _fmt(spot.get("location_index")), INK),
+        ("Heading", _fmt(spot.get("heading"), "°"), INK),
+    ]
+    position = [
+        ("Lat", _degrees(spot.get("latitude")), SECOND),
+        ("Lon", _degrees(spot.get("longitude")), SECOND),
+    ]
+    for col, cells in enumerate((settings, position)):
+        for row, (key, value, colour) in enumerate(cells):
+            cx = grid_x + col * 250
+            cy = y + row * 32
+            draw.text((cx, cy), key.upper(), font=mono_small, fill=MUTED)
+            draw.text((cx + 96, cy - 2), value, font=mono, fill=colour)
 
-    y += 78
+    y += 104
     draw.line([x, y, right, y], fill=RULE)
     y += 18
 
-    draw.text((x, y), _coords(spot), font=mono, fill=SECOND)
+    # Both on one line: who and when are the same kind of fact, and stacking
+    # them put the commander on the border of the sheet.
+    if spot.get("commander"):
+        draw.text((x, y), "CMDR " + spot["commander"], font=mono_small, fill=MUTED)
     marked = spot.get("marked_at")
     if marked:
         stamp = str(marked).split(".")[0]
-        draw.text((right - draw.textlength(stamp, font=mono_small), y + 3),
+        draw.text((right - draw.textlength(stamp, font=mono_small), y),
                   stamp, font=mono_small, fill=MUTED)
-    if spot.get("commander"):
-        draw.text((x, y + 24), "CMDR " + spot["commander"], font=mono_small, fill=MUTED)
 
     if out_path is None:
         out_path = _free(os.path.join(card_dir(spot.get("system")), filename(spot)))

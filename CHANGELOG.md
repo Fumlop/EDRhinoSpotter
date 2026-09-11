@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.0.1
+
+**The card carries coordinates instead of altitude.** You are landed when you
+press the button, so altitude was the ship's height above a patch of ground
+measured from that same patch of ground - always about zero, and it never told
+anyone anything. The latitude and longitude take its place, one per line,
+because a lat and a lon on one line is a single long number that has to be
+read twice to be split. They are the one thing on the card that cannot be
+worked out again afterwards.
+
+**The empty scan window leads with the instruction.** "FSS the system, or the
+planet you are heading for", then the reason under it.
+
 ## 2.0.0
 
 **RhinoScan.** A second button. It lists the landable bodies of the system you
