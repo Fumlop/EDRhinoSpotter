@@ -67,8 +67,13 @@ The target panel is the only place a location's materials are written down.
 ## Install
 
 Drop the folder into `%LOCALAPPDATA%\EDMarketConnector\plugins\` and restart
-EDMC. The panel shows the version and tells you when a newer release is out.
-It never overwrites itself - the install is yours to do.
+EDMC.
+
+The third button in the panel says the version. When a newer release is out it
+turns into **Update to vX.Y.Z**; press it and the release is fetched and
+unpacked in place, then the button reads **Restart EDMC**. Your exported
+`ground_rules.json` is kept, and cards and scans are never touched - they live
+under `%LOCALAPPDATA%\RhinoSpotter\`, not in the plugin folder.
 
 ## Refreshing the rates
 
@@ -82,5 +87,5 @@ That rewrites `ground_rules.json` in this folder from the current mining sheet.
 
     pytest
 
-116 checks, no network, no game, no display. See `structure.md` for how the
+136 checks, no network, no game, no display. See `structure.md` for how the
 code is laid out and why.

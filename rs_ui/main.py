@@ -13,7 +13,6 @@ import os
 import subprocess
 import threading
 import tkinter as tk
-import webbrowser
 
 from rs_core import bodies, grounds, screenshots, spotcard, spotmark, store, update
 from rs_core.logging import logger
@@ -37,6 +36,7 @@ _frame = None
 _status = None
 _done = None             # "completed" beside the button, once a card is on disk
 _scan_count = None       # how many landable bodies the current system has
+_update_button = None    # says the version, becomes "Update to ..." when one is out
 _loc = None              # tk.StringVar - mining location index
 _rigs = None             # tk.StringVar - rigs on the patch
 _material = None         # tk.StringVar - the material this spot is mined for
@@ -51,7 +51,7 @@ def start(plugin_dir):
 
 
 def build(parent):
-    global _frame, _status, _done, _scan_count, _loc, _rigs, _material
+    global _frame, _status, _done, _scan_count, _update_button, _loc, _rigs, _material
 
     _frame = tk.Frame(parent)
     _frame.columnconfigure(1, weight=1)
@@ -89,6 +89,13 @@ def build(parent):
     tk.Button(row, text="RhinoScan", width=13, command=open_scan).pack(side="left", padx=(16, 0))
     _scan_count = tk.Label(row, text="", anchor="w")
     _scan_count.pack(side="left", padx=(8, 0))
+
+    # Sits beside the two working buttons and says the version until there is
+    # something to do, then becomes the thing to press. A separate "check for
+    # updates" button would be a button that answers "no" all year.
+    _update_button = tk.Button(row, text=f"v{update.VERSION}", width=16,
+                               state="disabled", command=_install_update)
+    _update_button.pack(side="left", padx=(16, 0))
 
     _status = tk.Label(_frame, text="", anchor="w", wraplength=320, justify="left")
     _status.grid(row=4, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
@@ -220,18 +227,46 @@ def _report(message, token):
 
 def _on_update_checked(tag, newer):
     """Called on a worker thread - bounce to Tk before touching a widget."""
-    if not newer or not _frame:
+    if not _frame:
         return
-    _frame.after(0, _show_update, tag)
+    _frame.after(0, _show_update, tag, newer)
 
 
-def _show_update(tag):
-    if not _status:
+def _show_update(tag, newer):
+    if not _update_button:
         return
-    label = tk.Label(_frame, text=f"{tag} is out ↗", anchor="w", cursor="hand2",
-                     fg="#ffd43b")
-    label.bind("<Button-1>", lambda event: webbrowser.open(update.RELEASES_PAGE))
-    label.grid(row=5, column=0, columnspan=4, sticky="w", padx=2, pady=(0, 4))
+    if not newer:
+        # Offline or already current: the button keeps saying the version and
+        # stays dead. Nothing to press means nothing that looks pressable.
+        return
+    _update_button.config(text=f"Update to {tag}", state="normal", fg="#ffd43b")
+
+
+def _install_update():
+    """Fetch the release and put it in place. One press, no confirmation - the
+    only thing it can cost is a restart."""
+    if not _update_button:
+        return
+    _update_button.config(text="Updating...", state="disabled")
+    _set_status(f"downloading from {update.RELEASES_PAGE}")
+    update.install_async(_on_update_installed)
+
+
+def _on_update_installed(ok, message):
+    """Called on a worker thread - bounce to Tk before touching a widget."""
+    if _frame:
+        _frame.after(0, _report_update, ok, message)
+
+
+def _report_update(ok, message):
+    _set_status(message)
+    if not _update_button:
+        return
+    if ok:
+        _update_button.config(text="Restart EDMC", state="disabled", fg="#69db7c")
+    else:
+        # Left pressable on purpose: a failed download is usually a retry.
+        _update_button.config(text="Retry update", state="normal", fg="#ff8080")
 
 
 def _refresh_scan_count():

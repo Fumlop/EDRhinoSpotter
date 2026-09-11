@@ -28,7 +28,7 @@ anything scanned afterwards added to it. Beside the cards and outside the
 plugin folder, for the same reason the cards are: a reinstall replaces the
 plugin and should not take your scans with it.
 
-**Tests.** 116 of them, replacing the one hand-rolled script. Two that were
+**Tests.** 136 of them, replacing the one hand-rolled script. Two that were
 easy to get wrong and are now pinned: `Location` on game start must not empty
 the body list, and a scan from another system must reset it even if the
 arrival event was missed.
@@ -37,9 +37,13 @@ arrival event was missed.
 to the same right edge - the names are long enough that a narrow dropdown cut
 Low Temp Diamonds in half. Both buttons sit on one line.
 
-**Update check.** The panel says when a newer release is out and links to it.
-It does not download and does not overwrite the folder you are running from -
-replacing files EDMC holds open fails in ways nobody can debug afterwards.
+**Update button.** The third button says the version until there is something
+to do, then becomes "Update to vX.Y.Z". One press fetches the release, unpacks
+it in place and reads "Restart EDMC". The zipball goes to a temp folder first
+and is copied in a second pass, so a truncated download cannot leave half a
+plugin behind, and a zip that is not ours is refused before anything is
+touched. ground_rules.json is kept: you exported it from your own EDIntel, so
+the local copy is fresher than any release's.
 
 ## 1.1.0
 

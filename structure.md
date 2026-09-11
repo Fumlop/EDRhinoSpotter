@@ -17,7 +17,7 @@ RhinoSpotter/
 ├── load.py              EDMC lifecycle hooks, and nothing else
 ├── rs_core/             everything that is not a widget
 ├── rs_ui/               everything that is
-├── rs_tests/            pytest suite, 116 checks
+├── rs_tests/            pytest suite, 136 checks
 ├── ground_rules.json    the EDIntel mining sheet, frozen at export time
 ├── cards/               rendered cards (gitignored)
 ├── data/                screenshots and sidecars (gitignored)
@@ -69,9 +69,12 @@ No tkinter anywhere in here.
   is watching and nothing older, so a system honked last week is otherwise
   gone. Written through a temp file and a rename: EDMC can be closed at any
   moment, and a half-written cache that still parses is worse than none.
-- **[update.py](rs_core/update.py)** - is there a newer release. Checks and
-  reports, never downloads: a plugin that replaces its own files while EDMC
-  holds them open fails in ways nobody can debug afterwards.
+- **[update.py](rs_core/update.py)** - is there a newer release, and put it in
+  place if there is. The zipball is extracted to a temp folder inside the
+  plugin and copied in a second pass, so a truncated download cannot leave
+  half a plugin behind. `KEEP` names what an update may not overwrite -
+  `ground_rules.json` above all, because the commander exported it from their
+  own EDIntel and the release copy is by definition older.
 - **[logging.py](rs_core/logging.py)** - one logger, named so EDMC picks it up.
 
 ## UI (`rs_ui/`)
@@ -79,8 +82,10 @@ No tkinter anywhere in here.
 Everything in here imports tkinter.
 
 - **[main.py](rs_ui/main.py)** - the panel EDMC draws, and the handful of
-  variables that only make sense while a window is open. Both buttons live
-  here. The card render and the update check run off the UI thread and come
+  variables that only make sense while a window is open. All three buttons
+  live here. The third says the version until there is something to do and
+  becomes "Update to ..." when a release is out; a separate "check for
+  updates" button would be a button that answers no all year. The card render and the update check run off the UI thread and come
   back through `_frame.after`, because Tk is not thread-safe and a widget
   written from a worker fails minutes later somewhere unrelated.
 - **[scan.py](rs_ui/scan.py)** - the RhinoScan window. Read-only and
@@ -89,7 +94,7 @@ Everything in here imports tkinter.
 
 ## Tests (`rs_tests/`)
 
-`pytest` from the plugin folder. 116 checks, no network, no game, no display.
+`pytest` from the plugin folder. 136 checks, no network, no game, no display.
 
 - **conftest.py** - puts the plugin folder on `sys.path`, and builds Scan
   events carrying only the fields the code reads. The `sheet` fixture is a
@@ -107,8 +112,10 @@ Everything in here imports tkinter.
   written straight back.
 - **test_store.py** - round trip, system names Explorer refuses, an older
   cache shape, and that no temporary file survives a save.
-- **test_update.py** - version comparison, and that every network failure is
-  the same silent no-answer.
+- **test_update.py** - version comparison, that every network failure is the
+  same silent no-answer, and the installer: a zip from somewhere else and a
+  truncated download both change nothing, a replaced directory loses the
+  module deleted upstream, and the exported sheet survives.
 
 ## Where the data comes from
 
