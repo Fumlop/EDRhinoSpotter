@@ -244,9 +244,8 @@ def _on_material_changed(*_):
 # driving by eye, and cheap enough to run for as long as it takes.
 MEASURE_POLL_MS = 1000
 
-# How far from the starting rig still counts as having come back to it. The
-# SRV is about 5 m long and Status.json is a second behind, so ten metres is
-# "you closed it"; a hundred is a side the shoelace formula invented.
+# How far from the starting rig still counts as having come back to it. Only
+# the log cares: past this it notes that the area includes a side nobody drove.
 CLOSE_ENOUGH_M = 10.0
 
 
@@ -342,16 +341,13 @@ def _report_measure(final=False):
                  + (" - drive the border" if len(_track) else ""),
             fg=palette.MUTED)
         return
+    # No warning about how well the border was driven. You placed a rig and
+    # drove round it; whether you drove it well is yours to judge, and a panel
+    # that second-guesses that is a panel telling you things you know. The
+    # closure figure is in the log for when a number looks wrong.
     rigs = _track.rigs()
-    gap = _track.closure()
     text = (f"{_track.area():,.0f} m²   ·   {rigs} rig{'' if rigs == 1 else 's'}"
             f"   ·   {len(_track)} points")
-    # The gap is the one thing that says whether the number is worth anything,
-    # so it is said where the number is, not only in the log.
-    if final and gap > CLOSE_ENOUGH_M:
-        text += f"   ·   border open by {gap:,.0f} m"
-        _measure_status.config(text=text, fg=palette.ALERT)
-        return
     _measure_status.config(text=text, fg=palette.GOOD if final else palette.WARN)
 
 

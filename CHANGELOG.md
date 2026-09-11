@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.4.1
+
+**The panel stopped second-guessing how you drove.** It flagged an open border
+in red, which is a panel telling you something you already know: you placed a
+rig, you drove round it, and how well you drove it is yours to judge. The
+closure figure stays in the log, where it is there when a number looks wrong
+rather than in the way when it does not.
+
 ## 2.4.0
 
 **A measurement can be checked now.** The panel says how far the border was
