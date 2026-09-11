@@ -59,8 +59,15 @@ class TestIsNewer:
     def test_a_local_build_ahead_is_not_told_to_downgrade(self):
         assert not update.is_newer("v2.0.0", "2.1.0")
 
-    def test_defaults_to_the_shipped_version(self):
+    def test_defaults_to_the_running_version(self):
         assert not update.is_newer(update.VERSION)
+        assert update.RUNNING == update.VERSION or os.environ.get("RHINOSPOTTER_VERSION")
+
+    def test_the_override_makes_the_current_release_look_new(self, monkeypatch):
+        """The only way to exercise the update button without publishing a
+        throwaway release."""
+        monkeypatch.setattr(update, "RUNNING", "1.0.0")
+        assert update.is_newer(update.VERSION)
 
 
 class TestFetch:

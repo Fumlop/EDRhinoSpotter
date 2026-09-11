@@ -100,6 +100,14 @@ Kept across an update: `ground_rules.json`, and everything under
 `%LOCALAPPDATA%\RhinoSpotter\` - your cards and your scanned systems are not in
 the plugin folder and are never touched.
 
+### Testing the update without a throwaway release
+
+    set RHINOSPOTTER_VERSION=1.0.0
+
+Start EDMC from that same prompt. The plugin reports itself as 1.0.0, so the
+current release looks new and the button appears. What it installs is still
+whatever the release actually contains.
+
 ---
 
 ## What it does not do

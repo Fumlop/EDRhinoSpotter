@@ -24,6 +24,12 @@ import zipfile
 from rs_core.logging import logger
 
 VERSION = "2.0.0"
+
+# For testing the update path without publishing a throwaway release: set
+# RHINOSPOTTER_VERSION to something older and the running plugin will see the
+# current release as new. It changes nothing else - what gets installed is
+# still whatever the release actually contains.
+RUNNING = os.environ.get("RHINOSPOTTER_VERSION") or VERSION
 REPO = "Fumlop/EDRhinoSpotter"
 RELEASES_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
 RELEASES_PAGE = f"https://github.com/{REPO}/releases/latest"
@@ -55,10 +61,10 @@ def parse(version):
     return tuple(parts)
 
 
-def is_newer(latest, current=VERSION):
+def is_newer(latest, current=None):
     """Strictly newer. Equal is not an update, and neither is older - a local
     build ahead of the release must not be told to downgrade."""
-    return parse(latest) > parse(current)
+    return parse(latest) > parse(current if current is not None else RUNNING)
 
 
 def fetch_release(url=RELEASES_URL, opener=urllib.request.urlopen):

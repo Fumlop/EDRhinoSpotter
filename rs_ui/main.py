@@ -56,7 +56,7 @@ def build(parent):
     _frame = tk.Frame(parent)
     _frame.columnconfigure(1, weight=1)
 
-    tk.Label(_frame, text=f"RhinoSpotter {update.VERSION}", anchor="w").grid(
+    tk.Label(_frame, text=f"RhinoSpotter {update.RUNNING}", anchor="w").grid(
         row=0, column=0, sticky="w", padx=2, pady=(4, 2))
     link = _folder_link(_frame)
     link.grid(row=0, column=1, columnspan=3, sticky="w", padx=2, pady=(4, 2))
