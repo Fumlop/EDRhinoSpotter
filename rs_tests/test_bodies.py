@@ -117,3 +117,126 @@ class TestOrdering:
         groups = register.by_ground()
         assert len(groups) == 1
         assert len(groups[0][1]) == 3
+
+
+class TestMiningLocations:
+    """The count comes from the journal, not from EDSM and not from Ardent.
+
+    FSSBodySignals carries it from the FSS, without flying out to the body.
+    SAASignalsFound carries it again after a detailed surface scan. Both were
+    read off real journals before this was written.
+    """
+
+    def fss(self, name, count):
+        return {"event": "FSSBodySignals", "BodyName": name, "Signals": [
+            {"Type": "$PlanetaryMiningLocation_Name;",
+             "Type_Localised": "Planetary Mining Location", "Count": count}]}
+
+    def saa(self, name, count):
+        return {"event": "SAASignalsFound", "BodyName": name, "Signals": [
+            {"Type": "$PlanetaryMiningLocation_Name;", "Count": count},
+            {"Type": "$SAA_SignalType_Human;", "Count": 1}]}
+
+    def test_the_fss_count_lands_on_the_body(self, make_scan):
+        register = bodies.Register()
+        register.track(make_scan("Andel 1 a", "Rocky body"), system="Andel")
+        assert register.track(self.fss("Andel 1 a", 10))
+        assert register.bodies()[0]["locations"] == 10
+
+    def test_a_count_arriving_before_the_scan_is_not_lost(self, make_scan):
+        """FSSBodySignals often lands first. Writing it into a row that does
+        not exist yet would drop it."""
+        register = bodies.Register()
+        register.track(self.fss("Andel 1 a", 10))
+        register.track(make_scan("Andel 1 a", "Rocky body"), system="Andel")
+        assert register.bodies()[0]["locations"] == 10
+
+    def test_a_surface_scan_raises_the_count(self, make_scan):
+        register = bodies.Register()
+        register.track(make_scan("Andel 1 a", "Rocky body"), system="Andel")
+        register.track(self.fss("Andel 1 a", 10))
+        register.track(self.saa("Andel 1 a", 17))
+        assert register.bodies()[0]["locations"] == 17
+
+    def test_a_lower_count_never_wins(self, make_scan):
+        """A detailed scan counts more than the FSS did, never fewer. A
+        smaller number arriving later is a stale replay, not news."""
+        register = bodies.Register()
+        register.track(make_scan("Andel 1 a", "Rocky body"), system="Andel")
+        register.track(self.saa("Andel 1 a", 17))
+        assert not register.track(self.fss("Andel 1 a", 10))
+        assert register.bodies()[0]["locations"] == 17
+
+    def test_a_body_nobody_counted_says_nothing(self, make_scan):
+        """None, not 0. "0 locations" reads as barren, which is the opposite
+        of what an uncounted body means."""
+        register = bodies.Register()
+        register.track(make_scan("Andel 1 a", "Rocky body"), system="Andel")
+        assert register.bodies()[0]["locations"] is None
+
+    def test_signals_without_a_mining_type_are_ignored(self, make_scan):
+        register = bodies.Register()
+        register.track(make_scan("Andel 1 a", "Rocky body"), system="Andel")
+        assert not register.track({"event": "SAASignalsFound", "BodyName": "Andel 1 a",
+                                   "Signals": [{"Type": "$SAA_SignalType_Biological;",
+                                                "Count": 3}]})
+        assert register.bodies()[0]["locations"] is None
+
+    def test_a_ring_hotspot_is_not_a_mining_location(self):
+        """SAASignalsFound on a ring lists hotspot materials. Those are laser
+        mining, not ground mining, and no body row may take them."""
+        register = bodies.Register()
+        assert not register.track({"event": "SAASignalsFound",
+                                   "BodyName": "Aramo AB 3 A Ring",
+                                   "Signals": [{"Type": "Monazite", "Count": 3}]})
+
+    def test_counts_do_not_survive_a_jump(self, make_scan):
+        register = bodies.Register()
+        register.track(make_scan("Andel 1 a", "Rocky body"), system="Andel")
+        register.track(self.saa("Andel 1 a", 17))
+        register.track({"event": "FSDJump", "StarSystem": "Loha"})
+        register.track(make_scan("Andel 1 a", "Rocky body"), system="Loha")
+        assert register.bodies()[0]["locations"] is None
+
+
+class TestLeaving:
+    def test_leaving_hands_over_what_was_found(self, make_scan):
+        """This is where the cache write hangs, so bodies.py never has to know
+        a cache exists."""
+        seen = []
+        register = bodies.Register(on_leave=lambda system, found: seen.append((system, found)))
+        register.track(make_scan("Andel 1 a", "Rocky body"), system="Andel")
+        register.track({"event": "FSDJump", "StarSystem": "Loha"})
+        assert len(seen) == 1
+        assert seen[0][0] == "Andel"
+        assert [body["name"] for body in seen[0][1]] == ["Andel 1 a"]
+
+    def test_an_empty_system_hands_over_nothing(self):
+        seen = []
+        register = bodies.Register(on_leave=lambda system, found: seen.append(system))
+        register.track({"event": "FSDJump", "StarSystem": "Andel"})
+        register.track({"event": "FSDJump", "StarSystem": "Loha"})
+        assert seen == []
+
+    def test_adopting_a_cached_system(self):
+        register = bodies.Register()
+        count = register.adopt("Andel", [
+            {"name": "Andel 1 a", "ground": "volcanic magma", "distance": 412.0,
+             "locations": 17},
+            {"name": "Andel 4 c", "ground": "icy", "distance": 1016.0, "locations": None},
+        ])
+        assert count == 2
+        assert len(register) == 2
+        assert register.system == "Andel"
+        assert register.bodies()[0]["locations"] == 17
+        assert [ground for ground, _ in register.by_ground()] == ["volcanic magma", "icy"]
+
+    def test_a_scan_after_adopting_still_updates(self, make_scan):
+        register = bodies.Register()
+        register.adopt("Andel", [{"name": "Andel 1 a", "ground": "rocky",
+                                  "distance": 412.0, "locations": 17}])
+        assert register.track(make_scan("Andel 1 a", "Rocky body", "major metallic magma"),
+                              system="Andel")
+        body = register.bodies()[0]
+        assert body["ground"] == "volcanic magma"
+        assert body["locations"] == 17

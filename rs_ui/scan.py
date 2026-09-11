@@ -114,10 +114,18 @@ def _group(parent, ground, found, sheet):
 
 
 def _body_line(body):
+    """One body: where it is, how probed it is, what its volcanism is.
+
+    The location count comes from FSSBodySignals or SAASignalsFound. A body
+    with none has not been counted rather than counted at zero, so it says so -
+    "0 locations" reads as barren, which is the opposite of what it means.
+    """
     distance = body.get('distance')
     parts = [body['name']]
     if distance is not None:
         parts.append(f"{distance:,.0f} Ls")
+    locations = body.get('locations')
+    parts.append(f"{locations} loc" if locations is not None else "unprobed")
     volcanism = body.get('volcanism')
     if volcanism:
         parts.append(volcanism.replace(" volcanism", ""))

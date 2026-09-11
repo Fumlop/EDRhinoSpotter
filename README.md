@@ -12,15 +12,25 @@ been found to hold underneath.
 Rocky World [magma]          3 of them
   Olivine 56.1%  Monazite 45.6%  Bastnasite 42.1%  Serendibite 31.6%
   across 57 locations read
-   Andel 1 a    412 Ls   major metallic magma
-   Andel 1 b    418 Ls   minor metallic magma
-   Andel 4 a   1016 Ls   major rocky magma
+   Andel 1 a    412 Ls   16 loc     major metallic magma
+   Andel 1 b    418 Ls   unprobed   minor metallic magma
+   Andel 4 a   1016 Ls   9 loc      major rocky magma
 ```
 
 The bodies come from the journal, so a system you have honked is already fully
 described - `PlanetClass` and `Volcanism` arrive with the discovery scan, no
 detailed surface scan needed. Scan a body properly later and its row updates
 itself.
+
+The location count comes from the journal too: the FSS reports it without you
+flying out there, and a detailed surface scan confirms it. A body nobody has
+counted says `unprobed` rather than `0 loc` - none found and none looked for
+are not the same thing.
+
+Systems are remembered. EDMC replays the journal file it is watching and
+nothing older, so each system is written to `data/systems/` when you leave and
+read back when you return. Nothing is asked of EDSM or anyone else's server:
+this is your own scan data going to disk and coming back.
 
 The percentages come from `ground_rules.json`, exported from the EDIntel
 mining sheet. Neither half touches the network. Losing the JSON costs the
@@ -70,5 +80,5 @@ That rewrites `ground_rules.json` in this folder from the current mining sheet.
 
     pytest
 
-78 checks, no network, no game, no display. See `structure.md` for how the
+107 checks, no network, no game, no display. See `structure.md` for how the
 code is laid out and why.

@@ -15,7 +15,7 @@ import threading
 import tkinter as tk
 import webbrowser
 
-from rs_core import bodies, grounds, screenshots, spotcard, spotmark, update
+from rs_core import bodies, grounds, screenshots, spotcard, spotmark, store, update
 from rs_core.logging import logger
 from rs_ui import scan
 
@@ -30,7 +30,7 @@ _last_index = None       # the location the last press saw, for the sidecar
 _card_token = 0          # only the newest render may write to the status line
 _body_names = {}         # BodyID -> name, so a targeted location can be placed
 
-_register = bodies.Register()
+_register = bodies.Register(on_leave=store.save)
 _sheet = None            # rs_core.grounds.Sheet, read once at startup
 
 _frame = None
@@ -61,35 +61,37 @@ def build(parent):
     link = _folder_link(_frame)
     link.grid(row=0, column=1, columnspan=3, sticky="w", padx=2, pady=(4, 2))
 
-    _material = tk.StringVar(value="")
+    # Location and Rigs are both four characters wide, so they share a row and
+    # set how far the panel runs. Material goes underneath and stretches to the
+    # same right edge - the names are long enough that a narrow dropdown cut
+    # "Low Temp Diamonds" in half.
+    _loc = tk.StringVar(value="")
     _rigs = tk.StringVar(value="")
-    tk.Label(_frame, text="Material", anchor="w").grid(row=1, column=0, sticky="w", padx=2)
-    tk.OptionMenu(_frame, _material, "", *spotmark.MATERIALS).grid(
-        row=1, column=1, sticky="w", padx=2)
+    tk.Label(_frame, text="Location", anchor="w").grid(row=1, column=0, sticky="w", padx=2)
+    tk.Entry(_frame, textvariable=_loc, width=4).grid(row=1, column=1, sticky="w", padx=2)
     tk.Label(_frame, text="Rigs", anchor="w").grid(row=1, column=2, sticky="e", padx=2)
     tk.Spinbox(_frame, from_=0, to=12, textvariable=_rigs, width=4).grid(
         row=1, column=3, sticky="w", padx=2)
 
-    _loc = tk.StringVar(value="")
-    tk.Label(_frame, text="Location", anchor="w").grid(row=2, column=0, sticky="w", padx=2)
-    tk.Entry(_frame, textvariable=_loc, width=4).grid(row=2, column=1, sticky="w", padx=2)
+    _material = tk.StringVar(value="")
+    tk.Label(_frame, text="Material", anchor="w").grid(row=2, column=0, sticky="w", padx=2)
+    tk.OptionMenu(_frame, _material, "", *spotmark.MATERIALS).grid(
+        row=2, column=1, columnspan=3, sticky="we", padx=2)
 
-    # Own frame: column 1 stretches, and the markers have to sit against the
-    # buttons rather than out at the far edge of the panel.
+    # Own frame: column 1 stretches, and the buttons have to sit against each
+    # other rather than spread to the far edge of the panel. Both are one
+    # press with no confirmation, so they get a gap between them.
     row = tk.Frame(_frame)
     row.grid(row=3, column=0, columnspan=4, sticky="w", padx=2, pady=(4, 2))
     tk.Button(row, text="MiningCard", width=13, command=make_card).pack(side="left")
     _done = tk.Label(row, text="", anchor="w")
-    _done.pack(side="left", padx=8)
-
-    scan_row = tk.Frame(_frame)
-    scan_row.grid(row=4, column=0, columnspan=4, sticky="w", padx=2, pady=(0, 2))
-    tk.Button(scan_row, text="RhinoScan", width=13, command=open_scan).pack(side="left")
-    _scan_count = tk.Label(scan_row, text="", anchor="w")
-    _scan_count.pack(side="left", padx=8)
+    _done.pack(side="left", padx=(8, 0))
+    tk.Button(row, text="RhinoScan", width=13, command=open_scan).pack(side="left", padx=(16, 0))
+    _scan_count = tk.Label(row, text="", anchor="w")
+    _scan_count.pack(side="left", padx=(8, 0))
 
     _status = tk.Label(_frame, text="", anchor="w", wraplength=320, justify="left")
-    _status.grid(row=5, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
+    _status.grid(row=4, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
 
     if theme:
         theme.update(_frame)
@@ -149,6 +151,13 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
         _body_names[body_id] = body_name
 
     if _register.track(entry, system=system):
+        # Arriving in a system we have scanned before fills the list straight
+        # from disk - EDMC replays one journal file, and last week's honk is in
+        # an older one.
+        if not len(_register) and _register.system:
+            cached = store.load(_register.system)
+            if cached:
+                _register.adopt(_register.system, cached)
         _refresh_scan_count()
 
     if entry.get("event") == "Screenshot":
@@ -226,7 +235,7 @@ def _show_update(tag):
     label = tk.Label(_frame, text=f"{tag} is out ↗", anchor="w", cursor="hand2",
                      fg="#ffd43b")
     label.bind("<Button-1>", lambda event: webbrowser.open(update.RELEASES_PAGE))
-    label.grid(row=6, column=0, columnspan=4, sticky="w", padx=2, pady=(0, 4))
+    label.grid(row=5, column=0, columnspan=4, sticky="w", padx=2, pady=(0, 4))
 
 
 def _refresh_scan_count():

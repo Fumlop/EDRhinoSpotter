@@ -15,10 +15,22 @@ everything that is, `rs_tests` for pytest. `load.py` is now the EDMC contract
 and nothing else. Nothing in `rs_core` imports tkinter, which is what lets the
 suite run under a bare interpreter with no EDMC, no game and no display.
 
-**Tests.** 78 of them, replacing the one hand-rolled script. Two that were
+**Mining location counts, and a memory.** FSSBodySignals reports how many
+Planetary Mining Locations a body carries straight from the FSS, and
+SAASignalsFound confirms it after a surface scan, so the count is in the
+journal and no external service is asked for it. A body nobody counted reads
+unprobed, not 0 loc. Each system is written to data/systems/ when you leave it
+and read back when you return, because EDMC replays one journal file and last
+week's honk is in an older one.
+
+**Tests.** 107 of them, replacing the one hand-rolled script. Two that were
 easy to get wrong and are now pinned: `Location` on game start must not empty
 the body list, and a scan from another system must reset it even if the
 arrival event was missed.
+
+**Panel layout.** Location and Rigs share a row, Material stretches under them
+to the same right edge - the names are long enough that a narrow dropdown cut
+Low Temp Diamonds in half. Both buttons sit on one line.
 
 **Update check.** The panel says when a newer release is out and links to it.
 It does not download and does not overwrite the folder you are running from -

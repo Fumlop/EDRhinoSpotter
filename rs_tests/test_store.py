@@ -1,0 +1,85 @@
+"""The per-system cache: the commander's own scans, going to disk and back."""
+
+import json
+
+import pytest
+
+from rs_core import store
+
+BODIES = [
+    {"name": "Andel 1 a", "ground": "volcanic magma", "distance": 412.0,
+     "locations": 17, "volcanism": "major metallic magma", "planet_class": "Rocky body"},
+    {"name": "Andel 4 c", "ground": "icy", "distance": 1016.0,
+     "locations": None, "volcanism": "", "planet_class": "Icy body"},
+]
+
+
+class TestSafeName:
+    @pytest.mark.parametrize("system,expected", [
+        ("Andel", "Andel"),
+        ("Col 285 Sector KM-V d2-36", "Col 285 Sector KM-V d2-36"),
+        ("43 G. Canis Minoris", "43 G. Canis Minoris"),
+        # Explorer refuses these, and one bad system must not take the cache down.
+        ("Weird:System", "Weird_System"),
+        ("a/b\\c", "a_b_c"),
+        ("", "unknown"),
+        (None, "unknown"),
+    ])
+    def test_names(self, system, expected):
+        assert store.safe_name(system) == expected
+
+
+class TestRoundTrip:
+    def test_saves_and_loads(self, tmp_path):
+        assert store.save("Andel", BODIES, root=str(tmp_path))
+        assert store.load("Andel", root=str(tmp_path)) == BODIES
+
+    def test_an_unknown_system_is_empty(self, tmp_path):
+        assert store.load("Nowhere", root=str(tmp_path)) == []
+
+    def test_nothing_is_written_for_an_empty_system(self, tmp_path):
+        """A system with no landable bodies is not worth a file, and writing
+        one would make the next visit look cached and barren."""
+        assert store.save("Andel", [], root=str(tmp_path)) is None
+        assert store.save(None, BODIES, root=str(tmp_path)) is None
+        assert store.systems(root=str(tmp_path)) == []
+
+    def test_saving_twice_overwrites_rather_than_duplicates(self, tmp_path):
+        store.save("Andel", BODIES, root=str(tmp_path))
+        store.save("Andel", BODIES[:1], root=str(tmp_path))
+        assert len(store.load("Andel", root=str(tmp_path))) == 1
+        assert store.systems(root=str(tmp_path)) == ["Andel"]
+
+    def test_listing_systems(self, tmp_path):
+        store.save("Andel", BODIES, root=str(tmp_path))
+        store.save("Loha", BODIES, root=str(tmp_path))
+        assert store.systems(root=str(tmp_path)) == ["Andel", "Loha"]
+
+    def test_listing_a_missing_folder(self, tmp_path):
+        assert store.systems(root=str(tmp_path / "nope")) == []
+
+
+class TestBadData:
+    def test_broken_json_is_the_same_as_no_cache(self, tmp_path):
+        (tmp_path / "Andel.json").write_text("{not json", encoding="utf-8")
+        assert store.load("Andel", root=str(tmp_path)) == []
+
+    def test_an_older_shape_is_dropped(self, tmp_path):
+        """Dropping it costs one honk. Guessing at it costs a wrong answer
+        that looks right."""
+        (tmp_path / "Andel.json").write_text(
+            json.dumps({"version": 0, "system": "Andel", "bodies": BODIES}),
+            encoding="utf-8")
+        assert store.load("Andel", root=str(tmp_path)) == []
+
+    def test_bodies_that_are_not_a_list(self, tmp_path):
+        (tmp_path / "Andel.json").write_text(
+            json.dumps({"version": store.VERSION, "system": "Andel", "bodies": "nope"}),
+            encoding="utf-8")
+        assert store.load("Andel", root=str(tmp_path)) == []
+
+    def test_no_temporary_file_survives_a_save(self, tmp_path):
+        """The write goes through a temp file and a rename. A leftover .tmp
+        would be a half-written system nobody ever cleans up."""
+        store.save("Andel", BODIES, root=str(tmp_path))
+        assert [p.name for p in tmp_path.iterdir()] == ["Andel.json"]

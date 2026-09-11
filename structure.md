@@ -17,9 +17,10 @@ RhinoSpotter/
 ├── load.py              EDMC lifecycle hooks, and nothing else
 ├── rs_core/             everything that is not a widget
 ├── rs_ui/               everything that is
-├── rs_tests/            pytest suite, 78 checks
+├── rs_tests/            pytest suite, 107 checks
 ├── ground_rules.json    the EDIntel mining sheet, frozen at export time
 ├── cards/               rendered cards (gitignored)
+├── data/systems/        one JSON per system scanned (gitignored)
 ├── data/                screenshots and sidecars (gitignored)
 ├── lib/                 vendored, unused, gitignored - see below
 ├── pytest.ini
@@ -57,7 +58,16 @@ No tkinter anywhere in here.
   were measured on.
 - **[bodies.py](rs_core/bodies.py)** - `Register`, the landable bodies of the
   system you are in. Fed one journal event at a time, returns True when the
-  list changed. One system at a time; arriving somewhere clears it.
+  list changed. Reads `Scan` for the ground, and `FSSBodySignals` /
+  `SAASignalsFound` for how many mining locations a body carries - the FSS
+  already knows, no probes needed. Counts are kept beside the bodies because a
+  signal can arrive before its scan. One system at a time; leaving hands what
+  was found to `on_leave`.
+- **[store.py](rs_core/store.py)** - one JSON file per system under
+  `data/systems/`. EDMC replays the journal file it is watching and nothing
+  older, so a system honked last week is otherwise gone. Written through a
+  temp file and a rename: EDMC can be closed at any moment, and a half-written
+  cache that still parses is worse than none.
 - **[update.py](rs_core/update.py)** - is there a newer release. Checks and
   reports, never downloads: a plugin that replaces its own files while EDMC
   holds them open fails in ways nobody can debug afterwards.
@@ -78,7 +88,7 @@ Everything in here imports tkinter.
 
 ## Tests (`rs_tests/`)
 
-`pytest` from the plugin folder. 78 checks, no network, no game, no display.
+`pytest` from the plugin folder. 107 checks, no network, no game, no display.
 
 - **conftest.py** - puts the plugin folder on `sys.path`, and builds Scan
   events carrying only the fields the code reads. The `sheet` fixture is a
@@ -91,6 +101,8 @@ Everything in here imports tkinter.
   later detailed scan must replace what the honk recorded.
 - **test_spotmark.py** - Status.json parsing, including a read landing
   mid-write.
+- **test_store.py** - round trip, system names Explorer refuses, an older
+  cache shape, and that no temporary file survives a save.
 - **test_update.py** - version comparison, and that every network failure is
   the same silent no-answer.
 
@@ -99,10 +111,12 @@ Everything in here imports tkinter.
 | What | Source | Refreshed by |
 |---|---|---|
 | Bodies in this system | journal `Scan` events, via EDMC | the game, live |
+| Mining locations on a body | journal `FSSBodySignals` / `SAASignalsFound` | the FSS, then a surface scan |
+| Systems visited before | `data/systems/<System>.json` | written when you leave |
 | What a ground holds | `ground_rules.json` | `python scripts/export/rhinoscan_data.py` in EDIntel |
 | What a location holds | nothing - it is in no feed | screenshot and read by eye |
 
-The third row is the whole reason this plugin exists.
+The last row is the whole reason this plugin exists.
 
 ## lib/
 
