@@ -1,6 +1,6 @@
 # RhinoSpotter
 
-EDMC plugin for Elite Dangerous surface mining. Three buttons.
+EDMC plugin for Elite Dangerous surface mining. Two buttons.
 
 <p align="center">
   <img src="docs/plugin.png" alt="The RhinoSpotter panel in EDMC">
@@ -19,8 +19,8 @@ been found to hold above it.
 
 *Example system. Percentages are the share of that ground's mining locations
 that carried the material; `unprobed` means nobody has counted that body yet,
-and those rows are dimmed. A body you have already marked shows how many cards
-it has - click and Explorer opens with the newest one selected.*
+and those rows are dimmed. A body you have already marked shows how many
+bookmarks it has - click and Explorer opens with the newest one selected.*
 
 ### Filtering to one material
 
@@ -76,49 +76,7 @@ percentages, not the body list.
 no journal event and on no feed. This says where to prospect; it cannot say
 what you will find.
 
-## MeasureSpot - how big is this patch, and how many rigs
-
-Place a rig where you start, drive the border slowly, come back to it, press
-**Stop**. The line above the note reads the area and the rig count as you go.
-
-The rig is your only marker for where the border began - the game gives you
-nothing else to aim back at. Slowly is not fussiness: `Status.json` is read
-once a second, so at speed the corners get cut off and the shape comes out
-smaller than it is.
-
-```
-31,200 m2   .   8 rigs   .   6 points
-```
-
-The shape is whatever you drove - not a circle, not a rectangle, and usually
-neither. Position comes from `Status.json` once a second, and two samples
-closer than four metres are the same place, so parking at the fence does not
-add a hundred points that say nothing.
-
-The rig count is a 76 m grid laid over the shape with everything outside it
-thrown away. **It is an estimate and means to be read as one:** the ground is
-not flat, you did not drive the border exactly, and two rigs 76 m apart on a
-map are not 76 m apart on a slope.
-
-### Checking a measurement
-
-EDMC's log has a line when you start and a summary when you stop:
-
-```
-measure: body=Andel 1 a  radius_m=1480764.9  points=5  perimeter_m=800.0
-         closure_m=0.0  area_m2=40000.0  rigs=9  spacing_m=76.0
-```
-
-`closure_m` is how far the last point ended up from the first. A border you
-drove right round closes within a few metres; a big number means the area
-includes a side that was never driven, because the formula joins the last
-point back to the first either way.
-
-With `RHINOSPOTTER_DEBUG=1` it also logs every point that went in, in degrees
-and in metres, so a reading that looks wrong can be walked back rather than
-argued about.
-
-## Create Card - the patch you are standing on, as a PNG
+## Bookmark - the patch you are standing on, as a PNG
 
 <p align="center">
   <img src="docs/miningcard.png" width="620"
@@ -130,15 +88,15 @@ argued about.
 1. Land and put the rigs down.
 2. Pick the **Material**, set **Rigs**. `Location` fills itself when a mining
    location is the selected destination; otherwise type the signal number.
-3. Press **Create Card**. `completed` appears beside the button once the PNG is
+3. Press **Bookmark**. `completed` appears beside the button once the PNG is
    on disk.
 
 Coordinates, body and location are read out of `Status.json` at the press - it
 is live-only, so make the card before you fly off. Marking the same location
 for the same material twice gives you two cards, not one overwritten.
 
-Cards land in `%LOCALAPPDATA%\RhinoSpotter\cards\<System>\`. The **cards
-folder** link in the panel header opens it in Explorer.
+Bookmarks land in `%LOCALAPPDATA%\RhinoSpotter\cards\<System>\`. The
+**bookmarks** link in the panel header opens the folder in Explorer.
 
 ## Install
 
@@ -146,7 +104,7 @@ See [INSTALL.md](INSTALL.md). Short version: unpack into
 `%LOCALAPPDATA%\EDMarketConnector\plugins\RhinoSpotter\` so that `load.py`
 sits directly inside, and restart EDMC.
 
-When a newer release is out, **Create Card** reads **Update** instead and the
+When a newer release is out, **Bookmark** reads **Update** instead and the
 status line names the version. Press it and the release is fetched and
 unpacked in place, then it reads **Restart EDMC**. There is no third button:
 the panel stays the same width in every state.

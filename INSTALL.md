@@ -66,8 +66,8 @@ volcanism this reads, so:
 
 A system where you did neither shows nothing, and the window says so.
 
-**Cards you already made.** A body you have marked before shows "2 cards"
-behind it. Clicking opens Explorer with the newest one selected, rather than
+**Bookmarks you already made.** A body you have marked before shows
+"2 bookmarks" behind it. Clicking opens Explorer with the newest one selected, rather than
 the folder for you to hunt through. Bodies with none say nothing.
 
 **Filtering.** Pick a material in the panel and the window lists only the
@@ -79,14 +79,14 @@ Systems are remembered. Every scan is written to
 `%LOCALAPPDATA%\RhinoSpotter\data\<System>.json` as it happens, so jumping back
 weeks later opens already filled.
 
-### Create Card - the patch you are standing on
+### Bookmark - the patch you are standing on
 
 ![A card](docs/miningcard.png)
 
 1. Land, put the rigs down.
 2. Pick the **Material** and set **Rigs**. `Location` fills itself while the
    mining location is your selected destination; otherwise type the number.
-3. Press **Create Card**.
+3. Press **Bookmark**.
 
 `completed` appears beside the button once the PNG is on disk, in
 `%LOCALAPPDATA%\RhinoSpotter\cards\<System>\`. The **cards folder** link in
@@ -101,7 +101,7 @@ material twice gives you two cards, not one overwritten.
 
 ## Updating
 
-When a newer release is out, **Create Card** reads **Update** instead and the
+When a newer release is out, **Bookmark** reads **Update** instead and the
 status line names the version. Press it; the release is fetched and unpacked in
 place, and the button reads **Restart EDMC**.
 

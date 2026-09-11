@@ -96,7 +96,9 @@ No tkinter anywhere in here.
   metres across on a body a thousand kilometres in radius, and that error is
   smaller than the error of having driven the border by eye. `closure()` is
   what says whether a reading is worth anything - a border that does not close
-  still gets a plausible-looking area.
+  still gets a plausible-looking area. Nothing in the panel starts a
+  measurement: the code works and is tested, and has no button until there is
+  a decision about where it belongs.
 - **[palette.py](rs_core/palette.py)** - the colours, once. Hex for tkinter,
   RGB tuples for PIL, one conversion function between them so the window and
   the cards cannot drift apart. They used to be two schemes and looked like
@@ -108,8 +110,8 @@ No tkinter anywhere in here.
 Everything in here imports tkinter.
 
 - **[main.py](rs_ui/main.py)** - the panel EDMC draws, and the handful of
-  variables that only make sense while a window is open. All three buttons
-  live here. Create Card doubles as the update button: it reads "Update" when a
+  variables that only make sense while a window is open. Both buttons live
+  here. Create Card doubles as the update button: it reads "Update" when a
   release is out, then "Restart EDMC" once it is in. A third button would
   widen the panel on the one day it matters, and a permanent one every day. The card render and the update check run off the UI thread and come
   back through `_frame.after`, because Tk is not thread-safe and a widget

@@ -2,7 +2,7 @@
 
 Two buttons.
 
-    Create Card marks the patch you are standing on and renders it as a PNG.
+    Bookmark    marks the patch you are standing on and renders it as a PNG.
                 Position, body and the targeted mining location come out of
                 Status.json at the press, which is live-only, so the card has
                 to be made while you are still there.

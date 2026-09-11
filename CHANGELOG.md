@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.5.0
+
+**Create Card is called Bookmark**, and so is everything around it: the link
+in the header, and the count behind a body in the scan window. It is what the
+thing is - a place you want to come back to - and it is the word the game uses
+for that.
+
+**MeasureSpot has no button.** The measuring works, is tested and is reachable
+in the code; nothing in the panel calls it, until there is a decision about
+where it belongs. Its logging went down to debug with it: nothing starts a
+measurement, so nothing it has to say belongs in EDMC's log by default.
+
 ## 2.4.1
 
 **The panel stopped second-guessing how you drove.** It flagged an open border

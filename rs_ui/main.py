@@ -45,8 +45,7 @@ NO_MATERIAL = "select material"
 # the alphabet with the materials - it is not one of them.
 ALL_MATERIALS = "All"
 
-_card_button = None      # Create Card, until there is an update to install
-_measure_button = None   # MeasureSpot, and Stop while one is being driven
+_card_button = None      # Bookmark, until there is an update to install
 _measure_status = None   # what the tape measure reads, while it reads
 _track = None            # rs_core.measure.Track while measuring, else None
 _measure_after = None    # the pending poll, so stopping actually stops
@@ -64,7 +63,7 @@ def start(plugin_dir):
 
 
 def build(parent):
-    global _frame, _status, _done, _scan_count, _card_button, _measure_button
+    global _frame, _status, _done, _scan_count, _card_button
     global _measure_status, _loc, _rigs, _material
 
     _frame = tk.Frame(parent)
@@ -105,30 +104,26 @@ def build(parent):
     # press with no confirmation, so they get a gap between them.
     row = tk.Frame(_frame)
     row.grid(row=3, column=0, columnspan=4, sticky="w", padx=2, pady=(4, 2))
-    _card_button = tk.Button(row, text="Create Card", width=13, command=make_card)
+    _card_button = tk.Button(row, text="Bookmark", width=13, command=make_card)
     _card_button.pack(side="left")
     _done = tk.Label(row, text="", anchor="w")
     _done.pack(side="left", padx=(8, 0))
     tk.Button(row, text="RhinoScan", width=13, command=open_scan).pack(side="left", padx=(8, 0))
-    _measure_button = tk.Button(row, text="MeasureSpot", width=13, command=toggle_measure)
-    _measure_button.pack(side="left", padx=(16, 0))
 
-    # What the tape measure is reading, while it reads. Its own line above the
-    # note, because it changes every second while you drive and the status
-    # line below is where the card and the update talk.
-    _measure_status = tk.Label(_frame, text="", anchor="w", fg=palette.GOOD)
-    _measure_status.grid(row=4, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 0))
+    # No measuring line either. It would be an empty row every session: the
+    # label only ever has text while a measurement is running, and nothing in
+    # the panel starts one. _report_measure writes nowhere while this is None.
 
     # The one thing RhinoScan cannot do for you, and the thing everyone gets
     # wrong first: the honk finds the bodies, it does not describe them. Only
     # a resolved body carries PlanetClass and Volcanism, which is all this
     # reads. Said here, before you press the button and wonder.
     tk.Label(_frame, text="FSS unknown systems", anchor="w",
-             fg=palette.MUTED).grid(row=5, column=0, columnspan=4,
+             fg=palette.MUTED).grid(row=4, column=0, columnspan=4,
                                     sticky="w", padx=2, pady=(0, 2))
 
     _status = tk.Label(_frame, text="", anchor="w", wraplength=320, justify="left")
-    _status.grid(row=6, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
+    _status.grid(row=5, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
 
     if theme:
         theme.update(_frame)
@@ -186,15 +181,15 @@ def _on_ui(function, *args):
 
 
 def _folder_link(parent):
-    """The cards folder, one click away - a path you cannot open is a path you
-    stop looking at."""
-    label = tk.Label(parent, text="cards folder ↗", anchor="w", cursor="hand2")
+    """The bookmarks folder, one click away - a path you cannot open is a path
+    you stop looking at."""
+    label = tk.Label(parent, text="bookmarks ↗", anchor="w", cursor="hand2")
     label.bind("<Button-1>", lambda event: open_cards())
     return label
 
 
 def open_cards():
-    """Explorer on the cards folder, made if this is the first time."""
+    """Explorer on the bookmarks folder, made if this is the first time."""
     try:
         os.makedirs(spotcard.CARDS_ROOT, exist_ok=True)
         # startfile is Windows-only and EDMC is too, but a failure here must not
@@ -250,7 +245,11 @@ CLOSE_ENOUGH_M = 10.0
 
 
 def toggle_measure():
-    """Start driving the border, or stop and keep what was driven."""
+    """Start driving the border, or stop and keep what was driven.
+
+    Nothing in the panel calls this. The measuring works and is tested; it has
+    no button, on purpose, until there is a decision about where it belongs.
+    """
     global _track, _measure_after
 
     if _track is not None:
@@ -258,8 +257,6 @@ def toggle_measure():
         _report_measure(final=True)
         _log_measurement(_track)
         _track = None
-        if _measure_button:
-            _measure_button.config(text="MeasureSpot", fg=palette.ACCENT)
         return
 
     status = spotmark.read_status()
@@ -269,11 +266,9 @@ def toggle_measure():
 
     _track = measure.Track()
     _track.add(status)
-    logger.info(f"measure: started on {_track.body} "
-                f"at {status['Latitude']:.6f} / {status['Longitude']:.6f}, "
-                f"radius {_track.radius:,.0f} m")
-    if _measure_button:
-        _measure_button.config(text="Stop", fg=palette.WARN)
+    logger.debug(f"measure: started on {_track.body} "
+                 f"at {status['Latitude']:.6f} / {status['Longitude']:.6f}, "
+                 f"radius {_track.radius:,.0f} m")
     # The three things that decide whether the number is worth anything. A rig
     # at the start is the only marker the game gives you for where the border
     # began, and slowly is not fussiness - Status.json is read once a second,
@@ -314,15 +309,16 @@ def _cancel_poll():
 def _log_measurement(track):
     """The whole measurement, once, when it is finished.
 
-    Including every point in degrees: the area is derived, and a derived
-    number nobody can re-derive is a number nobody can check.
+    Debug level throughout. Nothing in the panel starts a measurement, so none
+    of this belongs in EDMC's log by default - it is there for whoever turns
+    RHINOSPOTTER_DEBUG on to check a number, and silent otherwise.
     """
     summary = track.summary()
-    logger.info("measure: " + "  ".join(f"{key}={value}"
-                                        for key, value in summary.items()))
+    logger.debug("measure: " + "  ".join(f"{key}={value}"
+                                         for key, value in summary.items()))
     if summary["points"] >= 3 and summary["closure_m"] > CLOSE_ENOUGH_M:
-        logger.warning(f"measure: border left open by {summary['closure_m']:,.0f} m - "
-                       "the area includes a side that was never driven")
+        logger.debug(f"measure: border left open by {summary['closure_m']:,.0f} m - "
+                     "the area includes a side that was never driven")
     for index, (lat, lon) in enumerate(track.points, start=1):
         logger.debug(f"measure: {index:>3}  {lat:.6f}  {lon:.6f}")
 
@@ -381,12 +377,12 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 
 
 def make_card():
-    """Mark where the ship is standing and render the card for it."""
+    """Mark where the ship is standing and render the bookmark for it."""
     global _card_token, _last_index
 
     _set_done("")
     if _material.get() in ("", NO_MATERIAL, ALL_MATERIALS):
-        _set_status("pick one material - a card names what you mined")
+        _set_status("pick one material - a bookmark names what you mined")
         return
 
     spot = spotmark.mark(spotmark.read_status(), system=_system, commander=_cmdr)
@@ -421,7 +417,7 @@ def _render_card(spot, token):
         spotcard.render(spot)
         message = None
     except Exception as err:
-        message = f"no card: {err}"
+        message = f"no bookmark: {err}"
     _on_ui(_report, message, token)
 
 
@@ -439,7 +435,7 @@ def _on_update_checked(tag, newer):
 
 
 def _show_update(tag, newer):
-    """Create Card becomes the update, rather than a fourth button appearing.
+    """Bookmark becomes the update, rather than a fourth button appearing.
 
     A permanent version button only made the panel wider, and a temporary one
     still widens it on the day it matters. The card can wait the thirty

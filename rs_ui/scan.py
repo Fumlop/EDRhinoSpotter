@@ -289,7 +289,7 @@ def _group(parent, ground, found, sheet, wrap, focus=None, marked=None):
 
 
 def _cards_link(parent, records):
-    """"2 cards" behind a body you have already marked, opening the newest.
+    """"2 bookmarks" behind a body you have already marked, opening the newest.
 
     Only on bodies that have one. A count of zero on every other row would be
     nine pieces of nothing in a ten-body system, and the useful signal here is
@@ -298,7 +298,7 @@ def _cards_link(parent, records):
     if not records:
         return
     count = len(records)
-    label = tk.Label(parent, text=f"  {count} card{'' if count == 1 else 's'} ↗",
+    label = tk.Label(parent, text=f"  {count} bookmark{'' if count == 1 else 's'} ↗",
                      bg=BG, fg=ACCENT, anchor="w", cursor="hand2",
                      font=("Consolas", 9))
     label.pack(side="left")
