@@ -2,14 +2,15 @@
 
 One row per landable body, grouped by what kind of body it is, with the
 materials that kind of body has been found to hold underneath. The body list
-comes from the journal; the percentages come from ground_rules.json, exported
-from the EDIntel mining sheet. Neither needs the network.
+comes from the journal; the percentages come from ground_rules.json, which
+ships with the plugin. Neither needs the network.
 
 The window is deliberately read-only and disposable. Nothing is saved from it,
 so pressing the button twice costs nothing and the card flow is untouched.
 """
 
 import tkinter as tk
+from tkinter import font as tkfont
 
 from rs_core import grounds, palette
 
@@ -18,10 +19,15 @@ try:
 except ImportError:      # running outside EDMC
     theme = None
 
-# Four is what fits beside a body without the row wrapping, and the fifth
-# material on rocky ground is already under 10%.
-TOP_MATERIALS = 4
+# Three. Four was what the window was sized around, and it was the longest
+# line in it by a hundred pixels - the fourth material is the least likely one
+# anyway, and a row of four pairs is a run of words rather than a list.
+TOP_MATERIALS = 3
 MIN_PCT = 2.0
+
+# Wide enough for "15 d a" and every other body designation in a normal
+# system, and narrow enough that the numbers start in the same place.
+NAME_WIDTH = 8
 
 BG = palette.BG
 FG = palette.FG
@@ -43,23 +49,87 @@ def show(parent, register, sheet):
     _window = tk.Toplevel(parent)
     _window.title(f"RhinoScan - {register.system or 'unknown system'}")
     _window.configure(bg=BG)
-    _window.geometry("620x560")
 
     outer = tk.Frame(_window, bg=BG)
     outer.pack(fill="both", expand=True, padx=14, pady=12)
 
     _header(outer, register, sheet)
 
-    listing = _scrollable(outer)
+    listing, wrap = _scrollable(outer)
     groups = register.by_ground()
     if not groups:
-        _empty(listing, register)
+        wrap(_empty(listing, register))
     else:
         for ground, found in groups:
-            _group(listing, ground, _shorten(found, register.system), sheet)
+            _group(listing, ground, _shorten(found, register.system), sheet, wrap)
 
-    _footer(outer, sheet)
+    _footer(outer, sheet, _Wrapper(_window, margin=40))
+    _fit(_window, listing)
     return _window
+
+
+# What the window may grow to before it starts scrolling instead. Wide enough
+# for four materials on one line and a body row beside them; tall enough for a
+# well-scanned system without covering the whole screen.
+MAX_WIDTH = 900
+MAX_HEIGHT = 780
+OUTER_PAD = 14
+SCROLLBAR = 18
+# The three spaces every body row starts with.
+INDENT = 24
+# Header, the two lines above the list, and the footer under it.
+CHROME = 150
+
+
+def _lines(container):
+    """Every label in the list, however deeply nested."""
+    found = []
+    for child in container.winfo_children():
+        if isinstance(child, tk.Label):
+            found.append(child)
+        found.extend(_lines(child))
+    return found
+
+
+def _measure(labels):
+    """The width of the widest label, measured off its text and its font.
+
+    Not off the widgets: a frame inside a canvas reports whatever its children
+    asked for before anything was laid out, and wraplength is still zero at
+    that point, so the answer came back both too small and too late. Font
+    metrics are exact and available immediately.
+    """
+    widest = 0
+    for label in labels:
+        text = label.cget("text")
+        if not text:
+            continue
+        metrics = tkfont.Font(font=label.cget("font"))
+        for line in text.splitlines():
+            widest = max(widest, metrics.measure(line))
+    return widest
+
+
+def _fit(window, listing):
+    """Open at the size the content asks for, capped.
+
+    Measured off the list rather than the window: a canvas has no natural size
+    of its own, so asking the window how big it wants to be gets an answer
+    that ignores everything inside the scrolling area - 520px, for content
+    that needs 700.
+
+    A fixed geometry was a guess and it was wrong in both directions: too
+    narrow for four materials on a line, too tall for a system with two bodies
+    in it. Past the cap the list scrolls, which is what the scrollbar is for.
+    """
+    window.update_idletasks()
+    # The rows, plus the scrollbar they sit beside and the padding around them.
+    content = _measure(_lines(listing)) + SCROLLBAR + 2 * OUTER_PAD + INDENT
+    width = min(max(content, 420), MAX_WIDTH)
+    wanted = max(window.winfo_reqheight(), listing.winfo_reqheight() + CHROME)
+    height = min(max(wanted, 260), MAX_HEIGHT)
+    window.geometry(f"{width}x{height}")
+    window.minsize(480, 240)
 
 
 def _header(parent, register, sheet):
@@ -74,19 +144,21 @@ def _header(parent, register, sheet):
 
 
 def _empty(parent, register):
-    text = ("Nothing scanned here yet. Honk the system - the discovery scan "
-            "carries everything this needs."
+    text = ("Nothing here yet. The honk alone does not describe the bodies - "
+            "run the FSS and resolve them, or fly in and let the auto-scan "
+            "do the near ones."
             if register.system else
             "Waiting for the journal. Jump somewhere, or restart EDMC if you "
             "were already docked when it started.")
-    tk.Label(parent, text=text, bg=BG, fg=DIM, wraplength=540, justify="left",
-             anchor="w").pack(fill="x", pady=6)
+    label = tk.Label(parent, text=text, bg=BG, fg=DIM, justify="left", anchor="w")
+    label.pack(fill="x", pady=6)
+    return label
 
 
-def _group(parent, ground, found, sheet):
+def _group(parent, ground, found, sheet, wrap):
     """One body type, its bodies, and what that type has been found to hold."""
     block = tk.Frame(parent, bg=BG)
-    block.pack(fill="x", pady=(0, 14))
+    block.pack(fill="x", pady=(0, 16))
 
     head = tk.Frame(block, bg=BG)
     head.pack(fill="x")
@@ -97,11 +169,13 @@ def _group(parent, ground, found, sheet):
 
     materials = sheet.materials(ground, limit=TOP_MATERIALS, minimum=MIN_PCT)
     if materials:
-        text = "  ".join(f"{row['material']} {row['pct']}%" for row in materials)
+        # Separated, not just spaced: "Olivine 56.1%  Monazite 45.6%" reads as
+        # one run of words, and the eye has to find the pairs itself.
+        text = "   ·   ".join(f"{row['material']} {row['pct']}%" for row in materials)
         line = tk.Label(block, text=text, bg=BG, fg=GOOD, anchor="w",
                         font=("Consolas", 9), justify="left")
-        line.pack(fill="x")
-        _wrap_with(line, block)
+        line.pack(fill="x", pady=(1, 5))
+        wrap(line)
     elif sheet.loaded:
         tk.Label(block, text="nothing measured on this ground yet", bg=BG, fg=WARN,
                  anchor="w", font=("Segoe UI", 9)).pack(fill="x")
@@ -126,47 +200,81 @@ def _shorten(found, system):
 
 
 def _body_line(body):
-    """One body: where it is, how probed it is, what its volcanism is.
+    """One body as fixed-width columns: name, distance, locations, strength.
 
-    The location count comes from FSSBodySignals or SAASignalsFound. A body
-    with none has not been counted rather than counted at zero, so it says so -
-    "0 locations" reads as barren, which is the opposite of what it means.
+    Ragged columns were the thing that made the list hard to read - every row
+    was the same weight of monospace and the numbers never lined up, so there
+    was nothing for the eye to run down. Right-aligned numbers give it two.
+
+    The volcanism is cut to "major" or "minor". What kind it is stands in the
+    heading above, in bigger type, once instead of ten times.
     """
-    distance = body.get('distance')
-    parts = [body.get('short') or body['name']]
-    if distance is not None:
-        parts.append(f"{distance:,.0f} Ls")
-    locations = body.get('locations')
-    parts.append(f"{locations} loc" if locations is not None else "unprobed")
-    volcanism = body.get('volcanism')
-    if volcanism:
-        parts.append(volcanism.replace(" volcanism", ""))
-    return "  ".join(parts)
+    name = (body.get("short") or body["name"])[:NAME_WIDTH].ljust(NAME_WIDTH)
+
+    distance = body.get("distance")
+    where = f"{distance:,.0f} Ls" if distance is not None else "-"
+
+    locations = body.get("locations")
+    counted = f"{locations} loc" if locations is not None else "unprobed"
+
+    return f"{name} {where:>10} {counted:>9}  {_strength(body)}"
 
 
-def _footer(parent, sheet):
+def _strength(body):
+    """How much of it there is, from the volcanism string.
+
+    The game says "major metallic magma" and "minor metallic magma"; the
+    heading already said metallic magma. Only major or minor is news here.
+    """
+    volcanism = (body.get("volcanism") or "").lower()
+    for word in ("major", "minor"):
+        if word in volcanism:
+            return word
+    return ""
+
+
+def _footer(parent, sheet, wrap):
     if sheet.loaded:
-        text = (f"Rates from the EDIntel mining sheet, {sheet.generated}. "
-                "What a location holds is in no game feed - this is where to "
-                "prospect, not what you will find.")
+        text = (f"Rates measured across every mining location read so far, "
+                f"{sheet.generated}. What a location holds is in no game feed - "
+                "this is where to prospect, not what you will find.")
     else:
         text = ("ground_rules.json is missing, so only the body types are "
-                "shown. Export it from EDIntel: "
-                "python scripts/export/rhinoscan_data.py")
+                "shown. Reinstall the plugin, or drop the file back beside "
+                "load.py.")
     note = tk.Label(parent, text=text, bg=BG, fg=DIM, justify="left",
                     anchor="w", font=("Segoe UI", 8))
     note.pack(side="top", fill="x", pady=(8, 0))
-    _wrap_with(note, parent)
+    wrap(note)
 
 
-def _wrap_with(label, container):
-    """Wrap at whatever width the container actually has, now and after every
-    resize. A fixed wraplength is a guess at the window size, and the window
-    is resizable."""
-    def resize(event):
-        if event.width > 40:
-            label.config(wraplength=event.width - 16)
-    container.bind("<Configure>", resize, add="+")
+class _Wrapper:
+    """Wraps labels at the width of the thing that actually knows it.
+
+    A frame inside a canvas grows to fit its widest child, so asking the frame
+    how wide it is gets the label's own width back and nothing ever wraps -
+    it just ran off the right edge instead. The canvas is clipped to the
+    window, so it is the one to ask, and it says so again on every resize.
+    """
+
+    def __init__(self, source, margin=0):
+        self.labels = []
+        self.margin = margin
+        self.width = 0
+        source.bind("<Configure>", self._resize, add="+")
+
+    def __call__(self, label):
+        self.labels.append(label)
+        if self.width:
+            label.config(wraplength=self.width)
+        return label
+
+    def _resize(self, event):
+        if event.width <= 80:
+            return
+        self.width = event.width - self.margin
+        for label in self.labels:
+            label.config(wraplength=self.width)
 
 
 def _scrollable(parent):
@@ -199,4 +307,6 @@ def _scrollable(parent):
     canvas.bind_all("<MouseWheel>",
                     lambda event: canvas.yview_scroll(-int(event.delta / 120), "units"))
     canvas.bind("<Destroy>", lambda event: canvas.unbind_all("<MouseWheel>"))
-    return inner
+    # 24px off the canvas width: the rows are indented three spaces and a
+    # wrapped line that touches the scrollbar looks like a bug.
+    return inner, _Wrapper(canvas, margin=24)

@@ -8,19 +8,12 @@ Press **RhinoScan**. A window opens listing the landable bodies of the system
 you are in, grouped by what kind of body they are, with what that kind has
 been found to hold underneath.
 
-```
-Rocky World [magma]          3 of them
-  Olivine 56.1%  Monazite 45.6%  Bastnasite 42.1%  Serendibite 31.6%
-  across 57 locations read
-   Andel 1 a    412 Ls   16 loc     major metallic magma
-   Andel 1 b    418 Ls   unprobed   minor metallic magma
-   Andel 4 a   1016 Ls   9 loc      major rocky magma
-```
+![The scan window](docs/rhinoscan.png)
 
-The bodies come from the journal, so a system you have honked is already fully
-described - `PlanetClass` and `Volcanism` arrive with the discovery scan, no
-detailed surface scan needed. Scan a body properly later and its row updates
-itself.
+The bodies come from the journal. **The honk alone is not enough**: it finds
+the bodies but does not describe them, and only a body the FSS has resolved
+carries the planet class and volcanism this reads. Honk, then work the FSS - or
+fly in and let the auto-scan sweep the near ones.
 
 The location count comes from the journal too: the FSS reports it without you
 flying out there, and a detailed surface scan confirms it. A body nobody has
@@ -34,8 +27,8 @@ anything you scan after that is added to it. Nothing is asked of EDSM or
 anyone else's server - this is your own scan data going to disk and coming
 back.
 
-The percentages come from `ground_rules.json`, exported from the EDIntel
-mining sheet. Neither half touches the network. Losing the JSON costs the
+The percentages come from `ground_rules.json`, the mining sheet shipped beside
+`load.py`. Neither half touches the network. Losing the JSON costs the
 percentages, not the body list.
 
 **These are rates, not contents.** What a mining location actually holds is in
@@ -43,6 +36,8 @@ no journal event and on no feed. This says where to prospect; it cannot say
 what you will find.
 
 ## MiningCard - the patch you are standing on, as a PNG
+
+![A card](docs/miningcard.png)
 
 1. Land and put the rigs down.
 2. Pick the **Material**, set **Rigs**. `Location` fills itself when a mining
@@ -66,8 +61,9 @@ The target panel is the only place a location's materials are written down.
 
 ## Install
 
-Drop the folder into `%LOCALAPPDATA%\EDMarketConnector\plugins\` and restart
-EDMC.
+See [INSTALL.md](INSTALL.md). Short version: unpack into
+`%LOCALAPPDATA%\EDMarketConnector\plugins\RhinoSpotter\` so that `load.py`
+sits directly inside, and restart EDMC.
 
 When a newer release is out, **MiningCard** reads **Update** instead and the
 status line names the version. Press it and the release is fetched and
@@ -77,14 +73,6 @@ the panel stays the same width in every state.
 Your exported `ground_rules.json` is kept, and cards and scans are never
 touched - they live under `%LOCALAPPDATA%\RhinoSpotter\`, not in the plugin
 folder.
-
-## Refreshing the rates
-
-From an EDIntel checkout:
-
-    python scripts/export/rhinoscan_data.py
-
-That rewrites `ground_rules.json` in this folder from the current mining sheet.
 
 ## Seeing it without flying anywhere
 

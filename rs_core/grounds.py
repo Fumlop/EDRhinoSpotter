@@ -6,10 +6,12 @@ way. See rs_tests/test_grounds.py.
 Two halves:
 
   classify()  turns a journal Scan into one of the eight grounds the mining
-              sheet measures. PlanetClass and Volcanism arrive with every
-              AutoScan, so a honk is enough - no detailed surface scan.
-  materials() looks that ground up in ground_rules.json, which is the sheet
-              frozen at export time by EDIntel's scripts/export/rhinoscan_data.py.
+              sheet measures. PlanetClass and Volcanism arrive with any Scan
+              event - the FSS resolving a body, or the auto-scan on arrival.
+              The honk itself emits none: it finds the bodies, it does not
+              describe them.
+  materials() looks that ground up in ground_rules.json, the mining sheet
+              frozen at the time the plugin was packaged.
 
 What a mining location actually holds is in no game feed. These are the rates
 across every location read so far, which is a reason to fly somewhere, not a
@@ -55,8 +57,8 @@ _SILICATE = 'silicate'
 def classify(body):
     """A journal Scan dict -> a ground key, or None if it is not landable.
 
-    Mirrors the CASE in EDIntel's fetch_hit_rates, so the ground a body lands
-    in here is the ground its percentages were measured on. Anything else is
+    Mirrors the classifier the sheet was measured with, so the ground a body
+    lands in here is the ground its percentages came from. Anything else is
     two tables that look alike and disagree.
     """
     if not body or not body.get('Landable'):

@@ -91,8 +91,16 @@ def build(parent):
     _scan_count = tk.Label(row, text="", anchor="w")
     _scan_count.pack(side="left", padx=(8, 0))
 
+    # The one thing RhinoScan cannot do for you, and the thing everyone gets
+    # wrong first: the honk finds the bodies, it does not describe them. Only
+    # a resolved body carries PlanetClass and Volcanism, which is all this
+    # reads. Said here, before you press the button and wonder.
+    tk.Label(_frame, text="FSS unknown systems", anchor="w",
+             fg=palette.MUTED).grid(row=4, column=0, columnspan=4,
+                                    sticky="w", padx=2, pady=(0, 2))
+
     _status = tk.Label(_frame, text="", anchor="w", wraplength=320, justify="left")
-    _status.grid(row=4, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
+    _status.grid(row=5, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
 
     if theme:
         theme.update(_frame)

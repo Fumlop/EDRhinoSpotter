@@ -6,8 +6,9 @@ rs_tests/test_bodies.py.
 EDMC hands every journal line to journal_entry. Three events matter:
 
     Scan              PlanetClass, Landable, Volcanism - everything the ground
-                      classification needs. Arrives from the honk, so a
-                      discovery-scanned system is already fully described.
+                      classification needs. Emitted when the FSS resolves a
+                      body, or when the auto-scan sweeps the near ones on
+                      arrival. The honk itself emits none.
     FSSBodySignals    how many Planetary Mining Locations a body carries, from
                       the FSS, without flying out to it.
     SAASignalsFound   the same count after a detailed surface scan, which is

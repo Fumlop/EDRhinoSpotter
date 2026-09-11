@@ -34,8 +34,8 @@ DOWNLOAD_TIMEOUT = 60
 ZIP_PREFIX = REPO.replace("/", "-") + "-"
 
 # Never overwritten by an update:
-#   ground_rules.json  the commander exported it from their own EDIntel, so the
-#                      local copy is by definition fresher than a release's.
+#   ground_rules.json  a locally refreshed sheet is newer than the one in a
+#                      release, so the release must not overwrite it.
 #   lib/               vendored, gitignored, and therefore not in the zip - it
 #                      is named here so a future release cannot quietly drop it.
 # Cards and scans are not in this list because they do not live here: both sit

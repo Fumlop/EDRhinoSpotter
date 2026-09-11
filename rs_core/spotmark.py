@@ -17,9 +17,9 @@ STATUS_PATH = os.path.expandvars(
     r"%USERPROFILE%\Saved Games\Frontier Developments\Elite Dangerous\Status.json"
 )
 
-# The prospecting guide sheet's 22 materials plus bromellite, which is minable
-# on ice and simply has no rows yet. Hardcoded rather than read off D: so the
-# dropdown fills with EDIntel absent.
+# The sheet's 22 materials plus bromellite, which is minable on ice and simply
+# has no rows yet. Hardcoded rather than read off the sheet, so the dropdown
+# fills even when ground_rules.json is missing.
 MATERIALS = (
     "Alexandrite", "Bastnasite", "Bromellite", "Deuterium", "Diamond",
     "Grandidierite", "Helium", "Helium-3", "Iridium", "Jadeite",

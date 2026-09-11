@@ -6,7 +6,7 @@
 are in, grouped by what kind of body they are, with what that kind of body has
 been found to hold. Bodies come from journal `Scan` events, so a honk is
 enough and a later detailed scan updates the row it already wrote. The rates
-come from `ground_rules.json`, exported from the EDIntel mining sheet. Neither
+come from `ground_rules.json`, the mining sheet shipped with it. Neither
 half touches the network, and losing the JSON costs the percentages rather
 than the body list.
 
@@ -41,7 +41,7 @@ distance and the location count off the right edge - the name is in the title
 and the header already.
 
 **One palette.** The cards kept a warm olive-and-orange scheme from the
-notebook they were prototyped in, while the scan window used EDIntel's dark
+notebook they were prototyped in, while the scan window used a cold
 blue. Side by side they looked like two tools, which is exactly what a card
 dropped into a chat next to a screenshot is not. Both draw from
 rs_core/palette.py now - hex for tkinter, RGB for PIL, one conversion between
@@ -63,8 +63,8 @@ measures the same 250px in every state, which a permanent version button did
 not. The zipball goes to a temp folder first
 and is copied in a second pass, so a truncated download cannot leave half a
 plugin behind, and a zip that is not ours is refused before anything is
-touched. ground_rules.json is kept: you exported it from your own EDIntel, so
-the local copy is fresher than any release's.
+touched. ground_rules.json is kept: a locally refreshed sheet is newer
+than the one in a release.
 
 ## 1.1.0
 

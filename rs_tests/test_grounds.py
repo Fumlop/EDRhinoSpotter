@@ -8,8 +8,8 @@ from rs_core import grounds
 class TestClassify:
     """The eight buckets, matched against real PlanetClass strings.
 
-    These have to agree with the CASE in EDIntel's fetch_hit_rates. Two tables
-    that look alike and disagree are worse than one table.
+    These have to agree with the classifier the sheet was measured with. Two
+    tables that look alike and disagree are worse than one table.
     """
 
     @pytest.mark.parametrize("planet_class,volcanism,expected", [

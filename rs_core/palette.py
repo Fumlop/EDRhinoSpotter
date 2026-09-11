@@ -1,7 +1,7 @@
 """One palette, for the window and for the cards.
 
-They were two: the scan window took EDIntel's dark blue, and the cards had a
-warm olive-and-orange scheme left over from the notebook they were prototyped
+They were two: the scan window took a cold blue, and the cards had a warm
+olive-and-orange scheme left over from the notebook they were prototyped
 in. Side by side they looked like two tools, which is exactly what a card
 dropped into a chat next to a screenshot of the window is not.
 

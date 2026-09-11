@@ -99,8 +99,8 @@ class TestShouldCopy:
 
     @pytest.mark.parametrize("name", ["ground_rules.json", "lib", "data", "cards"])
     def test_local_things_are_kept(self, name):
-        """ground_rules.json was exported from the commander's own EDIntel, so
-        the local copy is by definition fresher than a release's."""
+        """A locally refreshed sheet is newer than the one in a release, so
+        the release must not overwrite it."""
         assert not update.should_copy(name)
 
 

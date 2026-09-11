@@ -5,7 +5,7 @@ into a chat beside a screenshot of the window looks like the same tool. PIL
 ships inside EDMC, so nothing extra is vendored for this.
 
 The card is the whole record: what was marked is what it shows. Nothing is
-looked up, so it renders with the database down or EDIntel not mounted.
+looked up, so it renders with nothing else running and no network.
 """
 
 import os

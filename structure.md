@@ -18,10 +18,12 @@ RhinoSpotter/
 ├── rs_core/             everything that is not a widget
 ├── rs_ui/               everything that is
 ├── rs_tests/            pytest suite, 164 checks
-├── ground_rules.json    the EDIntel mining sheet, frozen at export time
+├── ground_rules.json    the mining sheet, frozen when the plugin was packaged
 ├── cards/               rendered cards (gitignored)
 ├── data/                screenshots and sidecars (gitignored)
 ├── lib/                 vendored, unused, gitignored - see below
+├── docs/                screenshots for the README and INSTALL
+├── INSTALL.md
 ├── pytest.ini
 ├── README.md
 ├── CHANGELOG.md
@@ -44,7 +46,7 @@ No tkinter anywhere in here.
   the moment you fly off, so it is read once, at the press.
   `location_index()`, `read_status()`, `mark()`, `on_surface()`, `MATERIALS`.
 - **[spotcard.py](rs_core/spotcard.py)** - one spot -> a PNG card. Looks
-  nothing up, so it renders with the database down and EDIntel unmounted.
+  nothing up, so it renders with nothing else running and no network.
   `render()`, `filename()`, `_free()` (a repeat mark is a second card, not a
   replacement), `CARDS_ROOT`.
 - **[screenshots.py](rs_core/screenshots.py)** - the game's .bmp -> a cropped
@@ -53,7 +55,7 @@ No tkinter anywhere in here.
 - **[grounds.py](rs_core/grounds.py)** - what a body is, and what that kind of
   body holds. `classify()` turns a journal Scan into one of eight grounds;
   `Sheet` reads `ground_rules.json`. The classifier mirrors the CASE in
-  EDIntel's `fetch_hit_rates`, so a body lands in the bucket its percentages
+  the classifier the sheet was measured with, so a body lands in the bucket its percentages
   were measured on.
 - **[bodies.py](rs_core/bodies.py)** - `Register`, the landable bodies of the
   system you are in. Fed one journal event at a time, returns True when the
@@ -79,8 +81,8 @@ No tkinter anywhere in here.
   place if there is. The zipball is extracted to a temp folder inside the
   plugin and copied in a second pass, so a truncated download cannot leave
   half a plugin behind. `KEEP` names what an update may not overwrite -
-  `ground_rules.json` above all, because the commander exported it from their
-  own EDIntel and the release copy is by definition older.
+  `ground_rules.json` above all, because a locally refreshed sheet is newer
+  than the one in a release.
 - **[palette.py](rs_core/palette.py)** - the colours, once. Hex for tkinter,
   RGB tuples for PIL, one conversion function between them so the window and
   the cards cannot drift apart. They used to be two schemes and looked like
@@ -140,7 +142,7 @@ Everything in here imports tkinter.
 | Bodies in this system | journal `Scan` events, via EDMC | the game, live |
 | Mining locations on a body | journal `FSSBodySignals` / `SAASignalsFound` | the FSS, then a surface scan |
 | Systems visited before | `%LOCALAPPDATA%\RhinoSpotter\data\<System>.json` | written on every change |
-| What a ground holds | `ground_rules.json` | `python scripts/export/rhinoscan_data.py` in EDIntel |
+| What a ground holds | `ground_rules.json` | shipped with the release |
 | What a location holds | nothing - it is in no feed | screenshot and read by eye |
 
 The last row is the whole reason this plugin exists.

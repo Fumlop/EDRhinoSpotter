@@ -37,8 +37,8 @@ STATUS_PATH = os.path.expandvars(
 )
 JOURNAL_DIR = os.path.dirname(STATUS_PATH)
 
-EDINTEL_ROOT = r"D:\Apps\EDIntel"
-OUT_ROOT = os.path.join(EDINTEL_ROOT, "data", "planetScreener")
+SHOTS_ROOT = r"D:\Apps\EDIntel"
+OUT_ROOT = os.path.join(SHOTS_ROOT, "data", "planetScreener")
 LOCAL_ROOT = os.path.join(os.path.dirname(__file__), "planetScreener")
 
 # The .bmp is the game's scratch file and is what fills the pictures folder;
@@ -68,7 +68,7 @@ def _safe(name):
 
 
 def out_root():
-    return OUT_ROOT if os.path.isdir(EDINTEL_ROOT) else LOCAL_ROOT
+    return OUT_ROOT if os.path.isdir(SHOTS_ROOT) else LOCAL_ROOT
 
 
 def _status():
