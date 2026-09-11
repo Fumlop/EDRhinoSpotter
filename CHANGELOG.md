@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.6.0
+
+**Bookmarks open as a page.** Clicking the count behind a body used to put
+Explorer's cursor on the newest card. Now it writes a table beside the cards
+and opens it in the browser: a row per bookmark with location, material, rigs,
+heading, coordinates and when it was marked, and the card itself alongside.
+
+Eleven bookmarks on one body were eleven files to open one at a time, and the
+sidecar holding the coordinates was not readable at all.
+
+Written fresh on every open, and beside the cards on purpose - the images are
+then one relative path away and the page works from a file:// URL with nothing
+serving it. A folder that cannot be written falls back to the old Explorer
+behaviour: a read-only folder should cost the table, not the bookmarks.
+
 ## 2.5.0
 
 **Create Card is called Bookmark**, and so is everything around it: the link

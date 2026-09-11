@@ -20,7 +20,18 @@ been found to hold above it.
 *Example system. Percentages are the share of that ground's mining locations
 that carried the material; `unprobed` means nobody has counted that body yet,
 and those rows are dimmed. A body you have already marked shows how many
-bookmarks it has - click and Explorer opens with the newest one selected.*
+bookmarks it has - click and a page of them opens in your browser.*
+
+### The bookmarks page
+
+Clicking `3 bookmarks` writes a page beside the cards and opens it: one row
+per bookmark with the location, material, rigs, heading, coordinates and when
+it was marked, and the card itself alongside. Sorted by location, which is the
+number on the target panel and the order a body gets worked in.
+
+It is written fresh every time it is opened. The bookmarks are the truth and
+the page is a view of them, so a stale one would be a bug waiting rather than
+a cache.
 
 ### Filtering to one material
 

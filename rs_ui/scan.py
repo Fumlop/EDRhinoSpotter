@@ -10,11 +10,13 @@ so pressing the button twice costs nothing and the card flow is untouched.
 """
 
 import os
+import pathlib
 import subprocess
 import tkinter as tk
+import webbrowser
 from tkinter import font as tkfont
 
-from rs_core import cards, grounds, palette
+from rs_core import cards, grounds, page, palette
 
 try:
     from theme import theme
@@ -302,22 +304,30 @@ def _cards_link(parent, records):
                      bg=BG, fg=ACCENT, anchor="w", cursor="hand2",
                      font=("Consolas", 9))
     label.pack(side="left")
-    newest = cards.newest(records)
-    label.bind("<Button-1>", lambda event: _reveal(newest.get("path")))
+    system = records[0].get("system")
+    body = records[0].get("planet_name")
+    label.bind("<Button-1>", lambda event: _open_bookmarks(system, body, records))
 
 
-def _reveal(path):
-    """Explorer, with the card selected rather than the folder opened.
+def _open_bookmarks(system, body, records):
+    """Write the page for this body and open it in the browser.
 
-    Opening the folder leaves you looking for the file among twenty others;
-    /select puts the cursor on it.
+    Written fresh every time rather than cached: the bookmarks are the truth
+    and the page is a view of them, so a stale one is a bug waiting.
+
+    Falls back to Explorer with the newest card selected if the page cannot be
+    written - a read-only folder should cost the table, not the bookmarks.
     """
-    if not path or not os.path.isfile(path):
+    path = page.write(system, body, records)
+    if path:
+        webbrowser.open(pathlib.Path(path).as_uri())
         return
-    try:
-        subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])
-    except OSError:
-        pass
+    newest = cards.newest(records)
+    if newest and os.path.isfile(newest.get("path") or ""):
+        try:
+            subprocess.Popen(["explorer", "/select,", os.path.normpath(newest["path"])])
+        except OSError:
+            pass
 
 
 def _shorten(found, system):

@@ -67,8 +67,9 @@ volcanism this reads, so:
 A system where you did neither shows nothing, and the window says so.
 
 **Bookmarks you already made.** A body you have marked before shows
-"2 bookmarks" behind it. Clicking opens Explorer with the newest one selected, rather than
-the folder for you to hunt through. Bodies with none say nothing.
+"2 bookmarks" behind it. Clicking opens a page in your browser: one row per
+bookmark with the location, material, rigs, heading, coordinates and when it
+was marked, and the card itself alongside. Bodies with none say nothing.
 
 **Filtering.** Pick a material in the panel and the window lists only the
 ground that carries it, each group leading with its rate for that material.

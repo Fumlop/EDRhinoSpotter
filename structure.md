@@ -99,6 +99,10 @@ No tkinter anywhere in here.
   still gets a plausible-looking area. Nothing in the panel starts a
   measurement: the code works and is tested, and has no button until there is
   a decision about where it belongs.
+- **[page.py](rs_core/page.py)** - the bookmarks of one body as an HTML table,
+  written beside the cards so the images are one relative path away and it
+  opens from a file:// URL with nothing serving it. Regenerated on every open
+  rather than cached.
 - **[palette.py](rs_core/palette.py)** - the colours, once. Hex for tkinter,
   RGB tuples for PIL, one conversion function between them so the window and
   the cards cannot drift apart. They used to be two schemes and looked like
@@ -143,6 +147,8 @@ Everything in here imports tkinter.
   written straight back.
 - **test_measure.py** - a square of known size, an L to prove the shape is
   the shape and not its bounding box, and a parked SRV adding nothing.
+- **test_page.py** - a row per bookmark, sorted by location, relative image
+  paths, and a body name that is markup.
 - **test_palette.py** - that the card and the window draw the same black, and
   that a colour which is not six hex digits raises rather than silently
   becoming black.
