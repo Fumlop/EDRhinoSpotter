@@ -126,13 +126,21 @@ Get-FileHash -Algorithm SHA256 .\RhinoSpotter-2.1.0.zip
 The zip has to be the one attached to the release, not a fresh one built
 locally - a rebuilt zip has different timestamps and a different hash.
 
+Valid `pluginCategory` values, and only these: Exploration, Navigation,
+Combat, Trading, Engineering, Anti-Xeno, Colonization, Utility, Lore, Social,
+Streaming, Other.
+
 ### The steps
 
 1. Cut the release on our side first (below). Nothing can be submitted without
    a version that exists.
 2. Fork `EDCD/EDMC-Plugin-Registry`, branch.
-3. Add `plugins/<PluginName>.json`. One file.
+3. Copy `docs/registry/RhinoSpotter.json` from this repo into `plugins/`.
+   One file, nothing else touched.
 4. Open the PR, follow their template, and wait for a human.
+
+`docs/registry/RhinoSpotter.json` is kept here as the source of truth for what
+we submitted, so the next version is a diff rather than a rewrite.
 
 ---
 
