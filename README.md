@@ -93,10 +93,10 @@ That rewrites `ground_rules.json` in this folder from the current mining sheet.
 Ranks the systems in your recent journals by how much good ground they hold,
 so you can argue with the scoring before it ends up on a panel.
 
-    set RHINOSPOTTER_TESTMODE=1
+    python -m rs_core.replay --days 3 --testmode
 
-Starts the plugin standing in the best of them. RhinoScan then has something
-real to draw. Nothing is written to the cache in test mode.
+Writes the best of them into the cache, so the next EDMC start arrives in it
+and RhinoScan has something real to draw.
 
 ## Tests
 

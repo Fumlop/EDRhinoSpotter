@@ -73,7 +73,8 @@ No tkinter anywhere in here.
   Register the live plugin uses, and a score for what they found. Every
   landable body is worth the best rate its ground has ever shown and the
   system is worth the sum, because the question is not "is there something
-  here" but "is there enough here". Also the test mode - see below.
+  here" but "is there enough here". `--testmode` writes the winner to the
+  cache - see below.
 - **[update.py](rs_core/update.py)** - is there a newer release, and put it in
   place if there is. The zipball is extracted to a temp folder inside the
   plugin and copied in a second pass, so a truncated download cannot leave
@@ -139,19 +140,17 @@ The last row is the whole reason this plugin exists.
 
 ## Test mode
 
-    set RHINOSPOTTER_TESTMODE=1
+    python -m rs_core.replay --days 3 --top 5              rank them
+    python -m rs_core.replay --days 3 --testmode           stand in the best
 
-The plugin starts standing in the best system of the last three days of
-journals, so RhinoScan has something real to draw without anyone flying
-anywhere. It is the only way to look at that window over a system with four
-grounds in it without waiting to find one.
+The flag writes the winning system into the cache, so the next EDMC start
+arrives in it without anyone flying anywhere. It is the only way to look at
+the scan window over a system with four grounds in it rather than whichever
+one you happen to be sitting in.
 
-Nothing is written: the register is filled by hand rather than tracked, so a
-test-mode session cannot put a replayed system into the cache.
-
-The same scoring, as a tool, with no EDMC involved:
-
-    python -m rs_core.replay --days 3 --top 5
+It writes the same cache the plugin writes, and the data is the commander's
+own scans, so there is nothing to undo afterwards - the next real jump
+replaces what is in the register anyway.
 
 ## lib/
 

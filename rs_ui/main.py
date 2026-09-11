@@ -14,7 +14,7 @@ import subprocess
 import threading
 import tkinter as tk
 
-from rs_core import bodies, grounds, replay, screenshots, spotcard, spotmark, store, update
+from rs_core import bodies, grounds, screenshots, spotcard, spotmark, store, update
 from rs_core.logging import logger
 from rs_ui import scan
 
@@ -47,33 +47,7 @@ def start(plugin_dir):
     _sheet = grounds.Sheet()
     if not _sheet.loaded:
         logger.warning(f"no ground_rules.json: {_sheet.error}")
-    if os.environ.get("RHINOSPOTTER_TESTMODE"):
-        _enter_test_mode()
     return "RhinoSpotter"
-
-
-def _enter_test_mode():
-    """Stand in the best system of the last few days, without flying there.
-
-    RHINOSPOTTER_TESTMODE=1 replays the commander's recent journals and adopts
-    the highest-scoring system, so RhinoScan has something real to draw. It is
-    the only way to look at that window over a system with four grounds in it
-    without waiting to find one.
-
-    Nothing is written: the register is filled by hand rather than tracked, so
-    a test-mode session cannot put a replayed system into the cache.
-    """
-    try:
-        found = replay.best(sheet=_sheet)
-    except Exception:                              # a test aid must never be
-        logger.exception("test mode failed")       # the reason EDMC will not start
-        return
-    if not found:
-        logger.warning("test mode: no landable bodies in the recent journals")
-        return
-    system, seen = found
-    _register.adopt(system, seen)
-    logger.info(f"test mode: standing in {system}, {len(seen)} landable bodies")
 
 
 def build(parent):

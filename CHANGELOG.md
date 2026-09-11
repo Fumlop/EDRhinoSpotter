@@ -28,11 +28,17 @@ anything scanned afterwards added to it. Beside the cards and outside the
 plugin folder, for the same reason the cards are: a reinstall replaces the
 plugin and should not take your scans with it.
 
-**Test mode.** RHINOSPOTTER_TESTMODE=1 replays the last three days of
-journals and starts the plugin standing in the best system they contain, so
-RhinoScan can be looked at over a system with four grounds in it without
-waiting to find one. `python -m rs_core.replay` prints the same ranking with
-no EDMC involved. Nothing is written to the cache in test mode.
+**Test mode.** python -m rs_core.replay ranks the systems in the last three
+days of journals by how much good ground they hold; --testmode writes the
+winner into the cache, so the next EDMC start arrives in it and RhinoScan can
+be looked at over a system with four grounds in it.
+
+**Scan window layout.** The footer packed into the same box as the scrolling
+list and landed beside it instead of underneath. Material lines were clipped
+rather than wrapped, because the wrap width was a guess at a window that is
+resizable. And every body row repeated the system name, which pushed the
+distance and the location count off the right edge - the name is in the title
+and the header already.
 
 **Tests.** 152 of them, replacing the one hand-rolled script. Two that were
 easy to get wrong and are now pinned: `Location` on game start must not empty

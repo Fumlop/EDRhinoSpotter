@@ -6,10 +6,11 @@ Two jobs.
                through lately, so the scoring can be argued with before it
                ends up on a panel.
 
-  As a test:   set RHINOSPOTTER_TESTMODE=1 and the plugin starts in the best
-               of those systems. RhinoScan then has something real to draw
-               without anyone flying anywhere, which is the only way to look
-               at the window over a system with four grounds in it.
+  As a test:   python -m rs_core.replay --testmode writes the best of those
+               systems into the cache, so the next EDMC start stands in it
+               without anyone flying anywhere. It is the only way to look at
+               the scan window over a system with four grounds in it rather
+               than whichever one you happen to be sitting in.
 
 It reads the commander's own journal files and nothing else - the same files
 EDMC reads, just more of them than the one it is watching.
@@ -24,7 +25,7 @@ import os
 import sys
 import time
 
-from rs_core import bodies, grounds
+from rs_core import bodies, grounds, store
 from rs_core.logging import logger
 
 JOURNAL_DIR = os.path.expandvars(
@@ -139,6 +140,9 @@ def main(argv=None):
     parser.add_argument("--days", type=int, default=DAYS)
     parser.add_argument("--root", default=JOURNAL_DIR)
     parser.add_argument("--top", type=int, default=10)
+    parser.add_argument("--testmode", action="store_true",
+                        help="write the best system to the cache, so the next "
+                             "EDMC start stands in it")
     args = parser.parse_args(argv)
 
     sheet = grounds.Sheet()
@@ -149,7 +153,15 @@ def main(argv=None):
         print("no landable bodies scanned in that window")
         return 1
 
-    for system, seen, value in rank(systems, sheet)[:args.top]:
+    ordered = rank(systems, sheet)
+    if args.testmode:
+        system, seen, value = ordered[0]
+        path = store.save(system, seen)
+        print(f"\ntest mode: {system} (score {value}, {len(seen)} landable)")
+        print(f"  -> {path}")
+        print("  start EDMC and jump nowhere - RhinoScan shows it")
+
+    for system, seen, value in ordered[:args.top]:
         counted = sum(body.get("locations") or 0 for body in seen)
         print(f"\n{system}   score {value}, {len(seen)} landable, {counted} locations counted")
         for ground, found in _by_ground(seen):
