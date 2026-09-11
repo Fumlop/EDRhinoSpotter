@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Cards and screenshots are the commander's own records, not the plugin.
+cards/
+data/
+
+# Vendored at some point for a database path that no longer exists. Kept out
+# of the repo until something imports it again.
+lib/

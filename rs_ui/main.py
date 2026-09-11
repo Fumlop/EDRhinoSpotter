@@ -1,0 +1,269 @@
+"""The panel EDMC draws, and the state behind it.
+
+Two things live here and nothing else does: the widgets, and the handful of
+variables that only make sense while a window is open. Everything that can be
+answered without a screen is in rs_core, which is why rs_tests can run it.
+
+Threads: the card render and the update check both run off the UI thread and
+come back through _frame.after. Tk is not thread-safe, and a widget written
+from a worker fails minutes later somewhere unrelated.
+"""
+
+import os
+import subprocess
+import threading
+import tkinter as tk
+import webbrowser
+
+from rs_core import bodies, grounds, screenshots, spotcard, spotmark, update
+from rs_core.logging import logger
+from rs_ui import scan
+
+try:
+    from theme import theme
+except ImportError:      # running outside EDMC
+    theme = None
+
+_system = ""
+_cmdr = None
+_last_index = None       # the location the last press saw, for the sidecar
+_card_token = 0          # only the newest render may write to the status line
+_body_names = {}         # BodyID -> name, so a targeted location can be placed
+
+_register = bodies.Register()
+_sheet = None            # rs_core.grounds.Sheet, read once at startup
+
+_frame = None
+_status = None
+_done = None             # "completed" beside the button, once a card is on disk
+_scan_count = None       # how many landable bodies the current system has
+_loc = None              # tk.StringVar - mining location index
+_rigs = None             # tk.StringVar - rigs on the patch
+_material = None         # tk.StringVar - the material this spot is mined for
+
+
+def start(plugin_dir):
+    global _sheet
+    _sheet = grounds.Sheet()
+    if not _sheet.loaded:
+        logger.warning(f"no ground_rules.json: {_sheet.error}")
+    return "RhinoSpotter"
+
+
+def build(parent):
+    global _frame, _status, _done, _scan_count, _loc, _rigs, _material
+
+    _frame = tk.Frame(parent)
+    _frame.columnconfigure(1, weight=1)
+
+    tk.Label(_frame, text=f"RhinoSpotter {update.VERSION}", anchor="w").grid(
+        row=0, column=0, sticky="w", padx=2, pady=(4, 2))
+    link = _folder_link(_frame)
+    link.grid(row=0, column=1, columnspan=3, sticky="w", padx=2, pady=(4, 2))
+
+    _material = tk.StringVar(value="")
+    _rigs = tk.StringVar(value="")
+    tk.Label(_frame, text="Material", anchor="w").grid(row=1, column=0, sticky="w", padx=2)
+    tk.OptionMenu(_frame, _material, "", *spotmark.MATERIALS).grid(
+        row=1, column=1, sticky="w", padx=2)
+    tk.Label(_frame, text="Rigs", anchor="w").grid(row=1, column=2, sticky="e", padx=2)
+    tk.Spinbox(_frame, from_=0, to=12, textvariable=_rigs, width=4).grid(
+        row=1, column=3, sticky="w", padx=2)
+
+    _loc = tk.StringVar(value="")
+    tk.Label(_frame, text="Location", anchor="w").grid(row=2, column=0, sticky="w", padx=2)
+    tk.Entry(_frame, textvariable=_loc, width=4).grid(row=2, column=1, sticky="w", padx=2)
+
+    # Own frame: column 1 stretches, and the markers have to sit against the
+    # buttons rather than out at the far edge of the panel.
+    row = tk.Frame(_frame)
+    row.grid(row=3, column=0, columnspan=4, sticky="w", padx=2, pady=(4, 2))
+    tk.Button(row, text="MiningCard", width=13, command=make_card).pack(side="left")
+    _done = tk.Label(row, text="", anchor="w")
+    _done.pack(side="left", padx=8)
+
+    scan_row = tk.Frame(_frame)
+    scan_row.grid(row=4, column=0, columnspan=4, sticky="w", padx=2, pady=(0, 2))
+    tk.Button(scan_row, text="RhinoScan", width=13, command=open_scan).pack(side="left")
+    _scan_count = tk.Label(scan_row, text="", anchor="w")
+    _scan_count.pack(side="left", padx=8)
+
+    _status = tk.Label(_frame, text="", anchor="w", wraplength=320, justify="left")
+    _status.grid(row=5, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
+
+    if theme:
+        theme.update(_frame)
+    # After the theme, which paints every label the same - the link has to stay
+    # visibly a link.
+    link.config(fg="#4a95eb")
+
+    update.check_async(_on_update_checked)
+    return _frame
+
+
+def _folder_link(parent):
+    """The cards folder, one click away - a path you cannot open is a path you
+    stop looking at."""
+    label = tk.Label(parent, text="cards folder ↗", anchor="w", cursor="hand2")
+    label.bind("<Button-1>", lambda event: open_cards())
+    return label
+
+
+def open_cards():
+    """Explorer on the cards folder, made if this is the first time."""
+    try:
+        os.makedirs(spotcard.CARDS_ROOT, exist_ok=True)
+        # startfile is Windows-only and EDMC is too, but a failure here must not
+        # be the thing that eats a card.
+        os.startfile(spotcard.CARDS_ROOT)          # noqa: S606
+    except AttributeError:
+        subprocess.Popen(["explorer", spotcard.CARDS_ROOT])
+    except OSError as err:
+        _set_status(f"cannot open {spotcard.CARDS_ROOT}: {err}")
+
+
+def open_scan():
+    """The RhinoScan window for the system the journal last named."""
+    if not _frame:
+        return
+    try:
+        scan.show(_frame.winfo_toplevel(), _register, _sheet)
+    except Exception as err:                       # a broken window must not
+        logger.exception("RhinoScan failed")       # take the card flow with it
+        _set_status(f"no scan window: {err}")
+
+
+def journal_entry(cmdr, is_beta, system, station, entry, state):
+    global _system, _cmdr
+
+    if system:
+        _system = system
+    if cmdr:
+        _cmdr = cmdr
+
+    # Status.json names the destination body by id only, so the names have to
+    # come from the journal, where half a dozen events carry both.
+    body_id = entry.get("BodyID")
+    body_name = entry.get("Body") or entry.get("BodyName")
+    if body_id is not None and body_name:
+        _body_names[body_id] = body_name
+
+    if _register.track(entry, system=system):
+        _refresh_scan_count()
+
+    if entry.get("event") == "Screenshot":
+        # Off the main thread: a 1080p bmp read plus a PNG write is long enough
+        # to stutter the panel, and nothing here needs an answer.
+        threading.Thread(target=_convert_shot,
+                         args=(entry, _location(), dict(_body_names)),
+                         daemon=True).start()
+
+
+def make_card():
+    """Mark where the ship is standing and render the card for it."""
+    global _card_token, _last_index
+
+    _set_done("")
+    if not _material.get():
+        _set_status("pick a material first")
+        return
+
+    spot = spotmark.mark(spotmark.read_status(), system=_system, commander=_cmdr)
+    _last_index = spot["location_index"]
+
+    # A typed Loc wins: Status.json only knows the location while it is the
+    # selected destination, and it is often deselected by the time you land.
+    typed = _int(_loc.get())
+    if typed is None and _last_index is not None:
+        _loc.set(str(_last_index))
+    else:
+        spot["location_index"] = typed
+
+    if not spotmark.on_surface(spot):
+        _set_status(f"no coordinates in Status.json for "
+                    f"{spot['planet_name'] or 'no body'} - are you on the surface?")
+        return
+
+    # Tk variables belong to the main thread - read them here, not in the worker.
+    spot["commodity"] = _material.get()
+    spot["rigs"] = _int(_rigs.get())
+
+    _set_status("")
+    _card_token += 1
+    threading.Thread(target=_render_card, args=(spot, _card_token), daemon=True).start()
+
+
+def _render_card(spot, token):
+    """The file name is not worth reading - either the card is there or the
+    reason it is not."""
+    try:
+        spotcard.render(spot)
+        message = None
+    except Exception as err:
+        message = f"no card: {err}"
+    if _frame:
+        _frame.after(0, _report, message, token)
+
+
+def _report(message, token):
+    """Stale renders stay quiet - a finished one must not label a running one."""
+    if token != _card_token:
+        return
+    _set_status(message or "")
+    _set_done("" if message else "completed")
+
+
+def _on_update_checked(tag, newer):
+    """Called on a worker thread - bounce to Tk before touching a widget."""
+    if not newer or not _frame:
+        return
+    _frame.after(0, _show_update, tag)
+
+
+def _show_update(tag):
+    if not _status:
+        return
+    label = tk.Label(_frame, text=f"{tag} is out ↗", anchor="w", cursor="hand2",
+                     fg="#ffd43b")
+    label.bind("<Button-1>", lambda event: webbrowser.open(update.RELEASES_PAGE))
+    label.grid(row=6, column=0, columnspan=4, sticky="w", padx=2, pady=(0, 4))
+
+
+def _refresh_scan_count():
+    if not _scan_count:
+        return
+    count = len(_register)
+    _scan_count.config(text=f"{count} landable" if count else "")
+
+
+def _set_status(text):
+    if _status:
+        _status.config(text=text)
+
+
+def _set_done(text):
+    if _done:
+        _done.config(text=text)
+
+
+def _int(value):
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _location():
+    """The mining location this session believes it is on, for the sidecar."""
+    typed = _int(_loc.get()) if _loc else None
+    return typed if typed else _last_index
+
+
+def _convert_shot(entry, mark_location, body_names):
+    try:
+        path = screenshots.convert(entry, mark_location, body_names)
+        message = "shot: " + os.path.basename(path)
+    except Exception as err:
+        message = f"screenshot not saved: {err}"
+    if _frame:
+        _frame.after(0, _set_status, message)

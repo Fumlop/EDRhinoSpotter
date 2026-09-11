@@ -1,0 +1,105 @@
+"""Which ground a body lands in, and what that ground is said to hold."""
+
+import pytest
+
+from rs_core import grounds
+
+
+class TestClassify:
+    """The eight buckets, matched against real PlanetClass strings.
+
+    These have to agree with the CASE in EDIntel's fetch_hit_rates. Two tables
+    that look alike and disagree are worse than one table.
+    """
+
+    @pytest.mark.parametrize("planet_class,volcanism,expected", [
+        # The game's own classes win before volcanism is looked at.
+        ("Metal rich body",         "metallic magma",  "metal-rich"),
+        ("Metal-rich body",         "",                "metal-rich"),
+        ("High metal content body", "silicate magma",  "high-metal-content"),
+        ("High metal content world", "",               "high-metal-content"),
+        ("Icy body",                "water geysers",   "icy"),
+        ("Rocky ice body",          "",                "rocky-ice"),
+        # A rocky body splits on what its volcanism is.
+        ("Rocky body", "major metallic magma",          "volcanic magma"),
+        ("Rocky body", "minor rocky magma",             "volcanic magma"),
+        ("Rocky body", "major silicate vapour geysers", "volcanic silicate"),
+        ("Rocky body", "major water geysers",           "volcanic rocky"),
+        ("Rocky body", "",                              "rocky"),
+    ])
+    def test_buckets(self, make_scan, planet_class, volcanism, expected):
+        assert grounds.classify(make_scan("B 1 a", planet_class, volcanism)) == expected
+
+    def test_silicate_beats_rocky_in_the_same_string(self, make_scan):
+        """'silicate' and 'rocky' both appear in some volcanism strings, and
+        silicate is the one that changes which materials are there."""
+        body = make_scan("B 1 a", "Rocky body", "minor rocky silicate vapour geysers")
+        assert grounds.classify(body) == "volcanic silicate"
+
+    def test_case_does_not_matter(self, make_scan):
+        assert grounds.classify(make_scan("B", "ROCKY BODY", "MAJOR METALLIC MAGMA")) \
+            == "volcanic magma"
+
+    @pytest.mark.parametrize("body", [
+        None,
+        {},
+        {"event": "Scan", "PlanetClass": "Rocky body", "Landable": False},
+        {"event": "Scan", "PlanetClass": "", "Landable": True},
+        {"event": "Scan", "Landable": True},
+    ])
+    def test_not_a_landable_body(self, body):
+        """A star, a gas giant, an unlandable rock: no ground, no row. The
+        panel answers what you can put a ship down on."""
+        assert grounds.classify(body) is None
+
+    def test_every_bucket_has_a_label(self):
+        for ground in grounds.GROUND_ORDER:
+            assert grounds.label(ground) != ground
+
+    def test_unknown_ground_labels_as_itself(self):
+        assert grounds.label("something new") == "something new"
+        assert grounds.label(None) == "unknown"
+
+
+class TestSheet:
+    def test_reads_the_table(self, sheet):
+        assert sheet.loaded
+        assert sheet.generated == "2026-01-01 00:00 UTC"
+        assert sheet.sample("volcanic magma") == 57
+
+    def test_materials_come_back_likeliest_first(self, sheet):
+        rows = sheet.materials("volcanic magma")
+        assert [row["material"] for row in rows] == ["Olivine", "Monazite", "Tiny"]
+
+    def test_limit_and_minimum_trim_the_tail(self, sheet):
+        assert len(sheet.materials("volcanic magma", limit=2)) == 2
+        kept = sheet.materials("volcanic magma", minimum=2.0)
+        assert [row["material"] for row in kept] == ["Olivine", "Monazite"]
+
+    def test_unknown_ground_is_empty_not_an_error(self, sheet):
+        assert sheet.materials("volcanic silicate") == []
+        assert sheet.sample("volcanic silicate") == 0
+
+    def test_missing_file_still_gives_a_usable_object(self, empty_sheet):
+        """The body list comes from the journal and owes nothing to this file.
+        Losing it must cost the percentages, not the panel."""
+        assert not empty_sheet.loaded
+        assert empty_sheet.error
+        assert empty_sheet.materials("rocky") == []
+        assert empty_sheet.sample("rocky") == 0
+
+    def test_broken_json_is_the_same_as_missing(self, tmp_path):
+        path = tmp_path / "ground_rules.json"
+        path.write_text("{not json", encoding="utf-8")
+        broken = grounds.Sheet(str(path))
+        assert not broken.loaded
+        assert broken.error
+
+    def test_the_shipped_table_parses(self):
+        """The file that actually ships, against the real classifier - a sheet
+        keyed by a ground nothing classifies into would be silently empty."""
+        shipped = grounds.Sheet()
+        if not shipped.loaded:
+            pytest.skip("ground_rules.json not exported into this checkout")
+        unknown = set(shipped.grounds) - set(grounds.GROUND_ORDER)
+        assert not unknown, f"sheet has grounds the classifier never returns: {unknown}"
