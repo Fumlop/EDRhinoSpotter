@@ -20,7 +20,14 @@ This file is the EDMC contract and nothing else: the lifecycle hooks, and where
 they go. The panel is rs_ui, the work is rs_core, the tests are rs_tests.
 """
 
+from rs_core.update import VERSION            # noqa: F401  the registry reads this
 from rs_ui import main
+
+# VERSION is re-exported on purpose. The EDMC plugin registry asks for a
+# VERSION constant or a __version__ dunder on the plugin, and the plugin is
+# this file - rs_core/update.py is where it is defined, because that is what
+# compares it against a release.
+__version__ = VERSION
 
 
 def plugin_start3(plugin_dir):

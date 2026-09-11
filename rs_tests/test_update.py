@@ -43,6 +43,14 @@ class TestVersion:
         assert headings[0] == f"## {update.VERSION}", (
             f"changelog leads with {headings[0]!r}, code says {update.VERSION}")
 
+    def test_the_plugin_exposes_it(self):
+        """The registry reads a VERSION constant or a __version__ dunder off
+        the plugin, and the plugin is load.py - not the module three imports
+        down where it happens to be defined."""
+        import load
+        assert load.VERSION == update.VERSION
+        assert load.__version__ == update.VERSION
+
     def test_the_version_is_three_numbers(self):
         assert update.parse(update.VERSION) != (0, 0, 0)
         assert len(update.VERSION.split(".")) == 3

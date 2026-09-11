@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.1.1
+
+**GPL-3.0.** There was no licence file at all, which is the one thing the EDMC
+plugin registry will not list a plugin without - it treats plugins as
+derivative works of EDMC, so GPL v2 or later compatible is the floor.
+
+**VERSION is readable from load.py.** It is defined in rs_core/update.py,
+where it is compared against a release, and re-exported here because the
+registry reads it off the plugin and the plugin is load.py. A test pins the
+two together.
+
 ## 2.1.0
 
 **Cards are linked from the bodies they were taken on.** A body you have
