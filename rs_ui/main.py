@@ -40,6 +40,10 @@ _scan_count = None       # how many landable bodies the current system has
 # an empty one: an OptionMenu with "" in it draws as a blank sunken box with a
 # marker floating in it, which reads as a broken text field.
 NO_MATERIAL = "select material"
+# Picking one filters the scan window to the grounds that carry it. "All" is
+# how you get back, and it sits directly under the placeholder rather than in
+# the alphabet with the materials - it is not one of them.
+ALL_MATERIALS = "All"
 
 _card_button = None      # MiningCard, until there is an update to install
 _loc = None              # tk.StringVar - mining location index
@@ -80,7 +84,8 @@ def build(parent):
 
     _material = tk.StringVar(value=NO_MATERIAL)
     tk.Label(_frame, text="Material", anchor="w").grid(row=2, column=0, sticky="w", padx=2)
-    _menu = tk.OptionMenu(_frame, _material, NO_MATERIAL, *spotmark.MATERIALS)
+    _menu = tk.OptionMenu(_frame, _material, NO_MATERIAL, ALL_MATERIALS,
+                          *spotmark.MATERIALS)
     _style_menu(_menu)
     _menu.grid(row=2, column=1, columnspan=3, sticky="we", padx=2)
 
@@ -185,10 +190,16 @@ def open_scan():
     if not _frame:
         return
     try:
-        scan.show(_frame.winfo_toplevel(), _register, _sheet)
+        scan.show(_frame.winfo_toplevel(), _register, _sheet, _focus())
     except Exception as err:                       # a broken window must not
         logger.exception("RhinoScan failed")       # take the card flow with it
         _set_status(f"no scan window: {err}")
+
+
+def _focus():
+    """The material the window should filter to, or None for everything."""
+    chosen = _material.get() if _material else ""
+    return None if chosen in ("", NO_MATERIAL, ALL_MATERIALS) else chosen
 
 
 def journal_entry(cmdr, is_beta, system, station, entry, state):
@@ -225,8 +236,8 @@ def make_card():
     global _card_token, _last_index
 
     _set_done("")
-    if _material.get() in ("", NO_MATERIAL):
-        _set_status("pick a material first")
+    if _material.get() in ("", NO_MATERIAL, ALL_MATERIALS):
+        _set_status("pick one material - a card names what you mined")
         return
 
     spot = spotmark.mark(spotmark.read_status(), system=_system, commander=_cmdr)

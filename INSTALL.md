@@ -66,6 +66,11 @@ volcanism this reads, so:
 
 A system where you did neither shows nothing, and the window says so.
 
+**Filtering.** Pick a material in the panel and the window lists only the
+ground that carries it, each group leading with its rate for that material.
+**All** puts everything back. A system where nothing carries it says so
+instead of opening empty.
+
 Systems are remembered. Every scan is written to
 `%LOCALAPPDATA%\RhinoSpotter\data\<System>.json` as it happens, so jumping back
 weeks later opens already filled.

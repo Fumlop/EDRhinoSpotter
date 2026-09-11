@@ -20,6 +20,14 @@ been found to hold above it.
 *Example system. Percentages are the share of that ground's mining locations
 that carried the material; `unprobed` means nobody has counted that body yet.*
 
+Pick a material in the panel and the window filters to the ground that carries
+it, with its rate on top of each group. **All** puts everything back.
+
+<p align="center">
+  <img src="docs/rhinoscan-filtered.png" width="600"
+       alt="The same system filtered to Monazite: the metal ground is gone, and every remaining group leads with its monazite rate">
+</p>
+
 The bodies come from the journal. **The honk alone is not enough**: it finds
 the bodies but does not describe them, and only a body the FSS has resolved
 carries the planet class and volcanism this reads. Honk, then work the FSS - or

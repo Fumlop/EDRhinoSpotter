@@ -39,21 +39,28 @@ WARN = palette.WARN
 _window = None           # only ever one, so the button cannot bury the panel
 
 
-def show(parent, register, sheet):
-    """Open the window, or raise the one already open."""
+def show(parent, register, sheet, focus=None):
+    """Open the window, or raise the one already open.
+
+    `focus` is one material. Given one, only the grounds that have ever
+    carried it are listed, and it leads every material line whatever its rate
+    - the question has changed from "what is here" to "where is the jadeite",
+    and a ground that answers it at 4% still answers it.
+    """
     global _window
 
     if _window is not None and _window.winfo_exists():
         _window.destroy()
 
     _window = tk.Toplevel(parent)
-    _window.title(f"RhinoScan - {register.system or 'unknown system'}")
+    _window.title(f"RhinoScan - {register.system or 'unknown system'}"
+                  + (f" - {focus}" if focus else ""))
     _window.configure(bg=BG)
 
     outer = tk.Frame(_window, bg=BG)
     outer.pack(fill="both", expand=True, padx=14, pady=12)
 
-    _header(outer, register, sheet)
+    _header(outer, register, sheet, focus)
 
     listing, wrap = _scrollable(outer)
     groups = register.by_ground()
@@ -61,11 +68,14 @@ def show(parent, register, sheet):
     # is given. The material lines are not: they are the widest real content,
     # and a window narrower than one of them wraps a list that should be a row.
     prose = []
+    if focus:
+        groups = [(ground, found) for ground, found in groups
+                  if sheet.rate(ground, focus) is not None]
     if not groups:
-        prose.append(wrap(_empty(listing, register)))
+        prose.append(wrap(_empty(listing, register, focus)))
     else:
         for ground, found in groups:
-            _group(listing, ground, _shorten(found, register.system), sheet, wrap)
+            _group(listing, ground, _shorten(found, register.system), sheet, wrap, focus)
 
     _footer(outer, sheet, _Wrapper(_window, margin=40))
     _fit(_window, listing, prose)
@@ -146,25 +156,31 @@ def _fit(window, listing, wrapped=()):
     window.minsize(480, 240)
 
 
-def _header(parent, register, sheet):
+def _header(parent, register, sheet, focus=None):
     tk.Label(parent, text=register.system or "no system yet", bg=BG, fg=FG,
              font=("Segoe UI", 15, "bold"), anchor="w").pack(fill="x")
     count = len(register)
     line = f"{count} landable {'body' if count == 1 else 'bodies'} scanned"
+    if focus:
+        line += f"  -  showing ground that carries {focus}"
     if not sheet.loaded:
         line += "  -  no ground_rules.json, types only"
     tk.Label(parent, text=line, bg=BG, fg=DIM, anchor="w",
              font=("Segoe UI", 9)).pack(fill="x", pady=(0, 10))
 
 
-def _empty(parent, register):
+def _empty(parent, register, focus=None):
     """What to do, then why - in that order.
 
     The empty window is where everybody meets this plugin for the first time,
     and the thing they have just done is honk. The instruction has to be the
     first line, not the conclusion of a paragraph about journal events.
     """
-    if register.system:
+    if register.system and focus:
+        action = f"No ground here carries {focus}"
+        why = ("Set the material back to All to see what this system does "
+               "have, or try the next one.")
+    elif register.system:
         action = "FSS the system, or the planet you are heading for"
         why = ("The honk finds the bodies. It does not describe them, and only "
                "a body the FSS has resolved carries the type this reads. "
@@ -181,7 +197,7 @@ def _empty(parent, register):
     return label
 
 
-def _group(parent, ground, found, sheet, wrap):
+def _group(parent, ground, found, sheet, wrap, focus=None):
     """One body type, its bodies, and what that type has been found to hold."""
     block = tk.Frame(parent, bg=BG)
     block.pack(fill="x", pady=(0, 16))
@@ -194,6 +210,16 @@ def _group(parent, ground, found, sheet, wrap):
              font=("Segoe UI", 9), anchor="w").pack(side="left", padx=8)
 
     materials = sheet.materials(ground, limit=TOP_MATERIALS, minimum=MIN_PCT)
+    if focus:
+        # The chosen material leads, whatever its rate, and in the accent
+        # colour so it is not read as one of the others. A ground listed
+        # because it carries jadeite has to say what it carries it at, even
+        # when three likelier things sit under it.
+        rate = sheet.rate(ground, focus)
+        tk.Label(block, text=f"{focus} {rate}%", bg=BG, fg=ACCENT, anchor="w",
+                 font=("Consolas", 10, "bold")).pack(fill="x", pady=(2, 0))
+        materials = [row for row in materials
+                     if row["material"].lower() != focus.lower()][:TOP_MATERIALS - 1]
     if materials:
         # Separated, not just spaced: "Olivine 56.1%  Monazite 45.6%" reads as
         # one run of words, and the eye has to find the pairs itself.

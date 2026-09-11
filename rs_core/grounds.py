@@ -135,6 +135,18 @@ class Sheet:
         rows = [row for row in self.grounds.get(ground, []) if row['pct'] >= minimum]
         return rows[:limit] if limit else rows
 
+    def rate(self, ground, material):
+        """What that ground reads for one material, or None if it never has.
+
+        None, not zero: a material nobody has found on a ground and a material
+        found on none of its locations are different claims, and only the
+        second one is a measurement.
+        """
+        for row in self.grounds.get(ground, []):
+            if row['material'].lower() == (material or '').lower():
+                return row['pct']
+        return None
+
     def sample(self, ground):
         """How many mining locations the percentages for that ground rest on."""
         return self.locations.get(ground, 0)

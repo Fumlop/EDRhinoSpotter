@@ -105,7 +105,10 @@ Everything in here imports tkinter.
   written from a worker fails minutes later somewhere unrelated.
 - **[scan.py](rs_ui/scan.py)** - the RhinoScan window. Read-only and
   disposable: nothing is saved from it, so pressing the button twice costs
-  nothing.
+  nothing. Given a material it lists only the ground that has ever carried it,
+  and that material leads every group whatever its rate - the question has
+  changed from "what is here" to "where is the jadeite", and a ground that
+  answers at 4% still answers.
 
 ## Tests (`rs_tests/`)
 
@@ -128,6 +131,11 @@ Everything in here imports tkinter.
 - **test_palette.py** - that the card and the window draw the same black, and
   that a colour which is not six hex digits raises rather than silently
   becoming black.
+- **make_docs_images.py** - not a test. Re-renders every picture in `docs/`
+  from the code as it stands, with an invented system and an invented
+  commander. Run it after anything that changes how the panel, the window or a
+  card looks; a README showing last month's layout is worse than one showing
+  none.
 - **test_replay.py** - which files count as recent, that a second visit does
   not lose the first, and that a ground the sheet never measured is worth
   nothing rather than guessed at.

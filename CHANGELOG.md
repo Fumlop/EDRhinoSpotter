@@ -10,6 +10,13 @@ because a lat and a lon on one line is a single long number that has to be
 read twice to be split. They are the one thing on the card that cannot be
 worked out again afterwards.
 
+**The material picks what the scan window shows.** The dropdown carries an
+"All" under the placeholder; choose anything else and RhinoScan lists only the
+ground that has ever carried it, each group leading with its rate for that
+material in the accent colour. A ground listed because it carries jadeite has
+to say what it carries it at, even when three likelier things sit under it. A
+system where nothing carries it says so rather than opening empty.
+
 **The material dropdown looks like the rest of the panel.** Tk gives a
 Menubutton a two-pixel raised border and centred text, and with an empty value
 in it the whole thing drew as a blank sunken box with a marker floating in the
