@@ -57,14 +57,18 @@ def show(parent, register, sheet):
 
     listing, wrap = _scrollable(outer)
     groups = register.by_ground()
+    # Prose is excluded from the width measurement below - it fits whatever it
+    # is given. The material lines are not: they are the widest real content,
+    # and a window narrower than one of them wraps a list that should be a row.
+    prose = []
     if not groups:
-        wrap(_empty(listing, register))
+        prose.append(wrap(_empty(listing, register)))
     else:
         for ground, found in groups:
             _group(listing, ground, _shorten(found, register.system), sheet, wrap)
 
     _footer(outer, sheet, _Wrapper(_window, margin=40))
-    _fit(_window, listing)
+    _fit(_window, listing, prose)
     return _window
 
 
@@ -77,8 +81,11 @@ OUTER_PAD = 14
 SCROLLBAR = 18
 # The three spaces every body row starts with.
 INDENT = 24
-# Header, the two lines above the list, and the footer under it.
-CHROME = 150
+# Header, the two lines above the list, and the footer under it. Generous on
+# purpose: the footer wraps to two lines in a narrow window, and a height that
+# is a little too large costs empty space while one that is too small eats the
+# footer.
+CHROME = 200
 
 
 def _lines(container):
@@ -91,8 +98,12 @@ def _lines(container):
     return found
 
 
-def _measure(labels):
+def _measure(labels, skip=()):
     """The width of the widest label, measured off its text and its font.
+
+    Prose is skipped: it fits whatever width it is given, so letting it ask for
+    its one-line width sized the window to the longest sentence in it - an
+    empty system opened 900px wide to hold two lines of explanation.
 
     Not off the widgets: a frame inside a canvas reports whatever its children
     asked for before anything was laid out, and wraplength is still zero at
@@ -100,7 +111,10 @@ def _measure(labels):
     metrics are exact and available immediately.
     """
     widest = 0
+    skip = set(skip)
     for label in labels:
+        if label in skip:
+            continue
         text = label.cget("text")
         if not text:
             continue
@@ -110,7 +124,7 @@ def _measure(labels):
     return widest
 
 
-def _fit(window, listing):
+def _fit(window, listing, wrapped=()):
     """Open at the size the content asks for, capped.
 
     Measured off the list rather than the window: a canvas has no natural size
@@ -124,7 +138,7 @@ def _fit(window, listing):
     """
     window.update_idletasks()
     # The rows, plus the scrollbar they sit beside and the padding around them.
-    content = _measure(_lines(listing)) + SCROLLBAR + 2 * OUTER_PAD + INDENT
+    content = _measure(_lines(listing), wrapped) + SCROLLBAR + 2 * OUTER_PAD + INDENT
     width = min(max(content, 420), MAX_WIDTH)
     wanted = max(window.winfo_reqheight(), listing.winfo_reqheight() + CHROME)
     height = min(max(wanted, 260), MAX_HEIGHT)
@@ -144,14 +158,26 @@ def _header(parent, register, sheet):
 
 
 def _empty(parent, register):
-    text = ("Nothing here yet. The honk alone does not describe the bodies - "
-            "run the FSS and resolve them, or fly in and let the auto-scan "
-            "do the near ones."
-            if register.system else
-            "Waiting for the journal. Jump somewhere, or restart EDMC if you "
-            "were already docked when it started.")
-    label = tk.Label(parent, text=text, bg=BG, fg=DIM, justify="left", anchor="w")
-    label.pack(fill="x", pady=6)
+    """What to do, then why - in that order.
+
+    The empty window is where everybody meets this plugin for the first time,
+    and the thing they have just done is honk. The instruction has to be the
+    first line, not the conclusion of a paragraph about journal events.
+    """
+    if register.system:
+        action = "FSS the system, or the planet you are heading for"
+        why = ("The honk finds the bodies. It does not describe them, and only "
+               "a body the FSS has resolved carries the type this reads. "
+               "Flying in works too - the auto-scan sweeps the near ones.")
+    else:
+        action = "Waiting for the journal"
+        why = ("Jump somewhere, or restart EDMC if it started while you were "
+               "already docked.")
+
+    tk.Label(parent, text=action, bg=BG, fg=ACCENT, anchor="w",
+             font=("Segoe UI", 11, "bold")).pack(fill="x", pady=(6, 4))
+    label = tk.Label(parent, text=why, bg=BG, fg=DIM, justify="left", anchor="w")
+    label.pack(fill="x")
     return label
 
 
@@ -235,9 +261,8 @@ def _strength(body):
 
 def _footer(parent, sheet, wrap):
     if sheet.loaded:
-        text = (f"Rates measured across every mining location read so far, "
-                f"{sheet.generated}. What a location holds is in no game feed - "
-                "this is where to prospect, not what you will find.")
+        text = (f"Rates from every mining location read so far, {sheet.generated}. "
+                "Where to prospect, not what you will find.")
     else:
         text = ("ground_rules.json is missing, so only the body types are "
                 "shown. Reinstall the plugin, or drop the file back beside "
