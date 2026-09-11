@@ -1,6 +1,12 @@
 """Re-render every picture in the docs, from the code as it stands.
 
+    set RHINOSPOTTER_DOCS=1
     python rs_tests/make_docs_images.py
+
+Behind a variable and deliberately not written up anywhere a user would look.
+It is maintenance tooling: it drives real windows, grabs the screen, and is of
+no use to anyone running the plugin. Guarded so that neither a stray run nor a
+reviewer reading the tree mistakes it for something the plugin does.
 
 Run it after anything that changes how the panel, the window or a card looks.
 A README showing last month's layout is worse than one showing none.
@@ -122,4 +128,6 @@ def main_images():
 
 
 if __name__ == "__main__":
+    if not os.environ.get("RHINOSPOTTER_DOCS"):
+        raise SystemExit("set RHINOSPOTTER_DOCS=1 to re-render the docs images")
     main_images()

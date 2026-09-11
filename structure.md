@@ -138,11 +138,6 @@ Everything in here imports tkinter.
 - **test_palette.py** - that the card and the window draw the same black, and
   that a colour which is not six hex digits raises rather than silently
   becoming black.
-- **make_docs_images.py** - not a test. Re-renders every picture in `docs/`
-  from the code as it stands, with an invented system and an invented
-  commander. Run it after anything that changes how the panel, the window or a
-  card looks; a README showing last month's layout is worse than one showing
-  none.
 - **test_replay.py** - which files count as recent, that a second visit does
   not lose the first, and that a ground the sheet never measured is worth
   nothing rather than guessed at.

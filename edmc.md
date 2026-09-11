@@ -135,9 +135,10 @@ to exist first.
 1. **Bump the version in both places.** `rs_core/update.py` holds `VERSION`;
    the changelog's top heading repeats it. A test fails if they disagree, so
    run `pytest` before anything else.
-2. **Regenerate the screenshots** if the panel, window or card changed:
-   `python rs_tests/make_docs_images.py`. A README showing last month's layout
-   is worse than one showing none.
+2. **Regenerate the screenshots** if the panel, window or card changed. The
+   tool is behind `RHINOSPOTTER_DOCS=1` and is not written up anywhere else -
+   it drives real windows and grabs the screen, which is maintenance work and
+   not something the plugin does.
 3. **Commit, tag, push both.**
 
    ```bash
