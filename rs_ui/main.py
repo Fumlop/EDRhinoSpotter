@@ -266,7 +266,12 @@ def toggle_measure():
     _track.add(status)
     if _measure_button:
         _measure_button.config(text="Stop", fg=palette.WARN)
-    _set_status("drive the border, then press Stop")
+    # The three things that decide whether the number is worth anything. A rig
+    # at the start is the only marker the game gives you for where the border
+    # began, and slowly is not fussiness - Status.json is read once a second,
+    # so at speed the corners are cut off.
+    _set_status("place a rig where you start, drive the border slowly, "
+                "come back to it, then Stop")
     _poll_measure()
 
 
@@ -299,7 +304,8 @@ def _report_measure(final=False):
         return
     if len(_track) < 3:
         _measure_status.config(
-            text=f"measuring - {len(_track)} point{'' if len(_track) == 1 else 's'}",
+            text=f"measuring - {len(_track)} point{'' if len(_track) == 1 else 's'}"
+                 + (" - drive the border" if len(_track) else ""),
             fg=palette.MUTED)
         return
     rigs = _track.rigs()

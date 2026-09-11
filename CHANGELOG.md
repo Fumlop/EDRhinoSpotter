@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.3.2
+
+**The panel says how to measure.** Place a rig where you start, drive the
+border slowly, come back to it, then Stop. The rig is the only marker for
+where the border began, and slowly matters because Status.json is read once a
+second - at speed the corners get cut off and the shape comes out smaller than
+it is.
+
 ## 2.3.1
 
 **A patch too small for the grid read as room for no rigs.** 4,000 m2 is 63 m

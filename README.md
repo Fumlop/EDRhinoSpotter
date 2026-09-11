@@ -78,8 +78,13 @@ what you will find.
 
 ## MeasureSpot - how big is this patch, and how many rigs
 
-Press **MeasureSpot**, drive the border of the spot in the SRV, press **Stop**.
-The line above the note reads the area and the rig count as you go.
+Place a rig where you start, drive the border slowly, come back to it, press
+**Stop**. The line above the note reads the area and the rig count as you go.
+
+The rig is your only marker for where the border began - the game gives you
+nothing else to aim back at. Slowly is not fussiness: `Status.json` is read
+once a second, so at speed the corners get cut off and the shape comes out
+smaller than it is.
 
 ```
 31,200 m2   .   8 rigs   .   6 points
