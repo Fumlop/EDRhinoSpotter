@@ -125,6 +125,13 @@ so you can argue with the scoring before it ends up on a panel.
 Writes the best of them into the cache, so the next EDMC start arrives in it
 and RhinoScan has something real to draw.
 
+    python -m rs_core.replay --days 7 --rebuild
+
+Writes **every** system it finds into the cache. EDMC replays the journal file
+it is watching and nothing older, so bodies you scanned in an earlier session
+never reached the plugin - they are in a file EDMC will never read. This is how
+they get in, and it is what to run after installing.
+
 ## Tests
 
     pytest

@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.2.1
+
+**Replaying two visits to one system kept only the last.** Two sessions
+describe different parts of a system - one honk resolved A 1 to A 7, the next
+only the AB bodies - and the later visit threw the earlier away. The
+docstring had claimed the union all along, which is how it went unnoticed.
+They are merged now, with a rescan of the same body winning over the older
+answer.
+
+**`--rebuild` fills the cache from every journal in the window.** EDMC replays
+the file it is watching and nothing older, so bodies scanned before the plugin
+was installed, or while it was not running, were in a file EDMC will never
+read. Run it once after installing.
+
 ## 2.2.0
 
 **Screenshot conversion has moved out**, into RhinoAnalysis - its own plugin,

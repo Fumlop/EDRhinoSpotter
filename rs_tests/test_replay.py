@@ -71,21 +71,39 @@ class TestReplay:
         assert systems["Andel"][0]["locations"] == 17
 
     def test_a_second_visit_does_not_lose_the_first(self, tmp_path):
-        """Leaving hands the list over before it is cleared, so a system
-        visited twice ends up with everything either visit found."""
+        """Two sessions describe different parts of one system. The later one
+        used to throw the earlier away, which is how bodies scanned on Tuesday
+        went missing on Wednesday."""
         write_journal(tmp_path, "Journal.a.log", [
             {"event": "FSDJump", "StarSystem": "Andel"},
-            scan("Andel 1 a", "Rocky body"),
+            scan("Andel 1 a", "Rocky body", distance=10.0),
+            scan("Andel 2 a", "Rocky body", distance=20.0),
             {"event": "FSDJump", "StarSystem": "Loha"},
             scan("Loha 3", "Icy body"),
         ], age_days=2)
         write_journal(tmp_path, "Journal.b.log", [
             {"event": "FSDJump", "StarSystem": "Andel"},
-            scan("Andel 4 c", "Icy body"),
+            scan("Andel 4 c", "Icy body", distance=30.0),
         ], age_days=0)
         systems = replay.replay(replay.journal_files(str(tmp_path)))
-        assert len(systems["Andel"]) >= 1
+        assert [body["name"] for body in systems["Andel"]] == [
+            "Andel 1 a", "Andel 2 a", "Andel 4 c"]
         assert "Loha" in systems
+
+    def test_a_later_visit_updates_a_body_it_rescanned(self, tmp_path):
+        """Merging must not mean the first answer wins. A body scanned again
+        is a better answer about the same body."""
+        write_journal(tmp_path, "Journal.a.log", [
+            {"event": "FSDJump", "StarSystem": "Andel"},
+            scan("Andel 1 a", "Rocky body"),
+        ], age_days=2)
+        write_journal(tmp_path, "Journal.b.log", [
+            {"event": "FSDJump", "StarSystem": "Andel"},
+            scan("Andel 1 a", "Rocky body", "major metallic magma"),
+        ], age_days=0)
+        systems = replay.replay(replay.journal_files(str(tmp_path)))
+        assert len(systems["Andel"]) == 1
+        assert systems["Andel"][0]["ground"] == "volcanic magma"
 
     def test_broken_lines_are_skipped(self, tmp_path):
         path = tmp_path / "Journal.a.log"

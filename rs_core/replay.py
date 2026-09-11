@@ -6,11 +6,15 @@ Two jobs.
                through lately, so the scoring can be argued with before it
                ends up on a panel.
 
+  As repair:   python -m rs_core.replay --rebuild writes every system it
+               finds into the cache. EDMC replays the journal file it is
+               watching and nothing older, so a body scanned in an earlier
+               session is in a file EDMC will never read - this is how it gets
+               back.
+
   As a test:   python -m rs_core.replay --testmode writes the best of those
                systems into the cache, so the next EDMC start stands in it
-               without anyone flying anywhere. It is the only way to look at
-               the scan window over a system with four grounds in it rather
-               than whichever one you happen to be sitting in.
+               without anyone flying anywhere.
 
 It reads the commander's own journal files and nothing else - the same files
 EDMC reads, just more of them than the one it is watching.
@@ -65,14 +69,24 @@ def replay(paths):
     """Every system in those files -> {system: [body, ...]}.
 
     Run through the same Register the live plugin uses, so what comes out is
-    what the panel would have shown at the time. A system visited twice ends
-    up with the union of both visits, because leaving hands the list over
-    before it is cleared.
+    what the panel would have shown at the time.
+
+    A system visited twice ends up with the union of both visits. Replacing
+    instead of merging looked equivalent and was not: two sessions describe
+    different parts of one system - the first honk resolved A 1 to A 7, the
+    second only the AB bodies - and the later visit silently threw the earlier
+    one away.
     """
     found = {}
 
     def keep(system, seen):
-        found[system] = seen
+        merged = {body["name"]: body for body in found.get(system, [])}
+        for body in seen:
+            merged[body["name"]] = body
+        found[system] = sorted(merged.values(),
+                               key=lambda body: (body["distance"] is None,
+                                                 body["distance"] or 0.0,
+                                                 body["name"]))
 
     register = bodies.Register(on_change=keep)
     for path in paths:
@@ -135,6 +149,29 @@ def best(root=JOURNAL_DIR, days=DAYS, sheet=None):
     return system, seen
 
 
+def rebuild(systems):
+    """Write every system found into the cache. Returns how many.
+
+    EDMC replays the journal file it is watching and nothing older, so a body
+    scanned in an earlier session never reaches the plugin - it is in a file
+    EDMC will never read. This walks the lot and fills the cache in, which is
+    the only way to recover a system scanned before the plugin was installed
+    or while it was not running.
+
+    Merged rather than replaced: a system already cached keeps the bodies this
+    pass did not see. Two journals of the same system describe different parts
+    of it, and the union is the true one.
+    """
+    written = 0
+    for system, seen in systems.items():
+        known = {body["name"]: body for body in store.load(system)}
+        for body in seen:
+            known[body["name"]] = body
+        if store.save(system, sorted(known.values(), key=lambda b: b["name"])):
+            written += 1
+    return written
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Rank the systems in recent journals")
     parser.add_argument("--days", type=int, default=DAYS)
@@ -143,6 +180,8 @@ def main(argv=None):
     parser.add_argument("--testmode", action="store_true",
                         help="write the best system to the cache, so the next "
                              "EDMC start stands in it")
+    parser.add_argument("--rebuild", action="store_true",
+                        help="write every system in the window to the cache")
     args = parser.parse_args(argv)
 
     sheet = grounds.Sheet()
@@ -154,6 +193,11 @@ def main(argv=None):
         return 1
 
     ordered = rank(systems, sheet)
+    if args.rebuild:
+        written = rebuild(systems)
+        print(f"\nrebuilt {written} system(s) in the cache")
+        print("  start EDMC and they are all there, no re-scanning")
+
     if args.testmode:
         system, seen, value = ordered[0]
         path = store.save(system, seen)
