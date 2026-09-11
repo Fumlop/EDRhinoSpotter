@@ -4,10 +4,10 @@ A bookmark is a PNG and a JSON sidecar. The PNG is readable one at a time and
 the sidecar is not readable at all, so eleven of them on one body is eleven
 files to open and nothing that compares them.
 
-This writes a table instead: one row per bookmark, the card beside it, sorted
-by the location it was taken at. Written into the folder the cards already
-live in, so the images are one relative path away and the page works from a
-file:// URL with nothing serving it.
+This writes a table instead: one row per bookmark, the card beside it, most
+rigs first. Written into the folder the cards already live in, so the images
+are one relative path away and the page works from a file:// URL with nothing
+serving it.
 
 Regenerated on every open. The bookmarks are the truth and this is a view of
 them, so a stale page is a bug waiting rather than a cache.
@@ -33,15 +33,18 @@ def filename(body):
 
 
 def _sort_key(record):
-    """By location, then by when it was marked.
+    """Most rigs first, then by location.
 
-    Location first because that is the number on the target panel and the
-    order somebody works a body in. A bookmark with no location - marked from
-    orbit, or with the destination deselected - sorts last rather than as
-    location zero.
+    Rigs first because that is the question the page answers: of the patches
+    you bookmarked on this body, which one was worth the most. Location was
+    the order you worked the body in, which is history rather than a decision.
+
+    A bookmark with no rig count sorts last rather than as zero - it was not
+    counted, which is not the same as having been counted at none.
     """
+    rigs = record.get("rigs")
     index = record.get("location_index")
-    return (index is None, index or 0, str(record.get("marked_at") or ""))
+    return (rigs is None, -(rigs or 0), index is None, index or 0)
 
 
 def _cell(value, dash="-"):

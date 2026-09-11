@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.6.1
+
+**The bookmarks page sorts by rig count, most first.** It sorted by location,
+which is the order you worked the body in - history rather than a decision.
+Rigs is the question the page answers: of the patches you bookmarked here,
+which one was worth the most. Equal counts fall back to location, and a
+bookmark with no count at all sorts last rather than as zero.
+
 ## 2.6.0
 
 **Bookmarks open as a page.** Clicking the count behind a body used to put

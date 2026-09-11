@@ -36,17 +36,24 @@ class TestRender:
         found = page.render("Andel", "Andel 1 a", [record(card="shot.png")])
         assert "/x/shot.png" not in found
 
-    def test_sorted_by_location(self):
+    def test_sorted_by_rigs(self):
+        """The question the page answers: of the patches on this body, which
+        one was worth the most."""
         found = page.render("Andel", "Andel 1 a",
-                            [record(9, "Nine"), record(2, "Two"), record(5, "Five")])
-        assert found.index("Two") < found.index("Five") < found.index("Nine")
+                            [record(1, "Two", rigs=2), record(2, "Nine", rigs=9),
+                             record(3, "Five", rigs=5)])
+        assert found.index("Nine") < found.index("Five") < found.index("Two")
 
-    def test_a_bookmark_from_orbit_sorts_last(self):
-        """No location index - marked from orbit or with the destination
-        deselected. Last, not location zero."""
+    def test_equal_rigs_fall_back_to_location(self):
         found = page.render("Andel", "Andel 1 a",
-                            [record(None, "Orbit"), record(3, "Ground")])
-        assert found.index("Ground") < found.index("Orbit")
+                            [record(7, "Later", rigs=4), record(2, "Earlier", rigs=4)])
+        assert found.index("Earlier") < found.index("Later")
+
+    def test_an_uncounted_bookmark_sorts_last(self):
+        """No rig count is not a rig count of zero - it was never counted."""
+        found = page.render("Andel", "Andel 1 a",
+                            [record(1, "Unknown", rigs=None), record(2, "One", rigs=1)])
+        assert found.index("One") < found.index("Unknown")
 
     def test_missing_fields_read_as_a_dash(self):
         found = page.render("Andel", "Andel 1 a",

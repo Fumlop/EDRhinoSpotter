@@ -26,8 +26,8 @@ bookmarks it has - click and a page of them opens in your browser.*
 
 Clicking `3 bookmarks` writes a page beside the cards and opens it: one row
 per bookmark with the location, material, rigs, heading, coordinates and when
-it was marked, and the card itself alongside. Sorted by location, which is the
-number on the target panel and the order a body gets worked in.
+it was marked, and the card itself alongside. **Most rigs first** - of the
+patches you bookmarked on this body, the best one is the top row.
 
 It is written fresh every time it is opened. The bookmarks are the truth and
 the page is a view of them, so a stale one would be a bug waiting rather than
