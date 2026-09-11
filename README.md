@@ -18,7 +18,9 @@ been found to hold above it.
 </p>
 
 *Example system. Percentages are the share of that ground's mining locations
-that carried the material; `unprobed` means nobody has counted that body yet.*
+that carried the material; `unprobed` means nobody has counted that body yet,
+and those rows are dimmed. A body you have already marked shows how many cards
+it has - click and Explorer opens with the newest one selected.*
 
 ### Filtering to one material
 
@@ -74,7 +76,7 @@ percentages, not the body list.
 no journal event and on no feed. This says where to prospect; it cannot say
 what you will find.
 
-## MiningCard - the patch you are standing on, as a PNG
+## Create Card - the patch you are standing on, as a PNG
 
 <p align="center">
   <img src="docs/miningcard.png" width="620"
@@ -86,7 +88,7 @@ what you will find.
 1. Land and put the rigs down.
 2. Pick the **Material**, set **Rigs**. `Location` fills itself when a mining
    location is the selected destination; otherwise type the signal number.
-3. Press **MiningCard**. `completed` appears beside the button once the PNG is
+3. Press **Create Card**. `completed` appears beside the button once the PNG is
    on disk.
 
 Coordinates, body and location are read out of `Status.json` at the press - it
@@ -109,7 +111,7 @@ See [INSTALL.md](INSTALL.md). Short version: unpack into
 `%LOCALAPPDATA%\EDMarketConnector\plugins\RhinoSpotter\` so that `load.py`
 sits directly inside, and restart EDMC.
 
-When a newer release is out, **MiningCard** reads **Update** instead and the
+When a newer release is out, **Create Card** reads **Update** instead and the
 status line names the version. Press it and the release is fetched and
 unpacked in place, then it reads **Restart EDMC**. There is no third button:
 the panel stays the same width in every state.

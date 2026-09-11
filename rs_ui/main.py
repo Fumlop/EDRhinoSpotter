@@ -45,7 +45,7 @@ NO_MATERIAL = "select material"
 # the alphabet with the materials - it is not one of them.
 ALL_MATERIALS = "All"
 
-_card_button = None      # MiningCard, until there is an update to install
+_card_button = None      # Create Card, until there is an update to install
 _loc = None              # tk.StringVar - mining location index
 _rigs = None             # tk.StringVar - rigs on the patch
 _material = None         # tk.StringVar - the material this spot is mined for
@@ -100,7 +100,7 @@ def build(parent):
     # press with no confirmation, so they get a gap between them.
     row = tk.Frame(_frame)
     row.grid(row=3, column=0, columnspan=4, sticky="w", padx=2, pady=(4, 2))
-    _card_button = tk.Button(row, text="MiningCard", width=13, command=make_card)
+    _card_button = tk.Button(row, text="Create Card", width=13, command=make_card)
     _card_button.pack(side="left")
     _done = tk.Label(row, text="", anchor="w")
     _done.pack(side="left", padx=(8, 0))
@@ -320,7 +320,7 @@ def _on_update_checked(tag, newer):
 
 
 def _show_update(tag, newer):
-    """MiningCard becomes the update, rather than a fourth button appearing.
+    """Create Card becomes the update, rather than a fourth button appearing.
 
     A permanent version button only made the panel wider, and a temporary one
     still widens it on the day it matters. The card can wait the thirty

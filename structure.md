@@ -88,6 +88,11 @@ No tkinter anywhere in here.
   half a plugin behind. `KEEP` names what an update may not overwrite -
   `ground_rules.json` above all, because a locally refreshed sheet is newer
   than the one in a release.
+- **[cards.py](rs_core/cards.py)** - which bodies in a system have been
+  marked, read from the JSON sidecars rather than the file names. A name has
+  had its spaces replaced and its material lowercased, so reading a body back
+  out of one is a guess; a PNG without a sidecar is skipped rather than
+  guessed at.
 - **[palette.py](rs_core/palette.py)** - the colours, once. Hex for tkinter,
   RGB tuples for PIL, one conversion function between them so the window and
   the cards cannot drift apart. They used to be two schemes and looked like
@@ -100,7 +105,7 @@ Everything in here imports tkinter.
 
 - **[main.py](rs_ui/main.py)** - the panel EDMC draws, and the handful of
   variables that only make sense while a window is open. Both buttons live
-  here. MiningCard doubles as the update button: it reads "Update" when a
+  here. Create Card doubles as the update button: it reads "Update" when a
   release is out, then "Restart EDMC" once it is in. A third button would
   widen the panel on the one day it matters, and a permanent one every day. The card render and the update check run off the UI thread and come
   back through `_frame.after`, because Tk is not thread-safe and a widget

@@ -8,6 +8,7 @@ The card is the whole record: what was marked is what it shows. Nothing is
 looked up, so it renders with nothing else running and no network.
 """
 
+import json
 import os
 
 from PIL import Image, ImageDraw, ImageFont
@@ -157,7 +158,30 @@ def render(spot, out_path=None):
         out_path = _free(os.path.join(card_dir(spot.get("system")), filename(spot)))
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     image.save(out_path)
+    _sidecar(out_path, spot)
     return out_path
+
+
+def _sidecar(card_path, spot):
+    """The same facts as JSON, beside the PNG.
+
+    A card is a picture, and a picture cannot be searched. The scan window
+    wants to know which bodies in this system have been marked, and reading
+    that out of a filename means parsing a body name that had its spaces
+    replaced and a material that was lowercased - both lossy, both guesses.
+
+    Failing to write it costs a link in a window. The card is the record, so
+    it is not worth taking the card down for.
+    """
+    record = {key: (None if value is None else
+                    value if isinstance(value, (int, float, str)) else str(value))
+              for key, value in spot.items()}
+    record["card"] = os.path.basename(card_path)
+    try:
+        with open(os.path.splitext(card_path)[0] + ".json", "w", encoding="utf-8") as handle:
+            json.dump(record, handle, indent=1)
+    except OSError:
+        pass
 
 
 def _free(path):

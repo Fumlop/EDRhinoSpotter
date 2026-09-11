@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.1.0
+
+**Cards are linked from the bodies they were taken on.** A body you have
+already marked shows "2 cards" behind it; clicking opens Explorer with the
+newest one selected, rather than the folder for you to hunt through. Only
+bodies that have one say so - a zero on every other row would be nine pieces
+of nothing in a ten-body system.
+
+**Every card gets a JSON sidecar.** A picture cannot be searched, and reading
+a body back out of a filename is a guess: the spaces were replaced and the
+material was lowercased. The sidecar holds what was actually marked, and a PNG
+without one is skipped rather than guessed at.
+
+**The material picker sits in the scan window too**, under the system name,
+bound to the panel's own variable. Choosing in one place is the same act as
+choosing in the other.
+
+**MiningCard is called Create Card.** It says what pressing it does, and the
+panel already says "cards folder" while the window says "2 cards" - one word
+for one thing.
+
 ## 2.0.2
 
 **The plugin knows where you are as soon as EDMC does.** The game writes a
@@ -102,7 +123,7 @@ arrival event was missed.
 to the same right edge - the names are long enough that a narrow dropdown cut
 Low Temp Diamonds in half. Both buttons sit on one line.
 
-**Update button.** MiningCard reads "Update" when a release is out, with the
+**Update button.** Create Card reads "Update" when a release is out, with the
 version in the status line. One press fetches it, unpacks it in place and the
 button reads "Restart EDMC". No third button and no version label: the panel
 measures the same 250px in every state, which a permanent version button did

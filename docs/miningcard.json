@@ -1,0 +1,13 @@
+{
+ "system": "Hyperion Reach AB-C d1-42",
+ "planet_name": "Hyperion Reach AB-C d1-42 4 a",
+ "location_index": 22,
+ "commodity": "Jadeite",
+ "rigs": 4,
+ "heading": 214,
+ "latitude": 12.345678,
+ "longitude": -98.765432,
+ "marked_at": "3311-05-14T18:40:00",
+ "commander": "Example",
+ "card": "miningcard.png"
+}

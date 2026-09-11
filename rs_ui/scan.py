@@ -9,10 +9,12 @@ The window is deliberately read-only and disposable. Nothing is saved from it,
 so pressing the button twice costs nothing and the card flow is untouched.
 """
 
+import os
+import subprocess
 import tkinter as tk
 from tkinter import font as tkfont
 
-from rs_core import grounds, palette
+from rs_core import cards, grounds, palette
 
 try:
     from theme import theme
@@ -73,6 +75,7 @@ def show(parent, register, sheet, focus=None, variable=None, materials=()):
 
     _header(outer, register, sheet, focus, variable, materials)
 
+    marked = cards.by_body(register.system) if register.system else {}
     listing, wrap = _scrollable(outer)
     groups = register.by_ground()
     # Prose is excluded from the width measurement below - it fits whatever it
@@ -86,7 +89,8 @@ def show(parent, register, sheet, focus=None, variable=None, materials=()):
         prose.append(wrap(_empty(listing, register, focus)))
     else:
         for ground, found in groups:
-            _group(listing, ground, _shorten(found, register.system), sheet, wrap, focus)
+            _group(listing, ground, _shorten(found, register.system), sheet, wrap,
+                   focus, marked)
 
     _footer(outer, sheet, _Wrapper(_window, margin=40))
     _fit(_window, listing, prose)
@@ -236,7 +240,7 @@ def _empty(parent, register, focus=None):
     return label
 
 
-def _group(parent, ground, found, sheet, wrap, focus=None):
+def _group(parent, ground, found, sheet, wrap, focus=None, marked=None):
     """One body type, its bodies, and what that type has been found to hold."""
     block = tk.Frame(parent, bg=BG)
     block.pack(fill="x", pady=(0, 16))
@@ -272,8 +276,48 @@ def _group(parent, ground, found, sheet, wrap, focus=None):
                  anchor="w", font=("Segoe UI", 9)).pack(fill="x")
 
     for body in found:
-        tk.Label(block, text="   " + _body_line(body), bg=BG, fg=FG, anchor="w",
-                 font=("Consolas", 9)).pack(fill="x")
+        # Unprobed bodies are dimmed rather than dropped. They are the right
+        # ground, but nobody has counted them, so they are where you go once
+        # the counted ones are worked out.
+        probed = body.get("locations") is not None
+        row = tk.Frame(block, bg=BG)
+        row.pack(fill="x")
+        tk.Label(row, text="   " + _body_line(body), bg=BG,
+                 fg=FG if probed else DIM, anchor="w",
+                 font=("Consolas", 9)).pack(side="left")
+        _cards_link(row, (marked or {}).get(body["name"]))
+
+
+def _cards_link(parent, records):
+    """"2 cards" behind a body you have already marked, opening the newest.
+
+    Only on bodies that have one. A count of zero on every other row would be
+    nine pieces of nothing in a ten-body system, and the useful signal here is
+    "you have been here before" - which is only worth saying when true.
+    """
+    if not records:
+        return
+    count = len(records)
+    label = tk.Label(parent, text=f"  {count} card{'' if count == 1 else 's'} ↗",
+                     bg=BG, fg=ACCENT, anchor="w", cursor="hand2",
+                     font=("Consolas", 9))
+    label.pack(side="left")
+    newest = cards.newest(records)
+    label.bind("<Button-1>", lambda event: _reveal(newest.get("path")))
+
+
+def _reveal(path):
+    """Explorer, with the card selected rather than the folder opened.
+
+    Opening the folder leaves you looking for the file among twenty others;
+    /select puts the cursor on it.
+    """
+    if not path or not os.path.isfile(path):
+        return
+    try:
+        subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])
+    except OSError:
+        pass
 
 
 def _shorten(found, system):
