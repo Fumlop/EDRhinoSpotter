@@ -97,15 +97,11 @@ def _group(parent, ground, found, sheet):
 
     materials = sheet.materials(ground, limit=TOP_MATERIALS, minimum=MIN_PCT)
     if materials:
-        # The sample size sits with the materials, not with the bodies: it
-        # qualifies the percentages and nothing else on the row.
         text = "  ".join(f"{row['material']} {row['pct']}%" for row in materials)
         line = tk.Label(block, text=text, bg=BG, fg=GOOD, anchor="w",
                         font=("Consolas", 9), justify="left")
         line.pack(fill="x")
         _wrap_with(line, block)
-        tk.Label(block, text=f"across {sheet.sample(ground)} locations read",
-                 bg=BG, fg=DIM, anchor="w", font=("Segoe UI", 8)).pack(fill="x")
     elif sheet.loaded:
         tk.Label(block, text="nothing measured on this ground yet", bg=BG, fg=WARN,
                  anchor="w", font=("Segoe UI", 9)).pack(fill="x")
