@@ -27,11 +27,11 @@ WIDTH = 240
 HEIGHT = 190
 POLL_MS = 500
 
-# How long a state with no arrow in it stays on screen before the overlay
-# takes itself down. A reading that cannot point anywhere is a notice, not a
-# session: you pressed Guide on the wrong body, it says so, and then it is
-# gone. Nobody should have to press Stop to clear a message.
-NOTICE_MS = 6000
+# How long a message stays up before the overlay takes itself down, when it
+# never managed to point anywhere. You pressed Guide on the wrong body, it says
+# so, and then it is gone - nobody should have to press Stop to clear a
+# message. Long enough to read it twice.
+NOTICE_MS = 10000
 
 # The Elite window carries this title in every build so far; the window class
 # has not been as stable.
@@ -50,6 +50,7 @@ _after = None
 _placed = None           # the last geometry, so the game standing still is free
 _on_stop = None          # the row that started this, to redraw when it ends
 _since = None            # when the current no-arrow state began
+_pointed = False         # whether this run ever drew an arrow
 
 
 def _key(record):
@@ -78,10 +79,11 @@ def start(parent, record, on_stop=None):
     `on_stop` is called when the overlay takes itself down, so the button that
     started it can go back to saying Guide.
     """
-    global _window, _canvas, _target, _placed, _on_stop, _since
+    global _window, _canvas, _target, _placed, _on_stop, _since, _pointed
     _target = record
     _on_stop = on_stop
     _since = None
+    _pointed = False
     if guiding():
         # The pending tick first. Without this, retargeting books a second
         # timer beside the first and every press after that doubles the rate.
@@ -125,8 +127,9 @@ def _cancel():
 
 def stop():
     """Take it down. Safe to call when nothing is up."""
-    global _window, _canvas, _target, _after, _placed, _on_stop, _since
+    global _window, _canvas, _target, _after, _placed, _on_stop, _since, _pointed
     _cancel()
+    _pointed = False
     if _window is not None and _window.winfo_exists():
         _window.destroy()
     _window = _canvas = _target = _after = _placed = _since = None
@@ -140,20 +143,21 @@ def stop():
 
 def _tick():
     """One reading, drawn, and the next one booked."""
-    global _after, _since
+    global _after, _since, _pointed
     if _window is None or not _window.winfo_exists():
         return
     reading = guide.fix(spotmark.read_status(), _target or {})
 
-    # An arrow clears the clock; anything else runs it. A fix lost for a
-    # moment - the game rewriting Status.json, a hop out of the atmosphere -
-    # must not count as a message that has been read.
+    # A guide that never got going is a message, and a message that has been
+    # read is in the way. One that has pointed at something stays: losing the
+    # fix is what taking off does, and you are still going back down.
     if reading["state"] in ("guiding", "arrived"):
         _since = None
-    else:
+        _pointed = True
+    elif not _pointed:
         _since = _since or time.monotonic()
         if (time.monotonic() - _since) * 1000 >= NOTICE_MS:
-            logger.info(f"overlay: nothing to point at ({reading['state']}), closing")
+            logger.info(f"overlay: never got going ({reading['state']}), closing")
             stop()
             return
 

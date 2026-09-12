@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.8.1
+
+**A guide that never got going says why for ten seconds, then goes.** It was
+six, and six seconds is not long enough to read a line, look at the body name
+and understand that you are one moon out.
+
+**A guide that did get going stays.** Losing the fix is what taking off does,
+and the arrow used to close itself six seconds into a climb - you were on your
+way back down to the same patch. Only a run that never pointed anywhere counts
+as a message, and only a message expires.
+
 ## 2.8.0
 
 **Delete, behind every bookmark.** A bookmark was two files in a folder and

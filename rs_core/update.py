@@ -23,7 +23,7 @@ import zipfile
 
 from rs_core.logging import logger
 
-VERSION = "2.8.0"
+VERSION = "2.8.1"
 
 # For testing the update path without publishing a throwaway release: set
 # RHINOSPOTTER_VERSION to something older and the running plugin will see the
