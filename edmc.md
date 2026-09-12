@@ -21,14 +21,14 @@ Checked 2026-09-12 against EDMC 6.1.2 as installed.
 |---|---|---|
 | Public repo | yes | yes |
 | Licence, GPL v2+ compatible | GPL-3.0 | GPL-3.0 |
-| `VERSION` and `__version__` on `load.py` | yes, 2.8.1 | yes, `v0.4.400.3.005` |
-| Semantic version | 2.8.1 | **no** - four parts and a leading `v` |
+| `VERSION` and `__version__` on `load.py` | yes, 2.8.2 | yes, `v0.4.400.3.005` |
+| Semantic version | 2.8.2 | **no** - four parts and a leading `v` |
 | Ships only what it needs | `lib/` is gitignored | `backup_legacy/` untracked |
-| Published release to point a zip at | tagged v2.8.1, release pending | yes |
+| Published release to point a zip at | tagged v2.8.2, release pending | yes |
 
 RhinoSpotter is submittable. `docs/registry/RhinoSpotter.json` is filled in
-for 2.8.1, including `pluginZip` and `pluginHash` - the hash is of the zip
-built from the v2.8.1 tag, so it holds as long as that exact file is the one
+for 2.8.2, including `pluginZip` and `pluginHash` - the hash is of the zip
+built from the v2.8.2 tag, so it holds as long as that exact file is the one
 attached to the release. Publish the release, attach it, then open the
 registry PR.
 
