@@ -11,3 +11,6 @@ data/
 # Vendored at some point for a database path that no longer exists. Kept out
 # of the repo until something imports it again.
 lib/
+
+# Release zips, built from a tag and uploaded, not kept.
+RhinoSpotter-*.zip

@@ -15,20 +15,22 @@ Every submission is read by a person. Nothing here is automatic.
 
 ## Where we stand
 
-Checked 2026-09-11 against EDMC 6.1.2 as installed.
+Checked 2026-09-12 against EDMC 6.1.2 as installed.
 
 | | RhinoSpotter | EliteMeritTracker |
 |---|---|---|
 | Public repo | yes | yes |
 | Licence, GPL v2+ compatible | GPL-3.0 | GPL-3.0 |
-| `VERSION` and `__version__` on `load.py` | yes, 2.2.0 | yes, `v0.4.400.3.005` |
-| Semantic version | 2.2.0 | **no** - four parts and a leading `v` |
+| `VERSION` and `__version__` on `load.py` | yes, 2.8.1 | yes, `v0.4.400.3.005` |
+| Semantic version | 2.8.1 | **no** - four parts and a leading `v` |
 | Ships only what it needs | `lib/` is gitignored | `backup_legacy/` untracked |
-| Published release to point a zip at | **not yet for 2.2.0** | yes |
+| Published release to point a zip at | tagged v2.8.1, release pending | yes |
 
-RhinoSpotter is submittable. The only thing missing is a published release for
-the current version, and that is only needed to fill `pluginZip` and
-`pluginHash`, both of which are recommended rather than required.
+RhinoSpotter is submittable. `docs/registry/RhinoSpotter.json` is filled in
+for 2.8.1, including `pluginZip` and `pluginHash` - the hash is of the zip
+built from the v2.8.1 tag, so it holds as long as that exact file is the one
+attached to the release. Publish the release, attach it, then open the
+registry PR.
 
 ### EliteMeritTracker, one thing left
 
