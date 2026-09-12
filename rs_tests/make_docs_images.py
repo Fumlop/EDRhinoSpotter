@@ -148,8 +148,16 @@ def main_images():
     body = f"{SYSTEM} 4 a"
     marks = bookmarks(body, card)
 
-    window = scan.show(root, found, sheet, None,
-                       variable=main._material, materials=picker)
+    # The material back to All first, and its trace let through before
+    # anything is built. The panel reopens the scan window when the material
+    # changes, and that was destroying the window this grabs, halfway
+    # through settling it.
+    main._material.set("All")
+    settle(root, 10)
+
+    scan.show(root, found, sheet, None,
+              variable=main._material, materials=picker)
+    window = scan._window
     scan._bookmarks_view(window, SYSTEM, body, marks)
     window.attributes("-topmost", True)
     window.deiconify()
@@ -169,6 +177,12 @@ def overlay_image(root, scale, mark):
     behind it - which on this machine is an editor. A backdrop keeps the
     picture about the arrow.
     """
+    # Elite off, as far as the overlay is concerned. With the game running it
+    # parks itself over the game window, and the picture would be half a
+    # cockpit that is not ours to publish. Off, it falls back to the middle of
+    # the screen, which is where the backdrop goes.
+    was_rect = overlay._game_rect
+    overlay._game_rect = lambda: None
     was = spotmark.read_status
     spotmark.read_status = lambda *args, **kwargs: {
         "BodyName": mark["planet_name"], "Latitude": 12.3400,
@@ -179,16 +193,24 @@ def overlay_image(root, scale, mark):
     backdrop.overrideredirect(True)
     backdrop.configure(bg="#05070a")
     backdrop.attributes("-topmost", True)
-    backdrop.geometry(f"420x260+{(root.winfo_screenwidth() - 420) // 2 - 90}+20")
+    backdrop.geometry(f"{overlay.WIDTH + 80}x{overlay.HEIGHT + 60}"
+                      f"+{(root.winfo_screenwidth() - overlay.WIDTH) // 2 - 40}+10")
     backdrop.deiconify()
     settle(backdrop, 10)
 
     window = overlay.start(root, mark)
     settle(window, 20)
+
+    # The backdrop under where the overlay actually landed, not where it was
+    # guessed to land: the overlay parks itself on the Elite window if one is
+    # running, and a picture half on the dark rectangle is worse than none.
+    window.lift()
+    settle(window, 10)
     grab(window, "guide.png", scale)
     overlay.stop()
     backdrop.destroy()
     spotmark.read_status = was
+    overlay._game_rect = was_rect
 
 
 if __name__ == "__main__":

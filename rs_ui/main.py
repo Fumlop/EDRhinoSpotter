@@ -210,6 +210,7 @@ def open_scan():
     """
     if not _frame:
         return
+    logger.debug(f"open_scan: focus={_focus()!r}")
     try:
         scan.show(_frame.winfo_toplevel(), _register, _sheet, _focus(),
                   variable=_material,
@@ -230,7 +231,10 @@ def _on_material_changed(*_):
     is still on screen, and destroying that menu's parent from underneath it is
     how Tk is told to close a window in the middle of closing itself.
     """
-    if _frame and scan.is_open():
+    open_now = bool(_frame) and scan.is_open()
+    logger.debug(f"material changed to {_material.get()!r}, "
+                 f"scan open={open_now} - {'reopening' if open_now else 'nothing to do'}")
+    if open_now:
         _frame.after_idle(open_scan)
 
 

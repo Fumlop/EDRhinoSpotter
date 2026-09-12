@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.8.2
+
+**The window stops fighting itself.** The footer flipped between one line and
+two, forever, and the list above it jumped by the difference - a scrollbar
+walking up and down on a window nobody was touching.
+
+A label that wraps is told what width to wrap at, and the thing that knows
+that width is the window, so the wrapper listens for the window's resize. But
+a child widget's bind tags carry its toplevel, so that listener was hearing
+every widget in the window - including the label it wraps. The label's own
+width set the wraplength, which changed the label's height, which was another
+resize. It now answers only for the widget it was bound to.
+
+Eleven thousand lines of debug log for one screenshot, and the window was
+being torn down mid-render; both are gone. The screenshots in the README are
+regenerated from the code as it stands, and the bookmark list and the guide
+arrow have pictures of their own now.
+
 ## 2.8.1
 
 **A guide that never got going says why for ten seconds, then goes.** It was

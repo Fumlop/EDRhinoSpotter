@@ -70,11 +70,21 @@ def show(parent, register, sheet, focus=None, variable=None, materials=()):
     if _window is not None and _window.winfo_exists():
         _window.destroy()
 
+    logger.debug(f"scan: open, system={register.system!r} focus={focus!r}")
     _window = tk.Toplevel(parent)
     _window.configure(bg=BG)
+    # Debug only, and only on the window itself: whatever takes it away, this
+    # is the line that names it. A window that vanishes with no Python frame
+    # behind it is the one thing the stack cannot be asked about afterwards.
+    _window.bind("<Destroy>", _log_destroy, add="+")
     _scan = (register, sheet, focus, variable, materials)
     _scan_view(_window)
     return _window
+
+
+def _log_destroy(event):
+    if _window is not None and event.widget is _window:
+        logger.debug("scan: the window was destroyed")
 
 
 def _clear(window):
@@ -90,6 +100,7 @@ def _scan_view(window):
     landed while it was behind them.
     """
     register, sheet, focus, variable, materials = _scan
+    logger.debug("scan: building the body list")
     _clear(window)
     window.title(f"RhinoScan - {register.system or 'unknown system'}"
                  + (f" - {focus}" if focus else ""))
@@ -191,6 +202,7 @@ def _fit(window, listing, wrapped=(), extra=0):
     width = min(max(content, 420), MAX_WIDTH)
     wanted = max(window.winfo_reqheight(), listing.winfo_reqheight() + CHROME)
     height = min(max(wanted, 260), MAX_HEIGHT)
+    logger.debug(f"scan: fit to {width}x{height}")
     window.geometry(f"{width}x{height}")
     window.minsize(480, 240)
 
@@ -225,7 +237,11 @@ def _picker(parent, variable, materials):
     row.pack(fill="x", pady=(6, 2))
     tk.Label(row, text="Showing", bg=BG, fg=DIM, font=("Segoe UI", 9)).pack(side="left")
 
+    before = variable.get()
     picker = tk.OptionMenu(row, variable, *materials)
+    if variable.get() != before:
+        logger.debug(f"picker: OptionMenu moved the material {before!r} -> "
+                     f"{variable.get()!r}")
     picker.config(relief="solid", borderwidth=1, highlightthickness=0,
                   bg=PANEL, fg=FG, activebackground=PANEL, activeforeground=ACCENT,
                   anchor="w", padx=6, pady=0, font=("Segoe UI", 9))
@@ -346,6 +362,7 @@ def _bookmarks_view(window, system, body, records):
     page in the browser, which meant leaving the game to read three numbers.
     """
     global _body
+    logger.debug(f"scan: building the bookmarks of {body}, {len(records)} of them")
     _body = (window, system, body, records)
     _clear(window)
     window.title(f"RhinoScan - {body} - bookmarks")
@@ -646,6 +663,7 @@ class _Wrapper:
         self.labels = []
         self.margin = margin
         self.width = 0
+        self.source = source
         source.bind("<Configure>", self._resize, add="+")
 
     def __call__(self, label):
@@ -655,6 +673,14 @@ class _Wrapper:
         return label
 
     def _resize(self, event):
+        # Only the widget this was bound to. A child's bindtags carry its
+        # toplevel, so a wrapper on the window hears every widget inside it -
+        # including the label it wraps, whose own width then set the
+        # wraplength, which changed the label's height, which was another
+        # Configure. The footer flipped between one line and two forever, and
+        # the list under it jumped by the difference.
+        if event.widget is not self.source:
+            return
         if event.width <= 80:
             return
         self.width = event.width - self.margin

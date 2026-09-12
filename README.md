@@ -29,6 +29,11 @@ with the location, material, rigs, heading, coordinates and when it was
 marked. **Most rigs first** - of the patches you bookmarked on this body, the
 best one is the top row. **Back**, top left, returns to the body list.
 
+<p align="center">
+  <img src="docs/bookmarks.png" width="620"
+       alt="The bookmarks of one body, three rows with Guide, Card and Delete">
+</p>
+
 Each row carries three buttons. **Card** opens that bookmark's PNG in whatever
 shows PNGs here, which is the thing that can then send it on.
 
@@ -45,6 +50,11 @@ you can type over.
 click-through, showing the direction to that patch and how far. It works from
 orbital cruise down to the SRV, and Elite has to run **borderless or
 windowed** - nothing draws over an exclusive fullscreen.
+
+<p align="center">
+  <img src="docs/guide.png" width="260"
+       alt="The guide arrow, with the distance to the patch under it">
+</p>
 
 The arrow points relative to your nose while the game gives a heading. Higher
 up it gives none, and the arrow then points north-up, dimmed and labelled with
