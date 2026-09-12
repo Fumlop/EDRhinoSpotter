@@ -34,7 +34,7 @@ _sheet = None            # rs_core.grounds.Sheet, read once at startup
 
 _frame = None
 _status = None
-_done = None             # "completed" beside the button, once a card is on disk
+_done_after = None       # the pending return of the button to "Bookmark"
 _scan_count = None       # how many landable bodies the current system has
 # What the dropdown says before anything is picked. A real string rather than
 # an empty one: an OptionMenu with "" in it draws as a blank sunken box with a
@@ -64,7 +64,7 @@ def start(plugin_dir):
 
 
 def build(parent):
-    global _frame, _status, _done, _scan_count, _card_button, _landed_after
+    global _frame, _status, _scan_count, _card_button, _landed_after
     global _measure_status, _loc, _rigs, _material
 
     _frame = tk.Frame(parent)
@@ -105,10 +105,8 @@ def build(parent):
     # press with no confirmation, so they get a gap between them.
     row = tk.Frame(_frame)
     row.grid(row=3, column=0, columnspan=4, sticky="w", padx=2, pady=(4, 2))
-    _card_button = tk.Button(row, text="Bookmark", width=13, command=make_card)
+    _card_button = tk.Button(row, text=CARD_TEXT, width=13, command=make_card)
     _card_button.pack(side="left")
-    _done = tk.Label(row, text="", anchor="w")
-    _done.pack(side="left", padx=(8, 0))
     tk.Button(row, text="RhinoScan", width=13, command=open_scan).pack(side="left", padx=(8, 0))
 
     # No measuring line either. It would be an empty row every session: the
@@ -261,7 +259,7 @@ def _poll_landed():
     global _landed_after
     if not _frame or not _card_button:
         return
-    if str(_card_button.cget("text")) == "Bookmark":
+    if str(_card_button.cget("text")) == CARD_TEXT:
         ready = spotmark.on_ground(spotmark.read_status())
         _card_button.config(state="normal" if ready else "disabled")
     _landed_after = _frame.after(LANDED_POLL_MS, _poll_landed)
@@ -355,9 +353,10 @@ def stop():
     teardown by design; left alone it fires once against a frame that is no
     longer there.
     """
-    global _measure_after, _landed_after
+    global _measure_after, _landed_after, _done_after
     _measure_after = _cancel_poll()
     _landed_after = _cancel_landed()
+    _done_after = _cancel_done()
 
 
 def _log_measurement(track):
@@ -488,7 +487,7 @@ def _report(message, token):
     if token != _card_token:
         return
     _set_status(message or "")
-    _set_done("" if message else "completed")
+    _set_done("" if message else DONE_TEXT)
 
 
 def _on_update_checked(tag, newer):
@@ -554,9 +553,44 @@ def _set_status(text):
         _status.config(text=text)
 
 
+# What the button says when it is itself, and what it says for a moment after
+# a card lands. The result goes on the button because that is where the eye
+# already is at the end of a press, and a label that is empty the rest of the
+# time was an empty row for the sake of one word.
+CARD_TEXT = "Bookmark"
+DONE_TEXT = "completed"
+DONE_MS = 5000
+
+
 def _set_done(text):
-    if _done:
-        _done.config(text=text)
+    """Say it on the button, and take it back after DONE_MS."""
+    global _done_after
+    if not _card_button or not _frame:
+        return
+    _done_after = _cancel_done()
+    if text:
+        _card_button.config(text=text)
+        _done_after = _frame.after(DONE_MS, _restore_card_button)
+    else:
+        _restore_card_button()
+
+
+def _restore_card_button():
+    """Only ever takes back our own word. An update can claim the button while
+    the message is up, and an update outranks a bookmark that already landed."""
+    global _done_after
+    _done_after = None
+    if _card_button and str(_card_button.cget("text")) == DONE_TEXT:
+        _card_button.config(text=CARD_TEXT)
+
+
+def _cancel_done():
+    if _done_after and _frame:
+        try:
+            _frame.after_cancel(_done_after)
+        except (ValueError, tk.TclError):
+            pass
+    return None
 
 
 def _int(value):
