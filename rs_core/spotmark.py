@@ -91,3 +91,22 @@ def mark(status, system=None, commander=None, marked_at=None):
 def on_surface(spot):
     """A mark without coordinates is not a place anyone can fly back to."""
     return spot.get("latitude") is not None and spot.get("longitude") is not None
+
+
+# Orbital cruise hands out coordinates too - 250 km up, over a body you have
+# not landed on. A patch is where you are standing, so height is the test that
+# separates the two, and a hundred metres is the ship on its gear plus slack.
+GROUND_M = 100.0
+
+
+def on_ground(status, ceiling=GROUND_M):
+    """Whether Status.json is describing somewhere you are standing.
+
+    Takes Status.json, not a mark - the panel asks this once a second to know
+    whether Bookmark can do anything, and building a mark to ask would be
+    building one every second.
+    """
+    if status.get("Latitude") is None or status.get("Longitude") is None:
+        return False
+    altitude = status.get("Altitude")
+    return altitude is not None and altitude <= ceiling

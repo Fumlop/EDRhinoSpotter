@@ -49,6 +49,7 @@ _card_button = None      # Bookmark, until there is an update to install
 _measure_status = None   # what the tape measure reads, while it reads
 _track = None            # rs_core.measure.Track while measuring, else None
 _measure_after = None    # the pending poll, so stopping actually stops
+_landed_after = None     # the pending look at whether we are on the ground
 _loc = None              # tk.StringVar - mining location index
 _rigs = None             # tk.StringVar - rigs on the patch
 _material = None         # tk.StringVar - the material this spot is mined for
@@ -137,6 +138,11 @@ def build(parent):
     # One watcher for the whole session. The picker in the scan window writes
     # to this same variable, so this fires for either of them.
     _material.trace_add("write", _on_material_changed)
+
+    # Bookmark starts out grey and the poll turns it on, rather than the other
+    # way round: EDMC usually starts while the commander is docked.
+    _card_button.config(state="disabled")
+    _poll_landed()
 
     _refresh_scan_count()
     update.check_async(_on_update_checked)
@@ -236,6 +242,27 @@ def _on_material_changed(*_):
                  f"scan open={open_now} - {'reopening' if open_now else 'nothing to do'}")
     if open_now:
         _frame.after_idle(open_scan)
+
+
+# How often Status.json is read to see whether Bookmark has anything to mark.
+# The same second the measuring loop uses, and for the same reason: it is one
+# small file, and the answer changes at walking pace.
+LANDED_POLL_MS = 1000
+
+
+def _poll_landed():
+    """Grey Bookmark out while there is nothing under the ship.
+
+    Only while the button is still Bookmark. It doubles as the update button,
+    and an update that is downloading has its own reasons for being disabled.
+    """
+    global _landed_after
+    if not _frame or not _card_button:
+        return
+    if str(_card_button.cget("text")) == "Bookmark":
+        ready = spotmark.on_ground(spotmark.read_status())
+        _card_button.config(state="normal" if ready else "disabled")
+    _landed_after = _frame.after(LANDED_POLL_MS, _poll_landed)
 
 
 # How often Status.json is read while measuring. The SRV does about 30 m/s

@@ -109,3 +109,28 @@ class TestNearestIndex:
 
     def test_a_landing_next_to_nothing(self):
         assert spotmark.nearest_index({"event": "Touchdown"}) is None
+
+
+class TestOnGround:
+    """What Bookmark asks once a second: is there anything under us to mark."""
+
+    def test_standing_on_it(self):
+        assert spotmark.on_ground({"Latitude": 1.0, "Longitude": 2.0,
+                                   "Altitude": 0.0}) is True
+
+    def test_orbital_cruise_has_coordinates_too(self):
+        """250 km up over a body you have not landed on. The coordinates are
+        real and the place is not one you are standing in."""
+        assert spotmark.on_ground({"Latitude": 9.674362, "Longitude": 153.538544,
+                                   "Altitude": 250038.0}) is False
+
+    def test_no_body_at_all(self):
+        assert spotmark.on_ground({"Altitude": 0.0}) is False
+
+    def test_no_altitude_is_not_the_ground(self):
+        """In space Status.json has no Altitude, and a missing number is not a
+        low one."""
+        assert spotmark.on_ground({"Latitude": 1.0, "Longitude": 2.0}) is False
+
+    def test_an_empty_status(self):
+        assert spotmark.on_ground({}) is False
