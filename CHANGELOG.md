@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.9.1
+
+**Changed**
+
+- "completed" appears on the Bookmark button for five seconds after a card is
+  written, then the button takes its own name back. It used to sit in a label
+  beside the button and stay there until the next press.
+- An update claiming the button while that message is up keeps it. The restore
+  only ever takes back its own word.
+
+**Fixed**
+
+- The pending restore is cancelled at shutdown, like the two polls.
+
 ## 2.9.0
 
 **Changed**
