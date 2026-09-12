@@ -64,3 +64,21 @@ def newest(records):
     if not records:
         return None
     return max(records, key=lambda record: str(record.get("marked_at") or ""))
+
+
+def ordered(records):
+    """The bookmarks of one body, most rigs first, then by location.
+
+    Rigs first because that is the question a list of them answers: of the
+    patches you marked on this body, which one was worth the most. Location is
+    the order you worked the body in, which is history rather than a decision.
+
+    A bookmark with no rig count sorts last rather than as zero - it was not
+    counted, which is not the same as having been counted at none.
+    """
+    def key(record):
+        rigs = record.get("rigs")
+        index = record.get("location_index")
+        return (rigs is None, -(rigs or 0), index is None, index or 0)
+
+    return sorted(records, key=key)

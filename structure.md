@@ -17,7 +17,7 @@ RhinoSpotter/
 ├── load.py              EDMC lifecycle hooks, and nothing else
 ├── rs_core/             everything that is not a widget
 ├── rs_ui/               everything that is
-├── rs_tests/            pytest suite, 164 checks
+├── rs_tests/            pytest suite, 231 checks
 ├── ground_rules.json    the mining sheet, frozen when the plugin was packaged
 ├── cards/               rendered cards (gitignored)
 ├── data/                screenshots and sidecars (gitignored)
@@ -89,7 +89,8 @@ No tkinter anywhere in here.
   marked, read from the JSON sidecars rather than the file names. A name has
   had its spaces replaced and its material lowercased, so reading a body back
   out of one is a guess; a PNG without a sidecar is skipped rather than
-  guessed at.
+  guessed at. `ordered()` is the order a body's bookmarks are read in: most
+  rigs first, uncounted ones last.
 - **[measure.py](rs_core/measure.py)** - area and rig count for a border
   driven in the SRV. Shoelace for the area, ray casting for what is inside,
   and a 76 m grid for the rigs. Flat earth on purpose: a spot is a few hundred
@@ -99,10 +100,13 @@ No tkinter anywhere in here.
   still gets a plausible-looking area. Nothing in the panel starts a
   measurement: the code works and is tested, and has no button until there is
   a decision about where it belongs.
-- **[page.py](rs_core/page.py)** - the bookmarks of one body as an HTML table,
-  written beside the cards so the images are one relative path away and it
-  opens from a file:// URL with nothing serving it. Regenerated on every open
-  rather than cached.
+- **[guide.py](rs_core/guide.py)** - one Status.json and one bookmark into one
+  arrow: `bearing()`, `distance()`, and `fix()` which says what the overlay
+  can draw. Great circle, not the flat earth measure.py uses - a patch is
+  metres across and flat is right for that, but guiding starts in orbital
+  cruise. Every case that is not an arrow is its own state, because "wrong
+  body" and "too high for coordinates" look identical from the cockpit and
+  want opposite actions.
 - **[palette.py](rs_core/palette.py)** - the colours, once. Hex for tkinter,
   RGB tuples for PIL, one conversion function between them so the window and
   the cards cannot drift apart. They used to be two schemes and looked like
@@ -120,8 +124,18 @@ Everything in here imports tkinter.
   widen the panel on the one day it matters, and a permanent one every day. The card render and the update check run off the UI thread and come
   back through `_frame.after`, because Tk is not thread-safe and a widget
   written from a worker fails minutes later somewhere unrelated.
-- **[scan.py](rs_ui/scan.py)** - the RhinoScan window. Read-only and
-  disposable: nothing is saved from it, so pressing the button twice costs
+- **[overlay.py](rs_ui/overlay.py)** - the arrow over the game. A borderless
+  always-on-top window keyed to a colour it then makes a hole of, so only what
+  is drawn shows, and click-through on top of that - a triangle over the
+  cockpit that eats a click will eat the wrong one. Parked at the top middle
+  of the Elite window and re-placed every tick, because the game gets moved.
+  Polls Status.json twice a second; guiding outlives the scan window, which is
+  why it hangs off the root and not off the window that started it.
+- **[scan.py](rs_ui/scan.py)** - the RhinoScan window, in two views: the
+  body list, and the bookmarks of one body with Back at the top left. One
+  window, rebuilt rather than stacked - the bookmarks are a step into the row
+  you clicked, not a second thing on the screen. Read-only and disposable:
+  nothing is saved from it, so pressing the button twice costs
   nothing. Given a material it lists only the ground that has ever carried it,
   and that material leads every group whatever its rate - the question has
   changed from "what is here" to "where is the jadeite", and a ground that
@@ -129,7 +143,7 @@ Everything in here imports tkinter.
 
 ## Tests (`rs_tests/`)
 
-`pytest` from the plugin folder. 164 checks, no network, no game, no display.
+`pytest` from the plugin folder. 231 checks, no network, no game, no display.
 
 - **conftest.py** - puts the plugin folder on `sys.path`, and builds Scan
   events carrying only the fields the code reads. The `sheet` fixture is a
@@ -147,8 +161,9 @@ Everything in here imports tkinter.
   written straight back.
 - **test_measure.py** - a square of known size, an L to prove the shape is
   the shape and not its bounding box, and a parked SRV adding nothing.
-- **test_page.py** - a row per bookmark, sorted by location, relative image
-  paths, and a body name that is markup.
+- **test_guide.py** - the four compass corners, a degree of latitude against
+  the number measure.py uses for the same thing, a heading turned into a left
+  turn rather than a bearing, and every state a reading can end in.
 - **test_palette.py** - that the card and the window draw the same black, and
   that a colour which is not six hex digits raises rather than silently
   becoming black.
@@ -171,6 +186,7 @@ Everything in here imports tkinter.
 | Systems visited before | `%LOCALAPPDATA%\RhinoSpotter\data\<System>.json` | written on every change |
 | What a ground holds | `ground_rules.json` | shipped with the release |
 | What a location holds | nothing - it is in no feed | screenshot and read by eye |
+| Where you are, while guiding | `Status.json` | the game, twice a second |
 
 The last row is the whole reason this plugin exists.
 

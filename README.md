@@ -20,18 +20,28 @@ been found to hold above it.
 *Example system. Percentages are the share of that ground's mining locations
 that carried the material; `unprobed` means nobody has counted that body yet,
 and those rows are dimmed. A body you have already marked shows how many
-bookmarks it has - click and a page of them opens in your browser.*
+bookmarks it has - click and the window lists them.*
 
-### The bookmarks page
+### The bookmarks of one body
 
-Clicking `3 bookmarks` writes a page beside the cards and opens it: one row
-per bookmark with the location, material, rigs, heading, coordinates and when
-it was marked, and the card itself alongside. **Most rigs first** - of the
-patches you bookmarked on this body, the best one is the top row.
+Clicking `3 bookmarks` puts the list in the same window: one row per bookmark
+with the location, material, rigs, heading, coordinates and when it was
+marked. **Most rigs first** - of the patches you bookmarked on this body, the
+best one is the top row. **Back**, top left, returns to the body list.
 
-It is written fresh every time it is opened. The bookmarks are the truth and
-the page is a view of them, so a stale one would be a bug waiting rather than
-a cache.
+Each row carries two buttons. **Card** opens that bookmark's PNG in whatever
+shows PNGs here, which is the thing that can then send it on.
+
+**Guide** puts an arrow over the game: top middle of the Elite window,
+click-through, showing the direction to that patch and how far. It works from
+orbital cruise down to the SRV, and Elite has to run **borderless or
+windowed** - nothing draws over an exclusive fullscreen.
+
+The arrow points relative to your nose while the game gives a heading. Higher
+up it gives none, and the arrow then points north-up, dimmed and labelled with
+the compass point. On the wrong body or too high for coordinates there is no
+arrow at all, just a line saying which. Press **Stop** on the same row, or
+**Guide** on another one, to move it.
 
 ### Filtering to one material
 

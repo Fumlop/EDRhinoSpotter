@@ -11,12 +11,13 @@ so pressing the button twice costs nothing and the card flow is untouched.
 
 import os
 import pathlib
-import subprocess
 import tkinter as tk
 import webbrowser
 from tkinter import font as tkfont
 
-from rs_core import cards, grounds, page, palette
+from rs_core import cards, grounds, palette
+from rs_core.logging import logger
+from rs_ui import overlay
 
 try:
     from theme import theme
@@ -42,6 +43,8 @@ GOOD = palette.GOOD
 WARN = palette.WARN
 
 _window = None           # only ever one, so the button cannot bury the panel
+_scan = None             # what show() was last given, so Back can rebuild
+_body = None             # the bookmark view's own arguments, for the same reason
 
 
 def is_open():
@@ -62,17 +65,36 @@ def show(parent, register, sheet, focus=None, variable=None, materials=()):
     variable is the panel's job - one watcher, added once, rather than another
     one on every open.
     """
-    global _window
+    global _window, _scan
 
     if _window is not None and _window.winfo_exists():
         _window.destroy()
 
     _window = tk.Toplevel(parent)
-    _window.title(f"RhinoScan - {register.system or 'unknown system'}"
-                  + (f" - {focus}" if focus else ""))
     _window.configure(bg=BG)
+    _scan = (register, sheet, focus, variable, materials)
+    _scan_view(_window)
+    return _window
 
-    outer = tk.Frame(_window, bg=BG)
+
+def _clear(window):
+    for child in window.winfo_children():
+        child.destroy()
+
+
+def _scan_view(window):
+    """The body list, built into an empty window.
+
+    Rebuilt rather than hidden and shown again: Back comes through here, and a
+    list kept alive behind the bookmarks is a list that missed every scan that
+    landed while it was behind them.
+    """
+    register, sheet, focus, variable, materials = _scan
+    _clear(window)
+    window.title(f"RhinoScan - {register.system or 'unknown system'}"
+                 + (f" - {focus}" if focus else ""))
+
+    outer = tk.Frame(window, bg=BG)
     outer.pack(fill="both", expand=True, padx=14, pady=12)
 
     _header(outer, register, sheet, focus, variable, materials)
@@ -94,9 +116,8 @@ def show(parent, register, sheet, focus=None, variable=None, materials=()):
             _group(listing, ground, _shorten(found, register.system), sheet, wrap,
                    focus, marked)
 
-    _footer(outer, sheet, _Wrapper(_window, margin=40))
-    _fit(_window, listing, prose)
-    return _window
+    _footer(outer, sheet, _Wrapper(window, margin=40))
+    _fit(window, listing, prose)
 
 
 # What the window may grow to before it starts scrolling instead. Wide enough
@@ -151,7 +172,7 @@ def _measure(labels, skip=()):
     return widest
 
 
-def _fit(window, listing, wrapped=()):
+def _fit(window, listing, wrapped=(), extra=0):
     """Open at the size the content asks for, capped.
 
     Measured off the list rather than the window: a canvas has no natural size
@@ -165,7 +186,8 @@ def _fit(window, listing, wrapped=()):
     """
     window.update_idletasks()
     # The rows, plus the scrollbar they sit beside and the padding around them.
-    content = _measure(_lines(listing), wrapped) + SCROLLBAR + 2 * OUTER_PAD + INDENT
+    content = (_measure(_lines(listing), wrapped) + extra
+               + SCROLLBAR + 2 * OUTER_PAD + INDENT)
     width = min(max(content, 420), MAX_WIDTH)
     wanted = max(window.winfo_reqheight(), listing.winfo_reqheight() + CHROME)
     height = min(max(wanted, 260), MAX_HEIGHT)
@@ -291,7 +313,7 @@ def _group(parent, ground, found, sheet, wrap, focus=None, marked=None):
 
 
 def _cards_link(parent, records):
-    """"2 bookmarks" behind a body you have already marked, opening the newest.
+    """"2 bookmarks" behind a body you have already marked, opening the list.
 
     Only on bodies that have one. A count of zero on every other row would be
     nine pieces of nothing in a ten-body system, and the useful signal here is
@@ -300,34 +322,195 @@ def _cards_link(parent, records):
     if not records:
         return
     count = len(records)
-    label = tk.Label(parent, text=f"  {count} bookmark{'' if count == 1 else 's'} ↗",
+    label = tk.Label(parent, text=f"  {count} bookmark{'' if count == 1 else 's'} ›",
                      bg=BG, fg=ACCENT, anchor="w", cursor="hand2",
                      font=("Consolas", 9))
     label.pack(side="left")
     system = records[0].get("system")
     body = records[0].get("planet_name")
-    label.bind("<Button-1>", lambda event: _open_bookmarks(system, body, records))
+    label.bind("<Button-1>",
+               lambda event: _bookmarks_view(label.winfo_toplevel(), system, body, records))
 
 
-def _open_bookmarks(system, body, records):
-    """Write the page for this body and open it in the browser.
+# The two buttons on every bookmark row. Buttons are not labels, so the width
+# measurement cannot see them and the window would open exactly that much too
+# narrow - and a row too narrow does not wrap, it drops what is packed right.
+BUTTONS = 130
 
-    Written fresh every time rather than cached: the bookmarks are the truth
-    and the page is a view of them, so a stale one is a bug waiting.
 
-    Falls back to Explorer with the newest card selected if the page cannot be
-    written - a read-only folder should cost the table, not the bookmarks.
+def _bookmarks_view(window, system, body, records):
+    """The bookmarks of one body, in the window the body list was in.
+
+    The same window on purpose: this is a step into the row that was clicked,
+    not a second thing on the screen, and Back is the way out of it. It was a
+    page in the browser, which meant leaving the game to read three numbers.
     """
-    path = page.write(system, body, records)
-    if path:
-        webbrowser.open(pathlib.Path(path).as_uri())
+    global _body
+    _body = (window, system, body, records)
+    _clear(window)
+    window.title(f"RhinoScan - {body} - bookmarks")
+
+    outer = tk.Frame(window, bg=BG)
+    outer.pack(fill="both", expand=True, padx=14, pady=12)
+
+    back = tk.Frame(outer, bg=BG)
+    back.pack(fill="x", pady=(0, 6))
+    _button(back, "‹ Back", lambda: _scan_view(window)).pack(side="left")
+
+    tk.Label(outer, text=body, bg=BG, fg=FG, anchor="w",
+             font=("Segoe UI", 15, "bold")).pack(fill="x")
+    count = len(records)
+    tk.Label(outer, text=f"{system or ''}  -  {count} bookmark{'' if count == 1 else 's'}",
+             bg=BG, fg=DIM, anchor="w", font=("Segoe UI", 9)).pack(fill="x", pady=(0, 10))
+
+    _column_header(outer)
+    listing, _ = _scrollable(outer)
+    for record in cards.ordered(records):
+        _bookmark_row(listing, record)
+
+    note = tk.Label(outer, text="Guide puts an arrow over the game, top middle - "
+                                "borderless or windowed only. Card opens the PNG.",
+                    bg=BG, fg=DIM, anchor="w", justify="left",
+                    font=("Segoe UI", 8))
+    note.pack(side="top", fill="x", pady=(8, 0))
+    _Wrapper(window, margin=40)(note)
+    _fit(window, listing, extra=BUTTONS)
+
+
+def _column_header(parent):
+    """The names of the four columns, above the list rather than in it.
+
+    Above because the list scrolls: a header that scrolls away is a header you
+    have to scroll back for. It names the top line of a row only - the dim
+    line under each one is position and time, which need no naming.
+    """
+    tk.Label(parent, text="   " + _columns("LOC", "MATERIAL", "RIGS", "HDG"),
+             bg=BG, fg=DIM, anchor="w", font=("Consolas", 9)).pack(fill="x")
+    tk.Frame(parent, bg=palette.RULE, height=1).pack(fill="x", pady=(2, 4))
+
+
+def _columns(loc, material, rigs, heading):
+    """The one place the column widths live, so the header cannot drift away
+    from the rows it names."""
+    return f"{loc.ljust(7)} {material[:22].ljust(22)} {rigs.rjust(7)} {heading.rjust(5)}"
+
+
+def _bookmark_row(parent, record):
+    """One bookmark, on two lines.
+
+    Two because one did not fit: the coordinates carry six decimals each and
+    with a material beside them the line ran past the right edge of any
+    sensible window, taking the buttons with it. The top line is the patch -
+    what was mined there and how big it is - and the buttons that act on it;
+    the dim line under it is where and when.
+    """
+    row = tk.Frame(parent, bg=BG)
+    row.pack(fill="x", pady=(2, 6))
+
+    head = tk.Frame(row, bg=BG)
+    head.pack(fill="x")
+    tk.Label(head, text="   " + _bookmark_line(record), bg=BG, fg=FG, anchor="w",
+             font=("Consolas", 9)).pack(side="left")
+    # Card first: side="right" packs from the edge inwards, and Guide is the
+    # one that belongs beside the row rather than at the very end.
+    path = record.get("path")
+    # Clear of the scrollbar on the right, which the row runs up against.
+    _button(head, "Card", (lambda: _open_card(path)) if path else None).pack(
+        side="right", padx=(4, 6))
+    _guide_button(head, record)
+
+    tk.Label(row, text="   " + _bookmark_detail(record), bg=BG, fg=DIM, anchor="w",
+             font=("Consolas", 8)).pack(fill="x")
+
+
+def _guide_button(parent, record):
+    """Guide, or Stop while this is the bookmark being guided to.
+
+    Disabled on a bookmark with no coordinates - there were versions of the
+    card before the coordinates went into the sidecar, and there is nothing to
+    point at on one of those.
+    """
+    if record.get("latitude") is None or record.get("longitude") is None:
+        _button(parent, "Guide").pack(side="right")
         return
-    newest = cards.newest(records)
-    if newest and os.path.isfile(newest.get("path") or ""):
-        try:
-            subprocess.Popen(["explorer", "/select,", os.path.normpath(newest["path"])])
-        except OSError:
-            pass
+    running = overlay.guiding(record)
+    _button(parent, "Stop" if running else "Guide",
+            lambda: _toggle_guide(record)).pack(side="right")
+
+
+def _toggle_guide(record):
+    """Start the arrow, or take it down, then redraw the rows.
+
+    Redrawn because the button that was pressed is not the only one that
+    changes: starting on a second bookmark has to turn the first one's Stop
+    back into Guide.
+    """
+    if overlay.guiding(record):
+        overlay.stop()
+    else:
+        overlay.start(_window, record)
+    if _body:
+        _bookmarks_view(*_body)
+
+
+def _bookmark_line(record):
+    """Location, material, rigs, heading - fixed-width, so the numbers of one
+    row sit under the numbers of the next."""
+    index = record.get("location_index")
+    rigs = record.get("rigs")
+    heading = record.get("heading")
+    return _columns(f"loc {index}" if index is not None else "loc ?",
+                    record.get("commodity") or "unknown",
+                    f"{rigs} rigs" if rigs is not None else "-",
+                    f"{heading}°" if heading is not None else "-")
+
+
+def _bookmark_detail(record):
+    """Where and when, dim, under the patch.
+
+    The coordinates carry all six decimals the game gave: they are the one
+    thing here that cannot be worked out again afterwards.
+    """
+    marked = str(record.get("marked_at") or "").split(".")[0].replace("T", " ")
+    return "  ".join(part for part in (_coords(record), marked) if part)
+
+
+def _coords(record):
+    lat, lon = record.get("latitude"), record.get("longitude")
+    if lat is None or lon is None:
+        return ""
+    return f"{float(lat):.6f} / {float(lon):.6f}"
+
+
+def _open_card(path):
+    """The PNG, in whatever shows PNGs here.
+
+    Opened rather than drawn into this window: it is a picture made to be sent
+    to somebody, and the viewer that opens it is the thing that can save it,
+    zoom it and copy it.
+    """
+    try:
+        os.startfile(path)                       # Windows, which is where EDMC runs
+    except AttributeError:
+        webbrowser.open(pathlib.Path(path).as_uri())
+    except OSError as err:
+        logger.warning(f"could not open {path}: {err}")
+
+
+def _button(parent, text, command=None):
+    """The window has no buttons anywhere else, so this is the style.
+
+    Without a command the button is disabled rather than silently dead: a
+    button that does nothing when pressed reads as a bug, and a greyed one
+    reads as not finished.
+    """
+    return tk.Button(parent, text=text, command=command,
+                     bg=PANEL, fg=FG, activebackground=PANEL,
+                     activeforeground=ACCENT, disabledforeground=DIM,
+                     relief="solid", borderwidth=1, highlightthickness=0,
+                     padx=8, pady=0, font=("Segoe UI", 8),
+                     cursor="hand2" if command else "arrow",
+                     state="normal" if command else "disabled")
 
 
 def _shorten(found, system):
@@ -417,6 +600,9 @@ class _Wrapper:
         if event.width <= 80:
             return
         self.width = event.width - self.margin
+        # A view this window has replaced leaves its labels destroyed and this
+        # binding behind, and configuring a destroyed widget raises.
+        self.labels = [label for label in self.labels if label.winfo_exists()]
         for label in self.labels:
             label.config(wraplength=self.width)
 

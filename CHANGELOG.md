@@ -1,5 +1,50 @@
 # Changelog
 
+## 2.7.0
+
+**The bookmarks of a body stay in the window.** Clicking the count behind a
+body wrote an HTML page and opened a browser; now the same window shows the
+list, with **Back** at the top left. Reading three numbers off a patch is not
+worth leaving the game for, and the page was a second place for the bookmarks
+to live.
+
+One row per bookmark, most rigs first, on two lines: location, material, rigs
+and heading on top, the coordinates and when it was marked dim underneath. Two
+lines because one did not fit - six decimals of latitude and longitude beside
+a material name ran the row past the right edge and took the buttons with it.
+
+The four columns are named above the list rather than in it, because the list
+scrolls and a header that scrolls away is one you have to scroll back for.
+
+**Card** opens that bookmark's PNG in whatever shows PNGs here - the thing
+that can zoom it, save it and send it to somebody, which is what the card is
+for.
+
+**Guide puts an arrow over the game.** A borderless, click-through window at
+the top middle of the Elite window, following it if it moves: the direction to
+the patch and how far. It reads Status.json twice a second and turns the
+position and heading into one angle, great circle rather than flat, because
+guiding starts in orbital cruise and over a hundred kilometres flat is wrong.
+
+Elite has to run borderless or windowed. Nothing draws over an exclusive
+fullscreen, and no plugin can change that.
+
+The arrow points relative to the nose while the game gives a heading, which is
+low down and in the SRV. Higher up there is none, and it then points north-up,
+dimmed and labelled with the compass point - a different instrument, so it has
+to look like one rather than quietly lying about which way to turn.
+
+No arrow on the wrong body, in orbit, or away from a body at all: a short line
+saying which, because sitting on the wrong moon and sitting too high look the
+same from the cockpit and want opposite actions. Under 50 m it says HERE.
+
+A bookmark from before the coordinates went into the sidecar has nothing to
+point at, and its Guide is greyed out rather than silently dead.
+
+`rs_core/page.py` and its tests are gone with the page. The one thing worth
+keeping from it, the order the bookmarks are read in, moved to
+`cards.ordered()`.
+
 ## 2.6.1
 
 **The bookmarks page sorts by rig count, most first.** It sorted by location,

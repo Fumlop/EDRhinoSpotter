@@ -67,9 +67,14 @@ volcanism this reads, so:
 A system where you did neither shows nothing, and the window says so.
 
 **Bookmarks you already made.** A body you have marked before shows
-"2 bookmarks" behind it. Clicking opens a page in your browser: one row per
+"2 bookmarks" behind it. Clicking lists them in the same window: one row per
 bookmark with the location, material, rigs, heading, coordinates and when it
-was marked, and the card itself alongside. Bodies with none say nothing.
+was marked, most rigs first. **Back** returns to the body list, and **Card**
+opens that bookmark's PNG. Bodies with none say nothing.
+
+**Guide.** An arrow over the game, top middle, pointing at that patch with the
+distance under it. Elite must run borderless or windowed - nothing draws over
+an exclusive fullscreen. **Stop** on the same row takes it down.
 
 **Filtering.** Pick a material in the panel and the window lists only the
 ground that carries it, each group leading with its rate for that material.

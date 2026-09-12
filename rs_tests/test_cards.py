@@ -86,6 +86,28 @@ class TestNewest:
         assert cards.newest([]) is None
 
 
+class TestOrdered:
+    """The order the bookmark list is read in: the best patch on this body
+    first, not the one worked first."""
+
+    def test_most_rigs_first(self):
+        found = cards.ordered([{"rigs": 2, "location_index": 1},
+                               {"rigs": 6, "location_index": 9},
+                               {"rigs": 4, "location_index": 5}])
+        assert [record["rigs"] for record in found] == [6, 4, 2]
+
+    def test_equal_rigs_fall_back_to_location(self):
+        found = cards.ordered([{"rigs": 4, "location_index": 9},
+                               {"rigs": 4, "location_index": 2}])
+        assert [record["location_index"] for record in found] == [2, 9]
+
+    def test_an_uncounted_bookmark_sorts_last(self):
+        """Not counted is not the same as counted at none."""
+        found = cards.ordered([{"rigs": None, "location_index": 1},
+                               {"rigs": 1, "location_index": 8}])
+        assert [record["rigs"] for record in found] == [1, None]
+
+
 class TestSidecarFromRender:
     def test_render_writes_one(self, tmp_path):
         """The end this is all read from: a real card, written by the real
