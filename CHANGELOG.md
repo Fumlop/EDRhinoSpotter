@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.9.0
+
+**Bookmark goes grey when there is nothing under the ship.** Orbital cruise
+hands out a latitude and a longitude too, 250 km up over a body nobody has
+landed on, so coordinates alone were never the test. Altitude is: a hundred
+metres is the ship on its gear plus slack, and below that you are standing
+somewhere you can fly back to. The button now says so before it is pressed
+rather than making a card of a place you were passing over.
+
+It reads Status.json once a second, the same cadence as the tape measure and
+for the same reason - one small file, and the answer changes at walking pace.
+It watches only while the button is still Bookmark; the update button borrows
+the same widget and disables itself for its own reasons.
+
+**The poll lets go when EDMC closes.** It reschedules itself forever, which is
+what a poll is, so it was still pending at teardown and fired once against a
+frame that had gone. `plugin_stop` now drops both polls.
+
+**The ground table carries every material.** It held the half that pays and
+dropped the rest on a price ceiling, which left a location's common half
+invisible - copper is on 55% of high-metal spots and was not on the list at
+all. Icy ground is read from 131 locations now rather than 124, and
+high-metal-content from 247 rather than 210.
+
 ## 2.8.2
 
 **The window stops fighting itself.** The footer flipped between one line and

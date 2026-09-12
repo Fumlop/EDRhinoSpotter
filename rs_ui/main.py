@@ -64,7 +64,7 @@ def start(plugin_dir):
 
 
 def build(parent):
-    global _frame, _status, _done, _scan_count, _card_button
+    global _frame, _status, _done, _scan_count, _card_button, _landed_after
     global _measure_status, _loc, _rigs, _material
 
     _frame = tk.Frame(parent)
@@ -140,8 +140,10 @@ def build(parent):
     _material.trace_add("write", _on_material_changed)
 
     # Bookmark starts out grey and the poll turns it on, rather than the other
-    # way round: EDMC usually starts while the commander is docked.
+    # way round: EDMC usually starts while the commander is docked. Cancel
+    # first: a second build would otherwise leave two chains polling forever.
     _card_button.config(state="disabled")
+    _landed_after = _cancel_landed()
     _poll_landed()
 
     _refresh_scan_count()
@@ -335,6 +337,27 @@ def _cancel_poll():
         except (ValueError, tk.TclError):
             pass
     return None
+
+
+def _cancel_landed():
+    if _landed_after and _frame:
+        try:
+            _frame.after_cancel(_landed_after)
+        except (ValueError, tk.TclError):
+            pass
+    return None
+
+
+def stop():
+    """EDMC is closing. Drop the polls before the widgets go.
+
+    The landed poll reschedules itself forever, so it is still pending at
+    teardown by design; left alone it fires once against a frame that is no
+    longer there.
+    """
+    global _measure_after, _landed_after
+    _measure_after = _cancel_poll()
+    _landed_after = _cancel_landed()
 
 
 def _log_measurement(track):

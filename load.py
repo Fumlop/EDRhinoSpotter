@@ -40,3 +40,7 @@ def plugin_app(parent):
 
 def journal_entry(cmdr, is_beta, system, station, entry, state):
     return main.journal_entry(cmdr, is_beta, system, station, entry, state)
+
+
+def plugin_stop():
+    return main.stop()
