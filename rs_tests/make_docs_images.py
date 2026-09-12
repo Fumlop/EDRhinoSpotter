@@ -26,8 +26,8 @@ sys.path.insert(0, PLUGIN_DIR)
 
 from PIL import ImageGrab                                   # noqa: E402
 
-from rs_core import bodies, spotcard                        # noqa: E402
-from rs_ui import main, scan                                # noqa: E402
+from rs_core import bodies, spotcard, spotmark              # noqa: E402
+from rs_ui import main, overlay, scan                       # noqa: E402
 
 DOCS = os.path.join(PLUGIN_DIR, "docs")
 SYSTEM = "Hyperion Reach AB-C d1-42"
@@ -43,6 +43,25 @@ BODIES = [
     ("9 b", "rocky",              2168.0,   10, ""),
     ("9 c", "rocky",              2172.0, None, ""),
 ]
+
+
+# Three bookmarks on one body, for the picture of the bookmark list. Invented
+# like everything else here: the coordinates are somebody's flight log.
+def bookmarks(body, card):
+    return [
+        {"system": SYSTEM, "planet_name": body, "location_index": 22,
+         "commodity": "Jadeite", "rigs": 4, "heading": 214,
+         "latitude": 12.345678, "longitude": -98.765432,
+         "marked_at": "3311-05-14T18:40:00", "path": card},
+        {"system": SYSTEM, "planet_name": body, "location_index": 9,
+         "commodity": "Monazite", "rigs": 2, "heading": 77,
+         "latitude": 12.401233, "longitude": -98.712001,
+         "marked_at": "3311-05-14T19:12:44", "path": card},
+        {"system": SYSTEM, "planet_name": body, "location_index": 15,
+         "commodity": "Olivine", "rigs": None, "heading": None,
+         "latitude": 12.388910, "longitude": -98.690004,
+         "marked_at": "3311-05-15T08:02:10", "path": card},
+    ]
 
 
 def settle(window, ticks=40):
@@ -117,14 +136,59 @@ def main_images():
         grab(window, name, scale, top_margin=34)
         window.destroy()
 
+    card = os.path.join(DOCS, "miningcard.png")
     spotcard.render({
         "system": SYSTEM, "planet_name": f"{SYSTEM} 4 a", "location_index": 22,
         "commodity": "Jadeite", "rigs": 4, "heading": 214,
         "latitude": 12.345678, "longitude": -98.765432,
         "marked_at": "3311-05-14T18:40:00", "commander": "Example",
-    }, os.path.join(DOCS, "miningcard.png"))
+    }, card)
     print(f"{'miningcard.png':<18} rendered")
+
+    body = f"{SYSTEM} 4 a"
+    marks = bookmarks(body, card)
+
+    window = scan.show(root, found, sheet, None,
+                       variable=main._material, materials=picker)
+    scan._bookmarks_view(window, SYSTEM, body, marks)
+    window.attributes("-topmost", True)
+    window.deiconify()
+    window.lift()
+    settle(window)
+    grab(window, "bookmarks.png", scale, top_margin=34)
+    window.destroy()
+
+    overlay_image(root, scale, marks[0])
     root.destroy()
+
+
+def overlay_image(root, scale, mark):
+    """The arrow, over a dark rectangle standing in for the cockpit.
+
+    The overlay is transparent, so a grab of it is a grab of whatever is
+    behind it - which on this machine is an editor. A backdrop keeps the
+    picture about the arrow.
+    """
+    was = spotmark.read_status
+    spotmark.read_status = lambda *args, **kwargs: {
+        "BodyName": mark["planet_name"], "Latitude": 12.3400,
+        "Longitude": -98.7700, "Heading": 95, "Altitude": 140.0,
+        "PlanetRadius": 1738000.0,
+    }
+    backdrop = tk.Toplevel(root)
+    backdrop.overrideredirect(True)
+    backdrop.configure(bg="#05070a")
+    backdrop.attributes("-topmost", True)
+    backdrop.geometry(f"420x260+{(root.winfo_screenwidth() - 420) // 2 - 90}+20")
+    backdrop.deiconify()
+    settle(backdrop, 10)
+
+    window = overlay.start(root, mark)
+    settle(window, 20)
+    grab(window, "guide.png", scale)
+    overlay.stop()
+    backdrop.destroy()
+    spotmark.read_status = was
 
 
 if __name__ == "__main__":

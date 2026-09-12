@@ -17,7 +17,7 @@ RhinoSpotter/
 ├── load.py              EDMC lifecycle hooks, and nothing else
 ├── rs_core/             everything that is not a widget
 ├── rs_ui/               everything that is
-├── rs_tests/            pytest suite, 231 checks
+├── rs_tests/            pytest suite, 239 checks
 ├── ground_rules.json    the mining sheet, frozen when the plugin was packaged
 ├── cards/               rendered cards (gitignored)
 ├── data/                screenshots and sidecars (gitignored)
@@ -45,6 +45,8 @@ No tkinter anywhere in here.
   Status.json is live-only: position and the targeted mining location vanish
   the moment you fly off, so it is read once, at the press.
   `location_index()`, `read_status()`, `mark()`, `on_surface()`, `MATERIALS`.
+  `nearest_index()` reads the same location out of a `Touchdown` or `Liftoff`
+  instead, which is where it survives the moment Status.json forgets it.
 - **[spotcard.py](rs_core/spotcard.py)** - one spot -> a PNG card. Looks
   nothing up, so it renders with nothing else running and no network.
   `render()`, `filename()`, `_free()` (a repeat mark is a second card, not a
@@ -90,7 +92,8 @@ No tkinter anywhere in here.
   had its spaces replaced and its material lowercased, so reading a body back
   out of one is a guess; a PNG without a sidecar is skipped rather than
   guessed at. `ordered()` is the order a body's bookmarks are read in: most
-  rigs first, uncounted ones last.
+  rigs first, uncounted ones last; `delete()` removes one, both files at once,
+  which is why the sidecar's path is carried on the record.
 - **[measure.py](rs_core/measure.py)** - area and rig count for a border
   driven in the SRV. Shoelace for the area, ray casting for what is inside,
   and a 76 m grid for the rigs. Flat earth on purpose: a spot is a few hundred
@@ -143,7 +146,7 @@ Everything in here imports tkinter.
 
 ## Tests (`rs_tests/`)
 
-`pytest` from the plugin folder. 231 checks, no network, no game, no display.
+`pytest` from the plugin folder. 239 checks, no network, no game, no display.
 
 - **conftest.py** - puts the plugin folder on `sys.path`, and builds Scan
   events carrying only the fields the code reads. The `sheet` fixture is a

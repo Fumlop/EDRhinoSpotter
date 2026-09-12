@@ -86,6 +86,47 @@ class TestNewest:
         assert cards.newest([]) is None
 
 
+class TestDelete:
+    """Removing a bookmark: the PNG and the sidecar, or neither."""
+
+    def test_both_files_go(self, tmp_path):
+        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "3311-05-14T18:40:00")
+        record = cards.for_system("Andel", root=str(tmp_path))[0]
+        assert cards.delete(record) is True
+        assert os.listdir(tmp_path) == []
+
+    def test_the_sidecar_is_not_guessed_from_the_png(self, tmp_path):
+        """The name has had its spaces replaced and its material lowercased,
+        so the path the reader found is the only one that is certain."""
+        write_card(tmp_path, "Andel 1 a", "Low Temp. Diamonds", 7, "x")
+        record = cards.for_system("Andel", root=str(tmp_path))[0]
+        assert os.path.isfile(record["sidecar"])
+        cards.delete(record)
+        assert os.listdir(tmp_path) == []
+
+    def test_a_file_already_gone_is_not_a_failure(self, tmp_path):
+        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "x")
+        record = cards.for_system("Andel", root=str(tmp_path))[0]
+        os.remove(record["path"])
+        assert cards.delete(record) is True
+        assert os.listdir(tmp_path) == []
+
+    def test_nothing_to_delete(self):
+        assert cards.delete({}) is False
+
+    def test_a_file_that_will_not_go_says_so(self, tmp_path, monkeypatch):
+        """Open in a viewer, or a read-only folder. The list must not claim it
+        deleted something it did not."""
+        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "x")
+        record = cards.for_system("Andel", root=str(tmp_path))[0]
+
+        def refuse(path):
+            raise PermissionError(13, "in use")
+
+        monkeypatch.setattr(cards.os, "remove", refuse)
+        assert cards.delete(record) is False
+
+
 class TestOrdered:
     """The order the bookmark list is read in: the best patch on this body
     first, not the one worked first."""

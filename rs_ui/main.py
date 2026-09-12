@@ -368,6 +368,14 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     if body_id is not None and body_name:
         _body_names[body_id] = body_name
 
+    # Landing fills Loc in. Touchdown names the mining location it came down
+    # at, and that is the one number a bookmark cannot work out for itself -
+    # Status.json has forgotten it by the time the ship has settled.
+    if entry.get("event") == "Touchdown" and _loc is not None:
+        index = spotmark.nearest_index(entry)
+        if index is not None:
+            _loc.set(str(index))
+
     # Arriving in a system scanned before fills the list straight from disk -
     # EDMC replays one journal file, and last week's honk is in an older one.
     # The register does that itself through on_arrive; this only redraws.

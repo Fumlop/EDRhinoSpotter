@@ -12,6 +12,7 @@ rs_tests/test_cards.py.
 import json
 import os
 
+from rs_core.logging import logger
 from rs_core.spotcard import card_dir
 
 
@@ -42,9 +43,37 @@ def for_system(system, root=None):
             continue
         card = record.get("card") or os.path.splitext(name)[0] + ".png"
         record["path"] = os.path.join(folder, card)
+        # Kept because a bookmark is two files and only one of them can be
+        # worked out from the other. Deleting one and leaving the other behind
+        # is how a folder fills up with sidecars pointing at nothing.
+        record["sidecar"] = path
         if os.path.isfile(record["path"]):
             found.append(record)
     return found
+
+
+def delete(record):
+    """Remove a bookmark: the PNG and the sidecar beside it.
+
+    True when something was removed. A file that is already gone is the state
+    the caller asked for and not a failure; a file that will not go - open in
+    a viewer, on a read-only folder - is, and says so rather than leaving the
+    list claiming it is deleted.
+    """
+    removed = False
+    for key in ("path", "sidecar"):
+        target = record.get(key)
+        if not target:
+            continue
+        try:
+            os.remove(target)
+            removed = True
+        except FileNotFoundError:
+            continue
+        except OSError as err:
+            logger.warning(f"could not delete {target}: {err}")
+            return False
+    return removed
 
 
 def by_body(system, root=None):

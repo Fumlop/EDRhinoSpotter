@@ -13,7 +13,7 @@ import os
 import pathlib
 import tkinter as tk
 import webbrowser
-from tkinter import font as tkfont
+from tkinter import font as tkfont, messagebox
 
 from rs_core import cards, grounds, palette
 from rs_core.logging import logger
@@ -332,10 +332,10 @@ def _cards_link(parent, records):
                lambda event: _bookmarks_view(label.winfo_toplevel(), system, body, records))
 
 
-# The two buttons on every bookmark row. Buttons are not labels, so the width
+# The three buttons on every bookmark row. Buttons are not labels, so the width
 # measurement cannot see them and the window would open exactly that much too
 # narrow - and a row too narrow does not wrap, it drops what is packed right.
-BUTTONS = 130
+BUTTONS = 200
 
 
 def _bookmarks_view(window, system, body, records):
@@ -415,8 +415,10 @@ def _bookmark_row(parent, record):
     # one that belongs beside the row rather than at the very end.
     path = record.get("path")
     # Clear of the scrollbar on the right, which the row runs up against.
+    _button(head, "Delete", lambda: _delete_bookmark(record),
+            active=palette.ALERT).pack(side="right", padx=(4, 6))
     _button(head, "Card", (lambda: _open_card(path)) if path else None).pack(
-        side="right", padx=(4, 6))
+        side="right", padx=(4, 0))
     _guide_button(head, record)
 
     tk.Label(row, text="   " + _bookmark_detail(record), bg=BG, fg=DIM, anchor="w",
@@ -438,6 +440,50 @@ def _guide_button(parent, record):
             lambda: _toggle_guide(record)).pack(side="right")
 
 
+def _delete_bookmark(record):
+    """Ask, then remove the card and its sidecar from disk.
+
+    Asked because it is the one button here that destroys something, and the
+    thing it destroys cannot be taken again - the patch is findable, the
+    reading of what was on it is not.
+    """
+    index = record.get("location_index")
+    what = f"loc {index}" if index is not None else "this bookmark"
+    material = record.get("commodity") or "no material"
+    if not messagebox.askyesno(
+            "Delete bookmark",
+            f"Delete {what}, {material}, on {record.get('planet_name')}?"
+            + os.linesep * 2
+            + "The card and its sidecar go from disk.",
+            default="no", parent=_window):
+        return
+    if overlay.guiding(record):
+        overlay.stop()
+    if not cards.delete(record):
+        messagebox.showwarning(
+            "Delete bookmark",
+            "Nothing was deleted. The file is open somewhere, or the folder "
+            "is read-only - see the EDMC log.", parent=_window)
+    _reload()
+
+
+def _reload():
+    """Read the folder again and redraw the rows.
+
+    Off disk rather than off the list in hand: the list is what was there when
+    the view opened, and after a delete that is exactly what it is not. An
+    empty body goes back to the scan, because a page of nothing is not a page.
+    """
+    if not _body:
+        return
+    window, system, body, _records = _body
+    records = cards.by_body(system).get(body, [])
+    if records:
+        _bookmarks_view(window, system, body, records)
+    else:
+        _scan_view(window)
+
+
 def _toggle_guide(record):
     """Start the arrow, or take it down, then redraw the rows.
 
@@ -448,9 +494,19 @@ def _toggle_guide(record):
     if overlay.guiding(record):
         overlay.stop()
     else:
-        overlay.start(_window, record)
-    if _body:
-        _bookmarks_view(*_body)
+        overlay.start(_window, record, on_stop=_refresh)
+    _refresh()
+
+
+def _refresh():
+    """Draw the bookmark rows again, if they are still what the window holds.
+
+    The overlay calls this when it closes itself, which can be minutes after
+    the press and with the window long since gone or moved on to another body.
+    """
+    if not _body or _window is None or not _window.winfo_exists():
+        return
+    _bookmarks_view(*_body)
 
 
 def _bookmark_line(record):
@@ -497,16 +553,18 @@ def _open_card(path):
         logger.warning(f"could not open {path}: {err}")
 
 
-def _button(parent, text, command=None):
+def _button(parent, text, command=None, active=ACCENT):
     """The window has no buttons anywhere else, so this is the style.
 
     Without a command the button is disabled rather than silently dead: a
     button that does nothing when pressed reads as a bug, and a greyed one
-    reads as not finished.
+    reads as not finished. `active` is what it turns under the pointer - the
+    one button that destroys something says so there rather than by sitting in
+    red all the time.
     """
     return tk.Button(parent, text=text, command=command,
                      bg=PANEL, fg=FG, activebackground=PANEL,
-                     activeforeground=ACCENT, disabledforeground=DIM,
+                     activeforeground=active, disabledforeground=DIM,
                      relief="solid", borderwidth=1, highlightthickness=0,
                      padx=8, pady=0, font=("Segoe UI", 8),
                      cursor="hand2" if command else "arrow",

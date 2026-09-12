@@ -74,7 +74,14 @@ opens that bookmark's PNG. Bodies with none say nothing.
 
 **Guide.** An arrow over the game, top middle, pointing at that patch with the
 distance under it. Elite must run borderless or windowed - nothing draws over
-an exclusive fullscreen. **Stop** on the same row takes it down.
+an exclusive fullscreen. **Stop** on the same row takes it down, and so does
+six seconds of having nothing to point at.
+
+**Delete.** Removes that bookmark from disk, the card and its sidecar, after
+asking.
+
+**Loc.** Landing fills it in by itself, from the mining location the game says
+you came down nearest to. Type over it if it picked the wrong one.
 
 **Filtering.** Pick a material in the panel and the window lists only the
 ground that carries it, each group leading with its rate for that material.

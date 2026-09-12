@@ -86,3 +86,26 @@ class TestMaterials:
         thing you hunt through on every single press."""
         assert list(spotmark.MATERIALS) == sorted(spotmark.MATERIALS)
         assert len(set(spotmark.MATERIALS)) == len(spotmark.MATERIALS)
+
+
+class TestNearestIndex:
+    """Touchdown and Liftoff carry the mining location in NearestDestination,
+    which is the only place it survives the moment - Status.json drops it as
+    soon as the location stops being the selected destination."""
+
+    def test_reads_a_touchdown(self):
+        entry = {"event": "Touchdown", "Latitude": 37.944237,
+                 "Longitude": 20.287926,
+                 "NearestDestination": "$SAA_Unknown_Signal:"
+                                       "#type=$PlanetaryMiningLocation_Name;:#index=3;",
+                 "NearestDestination_Localised": "Planetary Mining Location Signal (3)"}
+        assert spotmark.nearest_index(entry) == 3
+
+    def test_a_landing_next_to_something_else(self):
+        """Settlements and beacons are nearest destinations too, and none of
+        them is a mining location."""
+        assert spotmark.nearest_index(
+            {"event": "Touchdown", "NearestDestination": "Hutton Orbital"}) is None
+
+    def test_a_landing_next_to_nothing(self):
+        assert spotmark.nearest_index({"event": "Touchdown"}) is None

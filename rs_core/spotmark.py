@@ -29,15 +29,34 @@ MATERIALS = (
 )
 
 
+def _index(name):
+    """The number out of '$SAA_Unknown_Signal:#index=15;', or None."""
+    match = re.search(r"#index=(\d+)", name or "")
+    return int(match.group(1)) if match else None
+
+
 def location_index(status):
     """The mining location the ship is targeting, from Status.json.
 
     Destination.Name reads '$SAA_Unknown_Signal:#index=15;' while a planetary
-    mining location is the selected destination. Nothing else supplies it.
+    mining location is the selected destination.
     """
-    name = (status.get("Destination") or {}).get("Name") or ""
-    match = re.search(r"#index=(\d+)", name)
-    return int(match.group(1)) if match else None
+    return _index((status.get("Destination") or {}).get("Name"))
+
+
+def nearest_index(entry):
+    """The mining location a Touchdown or Liftoff happened at.
+
+    Those two journal events carry `NearestDestination`, the same
+    $SAA_Unknown_Signal string Status.json gives - and being in the journal it
+    survives the moment, where Status.json holds it only while the location is
+    still the selected destination.
+
+    Nearest, not selected. Set down between two locations and it names the
+    closer one, which is why the coordinates beside it are what a bookmark is
+    actually made of.
+    """
+    return _index(entry.get("NearestDestination"))
 
 
 def read_status(path=STATUS_PATH):

@@ -1,5 +1,40 @@
 # Changelog
 
+## 2.8.0
+
+**Delete, behind every bookmark.** A bookmark was two files in a folder and
+nothing in the plugin removed them, so a body worked twice carried both reads
+for good. It asks first - it is the one button here that destroys something,
+and what it destroys cannot be taken again: the patch is findable, the reading
+of what was on it is not.
+
+The PNG and its sidecar go together. The sidecar's path is carried on the
+record now rather than worked out from the card's name, because that name has
+had its spaces replaced and its material lowercased - deleting one file and
+leaving the other is how a folder fills up with sidecars pointing at nothing.
+A file that will not go, open in a viewer or on a read-only folder, says so
+instead of leaving the list claiming it is gone. The last bookmark on a body
+takes the view back to the body list.
+
+**Landing fills the Loc field in.** `Touchdown` carries
+`NearestDestination`, which on a mining location is the same
+`$SAA_Unknown_Signal` string Status.json gives - and being in the journal it
+survives the moment, where Status.json drops the number as soon as the
+location stops being the selected destination. That was the one thing on a
+bookmark nobody could work out afterwards and everybody had to type.
+
+Nearest, not selected: set down between two locations and it names the closer
+one. The coordinates beside it are what the bookmark is actually made of.
+
+**A state with no arrow in it closes the overlay.** Six seconds, then it takes
+itself down and the button says Guide again. Pressing Guide on the wrong body
+answered with a message you then had to press Stop to clear, which is a
+message charging rent.
+
+**Retargeting booked a second timer.** Guide on another bookmark while one was
+already running left the first tick in place beside the new one, so every
+press doubled the poll rate.
+
 ## 2.7.0
 
 **The bookmarks of a body stay in the window.** Clicking the count behind a

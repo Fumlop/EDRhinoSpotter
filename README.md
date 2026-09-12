@@ -29,8 +29,17 @@ with the location, material, rigs, heading, coordinates and when it was
 marked. **Most rigs first** - of the patches you bookmarked on this body, the
 best one is the top row. **Back**, top left, returns to the body list.
 
-Each row carries two buttons. **Card** opens that bookmark's PNG in whatever
+Each row carries three buttons. **Card** opens that bookmark's PNG in whatever
 shows PNGs here, which is the thing that can then send it on.
+
+**Delete** removes that bookmark from disk, the card and its sidecar, after
+asking. The last one on a body takes you back to the body list.
+
+**Loc fills itself in when you land.** The `Touchdown` journal event names the
+mining location you came down at, so the number is in the panel before you
+have stopped rolling. It is the nearest one, not the one you targeted - two
+locations close together and it can name the wrong one, so it is a suggestion
+you can type over.
 
 **Guide** puts an arrow over the game: top middle of the Elite window,
 click-through, showing the direction to that patch and how far. It works from
@@ -40,8 +49,9 @@ windowed** - nothing draws over an exclusive fullscreen.
 The arrow points relative to your nose while the game gives a heading. Higher
 up it gives none, and the arrow then points north-up, dimmed and labelled with
 the compass point. On the wrong body or too high for coordinates there is no
-arrow at all, just a line saying which. Press **Stop** on the same row, or
-**Guide** on another one, to move it.
+arrow at all, just a line saying which - and after six seconds of having
+nothing to point at, the overlay closes itself. Press **Stop** on the same
+row, or **Guide** on another one, to move it.
 
 ### Filtering to one material
 

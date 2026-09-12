@@ -13,6 +13,7 @@ can only point relative to the nose while the game gives a heading.
 """
 
 import math
+import time
 import tkinter as tk
 
 from rs_core import guide, palette, spotmark
@@ -25,6 +26,12 @@ KEY = "#010101"
 WIDTH = 240
 HEIGHT = 190
 POLL_MS = 500
+
+# How long a state with no arrow in it stays on screen before the overlay
+# takes itself down. A reading that cannot point anywhere is a notice, not a
+# session: you pressed Guide on the wrong body, it says so, and then it is
+# gone. Nobody should have to press Stop to clear a message.
+NOTICE_MS = 6000
 
 # The Elite window carries this title in every build so far; the window class
 # has not been as stable.
@@ -41,6 +48,8 @@ _canvas = None
 _target = None
 _after = None
 _placed = None           # the last geometry, so the game standing still is free
+_on_stop = None          # the row that started this, to redraw when it ends
+_since = None            # when the current no-arrow state began
 
 
 def _key(record):
@@ -63,11 +72,20 @@ def guiding(record=None):
     return record is None or _key(record) == _key(_target)
 
 
-def start(parent, record):
-    """Point at this bookmark. A second call retargets rather than stacking."""
-    global _window, _canvas, _target, _placed
+def start(parent, record, on_stop=None):
+    """Point at this bookmark. A second call retargets rather than stacking.
+
+    `on_stop` is called when the overlay takes itself down, so the button that
+    started it can go back to saying Guide.
+    """
+    global _window, _canvas, _target, _placed, _on_stop, _since
     _target = record
+    _on_stop = on_stop
+    _since = None
     if guiding():
+        # The pending tick first. Without this, retargeting books a second
+        # timer beside the first and every press after that doubles the rate.
+        _cancel()
         _tick()
         return _window
 
@@ -94,25 +112,51 @@ def start(parent, record):
     return _window
 
 
-def stop():
-    """Take it down. Safe to call when nothing is up."""
-    global _window, _canvas, _target, _after, _placed
+def _cancel():
+    """Drop the pending tick, if there is one and anything to cancel it on."""
+    global _after
     if _after and _window is not None and _window.winfo_exists():
         try:
             _window.after_cancel(_after)
         except tk.TclError:
             pass
+    _after = None
+
+
+def stop():
+    """Take it down. Safe to call when nothing is up."""
+    global _window, _canvas, _target, _after, _placed, _on_stop, _since
+    _cancel()
     if _window is not None and _window.winfo_exists():
         _window.destroy()
-    _window = _canvas = _target = _after = _placed = None
+    _window = _canvas = _target = _after = _placed = _since = None
+    ending, _on_stop = _on_stop, None
+    if ending:
+        try:
+            ending()
+        except tk.TclError:      # the window that asked is gone, which is fine
+            pass
 
 
 def _tick():
     """One reading, drawn, and the next one booked."""
-    global _after
+    global _after, _since
     if _window is None or not _window.winfo_exists():
         return
     reading = guide.fix(spotmark.read_status(), _target or {})
+
+    # An arrow clears the clock; anything else runs it. A fix lost for a
+    # moment - the game rewriting Status.json, a hop out of the atmosphere -
+    # must not count as a message that has been read.
+    if reading["state"] in ("guiding", "arrived"):
+        _since = None
+    else:
+        _since = _since or time.monotonic()
+        if (time.monotonic() - _since) * 1000 >= NOTICE_MS:
+            logger.info(f"overlay: nothing to point at ({reading['state']}), closing")
+            stop()
+            return
+
     _place()
     _draw(reading)
     _after = _window.after(POLL_MS, _tick)
