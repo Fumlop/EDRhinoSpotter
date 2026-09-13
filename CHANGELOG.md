@@ -17,7 +17,7 @@
   and two.
 - The saved `map N.png` carries a title and a legend. Above the map: body and
   system, the planet from the honk (type, gravity, distance, locations), and
-  the map with the locations its bookmarks were made at, painted km² and
+  the map with the locations its bookmarks were made at, prospected km² and
   when. Below: one row per bookmark on the map - code, material, location,
   rigs.
 

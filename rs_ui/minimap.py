@@ -278,7 +278,7 @@ def picture_text(cover, system, when=None):
     about = [cover.name or "map"]
     if locations:
         about.append("loc " + ", ".join(str(n) for n in locations))
-    about.append(f"{cover.painted_km2():.0f} km² painted")
+    about.append(f"{cover.painted_km2():.0f} km² prospected")
     about.append(time.strftime("%Y-%m-%d %H:%M", time.localtime(when)))
 
     title = [body]
