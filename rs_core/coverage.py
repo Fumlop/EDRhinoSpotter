@@ -371,7 +371,7 @@ def picture(mask, marks=(), title=(), legend=(), border_m=None):
     Coverage, so it can run off the Tk thread while the SRV keeps painting.
 
     `title` is lines of text above the map, the first one larger; `legend` is
-    (code, text) rows below it, one per bookmark. Both optional - without them
+    (code, text) or (code, text, depleted) rows below it, one per bookmark. Both optional - without them
     the picture is the bare map.
     """
     # No rings: the ground and the bookmarks are what the picture is kept for.
@@ -390,7 +390,7 @@ def picture(mask, marks=(), title=(), legend=(), border_m=None):
     bottom = (pad + len(legend) * line + pad) if legend else pad
     # Wider than the map when a long system name needs it; the map centred.
     widths = [big.getlength(t) if i == 0 else small.getlength(t) for i, t in enumerate(title)]
-    widths += [36 + small.getlength(text) for _, text in legend]
+    widths += [36 + small.getlength(text) for _, text, *_ in legend]
     width = max([image.width] + [int(w) + 2 * pad for w in widths])
     sheet = Image.new("RGB", (width, top + image.height + bottom), palette.rgb(palette.BG))
     sheet.paste(image, ((width - image.width) // 2, top))
@@ -399,8 +399,9 @@ def picture(mask, marks=(), title=(), legend=(), border_m=None):
         draw.text((pad, pad + i * line), text, font=big if i == 0 else small,
                   fill=palette.rgb(palette.FG if i == 0 else palette.MUTED))
     y = top + image.height + pad
-    for code, text in legend:
-        draw.text((pad, y), code or "-", font=code_font, fill=MARK)
+    for code, text, *depleted in legend:
+        draw.text((pad, y), code or "-", font=code_font,
+                  fill=MARK_DEPLETED if depleted and depleted[0] else MARK)
         draw.text((pad + 36, y), text, font=small, fill=palette.rgb(palette.FG))
         y += line
     return sheet
@@ -424,26 +425,30 @@ EDGE = _mix(palette.BG, palette.ACCENT, 0.85)
 RING = _mix(palette.BG, palette.GOOD, 0.4)
 BORDER = palette.rgb(palette.FG_SOFT)      # not WARN: that is the mask edge
 # Bookmarks: a colour nothing else on the map uses.
-MARK = palette.rgb(palette.ALERT)
+# Bookmarks: green while the patch still has something, red once depleted.
+MARK = palette.rgb(palette.GOOD)
+MARK_DEPLETED = palette.rgb(palette.ALERT)
 
 
 def _bookmarks(image, points, side):
     """A dot per bookmark at these pixel positions, its material's code beside
     it. Radius 1.8% of the map side: small, and still a dot at 180 px.
 
-    `points` are (x, y) or (x, y, code) - grounds.Sheet.codes gives the code.
+    `points` are (x, y), (x, y, code) or (x, y, code, depleted) - grounds.Sheet.codes
+    gives the code. A depleted bookmark is red, any other green.
     """
     r = max(3.0, side * 0.018)
     draw = ImageDraw.Draw(image)
     font = spotcard._font("consolab.ttf", max(9, int(round(side * 0.05))))
     for cx, cy, *rest in points:
         if -r <= cx <= image.width + r and -r <= cy <= image.height + r:
-            draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=MARK,
+            colour = MARK_DEPLETED if len(rest) > 1 and rest[1] else MARK
+            draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=colour,
                          outline=palette.rgb(palette.BG))
             if rest and rest[0]:
                 # Outlined in the background colour: readable over the painted
                 # area, the grid and the rings alike.
-                draw.text((cx + r + 1, cy), rest[0], fill=MARK, font=font, anchor="lm",
+                draw.text((cx + r + 1, cy), rest[0], fill=colour, font=font, anchor="lm",
                           stroke_width=2, stroke_fill=palette.rgb(palette.BG))
 
 

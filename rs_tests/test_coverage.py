@@ -444,6 +444,21 @@ class TestRender:
                                 title=["A 2  -  Col 285 Sector LS-P b7-1 with a much longer name"])
         assert long.width > bare.width
 
+    def test_a_depleted_bookmark_is_red_an_active_one_green(self):
+        side = 240
+        per_m = side / (2 * coverage.VIEW_M)
+        image = coverage.render(fresh(), 0, 0, None, side,
+                                marks=[(3000, -2000, "T", False), (-3000, -2000, "PL", True)])
+        assert self.pixel(image, side / 2 + 3000 * per_m, side / 2 + 2000 * per_m) == coverage.MARK
+        assert self.pixel(image, side / 2 - 3000 * per_m, side / 2 + 2000 * per_m) == coverage.MARK_DEPLETED
+
+    def test_a_legend_row_can_say_depleted(self):
+        # The plugin writes (code, text, depleted) rows; the picture must take them.
+        cover = fresh()
+        image = coverage.picture(cover.mask.copy(), title=["8 b"],
+                                 legend=[("T", "Thortveitite", False), ("PL", "Platinum  ·  depleted", True)])
+        assert image.height > coverage.MASK_PX
+
     def test_the_picture_carries_the_bookmarks(self):
         cover = fresh()
         image = coverage.picture(cover.mask.copy(), marks=[(4000, 4000)])

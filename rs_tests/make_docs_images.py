@@ -242,8 +242,8 @@ def minimap_image(root, scale):
     # Two bookmarks on the body, where the drive went past them.
     was_marks = minimap._bookmarks
     minimap._bookmarks = lambda system, body: [
-        (reading(x, y, 0, 0)["Latitude"], reading(x, y, 0, 0)["Longitude"], code)
-        for x, y, code in ((2400, 400, "T"), (-900, -6300, "PL"))]
+        (reading(x, y, 0, 0)["Latitude"], reading(x, y, 0, 0)["Longitude"], code, depleted)
+        for x, y, code, depleted in ((2400, 400, "T", False), (-900, -6300, "PL", True))]
 
     for track in launches:
         for (x1, y1), (x2, y2) in zip(track, track[1:]):
@@ -286,13 +286,13 @@ def minimap_image(root, scale):
     # plugin writes. Spelled out rather than read from cards and the system
     # cache, which hold the commander's own flights.
     cover = minimap._coverage
-    spots = [(2400, 400, "T", "Thortveitite", 2), (-900, -6300, "PL", "Platinum", 3)]
+    spots = [(2400, 400, "T", "Thortveitite", 2, False), (-900, -6300, "PL", "Platinum", 3, True)]
     marks, legend = [], []
-    for x, y, code, material, rigs in spots:
+    for x, y, code, material, rigs, depleted in spots:
         at = reading(x, y, 0, 0)
-        marks.append((*cover.xy(at["Latitude"], at["Longitude"]), code))
+        marks.append((*cover.xy(at["Latitude"], at["Longitude"]), code, depleted))
         legend.append((code, f"{material}  ·  {at['Latitude']:.6f} / {at['Longitude']:.6f}"
-                             f"  ·  {rigs} rigs"))
+                             f"  ·  {rigs} rigs" + ("  ·  depleted" if depleted else ""), depleted))
     centre = cover.origin
     title = ["4 a  -  " + SYSTEM, "Rocky World  ·  0.16 g  ·  1,284 Ls  ·  22 locations",
              f"map 1  ·  loc 22  ·  center {centre[0]:.6f} / {centre[1]:.6f}  ·  border 6.0 km",

@@ -73,7 +73,7 @@ _notice = None           # (text, until monotonic) on the hint line, e.g. "set c
 _writes = store.Debounced(write=coverstore.save)
 _in_srv = False
 _failed = False          # a draw that raised: stay down until the next launch
-_marks = None            # ((system, body, cards folder mtime), [(lat, lon, code), ...])
+_marks = None            # ((system, body, cards folder mtime), [(lat, lon, code, depleted), ...])
 _why = None              # why the map is down, logged when it changes (debug only)
 _codes = None            # grounds.Sheet.codes, read once
 _fresh = []              # [(system, body, lat, lon, code, when)] bookmarked, maybe not on disk yet
@@ -151,8 +151,8 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
     where = corner()
     x, y = _coverage.xy(lat, lon)
     header = _header(status, body, system)
-    marks = tuple((*_coverage.xy(mlat, mlon), code)
-                  for mlat, mlon, code in _bookmarks(system, body))
+    marks = tuple((*_coverage.xy(mlat, mlon), code, depleted)
+                  for mlat, mlon, code, depleted in _bookmarks(system, body))
     # What a picture is of, at the precision it is drawn at: a map pixel of
     # movement and a frame of the marker. Anything finer redraws for nothing.
     per_px = 2 * coverage.VIEW_M / side
@@ -210,7 +210,7 @@ def _remember():
 
 
 def _bookmarks(system, body):
-    """[(lat, lon, code), ...] of the bookmarks on this body.
+    """[(lat, lon, code, depleted), ...] of the bookmarks on this body.
 
     Read again when the cards folder changes - a card written or deleted moves
     its modified time - and every MARKS_S besides: the card is written on a
@@ -232,12 +232,13 @@ def _bookmarks(system, body):
                 lat, lon = record.get("latitude"), record.get("longitude")
                 if (record.get("planet_name") == body and isinstance(lat, (int, float))
                         and isinstance(lon, (int, float))):
-                    points.append((lat, lon, _code(record.get("commodity"))))
+                    points.append((lat, lon, _code(record.get("commodity")),
+                                   bool(record.get("depleted_at"))))
         _marks = (key, points)
     now = time.monotonic()
     _fresh[:] = [f for f in _fresh if now - f[5] < 2 * MARKS_S]
-    on_disk = {(lat, lon) for lat, lon, _ in _marks[1]}
-    fresh = [(lat, lon, code) for s, b, lat, lon, code, _ in _fresh
+    on_disk = {(lat, lon) for lat, lon, _, _ in _marks[1]}
+    fresh = [(lat, lon, code, False) for s, b, lat, lon, code, _ in _fresh
              if s == system and b == body and (lat, lon) not in on_disk]
     return _marks[1] + fresh if fresh else _marks[1]
 
@@ -274,7 +275,8 @@ def _docked(system):
         return
     body, name = _coverage.body, _coverage.name
     mask = _coverage.mask.copy()
-    marks = [(*_coverage.xy(lat, lon), code) for lat, lon, code in _bookmarks(system, body)]
+    marks = [(*_coverage.xy(lat, lon), code, depleted)
+             for lat, lon, code, depleted in _bookmarks(system, body)]
     title, legend = picture_text(_coverage, system)
     border_m = _coverage.border_m
 
@@ -343,7 +345,9 @@ def picture_text(cover, system, when=None):
         parts = [r.get("commodity") or "?", f"{float(r['latitude']):.6f} / {float(r['longitude']):.6f}"]
         if r.get("rigs") is not None:
             parts.append(f"{r['rigs']} rig" + ("" if r["rigs"] == 1 else "s"))
-        legend.append((_code(r.get("commodity")), "  ·  ".join(parts)))
+        if r.get("depleted_at"):
+            parts.append("depleted")
+        legend.append((_code(r.get("commodity")), "  ·  ".join(parts), bool(r.get("depleted_at"))))
     return title, legend
 
 

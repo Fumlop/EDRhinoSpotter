@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.1.1
+
+**Changed**
+
+- Bookmark dots on the minimap and in the saved map picture are green while
+  the patch is active and red once it is marked depleted, code and all. The
+  picture's legend colours each code the same way and says "depleted".
+
 ## 4.1.0
 
 **Added**

@@ -199,7 +199,8 @@ says how far and which way it is, and how many km² are painted.
   The map always shows 12 km across with a 1 km grid, so 1080p is about 50 m a
   pixel, 85% opaque. Hidden while the game is minimised or not the window in front;
   painting carries on meanwhile.
-- **Bookmarks show as red dots** on the body they were made on, with the material's code beside it: the most valuable material
+- **Bookmarks show as dots** on the body they were made on - green while active, red once marked
+  depleted - with the material's code beside it: the most valuable material
   gets one letter (Thortveitite **T**), a cheaper one sharing it gets two
   (Thorium **TH**, Titanium **TI**). A new bookmark is on the map the moment you press Bookmark. That
   press is a click in EDMC, which hides the map until you are back in the game.
