@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.8.0
+
+**Added**
+
+- **Ctrl+Alt+B** sets the location's border where the SRV stands: its
+  distance from the center, drawn as a bold circle on the minimap and on the
+  saved map picture, saved with the map as `border_m`, and named in the
+  picture's title. It needs a center; pressed without one, the map says
+  "set center first" for a few seconds. Both hotkeys are listed under the
+  map.
+
 ## 3.7.0
 
 **Added**

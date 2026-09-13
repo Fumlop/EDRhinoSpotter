@@ -141,7 +141,7 @@ Bookmarks land in `%LOCALAPPDATA%\RhinoSpotter\cards\<System>\`. The
 
 <p align="center">
   <img src="docs/minimap.png" width="260"
-       alt="The minimap: the painted area, two bookmarks, rings around the droppoint, the SRV in the middle">
+       alt="The minimap: the painted area, two bookmarks, rings and a bold border around the center, the SRV in the middle">
 </p>
 
 Launch the Rhino and a map comes up in a corner of the game. Wherever you
@@ -154,8 +154,14 @@ says how far and which way it is, and how many km² are painted.
 - **Ctrl+Alt+Z sets the center.** Drive to the middle of the mining location
   and press it: the map is rebuilt around where you stand, the rings move
   there, and the footer points to the **Center** instead of the droppoint.
-  The center is saved with the map. The hotkey is Windows-wide while EDMC
-  runs; if another program already holds it, EDMC's log says so.
+  The center is saved with the map.
+- **Ctrl+Alt+B sets the border.** Drive to the edge of the location and press
+  it: its distance from the center becomes the location's border, drawn as a
+  bold circle and saved with the map. Needs a center first - without one the
+  map says "set center first". No border set is fine; nothing is drawn.
+- Both hotkeys are Windows-wide while EDMC runs, and listed under the map. If
+  another program already holds one, EDMC's log says so and the other still
+  works.
 
 - **Painted means driven within 2 km, not scanned.** Nothing the game writes
   says a scan happened. The 2 km is the community figure; Frontier has not
@@ -197,7 +203,8 @@ system, the planet from the honk, the locations its bookmarks were made at,
 the km² prospected and when. Under the map, one row per bookmark on it - code,
 material, coordinates and rigs - so whoever you send it to can fly straight
 to the patch. The rings are left out; they only say where your ship was. A
-centered map names its center coordinates in the title.
+centered map names its center coordinates in the title, and a border is drawn
+and named too.
 ## Logging
 
 RhinoSpotter keeps out of EDMC's log: only warnings and errors are written.

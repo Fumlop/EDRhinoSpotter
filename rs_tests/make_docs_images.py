@@ -256,6 +256,15 @@ def minimap_image(root, scale):
         if track is not launches[-1]:
             # Back in the ship for the hop: nothing painted until the next launch.
             minimap.update(root, reading(*track[-1], 0, 0x1000000), SYSTEM)
+
+    # The player's two hotkeys, pressed where they would be: the centre in the
+    # middle of the drive, the border at its southern edge. Then one more fix
+    # so the map draws what they did.
+    last = launches[-1][-1]
+    for x, y, press in ((2500, -2500, minimap.center_here), (2500, -7000, minimap.border_here)):
+        minimap._here = (reading(x, y, 0, 0)["Latitude"], reading(x, y, 0, 0)["Longitude"])
+        press()
+    minimap.update(root, reading(*last, 0, minimap.coverage.IN_SRV), SYSTEM)
     window = minimap._window
     settle(window, 20)
     path = grab(window, "minimap.png", scale)
@@ -275,9 +284,11 @@ def minimap_image(root, scale):
         marks.append((*cover.xy(at["Latitude"], at["Longitude"]), code))
         legend.append((code, f"{material}  ·  {at['Latitude']:.6f} / {at['Longitude']:.6f}"
                              f"  ·  {rigs} rigs"))
+    centre = cover.origin
     title = ["4 a  -  " + SYSTEM, "Rocky World  ·  0.16 g  ·  1,284 Ls  ·  22 locations",
-             f"map 1  ·  loc 22  ·  {cover.painted_km2():.0f} km² prospected  ·  3311-05-14 18:40"]
-    coverage.picture(cover.mask, marks, title, legend).save(
+             f"map 1  ·  loc 22  ·  center {centre[0]:.6f} / {centre[1]:.6f}  ·  border 4.5 km",
+             f"{cover.painted_km2():.0f} km² prospected  ·  3311-05-14 18:40"]
+    coverage.picture(cover.mask, marks, title, legend, cover.border_m).save(
         os.path.join(DOCS, "mapshare.png"))
     print(f"{'mapshare.png':<18} rendered")
     minimap.stop()

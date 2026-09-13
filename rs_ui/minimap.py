@@ -51,6 +51,9 @@ MAP_ALPHA = 0.85
 # Bookmarks are read again at least this often, seconds.
 MARKS_S = 10
 
+# How long a hotkey's refusal stays on the hint line, seconds.
+NOTICE_S = 4
+
 SW_HIDE = 0
 SW_SHOWNOACTIVATE = 4
 HWND_TOPMOST = -1
@@ -64,8 +67,9 @@ _placed = None
 _photo = None            # the PhotoImage on the canvas - Tk drops it unreferenced
 _drawn = None            # what the last picture was of, so standing still is free
 _coverage = None
-_saved = None            # (map, version, centered, location) last handed to _writes
-_here = None             # (lat, lon) of the last SRV fix, for the centre hotkey
+_saved = None            # (map, version, centered, border, location) last handed to _writes
+_here = None             # (lat, lon) of the last SRV fix, for the hotkeys
+_notice = None           # (text, until monotonic) on the hint line, e.g. "set center first"
 _writes = store.Debounced(write=coverstore.save)
 _in_srv = False
 _failed = False          # a draw that raised: stay down until the next launch
@@ -155,7 +159,8 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
     state = (int(x // per_px), int(y // per_px),
              None if heading is None else arrow.bucket(heading),
              side, where, in_reach, header, _coverage.version,
-             tuple(round(v) for v in _coverage.anchor()), _coverage.centered, marks)
+             tuple(round(v) for v in _coverage.anchor()), _coverage.centered,
+             _coverage.border_m, _hint(), marks)
     if state != _drawn:
         _draw(side, x, y, heading, in_reach, header, marks)
         _drawn = state
@@ -175,10 +180,27 @@ def center_here():
     logger.debug(f"minimap: centre set at {_here[0]:.6f} / {_here[1]:.6f}")
 
 
+def border_here():
+    """The hotkey: where the SRV is now is the location's edge. Needs a centre
+    to measure from; without one the hint line says so for a few seconds."""
+    global _drawn, _notice
+    if not _in_srv or _coverage is None or _here is None:
+        logger.debug("minimap: border hotkey outside the SRV, ignored")
+        return
+    if not _coverage.set_border(*_here):
+        _notice = ("set center first", time.monotonic() + NOTICE_S)
+        _drawn = None
+        return
+    _drawn = None
+    _remember()
+    logger.debug(f"minimap: border set at {_coverage.border_m:.0f} m")
+
+
 def _remember():
     """Hand the map to the two-second writer when it has changed."""
     global _saved
-    state = (_coverage, _coverage.version, _coverage.centered, _coverage.location)
+    state = (_coverage, _coverage.version, _coverage.centered, _coverage.border_m,
+             _coverage.location)
     if state == _saved:
         return
     if _coverage.name is None:
@@ -254,10 +276,11 @@ def _docked(system):
     mask = _coverage.mask.copy()
     marks = [(*_coverage.xy(lat, lon), code) for lat, lon, code in _bookmarks(system, body)]
     title, legend = picture_text(_coverage, system)
+    border_m = _coverage.border_m
 
     def draw():
         try:
-            coverstore.save_png(body, name, coverage.picture(mask, marks, title, legend))
+            coverstore.save_png(body, name, coverage.picture(mask, marks, title, legend, border_m))
         except Exception:
             logger.exception(f"minimap: could not draw the picture of {name} on {body}")
 
@@ -299,6 +322,8 @@ def picture_text(cover, system, when=None):
     about = [cover.name or "map"]
     if cover.centered:
         about.append(f"center {cover.origin[0]:.6f} / {cover.origin[1]:.6f}")
+    if cover.border_m is not None:
+        about.append(f"border {guide.metres(cover.border_m)}")
     if locations:
         about.append("loc " + ", ".join(str(n) for n in locations))
     about.append(f"{cover.painted_km2():.0f} km² prospected")
@@ -459,11 +484,18 @@ def _build(root):
     return True
 
 
+def _hint():
+    """The refusal to show on the hint line, while it lasts, else None."""
+    if _notice and time.monotonic() < _notice[1]:
+        return _notice[0]
+    return None
+
+
 def _layout(side):
     unit = side / 240.0
     pad = max(6, round(8 * unit))
     band = max(18, round(22 * unit))
-    return unit, pad, band, side + 2 * pad, side + 3 * band + 2 * pad
+    return unit, pad, band, side + 2 * pad, side + 4 * band + 2 * pad
 
 
 def _place(side, where, rect):
@@ -547,7 +579,13 @@ def _draw(side, x, y, heading, in_reach, header, marks=()):
                         text=f"{label}  {guide.metres(distance)} "
                              f"{guide.compass(coverage.bearing(x, y, to_x, to_y))}",
                         fill=palette.GOOD, font=small, anchor="w")
-    _canvas.create_text(pad, foot + band, text=f"{hotkey.LABEL}  set center",
+    notice = _hint()
+    if notice:
+        _canvas.create_text(pad, foot + band, text=notice, fill=palette.WARN, font=small, anchor="w")
+    else:
+        _canvas.create_text(pad, foot + band, text=f"{hotkey.CENTER_LABEL}  set center",
+                            fill=palette.MUTED, font=small, anchor="w")
+    _canvas.create_text(pad, foot + 2 * band, text=f"{hotkey.BORDER_LABEL}  set border",
                         fill=palette.MUTED, font=small, anchor="w")
     if in_reach:
         _canvas.create_text(width - pad, foot, text=f"{_coverage.painted_km2():.0f} km²",

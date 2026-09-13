@@ -282,6 +282,33 @@ class TestSaved:
         cover.recenter(*at(-9000, -9000))
         assert len(cover.stamps) == stamps
 
+    def test_a_border_needs_a_centre(self):
+        cover = self.driven()
+        assert cover.set_border(*at(3000, 0)) is False
+        assert cover.border_m is None and "border_m" not in cover.to_dict()
+
+    def test_a_border_is_its_distance_from_the_centre(self):
+        cover = self.driven()
+        cover.recenter(*[round(v, 6) for v in at(1000, 1000)])
+        assert cover.set_border(*at(1000 + 3000, 1000 + 4000)) is True
+        # A few metres off 5000: the test's own projection is centred on LAT, the
+        # map's on the new centre a kilometre away.
+        assert cover.border_m == pytest.approx(5000, abs=5)
+        back = coverage.Coverage.from_dict("A 2", cover.to_dict(), "map 1")
+        assert back.border_m == pytest.approx(cover.border_m, abs=1)
+
+    def test_the_border_is_drawn_bold_around_the_centre(self):
+        cover = fresh()
+        cover.recenter(LAT, LON)
+        cover.set_border(*at(0, 4500))
+        side = 240
+        per_m = side / (2 * coverage.VIEW_M)
+        image = coverage.render(cover, 0, 0, None, side)
+        # Straight south of the centre at 4.5 km, where no ring or grid line is.
+        column = [image.getpixel((int(side / 2 + 250 * per_m), int(side / 2 + 4500 * per_m) + k))
+                  for k in (-1, 0, 1)]
+        assert coverage.BORDER in column
+
     def test_another_bodys_map_of_the_same_name_is_not_skipped(self):
         # 'map 1' on A 3 and 'map 1' on A 2 are different files.
         other = coverage.follow(None, self.fix(body="A 3"), was_in_srv=False)

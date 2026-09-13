@@ -109,6 +109,9 @@ class Coverage:
         self.stamps = []
         # True once the player has set the centre; then `origin` is it.
         self.centered = False
+        # The location's border as the player drove it: metres from the centre,
+        # or None. Only set once there is a centre to measure from.
+        self.border_m = None
         # Where the SRV last came out of the ship, (lat, lon). The rings and
         # the footer use it until a centre is set. Kept in memory only.
         self.drop = (lat, lon)
@@ -117,7 +120,7 @@ class Coverage:
         # The mining location last targeted on this map. A label, not a key.
         self.location = None
         self._last = None
-        self._layer = None      # ((version, side, ring centre), image)
+        self._layer = None      # ((version, side, ring centre, border), image)
 
     def to_dict(self):
         """The map as coverstore writes it. New lists, so a writer on another
@@ -128,6 +131,8 @@ class Coverage:
                 "location": self.location, "stamps": points(self.stamps)}
         if self.centered:
             data["center"] = points([self.origin])[0]
+        if self.border_m is not None:
+            data["border_m"] = round(self.border_m)
         return data
 
     @classmethod
@@ -138,6 +143,8 @@ class Coverage:
             lat, lon = data.get("center") or data["origin"]
             cover = cls(body, float(lat), float(lon), float(data["radius"]))
             cover.centered = bool(data.get("center"))
+            border = data.get("border_m")
+            cover.border_m = float(border) if cover.centered and border else None
             cover._repaint([(float(lat), float(lon)) for lat, lon in data["stamps"]])
         except (KeyError, TypeError, ValueError):
             return None
@@ -165,6 +172,14 @@ class Coverage:
         self.origin = (lat, lon)
         self.centered = True
         self._repaint(list(self.stamps))
+
+    def set_border(self, lat, lon):
+        """The player stands on the location's edge: its distance from the
+        centre is the border. False, and nothing set, without a centre."""
+        if not self.centered:
+            return False
+        self.border_m = math.hypot(*self.xy(lat, lon))
+        return True
 
     def anchor(self):
         """(x, y) metres the rings are drawn around: the centre once set, the
@@ -227,9 +242,9 @@ class Coverage:
         """The whole mask drawn at the scale of a map this big, kept until
         something new is painted."""
         ring_at = tuple(round(v) for v in self.anchor())
-        key = (self.version, side, ring_at)
+        key = (self.version, side, ring_at, self.border_m)
         if self._layer is None or self._layer[0] != key:
-            self._layer = (key, _draw_layer(self.mask, side, ring_at))
+            self._layer = (key, _draw_layer(self.mask, side, ring_at, self.border_m))
         return self._layer[1]
 
 
@@ -308,7 +323,7 @@ def map_at(found, body, lat, lon):
 PICTURE_SIDE = int(round(MASK_PX * VIEW_M / REACH_M))
 
 
-def picture(mask, marks=(), title=(), legend=()):
+def picture(mask, marks=(), title=(), legend=(), border_m=None):
     """The whole map as a PIL image, north up, bookmarks on it.
 
     Takes a copy of the mask and the bookmarks (metres) rather than the
@@ -319,7 +334,7 @@ def picture(mask, marks=(), title=(), legend=()):
     the picture is the bare map.
     """
     # No rings: the ground and the bookmarks are what the picture is kept for.
-    image = _draw_layer(mask, PICTURE_SIDE)
+    image = _draw_layer(mask, PICTURE_SIDE, border_m=border_m)
     scale = image.width / (2 * REACH_M)
     _bookmarks(image, [(image.width / 2 + mx * scale, image.height / 2 - my * scale, *rest)
                        for mx, my, *rest in marks], PICTURE_SIDE)
@@ -366,6 +381,7 @@ def _mix(a, b, share):
 FILL = _mix(palette.BG, palette.ACCENT, 0.22)
 EDGE = _mix(palette.BG, palette.ACCENT, 0.85)
 RING = _mix(palette.BG, palette.GOOD, 0.4)
+BORDER = palette.rgb(palette.FG_SOFT)      # not WARN: that is the mask edge
 # Bookmarks: a colour nothing else on the map uses.
 MARK = palette.rgb(palette.ALERT)
 
@@ -390,10 +406,10 @@ def _bookmarks(image, points, side):
                           stroke_width=2, stroke_fill=palette.rgb(palette.BG))
 
 
-def _draw_layer(mask, side, ring_at=None):
-    """Painted area, grid, the edge of the mask and the rings around `ring_at`
-    (metres, or None for no rings), over all of REACH_M, at `side` pixels to
-    2 * VIEW_M."""
+def _draw_layer(mask, side, ring_at=None, border_m=None):
+    """Painted area, grid, the edge of the mask, the rings around `ring_at`
+    (metres, or None for no rings) and the location's border around the centre
+    (metres, or None), over all of REACH_M, at `side` pixels to 2 * VIEW_M."""
     size = int(round(side * REACH_M / VIEW_M))
     big = size * SS
     scale = big / (2 * REACH_M)                   # pixels a metre
@@ -424,6 +440,13 @@ def _draw_layer(mask, side, ring_at=None):
         for radius_m in RANGE_RINGS_M:
             r = radius_m * scale
             draw.ellipse([dx - r, dy - r, dx + r, dy + r], outline=RING, width=SS)
+
+    # The border the player drove to, bold: it is a claim about the location,
+    # which the rings are not.
+    if border_m:
+        cx, cy = at(0.0, 0.0)
+        r = border_m * scale
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=BORDER, width=3 * SS)
 
     # A box average is all two-times supersampling needs, and a tenth of what
     # LANCZOS costs.

@@ -161,10 +161,11 @@ Everything in here imports tkinter.
   widen the panel on the one day it matters, and a permanent one every day. The bookmark write and the update check run off the UI thread and come
   back through `_frame.after`, because Tk is not thread-safe and a widget
   written from a worker fails minutes later somewhere unrelated.
-- **[hotkey.py](rs_ui/hotkey.py)** - Ctrl+Alt+Z, registered with
-  RegisterHotKey on a thread with its own message loop, since the game holds
-  the focus while you drive. The press is bounced to Tk and sets the map's
-  center. A combination already held elsewhere is a logged warning.
+- **[hotkey.py](rs_ui/hotkey.py)** - Ctrl+Alt+Z and Ctrl+Alt+B, registered
+  with RegisterHotKey on a thread with its own message loop, since the game
+  holds the focus while you drive. A press is bounced to Tk and sets the map's
+  center or border. A combination already held elsewhere is a logged warning;
+  the other still registers.
 - **[overlay.py](rs_ui/overlay.py)** - the arrow over the game. A borderless
   always-on-top window keyed to a colour it then makes a hole of, so only what
   is drawn shows, and click-through on top of that - a shape over the cockpit

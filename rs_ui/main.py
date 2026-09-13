@@ -141,7 +141,8 @@ def build(parent):
 
     _refresh_scan_count()
     update.check_async(_on_update_checked)
-    hotkey.start(lambda: _on_ui(minimap.center_here))
+    hotkey.start({hotkey.CENTER: lambda: _on_ui(minimap.center_here),
+                  hotkey.BORDER: lambda: _on_ui(minimap.border_here)})
     return _frame
 
 
