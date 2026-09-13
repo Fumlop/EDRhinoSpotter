@@ -18,6 +18,8 @@ except ImportError:                                  # bare interpreter, tests
     if not logger.handlers:
         logger.addHandler(logging.NullHandler())
 
-# Debug lines only on a machine that asks for them. EDMC's plugin logger passes
-# DEBUG by default, so without this every scan-window fit lands in a player's log.
-logger.setLevel(logging.DEBUG if os.environ.get("RHINOSPOTTER_DEBUG") else logging.INFO)
+# Quiet unless asked. EDMC's plugin logger passes everything, so without this
+# every map build and guide start lands in a player's log. Warnings and errors
+# still go through - a map that could not be saved has to say so somewhere.
+# Set RHINOSPOTTER_DEBUG=1 before starting EDMC for all of it.
+logger.setLevel(logging.DEBUG if os.environ.get("RHINOSPOTTER_DEBUG") else logging.WARNING)

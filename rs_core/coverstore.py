@@ -67,10 +67,10 @@ def maps(body, root=None):
                 raw = gzip.decompress(raw)
             data = json.loads(raw.decode("utf-8"))
         except Exception as err:        # zlib.error and RecursionError too
-            logger.info(f"minimap: skipping {file} on {body}: {err}")
+            logger.warning(f"minimap: skipping {file} on {body}: {err}")
             continue
         if not isinstance(data, dict) or data.get("version") != VERSION:
-            logger.info(f"minimap: skipping {file} on {body}: not version {VERSION}")
+            logger.warning(f"minimap: skipping {file} on {body}: not version {VERSION}")
             continue
         found.append((name, data))
     return found
@@ -107,7 +107,7 @@ def save(body, name, data, root=None):
         os.replace(handle.name, target)
         return target
     except OSError as err:
-        logger.info(f"minimap: could not save {name} on {body}: {err}")
+        logger.warning(f"minimap: could not save {name} on {body}: {err}")
         return None
 
 
@@ -127,7 +127,7 @@ def save_png(body, name, image, root=None):
         os.replace(handle.name, target)
         return target
     except (OSError, ValueError) as err:
-        logger.info(f"minimap: could not save the picture of {name} on {body}: {err}")
+        logger.warning(f"minimap: could not save the picture of {name} on {body}: {err}")
         return None
 
 

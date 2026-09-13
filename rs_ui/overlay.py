@@ -119,7 +119,7 @@ def start(parent, record, on_stop=None):
         try:
             _window.attributes("-transparentcolor", KEY)
         except tk.TclError:      # not Windows: a solid panel rather than nothing
-            logger.info("overlay: no transparent colour here, drawing solid")
+            logger.warning("overlay: no transparent colour here, drawing solid")
         _canvas = tk.Canvas(_window, width=WIDTH, height=HEIGHT, bg=KEY,
                             highlightthickness=0, borderwidth=0)
         _canvas.pack()
@@ -130,7 +130,7 @@ def start(parent, record, on_stop=None):
         # Whatever the reason - no window manager that will take it, a display
         # that will not have it on top - it is not worth a traceback out of a
         # button press. Say so and leave the list alone.
-        logger.info(f"overlay: no arrow here, skipping it: {err}")
+        logger.warning(f"overlay: no arrow here, skipping it: {err}")
         stop()
         return None
     logger.info(f"overlay: guiding to {_caption(record)} on "
@@ -248,6 +248,18 @@ def _place():
     _window.lift()
 
 
+def foreground_title():
+    """The title of the window in front, for a log line. '' when unknown."""
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+    except (ImportError, AttributeError, OSError):
+        return ""
+    buffer = ctypes.create_unicode_buffer(64)
+    user32.GetWindowTextW(user32.GetForegroundWindow(), buffer, 64)
+    return buffer.value
+
+
 def game_focused():
     """Whether Elite is the window in front. Not running counts as not in
     front; off Windows there is no asking, so it is always in front."""
@@ -315,7 +327,7 @@ def _click_through(window):
                               | 0x20                         # WS_EX_TRANSPARENT
                               | 0x8000000)                   # WS_EX_NOACTIVATE
     except (ImportError, AttributeError, OSError) as err:
-        logger.info(f"overlay: not click-through here: {err}")
+        logger.warning(f"overlay: not click-through here: {err}")
 
 
 # ------------------------------------------------------------------ drawing

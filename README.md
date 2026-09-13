@@ -194,6 +194,12 @@ the km² prospected and when. Under the map, one row per bookmark on it - code,
 material, coordinates and rigs - so whoever you send it to can fly straight
 to the patch. Droppoints and range rings are left out; they only say where
 your ship was.
+## Logging
+
+RhinoSpotter keeps out of EDMC's log: only warnings and errors are written.
+To see everything - including why the minimap is down whenever that changes -
+set the environment variable `RHINOSPOTTER_DEBUG=1` before starting EDMC.
+
 ## Install
 
 See [INSTALL.md](INSTALL.md). Short version: unpack into

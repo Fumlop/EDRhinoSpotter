@@ -69,6 +69,7 @@ _writes = store.Debounced(write=coverstore.save)
 _in_srv = False
 _failed = False          # a draw that raised: stay down until the next launch
 _marks = None            # ((system, body, cards folder mtime), [(lat, lon, code), ...])
+_why = None              # why the map is down, logged when it changes (debug only)
 _codes = None            # grounds.Sheet.codes, read once
 _fresh = []              # [(system, body, lat, lon, code, when)] bookmarked, maybe not on disk yet
 _enabled = None          # tk.BooleanVar on the settings tab
@@ -101,7 +102,8 @@ def update(root, status, system=None):
             if _in_srv:
                 _docked(system)
             _in_srv = _failed = False
-            hide()
+            _down("not in the SRV" if not int(status.get("Flags") or 0) & coverage.IN_SRV
+                  else "in the SRV, but Status.json has no body or coordinates")
             return
         previous = _coverage
         _coverage = coverage.follow(_coverage, fix, _in_srv, saved=coverstore.maps)
@@ -117,7 +119,7 @@ def update(root, status, system=None):
             _coverage.location = index
         _remember()
         if _failed or not enabled():
-            hide()
+            _down("a draw failed earlier" if _failed else "switched off in Settings")
             return
         _show_map(root, status, system, lat, lon, heading, in_reach, body)
     except Exception:
@@ -132,10 +134,13 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
     if not overlay.game_focused() or (rect and rect[3] - rect[1] < MIN_GAME_HEIGHT):
         # Alt-tabbed out, or minimised: nothing over the desktop. Painting
         # carries on; only the window goes.
-        hide()
+        _down(f"Elite not in front ({overlay.foreground_title()!r})"
+              if not overlay.game_focused() else f"game window {rect} is minimised")
         return
     if not _build(root):
+        _down("no window could be built")
         return
+    _up()
     side = coverage.map_side(rect[3] - rect[1] if rect else None)
     where = corner()
     x, y = _coverage.xy(lat, lon)
@@ -299,6 +304,23 @@ def picture_text(cover, system, when=None):
     return title, legend
 
 
+def _down(reason):
+    """Hide, and say why when the reason changes - one debug line per change,
+    not one a second."""
+    global _why
+    if reason != _why:
+        logger.debug(f"minimap: down, {reason}")
+        _why = reason
+    hide()
+
+
+def _up():
+    global _why
+    if _why is not None:
+        logger.debug(f"minimap: up, was down: {_why}")
+        _why = None
+
+
 def hide():
     """Hide the window. It and the painted area stay for the next launch."""
     global _shown
@@ -317,7 +339,7 @@ def hide():
 def stop():
     """EDMC is closing: the window goes, the map is written first."""
     global _window, _canvas, _handle, _shown, _placed, _photo, _drawn
-    global _coverage, _saved, _in_srv, _failed, _marks
+    global _coverage, _saved, _in_srv, _failed, _marks, _why
     _writes.flush()
     if _window is not None:
         try:
@@ -326,6 +348,7 @@ def stop():
             pass
     _window = _canvas = _handle = _placed = _photo = _drawn = _coverage = _saved = _marks = None
     _shown = _in_srv = _failed = False
+    _why = None
     _fresh.clear()
 
 
@@ -360,7 +383,7 @@ def _open_folder():
         os.makedirs(coverstore.ROOT, exist_ok=True)
         os.startfile(coverstore.ROOT)
     except (OSError, AttributeError) as err:       # AttributeError: not Windows
-        logger.info(f"minimap: could not open {coverstore.ROOT}: {err}")
+        logger.warning(f"minimap: could not open {coverstore.ROOT}: {err}")
 
 
 def prefs_changed():
@@ -411,7 +434,7 @@ def _build(root):
         _placed = _drawn = None
         _shown = False
     except tk.TclError as err:
-        logger.info(f"minimap: no window here, skipping it: {err}")
+        logger.warning(f"minimap: no window here, skipping it: {err}")
         stop()
         return False
     logger.info("minimap: built")

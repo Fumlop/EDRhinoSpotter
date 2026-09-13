@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.6.0
+
+**Removed**
+
+- The bookmark card: no PNG is drawn at Bookmark, and the bookmark rows lose
+  their Card button. The map picture that Share map opens shows the spot with
+  its neighbours, coordinates and rigs. A bookmark is its JSON file alone;
+  bookmarks made with a card before still list, and Delete takes their PNG
+  with them.
+
+**Changed**
+
+- RhinoSpotter no longer writes routine lines into EDMC's log. Warnings and
+  errors still go there; set `RHINOSPOTTER_DEBUG=1` before starting EDMC for
+  everything, including why the minimap is down whenever that changes.
+- Failures that were logged as info - a map that could not be saved or read,
+  a window that could not be built - are warnings now, so they still show.
+- The README shows an example of a shared map picture.
+
 ## 3.5.2
 
 **Changed**
