@@ -48,8 +48,10 @@ you can type over.
 
 **Guide** puts an arrow over the game: top middle of the Elite window,
 click-through, showing the direction to that patch and how far. It works from
-orbital cruise down to the SRV, and Elite has to run **borderless or
-windowed** - nothing draws over an exclusive fullscreen.
+orbital cruise down to the SRV. Borderless and windowed are what it is built
+for; fullscreen usually works too. If the Elite window cannot be found the
+arrow parks in the middle of the screen, and if it cannot be put up at all it
+says so in the log and nothing else changes.
 
 <p align="center">
   <img src="docs/guide.png" width="260"
@@ -59,7 +61,7 @@ windowed** - nothing draws over an exclusive fullscreen.
 The arrow points relative to your nose while the game gives a heading. Higher
 up it gives none, and the arrow then points north-up, dimmed and labelled with
 the compass point. On the wrong body or too high for coordinates there is no
-arrow at all, just a line saying which - and after six seconds of having
+arrow at all, just a line saying which - and after ten seconds of having
 nothing to point at, the overlay closes itself. Press **Stop** on the same
 row, or **Guide** on another one, to move it.
 

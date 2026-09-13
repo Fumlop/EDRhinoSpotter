@@ -30,6 +30,7 @@ import json
 import os
 import tempfile
 
+from rs_core import names
 from rs_core.logging import logger
 
 # Beside the cards, and outside the plugin folder for the same reason: scans
@@ -37,19 +38,17 @@ from rs_core.logging import logger
 # without hunting for it.
 STORE_ROOT = os.path.join(os.environ.get("LOCALAPPDATA")
                           or os.path.expanduser("~"), "RhinoSpotter", "data")
-BAD = r'<>:"/\|?*'
 VERSION = 1
 
 
 def safe_name(system):
     r"""A system name Windows will accept as a filename.
 
-    Real names carry characters Explorer refuses - "Col 285 Sector KM-V d2-36"
-    is fine, but a name with a colon in it is not, and one bad system must not
-    take the whole cache down.
+    The same rule the cards folder uses - rs_core/names.py. It has to be the
+    same one: a system that is safe here and not there is a cache that cannot
+    be matched to the cards beside it.
     """
-    cleaned = "".join("_" if ch in BAD else ch for ch in (system or "")).strip()
-    return cleaned or "unknown"
+    return names.safe(system)
 
 
 def path_for(system, root=STORE_ROOT):

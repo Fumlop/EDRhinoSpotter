@@ -87,6 +87,16 @@ No tkinter anywhere in here.
   half a plugin behind. `KEEP` names what an update may not overwrite -
   `ground_rules.json` above all, because a locally refreshed sheet is newer
   than the one in a release.
+- **[arrow.py](rs_core/arrow.py)** - the guide arrow, as a picture. Two faces
+  either side of a fold, drawn with PIL at four times the size and resized
+  down, which is where the smooth edge comes from - the Tk canvas has no
+  anti-aliasing and a shaded triangle drawn there reads as a broken shape
+  rather than as depth. One frame per five degrees, rendered the first time
+  that angle comes up and kept: 3.8 ms for a new angle, 0.34 ms for one
+  already seen.
+- **[names.py](rs_core/names.py)** - the one filename rule. The cards folder,
+  the card itself and the system cache all need a name Windows will take, and
+  they used to have three copies of the loop that makes one.
 - **[cards.py](rs_core/cards.py)** - which bodies in a system have been
   marked, read from the JSON sidecars rather than the file names. A name has
   had its spaces replaced and its material lowercased, so reading a body back
@@ -100,9 +110,9 @@ No tkinter anywhere in here.
   metres across on a body a thousand kilometres in radius, and that error is
   smaller than the error of having driven the border by eye. `closure()` is
   what says whether a reading is worth anything - a border that does not close
-  still gets a plausible-looking area. Nothing in the panel starts a
-  measurement: the code works and is tested, and has no button until there is
-  a decision about where it belongs.
+  still gets a plausible-looking area. Nothing calls it: the code works and is
+  tested and has no caller until there is a decision about where it belongs.
+  Kept because the minimap wants the same projection.
 - **[guide.py](rs_core/guide.py)** - one Status.json and one bookmark into one
   arrow: `bearing()`, `distance()`, and `fix()` which says what the overlay
   can draw. Great circle, not the flat earth measure.py uses - a patch is
@@ -129,11 +139,17 @@ Everything in here imports tkinter.
   written from a worker fails minutes later somewhere unrelated.
 - **[overlay.py](rs_ui/overlay.py)** - the arrow over the game. A borderless
   always-on-top window keyed to a colour it then makes a hole of, so only what
-  is drawn shows, and click-through on top of that - a triangle over the
-  cockpit that eats a click will eat the wrong one. Parked at the top middle
-  of the Elite window and re-placed every tick, because the game gets moved.
-  Polls Status.json twice a second; guiding outlives the scan window, which is
-  why it hangs off the root and not off the window that started it.
+  is drawn shows, and click-through on top of that - a shape over the cockpit
+  that eats a click will eat the wrong one. Parked at the top middle of the
+  Elite window and re-placed every tick, because the game gets moved, and told
+  it is topmost again on every one of those, because a game going fullscreen
+  takes the top of the Z-order with it. No Elite window found means the middle
+  of the screen rather than nothing. Polls Status.json twice a second; guiding
+  outlives the scan window, which is why it hangs off the root and not off the
+  window that started it. It draws `rs_core.arrow`'s frames through PNG bytes
+  rather than PIL's ImageTk, which is the one part of PIL that EDMC's build
+  cannot be relied on to carry. A window it cannot build is logged and
+  skipped - the bookmark list works without an arrow over the game.
 - **[scan.py](rs_ui/scan.py)** - the RhinoScan window, in two views: the
   body list, and the bookmarks of one body with Back at the top left. One
   window, rebuilt rather than stacked - the bookmarks are a step into the row
@@ -146,7 +162,7 @@ Everything in here imports tkinter.
 
 ## Tests (`rs_tests/`)
 
-`pytest` from the plugin folder. 239 checks, no network, no game, no display.
+`pytest` from the plugin folder. 274 checks, no network, no game, no display.
 
 - **conftest.py** - puts the plugin folder on `sys.path`, and builds Scan
   events carrying only the fields the code reads. The `sheet` fixture is a
@@ -167,6 +183,13 @@ Everything in here imports tkinter.
 - **test_guide.py** - the four compass corners, a degree of latitude against
   the number measure.py uses for the same thing, a heading turned into a left
   turn rather than a bearing, and every state a reading can end in.
+- **test_arrow.py** - that an angle lands on the nearest frame and wraps, that
+  the frame is the key colour everywhere the arrow is not, that the two faces
+  are two colours, and that no colour shaded down can land on the key colour
+  and punch a hole through its own arrow.
+- **test_names.py** - every character Windows refuses, spaces kept for a folder
+  and replaced for a file, and that the cache and the cards folder spell one
+  system the same way.
 - **test_palette.py** - that the card and the window draw the same black, and
   that a colour which is not six hex digits raises rather than silently
   becoming black.

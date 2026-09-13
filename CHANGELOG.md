@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.10.0
+
+**Changed**
+
+- The guide arrow is a shaded shape rather than a flat triangle. PIL frames,
+  one per five degrees, cached - 0.34 ms a frame against 0.42 for the polygon
+  it replaces.
+- The overlay says it is topmost again every tick, parks in the middle of the
+  screen when the Elite window is not found, and is logged and skipped rather
+  than raising when it cannot be built at all.
+- The scan window measures each font once instead of once per label: 31 ms
+  down to 14 on a well-scanned system.
+
+**Removed**
+
+- The measuring wiring in the panel, which no button reached.
+  `rs_core/measure.py` stays.
+- `_body_names`, filled on every journal line and read by nothing.
+- Two of the three copies of the filename rule. `rs_core/names.py` is the one.
+
 ## 2.9.1
 
 **Changed**

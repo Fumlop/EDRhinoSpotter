@@ -7,21 +7,30 @@ click-through, so it is something to look at rather than something in the way.
 It reads Status.json on a timer and rs_core.guide turns that into an angle.
 Nothing is saved and nothing is sent anywhere.
 
-Two things it cannot do anything about: Elite has to run borderless or
-windowed, because nothing draws over an exclusive fullscreen, and the arrow
-can only point relative to the nose while the game gives a heading.
+Borderless and windowed are what this is built for. Fullscreen usually works
+too - Windows turns most of it into a flip-model borderless behind the scenes,
+which is why other overlays manage it - so the arrow is put up either way and
+parks itself on the screen when the game window cannot be found. The one thing
+it cannot do anything about is the heading: without one from the game the
+arrow can only point north-up, and it says so.
+
+Nothing in here raises at the caller. A window that cannot be built is logged
+and skipped - the bookmark list is still a bookmark list without an arrow over
+the game.
 """
 
-import math
+import base64
+import io
 import time
 import tkinter as tk
 
-from rs_core import guide, palette, spotmark
+from rs_core import arrow, guide, palette, spotmark
 from rs_core.logging import logger
 
 # The colour the window is filled with and then told to make a hole of. Not a
-# palette colour: anything drawn in it would be a hole too.
-KEY = "#010101"
+# palette colour: anything drawn in it would be a hole too. rs_core.arrow
+# renders onto the same one, and keeps its faces clear of it.
+KEY = arrow.KEY
 
 WIDTH = 240
 HEIGHT = 190
@@ -51,6 +60,7 @@ _placed = None           # the last geometry, so the game standing still is free
 _on_stop = None          # the row that started this, to redraw when it ends
 _since = None            # when the current no-arrow state began
 _pointed = False         # whether this run ever drew an arrow
+_frames = {}             # (bucket, colour) -> PhotoImage, built as angles come up
 
 
 def _key(record):
@@ -94,20 +104,28 @@ def start(parent, record, on_stop=None):
     # The root, not the window that asked: the scan window is disposable and
     # the arrow has to outlive it - you close the list and fly.
     root = parent.master or parent
-    _window = tk.Toplevel(root)
-    _window.overrideredirect(True)
-    _window.configure(bg=KEY)
-    _window.attributes("-topmost", True)
     try:
-        _window.attributes("-transparentcolor", KEY)
-    except tk.TclError:      # not Windows: a solid panel rather than nothing
-        logger.info("overlay: no transparent colour here, drawing solid")
-    _canvas = tk.Canvas(_window, width=WIDTH, height=HEIGHT, bg=KEY,
-                        highlightthickness=0, borderwidth=0)
-    _canvas.pack()
-    _placed = None
-    _window.update_idletasks()
-    _click_through(_window)
+        _window = tk.Toplevel(root)
+        _window.overrideredirect(True)
+        _window.configure(bg=KEY)
+        _window.attributes("-topmost", True)
+        try:
+            _window.attributes("-transparentcolor", KEY)
+        except tk.TclError:      # not Windows: a solid panel rather than nothing
+            logger.info("overlay: no transparent colour here, drawing solid")
+        _canvas = tk.Canvas(_window, width=WIDTH, height=HEIGHT, bg=KEY,
+                            highlightthickness=0, borderwidth=0)
+        _canvas.pack()
+        _placed = None
+        _window.update_idletasks()
+        _click_through(_window)
+    except tk.TclError as err:
+        # Whatever the reason - no window manager that will take it, a display
+        # that will not have it on top - it is not worth a traceback out of a
+        # button press. Say so and leave the list alone.
+        logger.info(f"overlay: no arrow here, skipping it: {err}")
+        stop()
+        return None
     logger.info(f"overlay: guiding to {_caption(record)} on "
                 f"{record.get('planet_name')}")
     _tick()
@@ -161,8 +179,15 @@ def _tick():
             stop()
             return
 
-    _place()
-    _draw(reading)
+    try:
+        _place()
+        _draw(reading)
+    except Exception:
+        # Same rule as building it: an arrow that cannot be drawn is one the
+        # commander does without, not a traceback every half second.
+        logger.exception("overlay: could not draw, taking it down")
+        stop()
+        return
     _after = _window.after(POLL_MS, _tick)
 
 
@@ -187,6 +212,11 @@ def _place():
     if geometry != _placed:
         _window.geometry(geometry)
         _placed = geometry
+    # Said again every tick. Topmost is a request, not a promise - a game
+    # going fullscreen takes the top of the Z-order with it, and the arrow
+    # that was over it is then behind it with nothing to say so.
+    _window.attributes("-topmost", True)
+    _window.lift()
 
 
 def _game_rect():
@@ -249,7 +279,7 @@ def _draw(reading):
         # different instrument and has to look like one - dim, and labelled.
         north_up = reading["relative_deg"] is None
         angle = reading["bearing_deg"] if north_up else reading["relative_deg"]
-        _arrow(WIDTH / 2, 96, 52, angle, DIM if north_up else ACCENT)
+        _arrow(WIDTH / 2, 96, angle, DIM if north_up else ACCENT)
         _line(WIDTH / 2, 158, guide.metres(reading["distance_m"]), FG,
               ("Segoe UI", 16, "bold"))
         if north_up:
@@ -279,16 +309,30 @@ def _excuse(state, target):
     return "this bookmark has no coordinates"
 
 
-def _arrow(cx, cy, size, degrees, colour):
-    """A triangle pointing `degrees` clockwise from up."""
-    shape = ((0.0, -1.0), (0.62, 0.82), (0.0, 0.42), (-0.62, 0.82))
-    radians = math.radians(degrees or 0.0)
-    cos, sin = math.cos(radians), math.sin(radians)
-    points = []
-    for x, y in shape:
-        points += [cx + (x * cos - y * sin) * size,
-                   cy + (x * sin + y * cos) * size]
-    _canvas.create_polygon(points, fill=colour, outline=KEY, width=1)
+def _arrow(cx, cy, degrees, colour):
+    """The arrow, pointing `degrees` clockwise from up.
+
+    A picture rather than a canvas polygon: the faces that make it read as
+    solid need a smooth edge, and the canvas has none to give.
+    """
+    _canvas.create_image(cx, cy, image=_photo(degrees, colour))
+
+
+def _photo(degrees, colour):
+    """The frame for that angle, rendered once and kept.
+
+    Through PNG bytes rather than PIL's ImageTk: Tk reads those itself, and
+    ImageTk is the one part of PIL that EDMC's build cannot be relied on to
+    carry.
+    """
+    key = (arrow.bucket(degrees), colour)
+    photo = _frames.get(key)
+    if photo is None:
+        data = io.BytesIO()
+        arrow.frame(degrees, colour).save(data, "PNG")
+        photo = tk.PhotoImage(data=base64.b64encode(data.getvalue()))
+        _frames[key] = photo
+    return photo
 
 
 def _ring(cx, cy, radius, colour):

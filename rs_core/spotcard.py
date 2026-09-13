@@ -13,19 +13,21 @@ import os
 
 from PIL import Image, ImageDraw, ImageFont
 
-from rs_core import palette
+from rs_core import names, palette
 
 # Outside the plugin folder on purpose: cards outlive a plugin reinstall, and
 # %LOCALAPPDATA% is somewhere Explorer opens without hunting for it.
 CARDS_ROOT = os.path.join(os.environ.get("LOCALAPPDATA")
                           or os.path.expanduser("~"), "RhinoSpotter", "cards")
-BAD = r'<>:"/\|?*'
 
 
 def card_dir(system):
-    r"""%LOCALAPPDATA%\RhinoSpotter\cards\<System>\."""
-    safe = "".join("_" if ch in BAD else ch for ch in (system or "unknown")).strip() or "unknown"
-    return os.path.join(CARDS_ROOT, safe)
+    r"""%LOCALAPPDATA%\RhinoSpotter\cards\<System>\.
+
+    Spaces kept: this is the folder Explorer shows, and the name the game uses
+    is easier to find in a list than the same name with underscores in it.
+    """
+    return os.path.join(CARDS_ROOT, names.safe(system))
 
 W, H = 880, 360
 PAD = 34
@@ -208,5 +210,4 @@ def filename(spot):
     parts = [spot.get("planet_name") or "spot",
              f"loc{_fmt(spot.get('location_index'), dash='x')}",
              (spot.get("commodity") or "unknown").lower()]
-    stem = "_".join(parts)
-    return "".join("_" if ch in BAD or ch == " " else ch for ch in stem) + ".png"
+    return names.safe("_".join(parts), spaces=False) + ".png"

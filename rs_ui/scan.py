@@ -168,16 +168,25 @@ def _measure(labels, skip=()):
     asked for before anything was laid out, and wraplength is still zero at
     that point, so the answer came back both too small and too late. Font
     metrics are exact and available immediately.
+
+    One Font per font rather than one per label. Three fonts are ever used in
+    here, and building a fresh one for each of a hundred labels was a Tcl call
+    per label for an answer that does not differ - 31 ms against 14 on a
+    well-scanned system.
     """
     widest = 0
     skip = set(skip)
+    fonts = {}
     for label in labels:
         if label in skip:
             continue
         text = label.cget("text")
         if not text:
             continue
-        metrics = tkfont.Font(font=label.cget("font"))
+        spec = str(label.cget("font"))
+        metrics = fonts.get(spec)
+        if metrics is None:
+            metrics = fonts[spec] = tkfont.Font(font=spec)
         for line in text.splitlines():
             widest = max(widest, metrics.measure(line))
     return widest
@@ -510,8 +519,10 @@ def _toggle_guide(record):
     """
     if overlay.guiding(record):
         overlay.stop()
-    else:
-        overlay.start(_window, record, on_stop=_refresh)
+    elif overlay.start(_window, record, on_stop=_refresh) is None:
+        # No arrow to be had here - it said why in the log. The row stays as
+        # it was rather than offering a Stop for something that never started.
+        logger.info("scan: no overlay, the bookmark list is unchanged")
     _refresh()
 
 

@@ -14,7 +14,7 @@ import subprocess
 import threading
 import tkinter as tk
 
-from rs_core import bodies, grounds, measure, palette, spotcard, spotmark, store, update
+from rs_core import bodies, grounds, palette, spotcard, spotmark, store, update
 from rs_core.logging import logger
 from rs_ui import scan
 
@@ -25,9 +25,7 @@ except ImportError:      # running outside EDMC
 
 _system = ""
 _cmdr = None
-_last_index = None       # the location the last press saw, for the sidecar
 _card_token = 0          # only the newest render may write to the status line
-_body_names = {}         # BodyID -> name, so a targeted location can be placed
 
 _register = bodies.Register(on_change=store.save, on_arrive=store.load)
 _sheet = None            # rs_core.grounds.Sheet, read once at startup
@@ -46,9 +44,6 @@ NO_MATERIAL = "select material"
 ALL_MATERIALS = "All"
 
 _card_button = None      # Bookmark, until there is an update to install
-_measure_status = None   # what the tape measure reads, while it reads
-_track = None            # rs_core.measure.Track while measuring, else None
-_measure_after = None    # the pending poll, so stopping actually stops
 _landed_after = None     # the pending look at whether we are on the ground
 _loc = None              # tk.StringVar - mining location index
 _rigs = None             # tk.StringVar - rigs on the patch
@@ -65,7 +60,7 @@ def start(plugin_dir):
 
 def build(parent):
     global _frame, _status, _scan_count, _card_button, _landed_after
-    global _measure_status, _loc, _rigs, _material
+    global _loc, _rigs, _material
 
     _frame = tk.Frame(parent)
     _frame.columnconfigure(1, weight=1)
@@ -108,10 +103,6 @@ def build(parent):
     _card_button = tk.Button(row, text=CARD_TEXT, width=13, command=make_card)
     _card_button.pack(side="left")
     tk.Button(row, text="RhinoScan", width=13, command=open_scan).pack(side="left", padx=(8, 0))
-
-    # No measuring line either. It would be an empty row every session: the
-    # label only ever has text while a measurement is running, and nothing in
-    # the panel starts one. _report_measure writes nowhere while this is None.
 
     # The one thing RhinoScan cannot do for you, and the thing everyone gets
     # wrong first: the honk finds the bodies, it does not describe them. Only
@@ -245,8 +236,7 @@ def _on_material_changed(*_):
 
 
 # How often Status.json is read to see whether Bookmark has anything to mark.
-# The same second the measuring loop uses, and for the same reason: it is one
-# small file, and the answer changes at walking pace.
+# One small file, and the answer changes at walking pace.
 LANDED_POLL_MS = 1000
 
 
@@ -265,78 +255,6 @@ def _poll_landed():
     _landed_after = _frame.after(LANDED_POLL_MS, _poll_landed)
 
 
-# How often Status.json is read while measuring. The SRV does about 30 m/s
-# flat out, so a second is thirty metres of border - fine for a shape you are
-# driving by eye, and cheap enough to run for as long as it takes.
-MEASURE_POLL_MS = 1000
-
-# How far from the starting rig still counts as having come back to it. Only
-# the log cares: past this it notes that the area includes a side nobody drove.
-CLOSE_ENOUGH_M = 10.0
-
-
-def toggle_measure():
-    """Start driving the border, or stop and keep what was driven.
-
-    Nothing in the panel calls this. The measuring works and is tested; it has
-    no button, on purpose, until there is a decision about where it belongs.
-    """
-    global _track, _measure_after
-
-    if _track is not None:
-        _measure_after = _cancel_poll()
-        _report_measure(final=True)
-        _log_measurement(_track)
-        _track = None
-        return
-
-    status = spotmark.read_status()
-    if status.get("Latitude") is None:
-        _set_status("no position in Status.json - get out in the SRV first")
-        return
-
-    _track = measure.Track()
-    _track.add(status)
-    logger.debug(f"measure: started on {_track.body} "
-                 f"at {status['Latitude']:.6f} / {status['Longitude']:.6f}, "
-                 f"radius {_track.radius:,.0f} m")
-    # The three things that decide whether the number is worth anything. A rig
-    # at the start is the only marker the game gives you for where the border
-    # began, and slowly is not fussiness - Status.json is read once a second,
-    # so at speed the corners are cut off.
-    _set_status("place a rig where you start, drive the border slowly, "
-                "come back to it, then Stop")
-    _poll_measure()
-
-
-def _poll_measure():
-    """Read Status.json, keep the point if it moved, say what it adds up to."""
-    global _measure_after
-    if _track is None or not _frame:
-        return
-    before = len(_track)
-    status = spotmark.read_status()
-    if _track.add(status) and len(_track) > before:
-        # Every point that made it in, so a reading that looks wrong can be
-        # walked back through the log rather than argued about.
-        point = _track.polygon()[-1]
-        logger.debug(f"measure: point {len(_track):>3} "
-                     f"{status.get('Latitude'):.6f} / {status.get('Longitude'):.6f}"
-                     f"  ->  x {point[0]:>8.1f}  y {point[1]:>8.1f}"
-                     f"  area {_track.area():>10,.0f} m2")
-    _report_measure()
-    _measure_after = _frame.after(MEASURE_POLL_MS, _poll_measure)
-
-
-def _cancel_poll():
-    if _measure_after and _frame:
-        try:
-            _frame.after_cancel(_measure_after)
-        except (ValueError, tk.TclError):
-            pass
-    return None
-
-
 def _cancel_landed():
     if _landed_after and _frame:
         try:
@@ -353,51 +271,9 @@ def stop():
     teardown by design; left alone it fires once against a frame that is no
     longer there.
     """
-    global _measure_after, _landed_after, _done_after
-    _measure_after = _cancel_poll()
+    global _landed_after, _done_after
     _landed_after = _cancel_landed()
     _done_after = _cancel_done()
-
-
-def _log_measurement(track):
-    """The whole measurement, once, when it is finished.
-
-    Debug level throughout. Nothing in the panel starts a measurement, so none
-    of this belongs in EDMC's log by default - it is there for whoever turns
-    RHINOSPOTTER_DEBUG on to check a number, and silent otherwise.
-    """
-    summary = track.summary()
-    logger.debug("measure: " + "  ".join(f"{key}={value}"
-                                         for key, value in summary.items()))
-    if summary["points"] >= 3 and summary["closure_m"] > CLOSE_ENOUGH_M:
-        logger.debug(f"measure: border left open by {summary['closure_m']:,.0f} m - "
-                     "the area includes a side that was never driven")
-    for index, (lat, lon) in enumerate(track.points, start=1):
-        logger.debug(f"measure: {index:>3}  {lat:.6f}  {lon:.6f}")
-
-
-def _report_measure(final=False):
-    """Area and rig count, or why there is not one yet.
-
-    Three points is the first shape that encloses anything, so below that it
-    says how far round you are rather than an area of zero.
-    """
-    if not _measure_status or _track is None:
-        return
-    if len(_track) < 3:
-        _measure_status.config(
-            text=f"measuring - {len(_track)} point{'' if len(_track) == 1 else 's'}"
-                 + (" - drive the border" if len(_track) else ""),
-            fg=palette.MUTED)
-        return
-    # No warning about how well the border was driven. You placed a rig and
-    # drove round it; whether you drove it well is yours to judge, and a panel
-    # that second-guesses that is a panel telling you things you know. The
-    # closure figure is in the log for when a number looks wrong.
-    rigs = _track.rigs()
-    text = (f"{_track.area():,.0f} m²   ·   {rigs} rig{'' if rigs == 1 else 's'}"
-            f"   ·   {len(_track)} points")
-    _measure_status.config(text=text, fg=palette.GOOD if final else palette.WARN)
 
 
 def _focus():
@@ -413,13 +289,6 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
         _system = system
     if cmdr:
         _cmdr = cmdr
-
-    # Status.json names the destination body by id only, so the names have to
-    # come from the journal, where half a dozen events carry both.
-    body_id = entry.get("BodyID")
-    body_name = entry.get("Body") or entry.get("BodyName")
-    if body_id is not None and body_name:
-        _body_names[body_id] = body_name
 
     # Landing fills Loc in. Touchdown names the mining location it came down
     # at, and that is the one number a bookmark cannot work out for itself -
@@ -439,7 +308,7 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 
 def make_card():
     """Mark where the ship is standing and render the bookmark for it."""
-    global _card_token, _last_index
+    global _card_token
 
     _set_done("")
     if _material.get() in ("", NO_MATERIAL, ALL_MATERIALS):
@@ -447,13 +316,12 @@ def make_card():
         return
 
     spot = spotmark.mark(spotmark.read_status(), system=_system, commander=_cmdr)
-    _last_index = spot["location_index"]
 
     # A typed Loc wins: Status.json only knows the location while it is the
     # selected destination, and it is often deselected by the time you land.
     typed = _int(_loc.get())
-    if typed is None and _last_index is not None:
-        _loc.set(str(_last_index))
+    if typed is None and spot["location_index"] is not None:
+        _loc.set(str(spot["location_index"]))
     else:
         spot["location_index"] = typed
 
