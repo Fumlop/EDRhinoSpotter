@@ -113,12 +113,17 @@ you two bookmarks, not one overwritten.
 ## Updating
 
 When a newer release is out, **Bookmark** reads **Update** instead and the
-status line names the version. Press it; the release is fetched and unpacked in
-place, and the button reads **Restart EDMC**.
+status line names the version - checked at start and every hour after. Press
+it; the release is fetched and unpacked in place, and the button reads
+**Restart EDMC**.
+
+On 2.9.0 to 4.0.0 the button could stay grey when EDMC started docked. If you
+never saw a working Update there, download `RhinoSpotter-4.0.1.zip` (or newer)
+from the releases page and unpack it over the plugin folder once.
 
 Kept across an update: `ground_rules.json`, and everything under
-`%LOCALAPPDATA%\RhinoSpotter\` - your cards and your scanned systems are not in
-the plugin folder and are never touched.
+`%LOCALAPPDATA%\RhinoSpotter\` - your bookmarks, maps and scanned systems are
+not in the plugin folder and are never touched.
 
 ### Testing the update without a throwaway release
 
