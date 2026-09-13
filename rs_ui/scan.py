@@ -357,10 +357,10 @@ def _cards_link(parent, records):
                lambda event: _bookmarks_view(label.winfo_toplevel(), system, body, records))
 
 
-# The two buttons on every bookmark row. Buttons are not labels, so the width
+# The three buttons on every bookmark row. Buttons are not labels, so the width
 # measurement cannot see them and the window would open exactly that much too
 # narrow - and a row too narrow does not wrap, it drops what is packed right.
-BUTTONS = 140
+BUTTONS = 220
 
 
 def _bookmarks_view(window, system, body, records):
@@ -480,9 +480,29 @@ def _bookmark_row(parent, record):
     _button(head, "Delete", lambda: _delete_bookmark(record),
             active=palette.ALERT).pack(side="right", padx=(4, 6))
     _guide_button(head, record)
+    _depleted_button(head, record)
 
     tk.Label(row, text="   " + _bookmark_detail(record), bg=BG, fg=DIM, anchor="w",
              font=("Consolas", 8)).pack(fill="x")
+
+
+def _depleted_button(parent, record):
+    """Green "Active" while the patch still has something, red "Depleted" once
+    it is marked mined out; a press flips it. Packed after Guide, so it sits
+    before it on the row."""
+    depleted = bool(record.get("depleted_at"))
+    button = _button(parent, "Depleted" if depleted else "Active",
+                     lambda: _toggle_depleted(record))
+    button.config(fg=palette.ALERT if depleted else GOOD)
+    button.pack(side="right", padx=(0, 4))
+
+
+def _toggle_depleted(record):
+    if not cards.set_depleted(record, not record.get("depleted_at")):
+        messagebox.showwarning(
+            "Depleted", "The bookmark could not be written - see the EDMC log.",
+            parent=_window)
+    _reload()
 
 
 def _guide_button(parent, record):
@@ -590,7 +610,9 @@ def _bookmark_detail(record):
     thing here that cannot be worked out again afterwards.
     """
     marked = str(record.get("marked_at") or "").split(".")[0].replace("T", " ")
-    return "  ".join(part for part in (_coords(record), marked) if part)
+    depleted = str(record.get("depleted_at") or "").split("+")[0].replace("T", " ")
+    return "  ".join(part for part in (_coords(record), marked,
+                                       f"depleted {depleted}" if depleted else "") if part)
 
 
 def _coords(record):

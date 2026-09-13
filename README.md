@@ -40,6 +40,11 @@ returns to the body list.
 **Share map**, beside each location, opens the picture of the map that
 location's bookmarks were made on - see [Sharing a map](#sharing-a-map).
 
+**Active** / **Depleted**, before Guide, marks a patch as mined out: green
+while it still has something, red once marked, a press flips it. The bookmark
+keeps when it was marked (`depleted_at`), so once the community knows how long
+a patch takes to refill, that can be counted from it.
+
 **Delete** removes that bookmark from disk, after asking. The last one on a
 body takes you back to the body list.
 

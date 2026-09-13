@@ -78,6 +78,9 @@ distance under it. Elite must run borderless or windowed - nothing draws over
 an exclusive fullscreen. **Stop** on the same row takes it down, and so does
 six seconds of having nothing to point at.
 
+**Active / Depleted.** Marks the patch mined out (red) or not (green); the
+bookmark keeps when it was marked.
+
 **Delete.** Removes that bookmark from disk, after asking.
 
 **Loc.** Landing fills it in by itself, from the mining location the game says

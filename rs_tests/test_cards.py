@@ -129,6 +129,34 @@ class TestDelete:
         assert cards.delete(record) is False
 
 
+class TestDepleted:
+    """A bookmark marked mined out, and the mark taken off again."""
+
+    def test_marking_writes_when(self, tmp_path):
+        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "x")
+        record = cards.for_system("Andel", root=str(tmp_path))[0]
+        assert cards.set_depleted(record, True, when="3311-05-20T10:00:00+00:00") is True
+        again = cards.for_system("Andel", root=str(tmp_path))[0]
+        assert again["depleted_at"] == "3311-05-20T10:00:00+00:00"
+        assert record["depleted_at"] == again["depleted_at"]
+        # Everything else in the bookmark is left as it was.
+        assert again["commodity"] == "Jadeite" and again["location_index"] == 22
+
+    def test_unmarking_removes_the_key(self, tmp_path):
+        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "x")
+        record = cards.for_system("Andel", root=str(tmp_path))[0]
+        cards.set_depleted(record, True)
+        cards.set_depleted(record, False)
+        with open(record["sidecar"], encoding="utf-8") as handle:
+            assert "depleted_at" not in json.load(handle)
+        assert "depleted_at" not in record
+
+    def test_a_bookmark_that_cannot_be_written_says_so(self, tmp_path):
+        record = {"sidecar": str(tmp_path / "gone.json")}
+        assert cards.set_depleted(record, True) is False
+        assert cards.set_depleted({}, True) is False
+
+
 class TestOrdered:
     """The order the bookmark list is read in: the best patch on this body
     first, not the one worked first."""

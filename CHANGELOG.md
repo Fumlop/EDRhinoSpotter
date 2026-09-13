@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.1.0
+
+**Added**
+
+- Bookmarks can be marked depleted. A button before Guide reads a green
+  **Active** or a red **Depleted**, and a press flips it. The mark is written
+  into the bookmark's JSON as `depleted_at`, the time it was set, so a refill
+  time can be counted from it once the community knows one. The dim line
+  under the bookmark shows when.
+
 ## 4.0.2
 
 **Changed**

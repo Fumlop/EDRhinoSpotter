@@ -128,7 +128,8 @@ No tkinter anywhere in here.
   out of one is a guess; a PNG without JSON is skipped rather than guessed at.
   An old card's PNG is kept on the record as `path` when it is still there.
   `ordered()` is the order a body's bookmarks are read in: most rigs first,
-  uncounted ones last; `delete()` removes one, JSON and any old PNG at once.
+  uncounted ones last; `delete()` removes one, JSON and any old PNG at once;
+  `set_depleted()` writes or removes `depleted_at` in the bookmark's JSON.
 - **[measure.py](rs_core/measure.py)** - area and rig count for a border
   driven in the SRV. Shoelace for the area, ray casting for what is inside,
   and a 76 m grid for the rigs. Flat earth on purpose: a spot is a few hundred

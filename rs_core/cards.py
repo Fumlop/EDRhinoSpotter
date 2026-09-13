@@ -10,6 +10,8 @@ rs_tests/test_cards.py.
 
 import json
 import os
+import tempfile
+from datetime import datetime, timezone
 
 from rs_core.logging import logger
 from rs_core.spotcard import card_dir
@@ -70,6 +72,42 @@ def delete(record):
             logger.warning(f"could not delete {target}: {err}")
             return False
     return removed
+
+
+def set_depleted(record, depleted, when=None):
+    """Mark a bookmark as mined out, or take the mark off. True when written.
+
+    Written into the bookmark's own JSON as `depleted_at` - when it was marked,
+    not a yes/no - so the day the community knows how long a patch takes to
+    come back, the time is already there to count from. No mark, no key.
+    The record in hand is updated to match.
+    """
+    path = record.get("sidecar")
+    if not path:
+        return False
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+        if depleted:
+            data["depleted_at"] = when or datetime.now(timezone.utc).isoformat(timespec="seconds")
+        else:
+            data.pop("depleted_at", None)
+        folder = os.path.dirname(path) or "."
+        handle = tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=folder,
+                                             suffix=".tmp", delete=False)
+        try:
+            json.dump(data, handle, indent=1)
+        finally:
+            handle.close()
+        os.replace(handle.name, path)
+    except (OSError, ValueError) as err:
+        logger.warning(f"could not mark {path} depleted: {err}")
+        return False
+    if depleted:
+        record["depleted_at"] = data["depleted_at"]
+    else:
+        record.pop("depleted_at", None)
+    return True
 
 
 def by_body(system, root=None):
