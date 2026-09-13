@@ -246,8 +246,8 @@ def minimap_image(root, scale):
     # Two bookmarks on the body, where the drive went past them.
     was_marks = minimap._bookmarks
     minimap._bookmarks = lambda system, body: [
-        (reading(x, y, 0, 0)["Latitude"], reading(x, y, 0, 0)["Longitude"])
-        for x, y in ((2000, 1500), (-900, -6300))]
+        (reading(x, y, 0, 0)["Latitude"], reading(x, y, 0, 0)["Longitude"], code)
+        for x, y, code in ((2400, 400, "T"), (-900, -6300, "PL"))]
 
     for track in launches:
         for (x1, y1), (x2, y2) in zip(track, track[1:]):

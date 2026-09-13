@@ -269,8 +269,8 @@ def picture(mask, drops, marks=()):
     """
     image = _draw_layer(mask, drops, PICTURE_SIDE)
     scale = image.width / (2 * REACH_M)
-    _bookmarks(image, [(image.width / 2 + mx * scale, image.height / 2 - my * scale)
-                       for mx, my in marks], PICTURE_SIDE)
+    _bookmarks(image, [(image.width / 2 + mx * scale, image.height / 2 - my * scale, *rest)
+                       for mx, my, *rest in marks], PICTURE_SIDE)
     draw = ImageDraw.Draw(image)
     font = spotcard._font("consola.ttf", 16)
     for number, (mx, my) in enumerate(drops, 1):
@@ -302,14 +302,24 @@ MARK = palette.rgb(palette.ALERT)
 
 
 def _bookmarks(image, points, side):
-    """A dot per bookmark at these pixel positions. Radius 1.8% of the map side
-    against the latest droppoint's 3%: smaller than it, still a dot at 180 px."""
+    """A dot per bookmark at these pixel positions, its material's code beside
+    it. Radius 1.8% of the map side against the latest droppoint's 3%: smaller
+    than it, still a dot at 180 px.
+
+    `points` are (x, y) or (x, y, code) - grounds.Sheet.codes gives the code.
+    """
     r = max(3.0, side * 0.018)
     draw = ImageDraw.Draw(image)
-    for cx, cy in points:
+    font = spotcard._font("consolab.ttf", max(9, int(round(side * 0.05))))
+    for cx, cy, *rest in points:
         if -r <= cx <= image.width + r and -r <= cy <= image.height + r:
             draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=MARK,
                          outline=palette.rgb(palette.BG))
+            if rest and rest[0]:
+                # Outlined in the background colour: readable over the painted
+                # area, the grid and the droppoints alike.
+                draw.text((cx + r + 1, cy), rest[0], fill=MARK, font=font, anchor="lm",
+                          stroke_width=2, stroke_fill=palette.rgb(palette.BG))
 
 
 def _draw_layer(mask, drops, side):
@@ -391,8 +401,8 @@ def render(coverage, x, y, heading, side, marks=()):
     top = int(round(layer.height / 2 - y * scale - side / 2))
     image = Image.new("RGB", (side, side), palette.rgb(palette.BG))
     image.paste(layer, (-left, -top))
-    _bookmarks(image, [(side / 2 + (mx - x) * scale, side / 2 - (my - y) * scale)
-                       for mx, my in marks], side)
+    _bookmarks(image, [(side / 2 + (mx - x) * scale, side / 2 - (my - y) * scale, *rest)
+                       for mx, my, *rest in marks], side)
     size = max(12, int(round(side * 0.09)))
     marker = _marker(heading, size)
     image.paste(marker, ((side - size) // 2, (side - size) // 2), marker)

@@ -93,6 +93,25 @@ class TestSheet:
         rows = grounds.Sheet(str(path)).best("high-metal-content")
         assert [row["material"] for row in rows] == ["Iridium", "Osmium", "Copper"]
 
+    def test_codes_give_the_valuable_material_the_single_letter(self, tmp_path):
+        import json
+        path = tmp_path / "ground_rules.json"
+        path.write_text(json.dumps({"grounds": {"rocky": [
+            {"material": "Titanium", "pct": 52.6, "median": 0, "best": 0},
+            {"material": "Thorium", "pct": 47.6, "median": 0, "best": 0},
+            {"material": "Thortveitite", "pct": 12.2, "median": 160947, "best": 1},
+            {"material": "Tritium", "pct": 5.0, "median": 0, "best": 0},
+        ]}}), encoding="utf-8")
+        codes = grounds.Sheet(str(path)).codes()
+        assert codes["thortveitite"] == "T"
+        assert len(set(codes.values())) == len(codes)
+        assert codes == {"thortveitite": "T", "thorium": "TH", "titanium": "TI", "tritium": "TR"}
+
+    def test_every_shipped_material_has_its_own_code(self):
+        codes = grounds.Sheet().codes()
+        assert codes and len(set(codes.values())) == len(codes)
+        assert all(len(code) <= 3 for code in codes.values())
+
     def test_unknown_ground_is_empty_not_an_error(self, sheet):
         assert sheet.materials("volcanic silicate") == []
         assert sheet.sample("volcanic silicate") == 0

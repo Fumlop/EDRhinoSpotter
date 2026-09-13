@@ -24,7 +24,7 @@ import threading
 import time
 import tkinter as tk
 
-from rs_core import arrow, cards, coverage, coverstore, guide, palette, spotcard, spotmark, store
+from rs_core import arrow, cards, coverage, coverstore, grounds, guide, palette, spotcard, spotmark, store
 from rs_core.logging import logger
 from rs_ui import overlay
 
@@ -64,8 +64,9 @@ _saved = None            # (map, version, droppoints, location) last handed to _
 _writes = store.Debounced(write=coverstore.save)
 _in_srv = False
 _failed = False          # a draw that raised: stay down until the next launch
-_marks = None            # ((system, body, cards folder mtime), [(lat, lon), ...])
-_fresh = []              # [(system, body, lat, lon, when)] bookmarked, maybe not on disk yet
+_marks = None            # ((system, body, cards folder mtime), [(lat, lon, code), ...])
+_codes = None            # grounds.Sheet.codes, read once
+_fresh = []              # [(system, body, lat, lon, code, when)] bookmarked, maybe not on disk yet
 _enabled = None          # tk.BooleanVar on the settings tab
 _corner = None           # tk.StringVar on the settings tab
 
@@ -135,7 +136,8 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
     where = corner()
     x, y = _coverage.xy(lat, lon)
     header = _header(status, body, system)
-    marks = tuple(_coverage.xy(mlat, mlon) for mlat, mlon in _bookmarks(system, body))
+    marks = tuple((*_coverage.xy(mlat, mlon), code)
+                  for mlat, mlon, code in _bookmarks(system, body))
     # What a picture is of, at the precision it is drawn at: a map pixel of
     # movement and a frame of the marker. Anything finer redraws for nothing.
     per_px = 2 * coverage.VIEW_M / side
@@ -161,7 +163,7 @@ def _remember():
 
 
 def _bookmarks(system, body):
-    """[(lat, lon), ...] of the bookmarks on this body.
+    """[(lat, lon, code), ...] of the bookmarks on this body.
 
     Read again when the cards folder changes - a card written or deleted moves
     its modified time - and every MARKS_S besides: the card is written on a
@@ -183,13 +185,22 @@ def _bookmarks(system, body):
                 lat, lon = record.get("latitude"), record.get("longitude")
                 if (record.get("planet_name") == body and isinstance(lat, (int, float))
                         and isinstance(lon, (int, float))):
-                    points.append((lat, lon))
+                    points.append((lat, lon, _code(record.get("commodity"))))
         _marks = (key, points)
     now = time.monotonic()
-    _fresh[:] = [f for f in _fresh if now - f[4] < 2 * MARKS_S]
-    fresh = [(lat, lon) for s, b, lat, lon, _ in _fresh
-             if s == system and b == body and (lat, lon) not in _marks[1]]
+    _fresh[:] = [f for f in _fresh if now - f[5] < 2 * MARKS_S]
+    on_disk = {(lat, lon) for lat, lon, _ in _marks[1]}
+    fresh = [(lat, lon, code) for s, b, lat, lon, code, _ in _fresh
+             if s == system and b == body and (lat, lon) not in on_disk]
     return _marks[1] + fresh if fresh else _marks[1]
+
+
+def _code(material):
+    """The short code for a material, or None for one the sheet does not know."""
+    global _codes
+    if _codes is None:
+        _codes = grounds.Sheet().codes()
+    return _codes.get((material or "").lower())
 
 
 def bookmarked(spot):
@@ -203,7 +214,8 @@ def bookmarked(spot):
     lat, lon = spot.get("latitude"), spot.get("longitude")
     if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
         return
-    _fresh.append((spot.get("system"), spot.get("planet_name"), lat, lon, time.monotonic()))
+    _fresh.append((spot.get("system"), spot.get("planet_name"), lat, lon,
+                   _code(spot.get("commodity")), time.monotonic()))
     _drawn = None
 
 
@@ -215,7 +227,7 @@ def _docked(system):
         return
     body, name = _coverage.body, _coverage.name
     mask, drops = _coverage.mask.copy(), list(_coverage.drops)
-    marks = [_coverage.xy(lat, lon) for lat, lon in _bookmarks(system, body)]
+    marks = [(*_coverage.xy(lat, lon), code) for lat, lon, code in _bookmarks(system, body)]
 
     def draw():
         try:

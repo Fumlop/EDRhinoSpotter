@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.3.0
+
+**Added**
+
+- Each bookmark dot on the minimap carries its material's code. The most
+  valuable material gets its first letter, the next to want that letter gets
+  two: Thortveitite T, Thorium TH, Titanium TI, Tritium TR. Every code on the
+  sheet is different.
+
 ## 3.2.0
 
 **Added**

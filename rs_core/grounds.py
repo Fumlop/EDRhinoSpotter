@@ -125,6 +125,34 @@ class Sheet:
     def loaded(self):
         return bool(self.grounds)
 
+    def codes(self):
+        """{material, lowercased: short code} for labels on the minimap.
+
+        Every code is different. The most valuable material gets its first
+        letter, the next one to want that letter gets it plus the first of its
+        own letters still free: Thortveitite T, Thorium TH, Titanium TI. Capitals
+        throughout - a lowercase l beside a dot at 12 px reads as a 1. Value
+        is the median price, best across grounds; a refreshed sheet that
+        re-ranks prices can move a code.
+        """
+        price = {}
+        for rows in self.grounds.values():
+            for row in rows:
+                price[row['material']] = max(price.get(row['material'], 0), row.get('median') or 0)
+        taken, codes = set(), {}
+        for name in sorted(price, key=lambda n: (-price[n], n)):
+            first = name[0].upper()
+            wanted = [first] + [first + ch.upper() for ch in name[1:] if ch.isalpha()]
+            code = next((c for c in wanted if c not in taken), None)
+            n = 2
+            while code is None:
+                if f"{first}{n}" not in taken:
+                    code = f"{first}{n}"
+                n += 1
+            taken.add(code)
+            codes[name.lower()] = code
+        return codes
+
     def materials(self, ground, limit=None, minimum=0.0):
         """What that ground has been found to hold, likeliest first.
 
