@@ -7,6 +7,8 @@
 - The saved map picture leaves out the droppoints and the range rings: the
   painted ground, the bookmarks and the legend are what it is kept for. The
   minimap over the game still shows both.
+- **Share map** beside the planet name on a body's bookmarks page opens the
+  last map picture saved on that body. Greyed until the body has been driven.
 
 ## 3.5.0
 

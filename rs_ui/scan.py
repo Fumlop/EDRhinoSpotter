@@ -15,7 +15,7 @@ import tkinter as tk
 import webbrowser
 from tkinter import font as tkfont, messagebox
 
-from rs_core import cards, grounds, palette
+from rs_core import cards, coverstore, grounds, palette
 from rs_core.logging import logger
 from rs_ui import overlay
 
@@ -383,8 +383,15 @@ def _bookmarks_view(window, system, body, records):
     back.pack(fill="x", pady=(0, 6))
     _button(back, "‹ Back", lambda: _scan_view(window)).pack(side="left")
 
-    tk.Label(outer, text=body, bg=BG, fg=FG, anchor="w",
-             font=("Segoe UI", 15, "bold")).pack(fill="x")
+    title = tk.Frame(outer, bg=BG)
+    title.pack(fill="x")
+    tk.Label(title, text=body, bg=BG, fg=FG, anchor="w",
+             font=("Segoe UI", 15, "bold")).pack(side="left")
+    # The last map saved on this body, opened like a card. Greyed when the
+    # body has never been driven.
+    picture = coverstore.latest_png(body)
+    _button(title, "Share map", (lambda: _open_card(picture)) if picture else None).pack(
+        side="left", padx=(10, 0))
     count = len(records)
     tk.Label(outer, text=f"{system or ''}  -  {count} bookmark{'' if count == 1 else 's'}",
              bg=BG, fg=DIM, anchor="w", font=("Segoe UI", 9)).pack(fill="x", pady=(0, 10))

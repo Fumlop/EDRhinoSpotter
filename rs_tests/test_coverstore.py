@@ -63,6 +63,22 @@ class TestNames:
 
 
 @pytest.mark.unit
+class TestLatestPicture:
+
+    def test_the_newest_picture_on_the_body(self, tmp_path):
+        import os
+        from PIL import Image
+        older = coverstore.save_png(BODY, "map 1", Image.new("RGB", (8, 8)), root=str(tmp_path))
+        newer = coverstore.save_png(BODY, "map 2", Image.new("RGB", (8, 8)), root=str(tmp_path))
+        os.utime(older, (1000, 1000))
+        os.utime(newer, (2000, 2000))
+        assert coverstore.latest_png(BODY, root=str(tmp_path)) == newer
+
+    def test_none_for_a_body_never_driven(self, tmp_path):
+        assert coverstore.latest_png("Nowhere 1", root=str(tmp_path)) is None
+
+
+@pytest.mark.unit
 class TestUsage:
 
     def test_counts_maps_not_files(self, tmp_path):

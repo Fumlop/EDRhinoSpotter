@@ -131,6 +131,16 @@ def save_png(body, name, image, root=None):
         return None
 
 
+def latest_png(body, root=None):
+    """The path of the map picture on that body written last, or None."""
+    where = folder(body, root)
+    try:
+        pictures = [os.path.join(where, f) for f in os.listdir(where) if f.endswith(".png")]
+        return max(pictures, key=os.path.getmtime) if pictures else None
+    except OSError:
+        return None
+
+
 def usage(root=None):
     """(maps, bytes) over everything saved, for the settings tab."""
     count = size = 0
