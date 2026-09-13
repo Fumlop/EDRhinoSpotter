@@ -354,6 +354,7 @@ def make_card():
     spot["rigs"] = _int(_rigs.get())
 
     _set_status("")
+    minimap.bookmarked(spot)
     _card_token += 1
     threading.Thread(target=_render_card, args=(spot, _card_token), daemon=True).start()
 

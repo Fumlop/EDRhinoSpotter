@@ -65,6 +65,7 @@ _writes = store.Debounced(write=coverstore.save)
 _in_srv = False
 _failed = False          # a draw that raised: stay down until the next launch
 _marks = None            # ((system, body, cards folder mtime), [(lat, lon), ...])
+_fresh = []              # [(system, body, lat, lon, when)] bookmarked, maybe not on disk yet
 _enabled = None          # tk.BooleanVar on the settings tab
 _corner = None           # tk.StringVar on the settings tab
 
@@ -184,7 +185,26 @@ def _bookmarks(system, body):
                         and isinstance(lon, (int, float))):
                     points.append((lat, lon))
         _marks = (key, points)
-    return _marks[1]
+    now = time.monotonic()
+    _fresh[:] = [f for f in _fresh if now - f[4] < 2 * MARKS_S]
+    fresh = [(lat, lon) for s, b, lat, lon, _ in _fresh
+             if s == system and b == body and (lat, lon) not in _marks[1]]
+    return _marks[1] + fresh if fresh else _marks[1]
+
+
+def bookmarked(spot):
+    """A bookmark was just made: on the map now, not when its card is on disk.
+
+    The card renders on a worker thread, and until its sidecar is written and
+    read back the dot would be missing. Kept beside what is read from disk for
+    twice MARKS_S, by which time the sidecar has been read or the card failed.
+    """
+    global _drawn
+    lat, lon = spot.get("latitude"), spot.get("longitude")
+    if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+        return
+    _fresh.append((spot.get("system"), spot.get("planet_name"), lat, lon, time.monotonic()))
+    _drawn = None
 
 
 def _docked(system):
@@ -233,6 +253,7 @@ def stop():
             pass
     _window = _canvas = _handle = _placed = _photo = _drawn = _coverage = _saved = _marks = None
     _shown = _in_srv = _failed = False
+    _fresh.clear()
 
 
 # ---------------------------------------------------------------- settings

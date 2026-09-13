@@ -170,8 +170,8 @@ which way it is, and how many km² are painted.
   pixel. Hidden while the game is minimised or not the window in front;
   painting carries on meanwhile.
 - **Bookmarks show as red dots** on the body they were made on, smaller than a
-  droppoint. Bookmark is a click in EDMC, which hides the map; the new dot is
-  there when you are back in the game.
+  droppoint. A new bookmark is on the map the moment you press Bookmark. That
+  press is a click in EDMC, which hides the map until you are back in the game.
 - **Settings**: EDMC Settings, RhinoSpotter tab - the minimap on (default) or
   off, and top left, top right, bottom left or bottom right.
 - **Saved.** The painted area is written to

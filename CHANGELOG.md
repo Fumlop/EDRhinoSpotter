@@ -7,7 +7,8 @@
 - Bookmarks on the minimap: a red dot where each one on this body was made,
   smaller than a droppoint. On the saved `map N.png` too. The card sidecars are
   read again when the cards folder changes and every ten seconds, so a tick
-  costs one stat.
+  costs one stat. A bookmark made with the button is on the map at once, not
+  when its card has rendered.
 
 **Changed**
 
