@@ -235,19 +235,13 @@ See [INSTALL.md](INSTALL.md). Short version: unpack into
 sits directly inside, and restart EDMC.
 
 When a newer release is out, **Bookmark** reads **Update** instead and the
-status line names the version - checked at start and every hour after. Press
-it and the release is fetched and unpacked in place, then it reads **Restart
-EDMC**. There is no third button: the panel stays the same width in every
-state. The check reads GitHub's releases page, not its API, so a busy network
-does not hit the API's hourly limit.
+status line names the version. Press it and the release is fetched and
+unpacked in place, then it reads **Restart EDMC**. There is no third button:
+the panel stays the same width in every state.
 
-**On 2.9.0 to 4.0.0 and never saw Update?** Those versions could show it grey
-and unpressable when EDMC started docked. Download `RhinoSpotter-4.0.1.zip` (or
-newer) from the releases page and unpack it over the plugin folder once.
-
-Your exported `ground_rules.json` is kept, and bookmarks, maps and scans are
-never touched - they live under `%LOCALAPPDATA%\RhinoSpotter\`, not in the
-plugin folder.
+Your exported `ground_rules.json` is kept, and cards and scans are never
+touched - they live under `%LOCALAPPDATA%\RhinoSpotter\`, not in the plugin
+folder.
 
 ## Seeing it without flying anywhere
 
