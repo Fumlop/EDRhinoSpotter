@@ -259,16 +259,20 @@ def _pick_saved(found, body, lat, lon, skip=None):
 PICTURE_SIDE = int(round(MASK_PX * VIEW_M / REACH_M))
 
 
-def picture(mask, drops):
-    """The whole map as a PIL image, north up, droppoints numbered.
+def picture(mask, drops, marks=()):
+    """The whole map as a PIL image, north up, droppoints numbered, bookmarks
+    on it.
 
-    Takes a copy of the mask and the droppoints rather than the Coverage, so it
-    can run off the Tk thread while the SRV keeps painting.
+    Takes a copy of the mask, the droppoints and the bookmarks (metres) rather
+    than the Coverage, so it can run off the Tk thread while the SRV keeps
+    painting.
     """
     image = _draw_layer(mask, drops, PICTURE_SIDE)
+    scale = image.width / (2 * REACH_M)
+    _bookmarks(image, [(image.width / 2 + mx * scale, image.height / 2 - my * scale)
+                       for mx, my in marks], PICTURE_SIDE)
     draw = ImageDraw.Draw(image)
     font = spotcard._font("consola.ttf", 16)
-    scale = image.width / (2 * REACH_M)
     for number, (mx, my) in enumerate(drops, 1):
         dx, dy = image.width / 2 + mx * scale, image.height / 2 - my * scale
         draw.text((dx + PICTURE_SIDE * 0.035, dy - 8), str(number),
@@ -293,6 +297,19 @@ FILL = _mix(palette.BG, palette.ACCENT, 0.22)
 EDGE = _mix(palette.BG, palette.ACCENT, 0.85)
 # Earlier droppoints: still worth seeing, not where the ship is.
 DROP_OLD = _mix(palette.BG, palette.GOOD, 0.45)
+# Bookmarks: a colour nothing else on the map uses.
+MARK = palette.rgb(palette.ALERT)
+
+
+def _bookmarks(image, points, side):
+    """A dot per bookmark at these pixel positions. Radius 1.8% of the map side
+    against the latest droppoint's 3%: smaller than it, still a dot at 180 px."""
+    r = max(3.0, side * 0.018)
+    draw = ImageDraw.Draw(image)
+    for cx, cy in points:
+        if -r <= cx <= image.width + r and -r <= cy <= image.height + r:
+            draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=MARK,
+                         outline=palette.rgb(palette.BG))
 
 
 def _draw_layer(mask, drops, side):
@@ -361,11 +378,12 @@ def _marker(heading, size):
     return sprite
 
 
-def render(coverage, x, y, heading, side):
+def render(coverage, x, y, heading, side, marks=()):
     """The map, side x side, the SRV at (x, y) in the middle, north up.
 
-    A crop of the kept layer with the marker on top - the painting itself is
-    only redone when coverage.version moves.
+    A crop of the kept layer with the bookmarks and the marker on top - the
+    painting itself is only redone when coverage.version moves. `marks` are
+    bookmarks in metres from the first droppoint.
     """
     layer = coverage.layer(side)
     scale = side / (2 * VIEW_M)
@@ -373,6 +391,8 @@ def render(coverage, x, y, heading, side):
     top = int(round(layer.height / 2 - y * scale - side / 2))
     image = Image.new("RGB", (side, side), palette.rgb(palette.BG))
     image.paste(layer, (-left, -top))
+    _bookmarks(image, [(side / 2 + (mx - x) * scale, side / 2 - (my - y) * scale)
+                       for mx, my in marks], side)
     size = max(12, int(round(side * 0.09)))
     marker = _marker(heading, size)
     image.paste(marker, ((side - size) // 2, (side - size) // 2), marker)

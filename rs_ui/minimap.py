@@ -21,9 +21,10 @@ import base64
 import io
 import os
 import threading
+import time
 import tkinter as tk
 
-from rs_core import arrow, coverage, coverstore, guide, palette, spotmark, store
+from rs_core import arrow, cards, coverage, coverstore, guide, palette, spotcard, spotmark, store
 from rs_core.logging import logger
 from rs_ui import overlay
 
@@ -43,6 +44,9 @@ KEY = overlay.KEY
 # title bar. No map over the desktop then.
 MIN_GAME_HEIGHT = 200
 
+# Bookmarks are read again at least this often, seconds.
+MARKS_S = 10
+
 SW_HIDE = 0
 SW_SHOWNOACTIVATE = 4
 HWND_TOPMOST = -1
@@ -60,6 +64,7 @@ _saved = None            # (map, version, droppoints, location) last handed to _
 _writes = store.Debounced(write=coverstore.save)
 _in_srv = False
 _failed = False          # a draw that raised: stay down until the next launch
+_marks = None            # ((system, body, cards folder mtime), [(lat, lon), ...])
 _enabled = None          # tk.BooleanVar on the settings tab
 _corner = None           # tk.StringVar on the settings tab
 
@@ -88,7 +93,7 @@ def update(root, status, system=None):
         fix = coverage.srv_fix(status)
         if fix is None:
             if _in_srv:
-                _docked()
+                _docked(system)
             _in_srv = _failed = False
             hide()
             return
@@ -118,7 +123,9 @@ def update(root, status, system=None):
 def _show_map(root, status, system, lat, lon, heading, in_reach, body):
     global _drawn
     rect = overlay._game_rect()
-    if rect and rect[3] - rect[1] < MIN_GAME_HEIGHT:
+    if not overlay.game_focused() or (rect and rect[3] - rect[1] < MIN_GAME_HEIGHT):
+        # Alt-tabbed out, or minimised: nothing over the desktop. Painting
+        # carries on; only the window goes.
         hide()
         return
     if not _build(root):
@@ -127,14 +134,15 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
     where = corner()
     x, y = _coverage.xy(lat, lon)
     header = _header(status, body, system)
+    marks = tuple(_coverage.xy(mlat, mlon) for mlat, mlon in _bookmarks(system, body))
     # What a picture is of, at the precision it is drawn at: a map pixel of
     # movement and a frame of the marker. Anything finer redraws for nothing.
     per_px = 2 * coverage.VIEW_M / side
     state = (int(x // per_px), int(y // per_px),
              None if heading is None else arrow.bucket(heading),
-             side, where, in_reach, header, _coverage.version, len(_coverage.drops))
+             side, where, in_reach, header, _coverage.version, len(_coverage.drops), marks)
     if state != _drawn:
-        _draw(side, x, y, heading, in_reach, header)
+        _draw(side, x, y, heading, in_reach, header, marks)
         _drawn = state
     _place(side, where, rect)
 
@@ -151,7 +159,35 @@ def _remember():
     _saved = state
 
 
-def _docked():
+def _bookmarks(system, body):
+    """[(lat, lon), ...] of the bookmarks on this body.
+
+    Read again when the cards folder changes - a card written or deleted moves
+    its modified time - and every MARKS_S besides: the card is written on a
+    worker thread, a read that lands between the sidecar being created and
+    filled skips it, and filling it does not move the folder's time.
+    """
+    global _marks
+    if not system or not body:
+        return []
+    try:
+        stamp = os.stat(spotcard.card_dir(system)).st_mtime_ns
+    except OSError:
+        stamp = None
+    key = (system, body, stamp, int(time.monotonic() // MARKS_S))
+    if _marks is None or _marks[0] != key:
+        points = []
+        if stamp is not None:
+            for record in cards.for_system(system):
+                lat, lon = record.get("latitude"), record.get("longitude")
+                if (record.get("planet_name") == body and isinstance(lat, (int, float))
+                        and isinstance(lon, (int, float))):
+                    points.append((lat, lon))
+        _marks = (key, points)
+    return _marks[1]
+
+
+def _docked(system):
     """The SRV is back in the ship: the points written now, and the picture
     drawn off the Tk thread - 70 to 160 ms measured, and nothing waits for it."""
     _writes.flush()
@@ -159,10 +195,11 @@ def _docked():
         return
     body, name = _coverage.body, _coverage.name
     mask, drops = _coverage.mask.copy(), list(_coverage.drops)
+    marks = [_coverage.xy(lat, lon) for lat, lon in _bookmarks(system, body)]
 
     def draw():
         try:
-            coverstore.save_png(body, name, coverage.picture(mask, drops))
+            coverstore.save_png(body, name, coverage.picture(mask, drops, marks))
         except Exception:
             logger.exception(f"minimap: could not draw the picture of {name} on {body}")
 
@@ -187,14 +224,14 @@ def hide():
 def stop():
     """EDMC is closing: the window goes, the map is written first."""
     global _window, _canvas, _handle, _shown, _placed, _photo, _drawn
-    global _coverage, _saved, _in_srv, _failed
+    global _coverage, _saved, _in_srv, _failed, _marks
     _writes.flush()
     if _window is not None:
         try:
             _window.destroy()
         except tk.TclError:
             pass
-    _window = _canvas = _handle = _placed = _photo = _drawn = _coverage = _saved = None
+    _window = _canvas = _handle = _placed = _photo = _drawn = _coverage = _saved = _marks = None
     _shown = _in_srv = _failed = False
 
 
@@ -333,10 +370,10 @@ def _header(status, body, system):
     return f"loc {index}  {short}" if index is not None else short
 
 
-def _draw(side, x, y, heading, in_reach, header):
+def _draw(side, x, y, heading, in_reach, header, marks=()):
     global _photo
     unit, pad, band, width, height = _layout(side)
-    image = coverage.render(_coverage, x, y, heading, side)
+    image = coverage.render(_coverage, x, y, heading, side, marks)
     data = io.BytesIO()
     image.save(data, "PNG", compress_level=1)
     _photo = tk.PhotoImage(data=base64.b64encode(data.getvalue()))

@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.2.0
+
+**Added**
+
+- Bookmarks on the minimap: a red dot where each one on this body was made,
+  smaller than a droppoint. On the saved `map N.png` too. The card sidecars are
+  read again when the cards folder changes and every ten seconds, so a tick
+  costs one stat.
+
+**Changed**
+
+- The minimap and the guide arrow hide while Elite is not the window in front -
+  alt-tabbed out, EDMC clicked, or the game not running - and come back with
+  SW_SHOWNOACTIVATE, so they do not take focus from the game. Painting carries
+  on while hidden. The arrow's ten-second message starts again when you come
+  back from alt-tabbing, and still runs out with the game not started.
+- Up to a second before the minimap hides or returns, half a second for the
+  arrow: they follow the polls they already had.
+
 ## 3.1.0
 
 **Added**

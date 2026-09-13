@@ -9,8 +9,8 @@ Nothing is saved and nothing is sent anywhere.
 
 Borderless and windowed are what this is built for. Fullscreen usually works
 too - Windows turns most of it into a flip-model borderless behind the scenes,
-which is why other overlays manage it - so the arrow is put up either way and
-parks itself on the screen when the game window cannot be found. The one thing
+which is why other overlays manage it - so the arrow is put up either way. It
+hides while Elite is not the window in front, game not running included. The one thing
 it cannot do anything about is the heading: without one from the game the
 arrow can only point north-up, and it says so.
 
@@ -45,6 +45,7 @@ NOTICE_MS = 10000
 # The Elite window carries this title in every build so far; the window class
 # has not been as stable.
 GAME_TITLE = "Elite - Dangerous (CLIENT)"
+GAME_TITLE_PREFIX = "Elite - Dangerous"
 
 FG = palette.FG
 DIM = palette.MUTED
@@ -60,6 +61,7 @@ _placed = None           # the last geometry, so the game standing still is free
 _on_stop = None          # the row that started this, to redraw when it ends
 _since = None            # when the current no-arrow state began
 _pointed = False         # whether this run ever drew an arrow
+_hidden = False          # hidden because Elite is not the window in front
 _frames = {}             # (bucket, colour) -> PhotoImage, built as angles come up
 
 
@@ -145,9 +147,9 @@ def _cancel():
 
 def stop():
     """Take it down. Safe to call when nothing is up."""
-    global _window, _canvas, _target, _after, _placed, _on_stop, _since, _pointed
+    global _window, _canvas, _target, _after, _placed, _on_stop, _since, _pointed, _hidden
     _cancel()
-    _pointed = False
+    _pointed = _hidden = False
     if _window is not None and _window.winfo_exists():
         _window.destroy()
     _window = _canvas = _target = _after = _placed = _since = None
@@ -163,6 +165,16 @@ def _tick():
     """One reading, drawn, and the next one booked."""
     global _after, _since, _pointed
     if _window is None or not _window.winfo_exists():
+        return
+    focused = game_focused()
+    # Not in front: nothing over the desktop or another window.
+    _show(focused)
+    if not focused and _game_rect() is not None:
+        # Alt-tabbed out of a running game. A message nobody can see is not
+        # being read, so its clock waits. With no game at all it runs, and a
+        # Guide pressed before launching still gives up after ten seconds.
+        _since = None
+        _after = _window.after(POLL_MS, _tick)
         return
     reading = guide.fix(spotmark.read_status(), _target or {})
 
@@ -180,8 +192,9 @@ def _tick():
             return
 
     try:
-        _place()
-        _draw(reading)
+        if focused:
+            _place()
+            _draw(reading)
     except Exception:
         # Same rule as building it: an arrow that cannot be drawn is one the
         # commander does without, not a traceback every half second.
@@ -194,7 +207,8 @@ def _tick():
 # ---------------------------------------------------------------- placement
 
 def _place():
-    """Top middle of the Elite window, or of the screen when it is not there.
+    """Top middle of the Elite window, or of the screen when it is not there -
+    which, with the arrow hidden unless Elite is in front, is off Windows only.
 
     Re-read every tick rather than once: the game gets moved and alt-tabbed,
     and an arrow left behind on the desktop is worse than one that follows.
@@ -217,6 +231,37 @@ def _place():
     # that was over it is then behind it with nothing to say so.
     _window.attributes("-topmost", True)
     _window.lift()
+
+
+def game_focused():
+    """Whether Elite is the window in front. Not running counts as not in
+    front; off Windows there is no asking, so it is always in front."""
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+    except (ImportError, AttributeError, OSError):
+        return True
+    # By title prefix, as EDMC's own hotkey code does: an exact title that one
+    # build changes would keep the arrow and the map down for good.
+    buffer = ctypes.create_unicode_buffer(64)
+    user32.GetWindowTextW(user32.GetForegroundWindow(), buffer, 64)
+    return buffer.value.startswith(GAME_TITLE_PREFIX)
+
+
+def _show(visible):
+    """Hide or show without activating. Tk's deiconify takes the foreground,
+    and that would take it from the game the moment it came back."""
+    global _hidden
+    if visible != _hidden:
+        return
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+        handle = user32.GetParent(_window.winfo_id()) or _window.winfo_id()
+        user32.ShowWindow(handle, 4 if visible else 0)   # SW_SHOWNOACTIVATE, SW_HIDE
+    except (ImportError, AttributeError, OSError):
+        return
+    _hidden = not visible
 
 
 def _game_rect():

@@ -243,6 +243,12 @@ def minimap_image(root, scale):
             "Destination": {"Name": "$SAA_Unknown_Signal:#index=22;"},
         }
 
+    # Two bookmarks on the body, where the drive went past them.
+    was_marks = minimap._bookmarks
+    minimap._bookmarks = lambda system, body: [
+        (reading(x, y, 0, 0)["Latitude"], reading(x, y, 0, 0)["Longitude"])
+        for x, y in ((2000, 1500), (-900, -6300))]
+
     for track in launches:
         for (x1, y1), (x2, y2) in zip(track, track[1:]):
             steps = int(math.hypot(x2 - x1, y2 - y1) // 30)
@@ -262,6 +268,7 @@ def minimap_image(root, scale):
     shot = Image.open(path)
     shot.crop((0, 0, shot.width, shot.height - int(6 * scale))).save(path)
     minimap.stop()
+    minimap._bookmarks = was_marks
     overlay._game_rect = was_rect
 
 if __name__ == "__main__":
@@ -272,4 +279,7 @@ if __name__ == "__main__":
     # the commander's folder.
     with tempfile.TemporaryDirectory(prefix="rhinospotter-docs-") as scratch:
         coverstore.ROOT = scratch
+        # The overlays hide while Elite is not the window in front, and while
+        # this runs the terminal that started it is.
+        overlay.game_focused = lambda: True
         main_images()

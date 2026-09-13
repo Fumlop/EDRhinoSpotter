@@ -165,8 +165,11 @@ Everything in here imports tkinter.
   that eats a click will eat the wrong one. Parked at the top middle of the
   Elite window and re-placed every tick, because the game gets moved, and told
   it is topmost again on every one of those, because a game going fullscreen
-  takes the top of the Z-order with it. No Elite window found means the middle
-  of the screen rather than nothing. Polls Status.json twice a second; guiding
+  takes the top of the Z-order with it. Hidden while Elite is not the
+  foreground window (`game_focused`, shared with the minimap), shown again with
+  SW_SHOWNOACTIVATE so coming back does not take the game's focus; a message's
+  ten seconds start again after an alt-tab, and run out with no game at all.
+  Foreground is matched on the title prefix `Elite - Dangerous`, as EDMC does. Polls Status.json twice a second; guiding
   outlives the scan window, which is why it hangs off the root and not off the
   window that started it. It draws `rs_core.arrow`'s frames through PNG bytes
   rather than PIL's ImageTk, which is the one part of PIL that EDMC's build
@@ -194,6 +197,8 @@ Everything in here imports tkinter.
   goes to a two-second `store.Debounced`, flushed when the map changes, when
   the SRV docks and at plugin_stop; docking also draws `coverage.picture` on a
   thread. The settings tab counts the saved maps and opens their folder.
+  Bookmarks on the body are drawn as dots, read from the card sidecars again
+  when the cards folder's modified time moves, and every ten seconds.
 
 ## Tests (`rs_tests/`)
 

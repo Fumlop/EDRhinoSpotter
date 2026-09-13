@@ -297,6 +297,28 @@ class TestRender:
         assert north == coverage.FILL
         assert south == palette.rgb(palette.BG)
 
+    def test_a_bookmark_is_a_dot_where_it_is(self):
+        side = 240
+        per_m = side / (2 * coverage.VIEW_M)
+        image = coverage.render(fresh(), 0, 0, None, side, marks=[(3000, -2000)])
+        assert self.pixel(image, side / 2 + 3000 * per_m, side / 2 + 2000 * per_m) == coverage.MARK
+        assert self.pixel(image, side / 2 - 3000 * per_m, side / 2 + 2000 * per_m) != coverage.MARK
+
+    def test_a_bookmark_is_smaller_than_the_droppoint(self):
+        side = 240
+        image = coverage.render(fresh(), 5000, 0, None, side, marks=[(0, 0)])
+        dot = sum(1 for i in range(side) for j in range(side)
+                  if image.getpixel((i, j)) == coverage.MARK)
+        diamond = (2 * side * 0.03) ** 2 / 2          # the latest droppoint's area
+        assert 0 < dot < diamond
+
+    def test_the_picture_carries_the_bookmarks(self):
+        cover = fresh()
+        image = coverage.picture(cover.mask.copy(), list(cover.drops), marks=[(4000, 4000)])
+        scale = image.width / (2 * coverage.REACH_M)
+        assert image.getpixel((int(image.width / 2 + 4000 * scale),
+                               int(image.height / 2 - 4000 * scale))) == coverage.MARK
+
     def test_the_bearing_to_a_droppoint(self):
         assert coverage.bearing(0, 1000, 0, 0) == pytest.approx(180)
         assert coverage.bearing(1000, 0, 0, 0) == pytest.approx(270)
