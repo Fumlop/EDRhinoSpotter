@@ -5,6 +5,8 @@
 **Changed**
 
 - The minimap is 85% opaque: the game shows faintly through it.
+- Two thin rings around the latest droppoint, at 2 and 4 km: one scan radius
+  and two. On the saved map picture too.
 
 ## 3.4.0
 

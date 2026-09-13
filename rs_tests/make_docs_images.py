@@ -225,6 +225,9 @@ def minimap_image(root, scale):
     """
     was_rect = overlay._game_rect
     overlay._game_rect = lambda: (0, 0, 1920, 1080)
+    # Opaque for the picture: at the real 85% the grab carries whatever window
+    # is behind the map.
+    was_alpha, minimap.MAP_ALPHA = minimap.MAP_ALPHA, 1.0
     radius = 1738000.0
     per_degree = radius * math.pi / 180.0
     lat0, lon0 = 12.3400, -98.7700
@@ -269,6 +272,7 @@ def minimap_image(root, scale):
     shot.crop((0, 0, shot.width, shot.height - int(6 * scale))).save(path)
     minimap.stop()
     minimap._bookmarks = was_marks
+    minimap.MAP_ALPHA = was_alpha
     overlay._game_rect = was_rect
 
 if __name__ == "__main__":

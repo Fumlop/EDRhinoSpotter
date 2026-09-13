@@ -50,6 +50,9 @@ STAMP_M = 250.0
 # Grid lines, pinned to the droppoint so they move with the ground.
 GRID_M = 1000.0
 
+# Thin rings around the latest droppoint: one scan radius and two.
+RANGE_RINGS_M = (SCAN_RADIUS_M, 2 * SCAN_RADIUS_M)
+
 # How big the map is drawn, as a share of the game window's height, and the
 # limits either side - a laptop window should not get a stamp, a 4K screen
 # should not get a poster.
@@ -290,6 +293,7 @@ FILL = _mix(palette.BG, palette.ACCENT, 0.22)
 EDGE = _mix(palette.BG, palette.ACCENT, 0.85)
 # Earlier droppoints: still worth seeing, not where the ship is.
 DROP_OLD = _mix(palette.BG, palette.GOOD, 0.45)
+RING = _mix(palette.BG, palette.GOOD, 0.4)
 # Bookmarks: a colour nothing else on the map uses.
 MARK = palette.rgb(palette.ALERT)
 
@@ -340,6 +344,14 @@ def _draw_layer(mask, drops, side):
 
     # Where the mask ends - past it nothing is painted.
     draw.rectangle([0, 0, big - 1, big - 1], outline=palette.rgb(palette.WARN), width=SS)
+
+    # Scan range around the latest droppoint, one and two discs out: what the
+    # scanner covers from the ship, and from one disc further. A pixel wide
+    # after the reduce, and dim - a scale, not a claim.
+    dx, dy = at(*drops[-1])
+    for radius_m in RANGE_RINGS_M:
+        r = radius_m * scale
+        draw.ellipse([dx - r, dy - r, dx + r, dy + r], outline=RING, width=SS)
 
     for number, (mx, my) in enumerate(drops, 1):
         latest = number == len(drops)

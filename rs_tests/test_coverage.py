@@ -321,6 +321,21 @@ class TestRender:
                        if image.getpixel((i, j)) == coverage.MARK)
         assert red([(1500, 0, "T")]) > red([(1500, 0)]) + 10
 
+    def test_scan_range_rings_around_the_latest_droppoint(self):
+        side = 240
+        per_m = side / (2 * coverage.VIEW_M)
+        image = coverage.render(fresh(), 0, 0, None, side)
+
+        def ring_near(radius_m):
+            # Along a diagonal, off the grid lines, a pixel either side.
+            d = radius_m * per_m / math.sqrt(2)
+            # Reduced from twice the size, so blended with the background.
+            bg = palette.rgb(palette.BG)
+            return any(self.pixel(image, side / 2 + d + k, side / 2 - d - k) != bg
+                       for k in (-1, 0, 1))
+        assert ring_near(2000) and ring_near(4000)
+        assert not ring_near(3000)
+
     def test_the_picture_carries_the_bookmarks(self):
         cover = fresh()
         image = coverage.picture(cover.mask.copy(), list(cover.drops), marks=[(4000, 4000)])
