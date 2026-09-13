@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="280" viewBox="0 0 720 280" role="img" aria-labelledby="t">
+  <title id="t">RhinoSpotter - binoculars spotting a rhino</title>
+  <defs>
+    <linearGradient id="lens" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b8e4f7"/>
+      <stop offset="1" stop-color="#3b7fa3"/>
+    </linearGradient>
+    <linearGradient id="hide" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9fb3cf"/>
+      <stop offset="1" stop-color="#6d84a6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffd43b" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#ffd43b" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect x="2" y="2" width="716" height="276" rx="22" fill="#0f1419" stroke="#2a3744" stroke-width="3"/>
+
+  <!-- the spot the binoculars are on -->
+  <ellipse cx="505" cy="150" rx="190" ry="120" fill="url(#glow)"/>
+
+  <!-- sight lines -->
+  <g stroke="#ffd43b" stroke-width="3" stroke-dasharray="10 9" stroke-linecap="round" opacity="0.55">
+    <line x1="232" y1="92" x2="372" y2="118"/>
+    <line x1="232" y1="160" x2="372" y2="176"/>
+  </g>
+
+  <!-- binoculars -->
+  <g transform="rotate(-6 150 130)" stroke="#0b0f14" stroke-width="5" stroke-linejoin="round">
+    <rect x="44" y="68" width="30" height="42" rx="8" fill="#2a3744"/>
+    <rect x="44" y="140" width="30" height="42" rx="8" fill="#2a3744"/>
+    <rect x="70" y="58" width="150" height="62" rx="20" fill="#1c2632"/>
+    <rect x="70" y="130" width="150" height="62" rx="20" fill="#1c2632"/>
+    <rect x="118" y="108" width="52" height="34" rx="8" fill="#2a3744"/>
+    <rect x="88" y="66" width="18" height="46" rx="4" fill="#87ceeb" stroke-width="0" opacity="0.35"/>
+    <rect x="88" y="138" width="18" height="46" rx="4" fill="#87ceeb" stroke-width="0" opacity="0.35"/>
+    <ellipse cx="222" cy="89" rx="16" ry="31" fill="url(#lens)"/>
+    <ellipse cx="222" cy="161" rx="16" ry="31" fill="url(#lens)"/>
+    <ellipse cx="216" cy="78" rx="4" ry="9" fill="#ffffff" stroke-width="0" opacity="0.85"/>
+    <ellipse cx="216" cy="150" rx="4" ry="9" fill="#ffffff" stroke-width="0" opacity="0.85"/>
+  </g>
+
+  <!-- rhino -->
+  <g stroke="#0b0f14" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+    <ellipse cx="505" cy="236" rx="140" ry="12" fill="#000000" stroke-width="0" opacity="0.35"/>
+    <!-- tail -->
+    <path d="M640 150 q26 -6 22 20" fill="none"/>
+    <circle cx="662" cy="172" r="6" fill="#0b0f14" stroke-width="0"/>
+    <!-- legs -->
+    <rect x="468" y="190" width="30" height="44" rx="10" fill="#6d84a6"/>
+    <rect x="512" y="192" width="30" height="42" rx="10" fill="#6d84a6"/>
+    <rect x="578" y="192" width="30" height="42" rx="10" fill="#6d84a6"/>
+    <rect x="618" y="188" width="30" height="46" rx="10" fill="#6d84a6"/>
+    <!-- body -->
+    <ellipse cx="560" cy="160" rx="100" ry="58" fill="url(#hide)"/>
+    <path d="M530 118 q20 -10 44 0" fill="none" stroke-width="3" opacity="0.5"/>
+    <path d="M600 132 q18 -4 30 8" fill="none" stroke-width="3" opacity="0.5"/>
+    <!-- head -->
+    <ellipse cx="452" cy="148" rx="58" ry="44" fill="url(#hide)"/>
+    <path d="M488 112 l8 -30 l18 30 z" fill="#8ea3c1"/>
+    <path d="M495 104 l4 -12 l7 12 z" fill="#ff9aa2" stroke-width="0"/>
+    <!-- snout -->
+    <ellipse cx="404" cy="168" rx="36" ry="28" fill="#9fb3cf"/>
+    <!-- horns -->
+    <path d="M392 146 C380 116 372 92 360 66 C392 86 412 116 420 142 Z" fill="#f4f8ff"/>
+    <path d="M428 124 C424 110 424 100 428 88 C440 100 446 112 446 124 Z" fill="#f4f8ff"/>
+    <!-- eye, looking back at the binoculars -->
+    <circle cx="446" cy="138" r="13" fill="#ffffff"/>
+    <circle cx="440" cy="136" r="6" fill="#0b0f14" stroke-width="0"/>
+    <circle cx="438" cy="133" r="2" fill="#ffffff" stroke-width="0"/>
+    <path d="M430 116 q14 -10 30 -2" fill="none" stroke-width="4"/>
+    <!-- nostril and grin -->
+    <ellipse cx="386" cy="170" rx="4" ry="6" fill="#0b0f14" stroke-width="0"/>
+    <path d="M396 184 q14 12 30 2" fill="none" stroke-width="4"/>
+    <!-- spotted! -->
+    <path d="M338 70 l10 22" fill="none" stroke="#ffd43b" stroke-width="6"/>
+    <path d="M322 92 l18 12" fill="none" stroke="#ffd43b" stroke-width="6"/>
+    <path d="M356 58 l2 24" fill="none" stroke="#ffd43b" stroke-width="6"/>
+  </g>
+
+  <!-- a bookmark on the ground beside it -->
+  <g stroke="#0b0f14" stroke-width="3">
+    <circle cx="352" cy="228" r="9" fill="#ff8080"/>
+  </g>
+
+  <!-- name -->
+  <text x="40" y="244" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#e8f2ff">Rhino<tspan fill="#87ceeb">Spotter</tspan></text>
+  <text x="42" y="266" font-family="Consolas, Menlo, monospace" font-size="14" fill="#7c95b8">surface mining for EDMC</text>
+</svg>
