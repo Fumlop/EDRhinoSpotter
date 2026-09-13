@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="docs/logo.svg" width="600" alt="RhinoSpotter - a rhino seen through binoculars">
+  <img src="docs/logo.png" width="300" alt="RhinoSpotter, EDMC Plugin - a rhino seen through binoculars">
 </h1>
 
 EDMC plugin for Elite Dangerous surface mining. Two buttons.
