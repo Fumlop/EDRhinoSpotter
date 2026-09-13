@@ -27,7 +27,11 @@ _system = ""
 _cmdr = None
 _card_token = 0          # only the newest render may write to the status line
 
-_register = bodies.Register(on_change=store.save, on_arrive=store.load)
+# One write per burst rather than one per body. A honk is forty-odd changes
+# that all say the same file, and the last of them is the only one worth
+# having - see store.Debounced for what a crash costs.
+_writes = store.Debounced()
+_register = bodies.Register(on_change=_writes, on_arrive=store.load)
 _sheet = None            # rs_core.grounds.Sheet, read once at startup
 
 _frame = None
@@ -274,6 +278,9 @@ def stop():
     global _landed_after, _done_after
     _landed_after = _cancel_landed()
     _done_after = _cancel_done()
+    # Last, and not through the timer: EDMC is going, and a scan waiting on a
+    # two-second thread would go with it.
+    _writes.flush()
 
 
 def _focus():

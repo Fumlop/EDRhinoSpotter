@@ -72,6 +72,12 @@ No tkinter anywhere in here.
   is watching and nothing older, so a system honked last week is otherwise
   gone. Written through a temp file and a rename: EDMC can be closed at any
   moment, and a half-written cache that still parses is worse than none.
+  `Debounced` is what the panel hands the register instead of `save`: a honk
+  is one change per body and all of them rewrite the same file, so the first
+  starts a two-second timer and the last one before it fires is what gets
+  written. The timer is not restarted by the changes after it - a sweep longer
+  than the delay is written as it goes rather than held until it ends - and
+  `flush()` at plugin_stop means a normal shutdown loses nothing.
 - **[replay.py](rs_core/replay.py)** - recent journals through the same
   Register the live plugin uses, and a score for what they found. Every
   landable body is worth the best rate its ground has ever shown and the
@@ -197,7 +203,9 @@ Everything in here imports tkinter.
   not lose the first, and that a ground the sheet never measured is worth
   nothing rather than guessed at.
 - **test_store.py** - round trip, system names Explorer refuses, an older
-  cache shape, and that no temporary file survives a save.
+  cache shape, that no temporary file survives a save, and the debounce: a
+  burst is one write, the last change is the one written, flush takes the
+  pending write with it, and a burst longer than the delay still reaches disk.
 - **test_update.py** - version comparison, that every network failure is the
   same silent no-answer, and the installer: a zip from somewhere else and a
   truncated download both change nothing, a replaced directory loses the

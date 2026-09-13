@@ -12,6 +12,10 @@
   than raising when it cannot be built at all.
 - The scan window measures each font once instead of once per label: 31 ms
   down to 14 on a well-scanned system.
+- A honk is written once every two seconds instead of once per body. Replaying
+  the 45 landable scans of Col 285 Sector LM-V d2-73: 44 writes down to 5, the
+  same 23 bodies on disk. A hard crash now costs the last two seconds of
+  scanning; EDMC closing normally costs nothing.
 
 **Removed**
 

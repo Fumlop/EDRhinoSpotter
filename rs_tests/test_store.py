@@ -1,6 +1,7 @@
 """The per-system cache: the commander's own scans, going to disk and back."""
 
 import json
+import time
 
 import pytest
 
@@ -83,3 +84,67 @@ class TestBadData:
         would be a half-written system nobody ever cleans up."""
         store.save("Andel", BODIES, root=str(tmp_path))
         assert [p.name for p in tmp_path.iterdir()] == ["Andel.json"]
+
+
+class TestDebounced:
+    """A burst of changes, written once. The timer is a real one, so the
+    delays here are short and the waits are generous multiples of them."""
+
+    def counter(self):
+        calls = []
+        return calls, lambda *args, **kwargs: calls.append(args) or "written"
+
+    def test_a_burst_is_one_write(self):
+        calls, write = self.counter()
+        debounced = store.Debounced(delay=0.05, write=write)
+        for index in range(45):
+            debounced("Andel", BODIES[:1] * index)
+        assert calls == []                      # nothing yet - that is the point
+        time.sleep(0.3)
+        assert len(calls) == 1
+
+    def test_the_last_change_is_the_one_written(self):
+        calls, write = self.counter()
+        debounced = store.Debounced(delay=0.05, write=write)
+        debounced("Andel", BODIES[:1])
+        debounced("Andel", BODIES)
+        time.sleep(0.3)
+        assert calls == [("Andel", BODIES)]
+
+    def test_flush_writes_now(self):
+        calls, write = self.counter()
+        debounced = store.Debounced(delay=30, write=write)
+        debounced("Andel", BODIES)
+        assert debounced.flush() == "written"
+        assert len(calls) == 1
+
+    def test_flush_takes_the_pending_write_with_it(self):
+        # Otherwise shutdown writes once and the timer writes again after.
+        calls, write = self.counter()
+        debounced = store.Debounced(delay=0.05, write=write)
+        debounced("Andel", BODIES)
+        debounced.flush()
+        time.sleep(0.3)
+        assert len(calls) == 1
+
+    def test_flush_with_nothing_waiting_does_nothing(self):
+        calls, write = self.counter()
+        debounced = store.Debounced(delay=0.05, write=write)
+        assert debounced.flush() is None
+        assert calls == []
+
+    def test_a_burst_longer_than_the_delay_still_reaches_disk(self):
+        # The timer is not restarted by every change, so a long sweep is
+        # written as it goes rather than held until it ends.
+        calls, write = self.counter()
+        debounced = store.Debounced(delay=0.05, write=write)
+        for _ in range(3):
+            debounced("Andel", BODIES)
+            time.sleep(0.15)
+        assert len(calls) >= 2
+
+    def test_it_drops_in_where_save_was(self, tmp_path):
+        debounced = store.Debounced(delay=0.05)
+        debounced("Andel", BODIES, root=str(tmp_path))
+        debounced.flush()
+        assert store.load("Andel", root=str(tmp_path)) == BODIES
