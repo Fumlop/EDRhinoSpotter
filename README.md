@@ -169,7 +169,13 @@ which way it is, and how many km² are painted.
   while the game is minimised.
 - **Settings**: EDMC Settings, RhinoSpotter tab - the minimap on (default) or
   off, and top left, top right, bottom left or bottom right.
-- The painted area is kept in memory. Restarting EDMC starts a clean map.
+- **Saved.** The painted area is written to
+  `%LOCALAPPDATA%\RhinoSpotter\coverage\<Body>\` as the points it was painted
+  from, and a launch within 22 km of a saved map on that body carries it on,
+  EDMC restarts included. Each time the SRV goes back into the ship the whole
+  map is also saved as a picture beside it, `map N.png`, 880 px at 50 m a
+  pixel. The Settings tab shows how many maps there are and how much space
+  they take, with a button to open the folder.
 
 ## Install
 

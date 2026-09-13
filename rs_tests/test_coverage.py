@@ -168,6 +168,98 @@ class TestFollow:
         assert cover.version == version + 1
 
 
+def drive(cover, track):
+    """Fixes along the track, at the six decimals Status.json gives. A saved
+    point is rounded to six, so finer input would repaint a few edge pixels
+    differently - 3 of 774,400 when this was not rounded."""
+    for (x1, y1), (x2, y2) in zip(track, track[1:]):
+        steps = int(math.hypot(x2 - x1, y2 - y1) // 30)
+        for i in range(steps + 1):
+            lat, lon = at(x1 + (x2 - x1) * i / steps, y1 + (y2 - y1) * i / steps)
+            cover.add(round(lat, 6), round(lon, 6))
+
+
+@pytest.mark.unit
+class TestSaved:
+
+    def fix(self, **kwargs):
+        return coverage.srv_fix(status(**kwargs))
+
+    def driven(self):
+        cover = coverage.follow(None, self.fix(), was_in_srv=False)
+        drive(cover, [(0, 0), (6000, 2000), (3000, -5000), (-4000, -1000)])
+        cover.launched(*at(5000, 5000))
+        drive(cover, [(5000, 5000), (9000, 8000)])
+        return cover
+
+    def test_the_points_repaint_the_same_mask(self):
+        cover = self.driven()
+        back = coverage.Coverage.from_dict("A 2", cover.to_dict(), "map 1")
+        assert back.mask.tobytes() == cover.mask.tobytes()
+        flat = lambda drops: [v for drop in drops for v in drop]
+        assert flat(back.drops) == pytest.approx(flat(cover.drops), abs=0.1)
+        assert back.name == "map 1"
+
+    def test_only_new_ground_is_kept(self):
+        cover = fresh()
+        drive(cover, [(0, 0), (4000, 0), (0, 0)])
+        # Out and back: the way back paints nothing new.
+        stamps = len(cover.stamps)
+        drive(cover, [(0, 0), (4000, 0)])
+        assert len(cover.stamps) == stamps
+
+    def test_not_a_map_is_none(self):
+        assert coverage.Coverage.from_dict("A 2", {"origin": "x"}) is None
+        assert coverage.Coverage.from_dict("A 2", {}) is None
+
+    def test_a_launch_within_reach_carries_the_saved_map_on(self):
+        cover = self.driven()
+        saved = lambda body: [("map 1", cover.to_dict())] if body == "A 2" else []
+        again = coverage.follow(None, self.fix(x=8000, y=-3000), was_in_srv=False, saved=saved)
+        assert again.name == "map 1"
+        assert again.painted_km2() == pytest.approx(cover.painted_km2())
+        assert len(again.drops) == len(cover.drops) + 1
+
+    def test_a_launch_out_of_reach_is_a_new_map(self):
+        cover = self.driven()
+        saved = lambda body: [("map 1", cover.to_dict())]
+        again = coverage.follow(None, self.fix(x=coverage.REACH_M + 1000), was_in_srv=False,
+                                saved=saved)
+        assert again.name is None and again.painted_km2() == 0
+
+    def test_the_nearest_saved_map_wins(self):
+        near = coverage.Coverage("A 2", *at(2000, 0), RADIUS)
+        far = coverage.Coverage("A 2", *at(-15000, 0), RADIUS)
+        saved = lambda body: [("map 1", far.to_dict()), ("map 2", near.to_dict())]
+        assert coverage.follow(None, self.fix(), was_in_srv=False, saved=saved).name == "map 2"
+
+    def test_the_last_saved_map_wins_over_the_nearest(self):
+        # What EDMC would have had in memory, so a restart does not split the
+        # ground across two files.
+        near = dict(coverage.Coverage("A 2", *at(2000, 0), RADIUS).to_dict(), saved=100.0)
+        far = dict(coverage.Coverage("A 2", *at(-15000, 0), RADIUS).to_dict(), saved=200.0)
+        saved = lambda body: [("map 1", near), ("map 2", far)]
+        assert coverage.follow(None, self.fix(), was_in_srv=False, saved=saved).name == "map 2"
+
+    def test_a_nearest_map_that_will_not_load_gives_way(self):
+        near = dict(coverage.Coverage("A 2", *at(2000, 0), RADIUS).to_dict(), stamps="broken")
+        far = coverage.Coverage("A 2", *at(-15000, 0), RADIUS).to_dict()
+        saved = lambda body: [("map 1", far), ("map 2", near)]
+        assert coverage.follow(None, self.fix(), was_in_srv=False, saved=saved).name == "map 1"
+
+    def test_another_bodys_map_of_the_same_name_is_not_skipped(self):
+        # 'map 1' on A 3 and 'map 1' on A 2 are different files.
+        other = coverage.follow(None, self.fix(body="A 3"), was_in_srv=False)
+        other.name = "map 1"
+        saved = lambda body: [("map 1", fresh().to_dict())] if body == "A 2" else []
+        assert coverage.follow(other, self.fix(), was_in_srv=True, saved=saved).name == "map 1"
+
+    def test_the_picture_is_the_whole_mask_at_mask_size(self):
+        cover = self.driven()
+        image = coverage.picture(cover.mask.copy(), list(cover.drops))
+        assert image.size == (coverage.MASK_PX, coverage.MASK_PX)
+
+
 @pytest.mark.unit
 class TestScale:
 

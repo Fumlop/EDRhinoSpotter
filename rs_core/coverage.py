@@ -22,7 +22,7 @@ import math
 
 from PIL import Image, ImageDraw, ImageFilter
 
-from rs_core import arrow, measure, palette
+from rs_core import arrow, measure, palette, spotcard
 
 # Status.json Flags bit for "in the SRV", as EDMC's edmc_data names it.
 IN_SRV = 0x4000000
@@ -97,8 +97,47 @@ class Coverage:
         # Where the SRV came out of the ship, in metres from the first of them.
         # The last one is where the ship is now.
         self.drops = [(0.0, 0.0)]
+        # What goes to disk: the droppoints, and every point that painted new
+        # ground, as (lat, lon). A point that painted nothing new adds nothing
+        # to a repaint either.
+        self.drop_fixes = [(lat, lon)]
+        self.stamps = []
+        # The file this map is saved as - coverstore's 'map N' - once it is.
+        self.name = None
+        # The mining location last targeted on this map. A label, not a key.
+        self.location = None
         self._last = None
         self._layer = None      # ((version, drops, side), image)
+
+    def to_dict(self):
+        """The map as coverstore writes it. New lists, so a writer on another
+        thread never sees one change under it."""
+        def points(fixes):
+            return [[round(lat, 6), round(lon, 6)] for lat, lon in fixes]
+        return {"origin": points([self.origin])[0], "radius": self.radius,
+                "location": self.location, "drops": points(self.drop_fixes),
+                "stamps": points(self.stamps)}
+
+    @classmethod
+    def from_dict(cls, body, data, name=None):
+        """A map back from disk, repainted from its points. None when the data
+        is not a map."""
+        try:
+            lat, lon = data["origin"]
+            cover = cls(body, float(lat), float(lon), float(data["radius"]))
+            for lat, lon in data["stamps"]:
+                x, y = cover.xy(float(lat), float(lon))
+                if cover._stamp(x, y):
+                    cover.stamps.append((float(lat), float(lon)))
+            drops = [(float(lat), float(lon)) for lat, lon in data["drops"]]
+        except (KeyError, TypeError, ValueError):
+            return None
+        if drops:
+            cover.drop_fixes = drops
+            cover.drops = [cover.xy(lat, lon) for lat, lon in drops]
+        cover.name = name
+        cover.location = data.get("location")
+        return cover
 
     def xy(self, lat, lon):
         """Metres east and north of the first droppoint."""
@@ -116,6 +155,7 @@ class Coverage:
         the first fix is painted rather than measured against where the last
         launch ended - the ship flew between them and painted nothing."""
         self.drops.append(self.xy(lat, lon))
+        self.drop_fixes.append((lat, lon))
         self._last = None
 
     def add(self, lat, lon):
@@ -126,6 +166,12 @@ class Coverage:
         if self._last is not None and math.hypot(x - self._last[0], y - self._last[1]) < STAMP_M:
             return True
         self._last = (x, y)
+        if self._stamp(x, y):
+            self.stamps.append((lat, lon))
+        return True
+
+    def _stamp(self, x, y):
+        """One disc at (x, y) metres. True when it painted new ground."""
         px, py = _mask_px(x, y)
         r = SCAN_RADIUS_M / MASK_M_PER_PX
         # Clamped to the mask. A crop past the edge is padded with zeros, the
@@ -140,7 +186,8 @@ class Coverage:
         if region.histogram()[255] > before:
             self.mask.paste(region, box[:2])
             self.version += 1
-        return True
+            return True
+        return False
 
     def painted_km2(self):
         return sum(self.mask.histogram()[1:]) * (MASK_M_PER_PX / 1000.0) ** 2
@@ -154,20 +201,78 @@ class Coverage:
         return self._layer[1]
 
 
-def follow(coverage, fix, was_in_srv):
+def follow(coverage, fix, was_in_srv, saved=None):
     """The Coverage this fix belongs to.
 
     The same one while the body is the same and the fix is inside its mask,
     so a ship hop of a few km carries on painting the same map. Anything else
-    is a new droppoint.
+    is a map saved on this body that reaches here - the last one saved, carried on
+    with a new droppoint - or a new map.
+
+    `saved(body)` gives coverstore.maps' [(name, data), ...].
     """
     body, lat, lon, radius, _ = fix
     if coverage is None or coverage.body != body or (
             not was_in_srv and not coverage.reaches(lat, lon)):
-        return Coverage(body, lat, lon, radius)
+        loaded = _pick_saved(saved(body) if saved else [], body, lat, lon,
+                                skip=coverage.name if coverage and coverage.body == body else None)
+        if loaded is None:
+            return Coverage(body, lat, lon, radius)
+        coverage = loaded
+        was_in_srv = False
     if not was_in_srv:
         coverage.launched(lat, lon)
     return coverage
+
+
+def _pick_saved(found, body, lat, lon, skip=None):
+    """The saved map that reaches here and was saved last, repainted; nearest
+    origin breaks a tie. Last saved, not nearest: while EDMC runs, a launch
+    that two maps reach carries on the one in memory, which is the one used
+    last, and a restart has to pick the same one or the ground splits across
+    two files. Reach is measured from each map's origin first, so only the one
+    chosen pays for a repaint. One that will not load gives way to the next."""
+    reaching = []
+    for name, data in found:
+        if name == skip:
+            continue
+        try:
+            probe = Coverage(body, float(data["origin"][0]), float(data["origin"][1]),
+                             float(data["radius"]))
+        except (KeyError, IndexError, TypeError, ValueError):
+            continue
+        if probe.reaches(lat, lon):
+            saved_at = data.get("saved")
+            order = (-(saved_at if isinstance(saved_at, (int, float)) else 0),
+                     math.hypot(*probe.xy(lat, lon)))
+            reaching.append((order, name, data))
+    for _, name, data in sorted(reaching, key=lambda item: item[0]):
+        cover = Coverage.from_dict(body, data, name)
+        if cover is not None:
+            return cover
+    return None
+
+
+# The map side that makes the saved picture come out at the mask's own size:
+# the whole mask, 880 x 880 at 50 m a pixel.
+PICTURE_SIDE = int(round(MASK_PX * VIEW_M / REACH_M))
+
+
+def picture(mask, drops):
+    """The whole map as a PIL image, north up, droppoints numbered.
+
+    Takes a copy of the mask and the droppoints rather than the Coverage, so it
+    can run off the Tk thread while the SRV keeps painting.
+    """
+    image = _draw_layer(mask, drops, PICTURE_SIDE)
+    draw = ImageDraw.Draw(image)
+    font = spotcard._font("consola.ttf", 16)
+    scale = image.width / (2 * REACH_M)
+    for number, (mx, my) in enumerate(drops, 1):
+        dx, dy = image.width / 2 + mx * scale, image.height / 2 - my * scale
+        draw.text((dx + PICTURE_SIDE * 0.035, dy - 8), str(number),
+                  fill=palette.rgb(palette.FG), font=font)
+    return image
 
 
 def bearing(x, y, to_x, to_y):

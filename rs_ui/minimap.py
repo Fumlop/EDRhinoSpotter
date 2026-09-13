@@ -12,14 +12,18 @@ from then on shown, moved and hidden with Win32 calls that do not activate
 it. Tk's own deiconify took the foreground in testing even with the
 no-activate style already set.
 
-The painted area lives in memory. Restarting EDMC starts a clean map.
+The painted area is saved through rs_core.coverstore: the points, two seconds
+after new ground at most, and a picture of the whole map each time the SRV
+goes back into the ship. A launch within reach of a saved map carries it on.
 """
 
 import base64
 import io
+import os
+import threading
 import tkinter as tk
 
-from rs_core import arrow, coverage, guide, palette, spotmark
+from rs_core import arrow, coverage, coverstore, guide, palette, spotmark, store
 from rs_core.logging import logger
 from rs_ui import overlay
 
@@ -52,6 +56,8 @@ _placed = None
 _photo = None            # the PhotoImage on the canvas - Tk drops it unreferenced
 _drawn = None            # what the last picture was of, so standing still is free
 _coverage = None
+_saved = None            # (map, version, droppoints, location) last handed to _writes
+_writes = store.Debounced(write=coverstore.save)
 _in_srv = False
 _failed = False          # a draw that raised: stay down until the next launch
 _enabled = None          # tk.BooleanVar on the settings tab
@@ -81,13 +87,24 @@ def update(root, status, system=None):
     try:
         fix = coverage.srv_fix(status)
         if fix is None:
+            if _in_srv:
+                _docked()
             _in_srv = _failed = False
             hide()
             return
-        _coverage = coverage.follow(_coverage, fix, _in_srv)
+        previous = _coverage
+        _coverage = coverage.follow(_coverage, fix, _in_srv, saved=coverstore.maps)
+        if previous is not None and _coverage is not previous:
+            # Written now: the timer holds one pending save, and the next one
+            # is for another map.
+            _writes.flush()
         _in_srv = True
         body, lat, lon, _, heading = fix
         in_reach = _coverage.add(lat, lon)
+        index = spotmark.location_index(status)
+        if index is not None:
+            _coverage.location = index
+        _remember()
         if _failed or not enabled():
             hide()
             return
@@ -122,6 +139,36 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
     _place(side, where, rect)
 
 
+def _remember():
+    """Hand the map to the two-second writer when it has changed."""
+    global _saved
+    state = (_coverage, _coverage.version, len(_coverage.drops), _coverage.location)
+    if state == _saved:
+        return
+    if _coverage.name is None:
+        _coverage.name = coverstore.next_name(_coverage.body)
+    _writes(_coverage.body, _coverage.name, _coverage.to_dict())
+    _saved = state
+
+
+def _docked():
+    """The SRV is back in the ship: the points written now, and the picture
+    drawn off the Tk thread - 70 to 160 ms measured, and nothing waits for it."""
+    _writes.flush()
+    if _coverage is None or _coverage.name is None:
+        return
+    body, name = _coverage.body, _coverage.name
+    mask, drops = _coverage.mask.copy(), list(_coverage.drops)
+
+    def draw():
+        try:
+            coverstore.save_png(body, name, coverage.picture(mask, drops))
+        except Exception:
+            logger.exception(f"minimap: could not draw the picture of {name} on {body}")
+
+    threading.Thread(target=draw, name="rhinospotter-map-png", daemon=True).start()
+
+
 def hide():
     """Hide the window. It and the painted area stay for the next launch."""
     global _shown
@@ -138,15 +185,16 @@ def hide():
 
 
 def stop():
-    """EDMC is closing: the window goes, and the map with it."""
+    """EDMC is closing: the window goes, the map is written first."""
     global _window, _canvas, _handle, _shown, _placed, _photo, _drawn
-    global _coverage, _in_srv, _failed
+    global _coverage, _saved, _in_srv, _failed
+    _writes.flush()
     if _window is not None:
         try:
             _window.destroy()
         except tk.TclError:
             pass
-    _window = _canvas = _handle = _placed = _photo = _drawn = _coverage = None
+    _window = _canvas = _handle = _placed = _photo = _drawn = _coverage = _saved = None
     _shown = _in_srv = _failed = False
 
 
@@ -166,8 +214,22 @@ def prefs(parent):
         row=1, column=1, sticky="w", padx=10, pady=2)
     nb.Label(frame, text="Painted means driven within "
                          f"{coverage.SCAN_RADIUS_M / 1000:.0f} km, not scanned.").grid(
-        row=2, column=0, columnspan=2, sticky="w", padx=10, pady=(2, 10))
+        row=2, column=0, columnspan=2, sticky="w", padx=10, pady=2)
+    count, size = coverstore.usage()
+    amount = f"{size / 1048576:.1f} MB" if size >= 1048576 else f"{size / 1024:.0f} KB"
+    nb.Label(frame, text=f"Saved maps: {count} ({amount})").grid(
+        row=3, column=0, sticky="w", padx=10, pady=(2, 10))
+    nb.Button(frame, text="Open folder", command=_open_folder).grid(
+        row=3, column=1, sticky="w", padx=10, pady=(2, 10))
     return frame
+
+
+def _open_folder():
+    try:
+        os.makedirs(coverstore.ROOT, exist_ok=True)
+        os.startfile(coverstore.ROOT)
+    except (OSError, AttributeError) as err:       # AttributeError: not Windows
+        logger.info(f"minimap: could not open {coverstore.ROOT}: {err}")
 
 
 def prefs_changed():

@@ -19,6 +19,7 @@ plausible.
 import math
 import os
 import sys
+import tempfile
 import time
 import tkinter as tk
 
@@ -27,7 +28,7 @@ sys.path.insert(0, PLUGIN_DIR)
 
 from PIL import Image, ImageGrab                            # noqa: E402
 
-from rs_core import bodies, spotcard, spotmark              # noqa: E402
+from rs_core import bodies, coverstore, spotcard, spotmark  # noqa: E402
 from rs_ui import main, minimap, overlay, scan              # noqa: E402
 
 DOCS = os.path.join(PLUGIN_DIR, "docs")
@@ -266,4 +267,9 @@ def minimap_image(root, scale):
 if __name__ == "__main__":
     if not os.environ.get("RHINOSPOTTER_DOCS"):
         raise SystemExit("set RHINOSPOTTER_DOCS=1 to re-render the docs images")
-    main_images()
+    # Before anything builds the panel: its poll feeds the real Status.json to
+    # the minimap, and neither that nor the invented body may save maps into
+    # the commander's folder.
+    with tempfile.TemporaryDirectory(prefix="rhinospotter-docs-") as scratch:
+        coverstore.ROOT = scratch
+        main_images()

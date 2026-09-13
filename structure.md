@@ -78,6 +78,12 @@ No tkinter anywhere in here.
   written. The timer is not restarted by the changes after it - a sweep longer
   than the delay is written as it goes rather than held until it ends - and
   `flush()` at plugin_stop means a normal shutdown loses nothing.
+- **[coverstore.py](rs_core/coverstore.py)** - the minimap's maps under
+  `%LOCALAPPDATA%\RhinoSpotter\coverage\<Body>\map N.json.gz`, a folder per
+  body and a file per map, so a save never merges. The points that painted new
+  ground and the droppoints, lat/lon to six decimals, gzipped: an hour's drive
+  is about 2.4 KB. Plain `.json` is read too. A file that will not parse is
+  skipped and logged. `map N.png` beside it is written, never read.
 - **[replay.py](rs_core/replay.py)** - recent journals through the same
   Register the live plugin uses, and a score for what they found. Every
   landable body is worth the best rate its ground has ever shown and the
@@ -184,7 +190,10 @@ Everything in here imports tkinter.
   Built once, hidden, and made click-through and no-activate before it is
   first shown; then shown, moved and hidden with Win32 calls that do not take
   the foreground, because it comes up mid-game on its own. A draw that raises
-  keeps it down until the next launch. The painted area is in memory only.
+  keeps it down until the next launch. Saves through `coverstore`: new ground
+  goes to a two-second `store.Debounced`, flushed when the map changes, when
+  the SRV docks and at plugin_stop; docking also draws `coverage.picture` on a
+  thread. The settings tab counts the saved maps and opens their folder.
 
 ## Tests (`rs_tests/`)
 
@@ -218,7 +227,10 @@ Everything in here imports tkinter.
   ground, the 180th meridian, when a launch keeps the map and adds a
   droppoint and when it is a new map, a ship hop painting nothing, the
   window-height clamp, north up, and the layer kept until new ground is
-  painted.
+  painted. Saved maps: the points repaint the same mask, a launch within reach
+  carries the last saved map on (nearest on a tie), one out of reach starts a new one.
+- **test_coverstore.py** - gzipped round trip, plain JSON read, a broken or
+  other-version file skipped, `map N` numbering, and the settings-tab count.
 - **test_names.py** - every character Windows refuses, spaces kept for a folder
   and replaced for a file, and that the cache and the cards folder spell one
   system the same way.
