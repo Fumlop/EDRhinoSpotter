@@ -232,14 +232,71 @@ def _docked(system):
     body, name = _coverage.body, _coverage.name
     mask, drops = _coverage.mask.copy(), list(_coverage.drops)
     marks = [(*_coverage.xy(lat, lon), code) for lat, lon, code in _bookmarks(system, body)]
+    title, legend = picture_text(_coverage, system)
 
     def draw():
         try:
-            coverstore.save_png(body, name, coverage.picture(mask, drops, marks))
+            coverstore.save_png(body, name, coverage.picture(mask, drops, marks, title, legend))
         except Exception:
             logger.exception(f"minimap: could not draw the picture of {name} on {body}")
 
     threading.Thread(target=draw, name="rhinospotter-map-png", daemon=True).start()
+
+
+def picture_text(cover, system, when=None):
+    """(title lines, legend rows) for the saved picture of a map.
+
+    Title: the body, what kind of planet it is from the system's honk, and the
+    map with the locations its bookmarks were made at. Legend: one row per
+    bookmark on the map - its code, material, location and rigs.
+    """
+    body = cover.body
+    records = []
+    if system:
+        for record in cards.for_system(system):
+            lat, lon = record.get("latitude"), record.get("longitude")
+            if (record.get("planet_name") == body and isinstance(lat, (int, float))
+                    and isinstance(lon, (int, float)) and cover.reaches(lat, lon)):
+                records.append(record)
+    records.sort(key=lambda r: (_code(r.get("commodity")) or "", r.get("location_index") or 0,
+                                str(r.get("marked_at"))))
+
+    planet = next((b for b in store.load(system) if b.get("name") == body), None) if system else None
+    facts = []
+    if planet:
+        facts.append(grounds.label(planet.get("ground")))
+        if isinstance(planet.get("gravity"), (int, float)):
+            facts.append(f"{planet['gravity']:.2f} g")
+        if isinstance(planet.get("distance"), (int, float)):
+            facts.append(f"{planet['distance']:,.0f} Ls")
+        if planet.get("locations") is not None:
+            facts.append(f"{planet['locations']} locations")
+
+    locations = sorted({r["location_index"] for r in records if r.get("location_index") is not None})
+    if not locations and cover.location is not None:
+        locations = [cover.location]
+    about = [cover.name or "map"]
+    if locations:
+        about.append("loc " + ", ".join(str(n) for n in locations))
+    about.append(f"{cover.painted_km2():.0f} km² painted")
+    about.append(time.strftime("%Y-%m-%d %H:%M", time.localtime(when)))
+
+    title = [body]
+    if system and body.startswith(system + " "):
+        title = [f"{body[len(system) + 1:]}  -  {system}"]
+    if facts:
+        title.append("  ·  ".join(facts))
+    title.append("  ·  ".join(about))
+
+    legend = []
+    for r in records:
+        parts = [r.get("commodity") or "?"]
+        if r.get("location_index") is not None:
+            parts.append(f"loc {r['location_index']}")
+        if r.get("rigs") is not None:
+            parts.append(f"{r['rigs']} rig" + ("" if r["rigs"] == 1 else "s"))
+        legend.append((_code(r.get("commodity")), "  ·  ".join(parts)))
+    return title, legend
 
 
 def hide():

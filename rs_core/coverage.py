@@ -262,18 +262,46 @@ def _pick_saved(found, body, lat, lon, skip=None):
 PICTURE_SIDE = int(round(MASK_PX * VIEW_M / REACH_M))
 
 
-def picture(mask, drops, marks=()):
+def picture(mask, drops, marks=(), title=(), legend=()):
     """The whole map as a PIL image, north up, droppoints and bookmarks on it.
 
     Takes a copy of the mask, the droppoints and the bookmarks (metres) rather
     than the Coverage, so it can run off the Tk thread while the SRV keeps
     painting.
+
+    `title` is lines of text above the map, the first one larger; `legend` is
+    (code, text) rows below it, one per bookmark. Both optional - without them
+    the picture is the bare map.
     """
     image = _draw_layer(mask, drops, PICTURE_SIDE)
     scale = image.width / (2 * REACH_M)
     _bookmarks(image, [(image.width / 2 + mx * scale, image.height / 2 - my * scale, *rest)
                        for mx, my, *rest in marks], PICTURE_SIDE)
-    return image
+    if not title and not legend:
+        return image
+
+    pad, line = 12, 18
+    big = spotcard._font("consolab.ttf", 17)
+    small = spotcard._font("consola.ttf", 13)
+    code_font = spotcard._font("consolab.ttf", 13)
+    top = pad + (len(title) * line + 6 if title else 0)
+    bottom = (pad + len(legend) * line + pad) if legend else pad
+    # Wider than the map when a long system name needs it; the map centred.
+    widths = [big.getlength(t) if i == 0 else small.getlength(t) for i, t in enumerate(title)]
+    widths += [36 + small.getlength(text) for _, text in legend]
+    width = max([image.width] + [int(w) + 2 * pad for w in widths])
+    sheet = Image.new("RGB", (width, top + image.height + bottom), palette.rgb(palette.BG))
+    sheet.paste(image, ((width - image.width) // 2, top))
+    draw = ImageDraw.Draw(sheet)
+    for i, text in enumerate(title):
+        draw.text((pad, pad + i * line), text, font=big if i == 0 else small,
+                  fill=palette.rgb(palette.FG if i == 0 else palette.MUTED))
+    y = top + image.height + pad
+    for code, text in legend:
+        draw.text((pad, y), code or "-", font=code_font, fill=MARK)
+        draw.text((pad + 36, y), text, font=small, fill=palette.rgb(palette.FG))
+        y += line
+    return sheet
 
 
 def bearing(x, y, to_x, to_y):

@@ -336,6 +336,17 @@ class TestRender:
         assert ring_near(2000) and ring_near(4000)
         assert not ring_near(3000)
 
+    def test_the_picture_grows_for_title_and_legend(self):
+        cover = fresh()
+        bare = coverage.picture(cover.mask.copy(), list(cover.drops))
+        full = coverage.picture(cover.mask.copy(), list(cover.drops),
+                                title=["8 b  -  r Velorum", "Rocky World", "map 1"],
+                                legend=[("T", "Thortveitite  ·  loc 2  ·  2 rigs")])
+        assert full.width == bare.width and full.height > bare.height + 60
+        long = coverage.picture(cover.mask.copy(), list(cover.drops),
+                                title=["A 2  -  Col 285 Sector LS-P b7-1 with a much longer name"])
+        assert long.width > bare.width
+
     def test_the_picture_carries_the_bookmarks(self):
         cover = fresh()
         image = coverage.picture(cover.mask.copy(), list(cover.drops), marks=[(4000, 4000)])

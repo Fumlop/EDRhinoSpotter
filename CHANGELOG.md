@@ -7,6 +7,11 @@
 - The minimap is 85% opaque: the game shows faintly through it.
 - Two thin rings around the latest droppoint, at 2 and 4 km: one scan radius
   and two. On the saved map picture too.
+- The saved `map N.png` carries a title and a legend. Above the map: body and
+  system, the planet from the honk (type, gravity, distance, locations), and
+  the map with the locations its bookmarks were made at, painted km² and
+  when. Below: one row per bookmark on the map - code, material, location,
+  rigs.
 
 ## 3.4.0
 
