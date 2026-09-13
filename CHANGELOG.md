@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.4.0
+
+**Changed**
+
+- The guide stops itself ten seconds after HERE first shows, and the button
+  goes back to Guide. Rolling off the spot again inside those ten seconds does
+  not restart them.
+
 ## 3.3.0
 
 **Added**

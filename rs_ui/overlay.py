@@ -42,6 +42,10 @@ POLL_MS = 500
 # message. Long enough to read it twice.
 NOTICE_MS = 10000
 
+# How long HERE stays up before the guide stops itself. You are there; the
+# arrow has nothing left to say, and Stop should not be a chore.
+HERE_MS = 10000
+
 # The Elite window carries this title in every build so far; the window class
 # has not been as stable.
 GAME_TITLE = "Elite - Dangerous (CLIENT)"
@@ -60,6 +64,7 @@ _after = None
 _placed = None           # the last geometry, so the game standing still is free
 _on_stop = None          # the row that started this, to redraw when it ends
 _since = None            # when the current no-arrow state began
+_here = None             # when HERE was first shown on this run
 _pointed = False         # whether this run ever drew an arrow
 _hidden = False          # hidden because Elite is not the window in front
 _frames = {}             # (bucket, colour) -> PhotoImage, built as angles come up
@@ -91,10 +96,10 @@ def start(parent, record, on_stop=None):
     `on_stop` is called when the overlay takes itself down, so the button that
     started it can go back to saying Guide.
     """
-    global _window, _canvas, _target, _placed, _on_stop, _since, _pointed
+    global _window, _canvas, _target, _placed, _on_stop, _since, _pointed, _here
     _target = record
     _on_stop = on_stop
-    _since = None
+    _since = _here = None
     _pointed = False
     if guiding():
         # The pending tick first. Without this, retargeting books a second
@@ -147,8 +152,9 @@ def _cancel():
 
 def stop():
     """Take it down. Safe to call when nothing is up."""
-    global _window, _canvas, _target, _after, _placed, _on_stop, _since, _pointed, _hidden
+    global _window, _canvas, _target, _after, _placed, _on_stop, _since, _pointed, _hidden, _here
     _cancel()
+    _here = None
     _pointed = _hidden = False
     if _window is not None and _window.winfo_exists():
         _window.destroy()
@@ -163,7 +169,7 @@ def stop():
 
 def _tick():
     """One reading, drawn, and the next one booked."""
-    global _after, _since, _pointed
+    global _after, _since, _pointed, _here
     if _window is None or not _window.winfo_exists():
         return
     focused = game_focused()
@@ -191,10 +197,19 @@ def _tick():
             stop()
             return
 
+    # Ten seconds from the first HERE, whether or not you roll off the spot
+    # again: the guide got you there.
+    if _here is not None and (time.monotonic() - _here) * 1000 >= HERE_MS:
+        logger.info("overlay: arrived, closing")
+        stop()
+        return
+
     try:
         if focused:
             _place()
             _draw(reading)
+            if reading["state"] == "arrived" and _here is None:
+                _here = time.monotonic()
     except Exception:
         # Same rule as building it: an arrow that cannot be drawn is one the
         # commander does without, not a traceback every half second.
