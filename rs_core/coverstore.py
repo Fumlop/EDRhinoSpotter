@@ -4,7 +4,7 @@ r"""The minimap's painted ground, kept, so an EDMC restart does not wipe it.
     %LOCALAPPDATA%\RhinoSpotter\coverage\<Body>\map 1.png
 
 A folder per body, a file per map. A body can hold several maps - two mining
-locations more than 22 km apart are two - and one file each means a save never
+locations more than 10 km apart are two - and one file each means a save never
 has to read and merge the others.
 
 Not a picture: the points the SRV painted new ground at, as latitude and

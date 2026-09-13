@@ -8,14 +8,20 @@
   droppoints go to `%LOCALAPPDATA%\RhinoSpotter\coverage\<Body>\map N.json.gz`,
   about 2.4 KB for an hour's drive and 1.3 ms to write, two seconds after new
   ground at most and at once when the SRV docks or EDMC closes. A launch
-  within 22 km of a saved map on that body carries it on, with a new
+  within 10 km of a saved map on that body carries it on, with a new
   droppoint; loading repaints the mask from the points, 11 ms for an hour's
   drive. Plain `.json` files are read too.
 - Each time the SRV docks, the whole map is saved beside it as `map N.png`:
-  880 px, 50 m a pixel, north up, droppoints numbered. Drawn off the Tk
+  400 px, 50 m a pixel, north up, droppoints numbered. Drawn off the Tk
   thread, 70 to 160 ms measured. Nothing reads it back.
 - The RhinoSpotter settings tab shows how many maps are saved and how much
   space they take, and opens the folder.
+
+**Changed**
+
+- The minimap reaches 10 km from the first droppoint, was 22, and shows 12 km
+  across, was 24, with a 1 km grid, was 2. On a 1080p game that is 50 m a
+  pixel, was 100. A launch more than 10 km out starts a new map.
 
 **Not flown**
 

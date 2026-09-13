@@ -100,8 +100,8 @@ No tkinter anywhere in here.
   `ground_rules.json` above all, because a locally refreshed sheet is newer
   than the one in a release.
 - **[coverage.py](rs_core/coverage.py)** - the minimap's painting. Every
-  Status.json fix in the SRV stamps a 2 km disc onto an 880 x 880 mask, 50 m
-  a pixel, anchored at the first droppoint and reaching 22 km either way.
+  Status.json fix in the SRV stamps a 2 km disc onto a 400 x 400 mask, 50 m
+  a pixel, anchored at the first droppoint and reaching 10 km either way.
   `follow()` decides when a launch is the same map (same body, inside the
   mask) and adds a droppoint, and when it is a new map. A disc that paints
   nothing new does not move `version`, and the drawn layer is only rebuilt

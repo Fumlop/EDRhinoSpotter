@@ -89,18 +89,20 @@ class TestPainting:
 
     def test_the_mask_edge_paints_only_what_is_inside(self):
         cover = fresh()
-        cover.add(*at(coverage.REACH_M, 0))
+        # A metre inside: exactly on REACH_M is a float's width either side.
+        cover.add(*at(coverage.REACH_M - 1, 0))
         assert cover.painted_km2() == pytest.approx(disc_km2() / 2, rel=0.05)
 
     def test_stamping_the_mask_edge_again_is_not_new_ground(self):
         # A crop past the edge used to count its zero padding as new paint,
         # and rebuild the layer on every stamp out there.
         cover = fresh()
-        cover.add(*at(21000, 0))
+        edge = coverage.REACH_M - 1000
+        cover.add(*at(edge, 0))
         version = cover.version
         for _ in range(5):
-            cover.launched(*at(21000, 0))
-            cover.add(*at(21000, 0))
+            cover.launched(*at(edge, 0))
+            cover.add(*at(edge, 0))
         assert cover.version == version
 
     def test_crossing_the_180th_meridian_is_a_step_not_a_planet(self):
@@ -147,8 +149,8 @@ class TestFollow:
         # leaves the ground between them unpainted.
         cover = coverage.follow(None, self.fix(), was_in_srv=False)
         cover.add(*at(0, 0))
-        cover = coverage.follow(cover, self.fix(x=9000), was_in_srv=False)
-        cover.add(*at(9000, 0))
+        cover = coverage.follow(cover, self.fix(x=6000), was_in_srv=False)
+        cover.add(*at(6000, 0))
         assert cover.painted_km2() == pytest.approx(2 * disc_km2(), rel=0.03)
 
     def test_another_body_is_a_new_droppoint(self):
@@ -229,7 +231,7 @@ class TestSaved:
 
     def test_the_nearest_saved_map_wins(self):
         near = coverage.Coverage("A 2", *at(2000, 0), RADIUS)
-        far = coverage.Coverage("A 2", *at(-15000, 0), RADIUS)
+        far = coverage.Coverage("A 2", *at(-8000, 0), RADIUS)
         saved = lambda body: [("map 1", far.to_dict()), ("map 2", near.to_dict())]
         assert coverage.follow(None, self.fix(), was_in_srv=False, saved=saved).name == "map 2"
 
@@ -237,13 +239,13 @@ class TestSaved:
         # What EDMC would have had in memory, so a restart does not split the
         # ground across two files.
         near = dict(coverage.Coverage("A 2", *at(2000, 0), RADIUS).to_dict(), saved=100.0)
-        far = dict(coverage.Coverage("A 2", *at(-15000, 0), RADIUS).to_dict(), saved=200.0)
+        far = dict(coverage.Coverage("A 2", *at(-8000, 0), RADIUS).to_dict(), saved=200.0)
         saved = lambda body: [("map 1", near), ("map 2", far)]
         assert coverage.follow(None, self.fix(), was_in_srv=False, saved=saved).name == "map 2"
 
     def test_a_nearest_map_that_will_not_load_gives_way(self):
         near = dict(coverage.Coverage("A 2", *at(2000, 0), RADIUS).to_dict(), stamps="broken")
-        far = coverage.Coverage("A 2", *at(-15000, 0), RADIUS).to_dict()
+        far = coverage.Coverage("A 2", *at(-8000, 0), RADIUS).to_dict()
         saved = lambda body: [("map 1", far), ("map 2", near)]
         assert coverage.follow(None, self.fix(), was_in_srv=False, saved=saved).name == "map 1"
 
@@ -289,9 +291,9 @@ class TestRender:
         side = 240
         image = coverage.render(cover, 0, 0, None, side)
         per_m = side / (2 * coverage.VIEW_M)
-        # 1 km east and 5 km north: inside the disc and off every grid line.
-        north = self.pixel(image, side / 2 + 1000 * per_m, side / 2 - 5000 * per_m)
-        south = self.pixel(image, side / 2 + 1000 * per_m, side / 2 + 5000 * per_m)
+        # 500 m east and 4.5 km north: inside the disc and off every grid line.
+        north = self.pixel(image, side / 2 + 500 * per_m, side / 2 - 4500 * per_m)
+        south = self.pixel(image, side / 2 + 500 * per_m, side / 2 + 4500 * per_m)
         assert north == coverage.FILL
         assert south == palette.rgb(palette.BG)
 

@@ -10,7 +10,7 @@ writes says a scan happened, so the map cannot know, and it does not claim to.
 SCAN_RADIUS_M is the community figure - Frontier has not published one. Change
 it here and nothing else moves.
 
-Flat earth, through measure.to_metres: REACH_M is 22 km on bodies a thousand
+Flat earth, through measure.to_metres: REACH_M is 10 km on bodies a thousand
 kilometres in radius, and at that distance the projection is off by less than
 a disc edge is wide.
 
@@ -30,15 +30,16 @@ IN_SRV = 0x4000000
 # What the scanner sees from where the SRV is, in metres.
 SCAN_RADIUS_M = 2000.0
 
-# Half the width of what the map shows around the SRV: a mining location of up
-# to 10 km radius plus one disc.
-VIEW_M = 12000.0
+# Half the width of what the map shows around the SRV. 12 km across is 50 m a
+# pixel on a 1080p map - the mask's own resolution - and a 1 km grid still has
+# 20 px between its lines.
+VIEW_M = 6000.0
 
-# Half the width of the mask around the droppoint. A droppoint at the edge of a
-# 10 km location has its far side 20 km away, plus one disc.
-REACH_M = 22000.0
+# Half the width of the mask around the droppoint. Few drive further than 6-7
+# km from the ship in any direction; 10 km leaves room past that.
+REACH_M = 10000.0
 
-# Mask resolution. 50 m a pixel is 880 x 880, 774 KB, and still sharp on a map
+# Mask resolution. 50 m a pixel is 400 x 400, 160 KB, and still sharp on a map
 # drawn 480 px wide.
 MASK_M_PER_PX = 50.0
 
@@ -47,7 +48,7 @@ MASK_M_PER_PX = 50.0
 STAMP_M = 250.0
 
 # Grid lines, pinned to the droppoint so they move with the ground.
-GRID_M = 2000.0
+GRID_M = 1000.0
 
 # How big the map is drawn, as a share of the game window's height, and the
 # limits either side - a laptop window should not get a stamp, a 4K screen
@@ -254,7 +255,7 @@ def _pick_saved(found, body, lat, lon, skip=None):
 
 
 # The map side that makes the saved picture come out at the mask's own size:
-# the whole mask, 880 x 880 at 50 m a pixel.
+# the whole mask, 400 x 400 at 50 m a pixel.
 PICTURE_SIDE = int(round(MASK_PX * VIEW_M / REACH_M))
 
 

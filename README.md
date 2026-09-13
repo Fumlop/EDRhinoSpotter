@@ -161,19 +161,20 @@ which way it is, and how many km² are painted.
 - **Ship hops keep the map and paint nothing.** Dock, fly 3 km, launch again,
   and it carries on painting the same area from the new droppoint. Droppoints
   are numbered; the latest is bright, because that is where the ship is, and
-  the footer points to it. A launch more than 22 km from the first droppoint,
-  or on another body, starts a fresh map. Driving past 22 km says **out of
+  the footer points to it. A launch more than 10 km from the first droppoint,
+  or on another body, starts a fresh map. Driving past 10 km says **out of
   range** and stops painting.
 - **Size follows the game window**: 22% of its height, between 180 and 480 px.
-  The map always shows 24 km across, so 1080p is about 100 m a pixel. Hidden
+  The map always shows 12 km across with a 1 km grid, so 1080p is about 50 m a
+  pixel. Hidden
   while the game is minimised.
 - **Settings**: EDMC Settings, RhinoSpotter tab - the minimap on (default) or
   off, and top left, top right, bottom left or bottom right.
 - **Saved.** The painted area is written to
   `%LOCALAPPDATA%\RhinoSpotter\coverage\<Body>\` as the points it was painted
-  from, and a launch within 22 km of a saved map on that body carries it on,
+  from, and a launch within 10 km of a saved map on that body carries it on,
   EDMC restarts included. Each time the SRV goes back into the ship the whole
-  map is also saved as a picture beside it, `map N.png`, 880 px at 50 m a
+  map is also saved as a picture beside it, `map N.png`, 400 px at 50 m a
   pixel. The Settings tab shows how many maps there are and how much space
   they take, with a button to open the folder.
 
