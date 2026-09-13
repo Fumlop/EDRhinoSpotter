@@ -427,7 +427,7 @@ def _show_update(tag, newer):
     # and that poll leaves anything not reading "Bookmark" alone - so starting
     # EDMC docked gave a grey Update nobody could press.
     _card_button.config(text="Update", fg=palette.WARN, command=_install_update, state="normal")
-    _set_status(f"{tag} is out")
+    _set_status(f"{tag} is out - press Update")
 
 
 def _install_update():

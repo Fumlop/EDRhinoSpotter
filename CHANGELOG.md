@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.0.2
+
+**Changed**
+
+- When a release is out, the status line says "vX.Y.Z is out - press Update",
+  so the button it means is named. Released mainly as a newer version for
+  4.0.1 to find, to check the Update button end to end.
+
 ## 4.0.1
 
 **Fixed**
