@@ -26,19 +26,20 @@ bookmarks it has - click and the window lists them.*
 
 Clicking `3 bookmarks` puts the list in the same window: one row per bookmark
 with the location, material, rigs, heading, coordinates and when it was
-marked. **Most rigs first** - of the patches you bookmarked on this body, the
-best one is the top row. **Back**, top left, returns to the body list.
+marked, grouped by location. **Most rigs first** within a location - of the
+patches you bookmarked there, the best one is the top row. **Back**, top left,
+returns to the body list.
 
 <p align="center">
   <img src="docs/bookmarks.png" width="620"
-       alt="The bookmarks of one body, three rows with Guide, Card and Delete">
+       alt="The bookmarks of one body, grouped by location, each with Share map; rows with Guide and Delete">
 </p>
 
-Each row carries three buttons. **Card** opens that bookmark's PNG in whatever
-shows PNGs here, which is the thing that can then send it on.
+**Share map**, beside each location, opens the picture of the map that
+location's bookmarks were made on - see [Sharing a map](#sharing-a-map).
 
-**Delete** removes that bookmark from disk, the card and its sidecar, after
-asking. The last one on a body takes you back to the body list.
+**Delete** removes that bookmark from disk, after asking. The last one on a
+body takes you back to the body list.
 
 **Loc fills itself in when you land.** The `Touchdown` journal event names the
 mining location you came down at, so the number is in the panel before you
@@ -120,24 +121,18 @@ percentages, not the body list.
 no journal event and on no feed. This says where to prospect; it cannot say
 what you will find.
 
-## Bookmark - the patch you are standing on, as a PNG
-
-<p align="center">
-  <img src="docs/miningcard.png" width="620"
-       alt="A mining card: body, material, rigs, location, heading, altitude and coordinates">
-</p>
-
-*Example card. Everything on it was read from `Status.json` at the press.*
+## Bookmark - the patch you are standing on
 
 1. Land and put the rigs down.
 2. Pick the **Material**, set **Rigs**. `Location` fills itself when a mining
    location is the selected destination; otherwise type the signal number.
-3. Press **Bookmark**. `completed` appears beside the button once the PNG is
-   on disk.
+3. Press **Bookmark**. `completed` appears on the button once it is on disk.
 
-Coordinates, body and location are read out of `Status.json` at the press - it
-is live-only, so make the card before you fly off. Marking the same location
-for the same material twice gives you two cards, not one overwritten.
+Coordinates, body, heading and location are read out of `Status.json` at the
+press - it is live-only, so bookmark before you fly off. Marking the same
+location for the same material twice gives you two bookmarks, not one
+overwritten. The bookmark shows on the minimap at once, and in the map picture
+the next time the SRV docks.
 
 Bookmarks land in `%LOCALAPPDATA%\RhinoSpotter\cards\<System>\`. The
 **bookmarks** link in the panel header opens the folder in Explorer.
@@ -184,6 +179,21 @@ which way it is, and how many km² are painted.
   pixel. The Settings tab shows how many maps there are and how much space
   they take, with a button to open the folder.
 
+### Sharing a map
+
+<p align="center">
+  <img src="docs/mapshare.png" width="440"
+       alt="A saved map picture: body, system and planet facts on top, the prospected ground with two bookmarks, and a legend with material, coordinates and rigs">
+</p>
+
+*Example map picture, invented system. What **Share map** opens.*
+
+Each time the SRV docks, the whole map is written as `map N.png`: body and
+system, the planet from the honk, the locations its bookmarks were made at,
+the km² prospected and when. Under the map, one row per bookmark on it - code,
+material, coordinates and rigs - so whoever you send it to can fly straight
+to the patch. Droppoints and range rings are left out; they only say where
+your ship was.
 ## Install
 
 See [INSTALL.md](INSTALL.md). Short version: unpack into

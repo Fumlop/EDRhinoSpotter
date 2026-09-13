@@ -1,9 +1,8 @@
 """Which bodies in a system you have already marked.
 
-Read from the JSON sidecars spotcard writes beside each PNG, not from the file
-names. A name has had its spaces replaced and its material lowercased, so
-reading a body back out of one is a guess; the sidecar holds what was actually
-marked.
+Read from the JSON bookmarks spotcard writes, not from the file names. A name
+has had its spaces replaced and its material lowercased, so reading a body
+back out of one is a guess; the JSON holds what was actually marked.
 
 No tkinter and no PIL, so it can be checked without EDMC or a display. See
 rs_tests/test_cards.py.
@@ -17,11 +16,12 @@ from rs_core.spotcard import card_dir
 
 
 def for_system(system, root=None):
-    """Every card marked in that system, newest last.
+    """Every bookmark marked in that system, newest last.
 
-    A PNG with no sidecar is skipped rather than guessed at - it was written
-    by a version that did not keep one, and a link to the wrong body is worse
-    than no link.
+    The JSON is the bookmark. Older versions wrote a PNG card beside it; that
+    card's path is kept in `path` when it is still there, so Delete takes it
+    too, and None otherwise. A PNG with no JSON is skipped rather than guessed
+    at - a link to the wrong body is worse than no link.
     """
     folder = card_dir(system) if root is None else root
     try:
@@ -41,19 +41,15 @@ def for_system(system, root=None):
             continue
         if not isinstance(record, dict) or not record.get("planet_name"):
             continue
-        card = record.get("card") or os.path.splitext(name)[0] + ".png"
-        record["path"] = os.path.join(folder, card)
-        # Kept because a bookmark is two files and only one of them can be
-        # worked out from the other. Deleting one and leaving the other behind
-        # is how a folder fills up with sidecars pointing at nothing.
+        card = os.path.join(folder, record.get("card") or os.path.splitext(name)[0] + ".png")
+        record["path"] = card if os.path.isfile(card) else None
         record["sidecar"] = path
-        if os.path.isfile(record["path"]):
-            found.append(record)
+        found.append(record)
     return found
 
 
 def delete(record):
-    """Remove a bookmark: the PNG and the sidecar beside it.
+    """Remove a bookmark: its JSON, and an old card's PNG if it has one.
 
     True when something was removed. A file that is already gone is the state
     the caller asked for and not a failure; a file that will not go - open in

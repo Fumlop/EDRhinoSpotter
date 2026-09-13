@@ -42,8 +42,8 @@ class TestTheCallersAgree:
         system = 'Col 285 "Sector" KM-V:d2-36'
         assert store.safe_name(system) in spotcard.card_dir(system)
 
-    def test_a_card_filename_has_no_spaces_in_it(self):
+    def test_a_bookmark_filename_has_no_spaces_in_it(self):
         name = spotcard.filename({"planet_name": "Hyperion Reach 4 a",
                                   "location_index": 7, "commodity": "Jadeite"})
         assert " " not in name
-        assert name.endswith(".png")
+        assert name.endswith(".json")

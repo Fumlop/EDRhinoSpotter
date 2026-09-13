@@ -357,10 +357,10 @@ def _cards_link(parent, records):
                lambda event: _bookmarks_view(label.winfo_toplevel(), system, body, records))
 
 
-# The three buttons on every bookmark row. Buttons are not labels, so the width
+# The two buttons on every bookmark row. Buttons are not labels, so the width
 # measurement cannot see them and the window would open exactly that much too
 # narrow - and a row too narrow does not wrap, it drops what is packed right.
-BUTTONS = 200
+BUTTONS = 140
 
 
 def _bookmarks_view(window, system, body, records):
@@ -398,7 +398,8 @@ def _bookmarks_view(window, system, body, records):
             _bookmark_row(listing, record)
 
     note = tk.Label(outer, text="Guide puts an arrow over the game, top middle - "
-                                "borderless or windowed only. Card opens the PNG.",
+                                "borderless or windowed only. Share map opens the "
+                                "picture of the map a location's bookmarks are on.",
                     bg=BG, fg=DIM, anchor="w", justify="left",
                     font=("Segoe UI", 8))
     note.pack(side="top", fill="x", pady=(8, 0))
@@ -473,14 +474,11 @@ def _bookmark_row(parent, record):
     head.pack(fill="x")
     tk.Label(head, text="   " + _bookmark_line(record), bg=BG, fg=FG, anchor="w",
              font=("Consolas", 9)).pack(side="left")
-    # Card first: side="right" packs from the edge inwards, and Guide is the
-    # one that belongs beside the row rather than at the very end.
-    path = record.get("path")
-    # Clear of the scrollbar on the right, which the row runs up against.
+    # Delete first: side="right" packs from the edge inwards, and Guide is the
+    # one that belongs beside the row rather than at the very end. Clear of
+    # the scrollbar on the right, which the row runs up against.
     _button(head, "Delete", lambda: _delete_bookmark(record),
             active=palette.ALERT).pack(side="right", padx=(4, 6))
-    _button(head, "Card", (lambda: _open_card(path)) if path else None).pack(
-        side="right", padx=(4, 0))
     _guide_button(head, record)
 
     tk.Label(row, text="   " + _bookmark_detail(record), bg=BG, fg=DIM, anchor="w",
@@ -503,7 +501,7 @@ def _guide_button(parent, record):
 
 
 def _delete_bookmark(record):
-    """Ask, then remove the card and its sidecar from disk.
+    """Ask, then remove the bookmark from disk.
 
     Asked because it is the one button here that destroys something, and the
     thing it destroys cannot be taken again - the patch is findable, the
@@ -516,7 +514,7 @@ def _delete_bookmark(record):
             "Delete bookmark",
             f"Delete {what}, {material}, on {record.get('planet_name')}?"
             + os.linesep * 2
-            + "The card and its sidecar go from disk.",
+            + "The bookmark goes from disk.",
             default="no", parent=_window):
         return
     if overlay.guiding(record):

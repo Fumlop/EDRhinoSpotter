@@ -36,10 +36,12 @@ class TestForSystem:
         write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "x", with_sidecar=False)
         assert cards.for_system("Andel", root=str(tmp_path)) == []
 
-    def test_a_sidecar_without_its_png_is_skipped(self, tmp_path):
+    def test_a_bookmark_without_a_png_is_kept(self, tmp_path):
+        """The JSON is the bookmark; the card image is gone from the plugin."""
         write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "x")
         os.remove(os.path.join(str(tmp_path), "Andel_1_a_loc22_jadeite.png"))
-        assert cards.for_system("Andel", root=str(tmp_path)) == []
+        [record] = cards.for_system("Andel", root=str(tmp_path))
+        assert record["planet_name"] == "Andel 1 a" and record["path"] is None
 
     def test_broken_json_is_skipped_not_raised(self, tmp_path):
         (tmp_path / "Andel_1_a_loc1_jadeite.json").write_text("{not json", encoding="utf-8")
@@ -54,7 +56,7 @@ class TestForSystem:
     def test_a_system_with_no_folder(self, tmp_path):
         assert cards.for_system("Nowhere", root=str(tmp_path / "nope")) == []
 
-    def test_the_path_points_at_the_png(self, tmp_path):
+    def test_an_old_cards_path_points_at_its_png(self, tmp_path):
         png = write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "x")
         assert cards.for_system("Andel", root=str(tmp_path))[0]["path"] == png
 
@@ -87,7 +89,7 @@ class TestNewest:
 
 
 class TestDelete:
-    """Removing a bookmark: the PNG and the sidecar, or neither."""
+    """Removing a bookmark: its JSON, and an old card's PNG with it."""
 
     def test_both_files_go(self, tmp_path):
         write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "3311-05-14T18:40:00")
@@ -149,30 +151,38 @@ class TestOrdered:
         assert [record["rigs"] for record in found] == [1, None]
 
 
-class TestSidecarFromRender:
-    def test_render_writes_one(self, tmp_path):
-        """The end this is all read from: a real card, written by the real
-        renderer."""
-        path = spotcard.render({
+class TestSave:
+    def test_save_writes_one(self, tmp_path):
+        """The end this is all read from: a real bookmark, written by the real
+        writer, and no picture beside it."""
+        path = spotcard.save({
             "system": "Andel", "planet_name": "Andel 1 a", "location_index": 22,
             "commodity": "Jadeite", "rigs": 4, "heading": 214,
             "latitude": 1.5, "longitude": -2.5,
             "marked_at": "3311-05-14T18:40:00", "commander": "Example",
-        }, str(tmp_path / "Andel_1_a_loc22_jadeite.png"))
+        }, str(tmp_path / "Andel_1_a_loc22_jadeite.json"))
         found = cards.for_system("Andel", root=str(tmp_path))
         assert len(found) == 1
         assert found[0]["planet_name"] == "Andel 1 a"
         assert found[0]["commodity"] == "Jadeite"
-        assert found[0]["path"] == path
+        assert found[0]["sidecar"] == path and found[0]["path"] is None
+        assert os.listdir(tmp_path) == ["Andel_1_a_loc22_jadeite.json"]
+
+    def test_a_second_mark_of_the_same_spot_is_a_second_file(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(spotcard, "CARDS_ROOT", str(tmp_path))
+        spot = {"system": "Andel", "planet_name": "Andel 1 a", "location_index": 22,
+                "commodity": "Jadeite", "latitude": 1.0, "longitude": 2.0}
+        first, second = spotcard.save(dict(spot)), spotcard.save(dict(spot))
+        assert first != second and second.endswith("_2.json")
 
     def test_a_datetime_survives_as_text(self, tmp_path):
         """marked_at is a datetime when the plugin writes it and has to come
         back as something json can hold."""
         from datetime import datetime, timezone
-        spotcard.render({
+        spotcard.save({
             "system": "Andel", "planet_name": "Andel 1 a", "location_index": 1,
             "commodity": "Jadeite", "latitude": 1.0, "longitude": 2.0,
             "marked_at": datetime(3311, 5, 14, tzinfo=timezone.utc),
-        }, str(tmp_path / "card.png"))
+        }, str(tmp_path / "spot.json"))
         record = cards.for_system("Andel", root=str(tmp_path))[0]
         assert "3311" in record["marked_at"]

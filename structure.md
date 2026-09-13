@@ -47,10 +47,10 @@ No tkinter anywhere in here.
   `location_index()`, `read_status()`, `mark()`, `on_surface()`, `MATERIALS`.
   `nearest_index()` reads the same location out of a `Touchdown` or `Liftoff`
   instead, which is where it survives the moment Status.json forgets it.
-- **[spotcard.py](rs_core/spotcard.py)** - one spot -> a PNG card. Looks
-  nothing up, so it renders with nothing else running and no network.
-  `render()`, `filename()`, `_free()` (a repeat mark is a second card, not a
-  replacement), `CARDS_ROOT`.
+- **[spotcard.py](rs_core/spotcard.py)** - one spot -> a JSON bookmark. Looks
+  nothing up. `save()`, `filename()`, `_free()` (a repeat mark is a second
+  bookmark, not a replacement), `CARDS_ROOT`, and `_font()` for the map
+  picture's text. It drew a PNG card until the map picture replaced it.
 - **[grounds.py](rs_core/grounds.py)** - what a body is, and what that kind of
   body holds. `classify()` turns a journal Scan into one of eight grounds;
   `Sheet` reads `ground_rules.json`. The classifier mirrors the CASE in
@@ -120,12 +120,12 @@ No tkinter anywhere in here.
   the card itself and the system cache all need a name Windows will take, and
   they used to have three copies of the loop that makes one.
 - **[cards.py](rs_core/cards.py)** - which bodies in a system have been
-  marked, read from the JSON sidecars rather than the file names. A name has
+  marked, read from the JSON bookmarks rather than the file names. A name has
   had its spaces replaced and its material lowercased, so reading a body back
-  out of one is a guess; a PNG without a sidecar is skipped rather than
-  guessed at. `ordered()` is the order a body's bookmarks are read in: most
-  rigs first, uncounted ones last; `delete()` removes one, both files at once,
-  which is why the sidecar's path is carried on the record.
+  out of one is a guess; a PNG without JSON is skipped rather than guessed at.
+  An old card's PNG is kept on the record as `path` when it is still there.
+  `ordered()` is the order a body's bookmarks are read in: most rigs first,
+  uncounted ones last; `delete()` removes one, JSON and any old PNG at once.
 - **[measure.py](rs_core/measure.py)** - area and rig count for a border
   driven in the SRV. Shoelace for the area, ray casting for what is inside,
   and a 76 m grid for the rigs. Flat earth on purpose: a spot is a few hundred
@@ -156,7 +156,7 @@ Everything in here imports tkinter.
   variables that only make sense while a window is open. Both buttons live
   here. Create Card doubles as the update button: it reads "Update" when a
   release is out, then "Restart EDMC" once it is in. A third button would
-  widen the panel on the one day it matters, and a permanent one every day. The card render and the update check run off the UI thread and come
+  widen the panel on the one day it matters, and a permanent one every day. The bookmark write and the update check run off the UI thread and come
   back through `_frame.after`, because Tk is not thread-safe and a widget
   written from a worker fails minutes later somewhere unrelated.
 - **[overlay.py](rs_ui/overlay.py)** - the arrow over the game. A borderless

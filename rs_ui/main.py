@@ -360,10 +360,10 @@ def make_card():
 
 
 def _render_card(spot, token):
-    """The file name is not worth reading - either the card is there or the
-    reason it is not."""
+    """The file name is not worth reading - either the bookmark is there or
+    the reason it is not."""
     try:
-        spotcard.render(spot)
+        spotcard.save(spot)
         message = None
     except Exception as err:
         message = f"no bookmark: {err}"

@@ -69,16 +69,16 @@ A system where you did neither shows nothing, and the window says so.
 **Bookmarks you already made.** A body you have marked before shows
 "2 bookmarks" behind it. Clicking lists them in the same window: one row per
 bookmark with the location, material, rigs, heading, coordinates and when it
-was marked, most rigs first. **Back** returns to the body list, and **Card**
-opens that bookmark's PNG. Bodies with none say nothing.
+was marked, grouped by location, most rigs first. **Back** returns to the body
+list, and **Share map** beside a location opens the picture of the map its
+bookmarks are on. Bodies with none say nothing.
 
 **Guide.** An arrow over the game, top middle, pointing at that patch with the
 distance under it. Elite must run borderless or windowed - nothing draws over
 an exclusive fullscreen. **Stop** on the same row takes it down, and so does
 six seconds of having nothing to point at.
 
-**Delete.** Removes that bookmark from disk, the card and its sidecar, after
-asking.
+**Delete.** Removes that bookmark from disk, after asking.
 
 **Loc.** Landing fills it in by itself, from the mining location the game says
 you came down nearest to. Type over it if it picked the wrong one.
@@ -94,21 +94,19 @@ weeks later opens already filled.
 
 ### Bookmark - the patch you are standing on
 
-![A card](docs/miningcard.png)
-
 1. Land, put the rigs down.
 2. Pick the **Material** and set **Rigs**. `Location` fills itself while the
    mining location is your selected destination; otherwise type the number.
 3. Press **Bookmark**.
 
-`completed` appears beside the button once the PNG is on disk, in
+`completed` appears on the button once the bookmark is on disk, in
 `%LOCALAPPDATA%\RhinoSpotter\cards\<System>\`. The **cards folder** link in
 the panel header opens it.
 
-Everything on the card is read from `Status.json` at the press. It is
-live-only: position and selected location are gone the moment you fly off, so
-make the card before you leave. Marking the same location for the same
-material twice gives you two cards, not one overwritten.
+Everything in it is read from `Status.json` at the press. It is live-only:
+position and selected location are gone the moment you fly off, so bookmark
+before you leave. Marking the same location for the same material twice gives
+you two bookmarks, not one overwritten.
 
 ---
 

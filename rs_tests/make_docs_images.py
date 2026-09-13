@@ -28,7 +28,7 @@ sys.path.insert(0, PLUGIN_DIR)
 
 from PIL import Image, ImageGrab                            # noqa: E402
 
-from rs_core import bodies, coverstore, spotcard, spotmark  # noqa: E402
+from rs_core import bodies, coverage, coverstore, spotmark  # noqa: E402
 from rs_ui import main, minimap, overlay, scan              # noqa: E402
 
 DOCS = os.path.join(PLUGIN_DIR, "docs")
@@ -138,14 +138,7 @@ def main_images():
         grab(window, name, scale, top_margin=34)
         window.destroy()
 
-    card = os.path.join(DOCS, "miningcard.png")
-    spotcard.render({
-        "system": SYSTEM, "planet_name": f"{SYSTEM} 4 a", "location_index": 22,
-        "commodity": "Jadeite", "rigs": 4, "heading": 214,
-        "latitude": 12.345678, "longitude": -98.765432,
-        "marked_at": "3311-05-14T18:40:00", "commander": "Example",
-    }, card)
-    print(f"{'miningcard.png':<18} rendered")
+    card = None             # bookmarks carry no card image any more
 
     body = f"{SYSTEM} 4 a"
     marks = bookmarks(body, card)
@@ -270,6 +263,23 @@ def minimap_image(root, scale):
     # panel with none, and those 6 px are whatever desktop is behind it.
     shot = Image.open(path)
     shot.crop((0, 0, shot.width, shot.height - int(6 * scale))).save(path)
+
+    # The same drive as a shared map picture, with the title and legend the
+    # plugin writes. Spelled out rather than read from cards and the system
+    # cache, which hold the commander's own flights.
+    cover = minimap._coverage
+    spots = [(2400, 400, "T", "Thortveitite", 2), (-900, -6300, "PL", "Platinum", 3)]
+    marks, legend = [], []
+    for x, y, code, material, rigs in spots:
+        at = reading(x, y, 0, 0)
+        marks.append((*cover.xy(at["Latitude"], at["Longitude"]), code))
+        legend.append((code, f"{material}  ·  {at['Latitude']:.6f} / {at['Longitude']:.6f}"
+                             f"  ·  {rigs} rigs"))
+    title = ["4 a  -  " + SYSTEM, "Rocky World  ·  0.16 g  ·  1,284 Ls  ·  22 locations",
+             f"map 1  ·  loc 22  ·  {cover.painted_km2():.0f} km² prospected  ·  3311-05-14 18:40"]
+    coverage.picture(cover.mask, cover.drops, marks, title, legend).save(
+        os.path.join(DOCS, "mapshare.png"))
+    print(f"{'mapshare.png':<18} rendered")
     minimap.stop()
     minimap._bookmarks = was_marks
     minimap.MAP_ALPHA = was_alpha
