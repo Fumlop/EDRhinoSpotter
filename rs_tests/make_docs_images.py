@@ -277,7 +277,7 @@ def minimap_image(root, scale):
                              f"  ·  {rigs} rigs"))
     title = ["4 a  -  " + SYSTEM, "Rocky World  ·  0.16 g  ·  1,284 Ls  ·  22 locations",
              f"map 1  ·  loc 22  ·  {cover.painted_km2():.0f} km² prospected  ·  3311-05-14 18:40"]
-    coverage.picture(cover.mask, cover.drops, marks, title, legend).save(
+    coverage.picture(cover.mask, marks, title, legend).save(
         os.path.join(DOCS, "mapshare.png"))
     print(f"{'mapshare.png':<18} rendered")
     minimap.stop()

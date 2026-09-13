@@ -1,7 +1,7 @@
 """The minimap: how much ground the Rhino's scanner has been driven over.
 
 Every fix out of Status.json while you are in the SRV stamps a disc of
-SCAN_RADIUS_M onto a mask anchored at the droppoint. The discs overlap into one
+SCAN_RADIUS_M onto a mask anchored at the map's centre. The discs overlap into one
 painted area, and the map shows that area around the SRV, north up.
 
 Painted means driven within scanner range, not scanned. Nothing the game
@@ -35,7 +35,7 @@ SCAN_RADIUS_M = 2000.0
 # 20 px between its lines.
 VIEW_M = 6000.0
 
-# Half the width of the mask around the droppoint. Few drive further than 6-7
+# Half the width of the mask around the centre. Few drive further than 6-7
 # km from the ship in any direction; 10 km leaves room past that.
 REACH_M = 10000.0
 
@@ -47,12 +47,12 @@ MASK_M_PER_PX = 50.0
 # in the edge between them, which nobody sees at 50 m a pixel.
 STAMP_M = 250.0
 
-# Grid lines, pinned to the droppoint so they move with the ground.
+# Grid lines, pinned to the centre so they move with the ground.
 GRID_M = 1000.0
 
-# Thin rings around the latest droppoint. At 3 and 5 km rather than one and two
-# scan radii: the first scan disc sits on the droppoint and paints its own
-# 2 km edge, so a ring there only traced it again.
+# Thin rings around the centre, or the latest droppoint until one is set. At 3
+# and 5 km rather than one and two scan radii: a scan disc there paints its own
+# 2 km edge, so a ring at 2 km only traced it again.
 RANGE_RINGS_M = (3000.0, 5000.0)
 
 # How big the map is drawn, as a share of the game window's height, and the
@@ -89,7 +89,11 @@ def map_side(window_height):
 
 
 class Coverage:
-    """One droppoint and everything painted around it."""
+    """One map: everything painted around its centre.
+
+    The centre is where the SRV first came out of the ship, until the player
+    picks one with the hotkey - see recenter().
+    """
 
     def __init__(self, body, lat, lon, radius):
         self.body = body
@@ -100,53 +104,75 @@ class Coverage:
         # Driving around inside what is already painted leaves it alone, and
         # so leaves the drawn layer alone.
         self.version = 0
-        # Where the SRV came out of the ship, in metres from the first of them.
-        # The last one is where the ship is now.
-        self.drops = [(0.0, 0.0)]
-        # What goes to disk: the droppoints, and every point that painted new
-        # ground, as (lat, lon). A point that painted nothing new adds nothing
-        # to a repaint either.
-        self.drop_fixes = [(lat, lon)]
+        # What goes to disk: every point that painted new ground, as (lat,
+        # lon). A point that painted nothing new adds nothing to a repaint.
         self.stamps = []
+        # True once the player has set the centre; then `origin` is it.
+        self.centered = False
+        # Where the SRV last came out of the ship, (lat, lon). The rings and
+        # the footer use it until a centre is set. Kept in memory only.
+        self.drop = (lat, lon)
         # The file this map is saved as - coverstore's 'map N' - once it is.
         self.name = None
         # The mining location last targeted on this map. A label, not a key.
         self.location = None
         self._last = None
-        self._layer = None      # ((version, drops, side), image)
+        self._layer = None      # ((version, side, ring centre), image)
 
     def to_dict(self):
         """The map as coverstore writes it. New lists, so a writer on another
         thread never sees one change under it."""
         def points(fixes):
             return [[round(lat, 6), round(lon, 6)] for lat, lon in fixes]
-        return {"origin": points([self.origin])[0], "radius": self.radius,
-                "location": self.location, "drops": points(self.drop_fixes),
-                "stamps": points(self.stamps)}
+        data = {"origin": points([self.origin])[0], "radius": self.radius,
+                "location": self.location, "stamps": points(self.stamps)}
+        if self.centered:
+            data["center"] = points([self.origin])[0]
+        return data
 
     @classmethod
     def from_dict(cls, body, data, name=None):
         """A map back from disk, repainted from its points. None when the data
-        is not a map."""
+        is not a map. Droppoints in older files are ignored."""
         try:
-            lat, lon = data["origin"]
+            lat, lon = data.get("center") or data["origin"]
             cover = cls(body, float(lat), float(lon), float(data["radius"]))
-            for lat, lon in data["stamps"]:
-                x, y = cover.xy(float(lat), float(lon))
-                if cover._stamp(x, y):
-                    cover.stamps.append((float(lat), float(lon)))
-            drops = [(float(lat), float(lon)) for lat, lon in data["drops"]]
+            cover.centered = bool(data.get("center"))
+            cover._repaint([(float(lat), float(lon)) for lat, lon in data["stamps"]])
         except (KeyError, TypeError, ValueError):
             return None
-        if drops:
-            cover.drop_fixes = drops
-            cover.drops = [cover.xy(lat, lon) for lat, lon in drops]
         cover.name = name
         cover.location = data.get("location")
         return cover
 
+    def _repaint(self, points):
+        """Paint these (lat, lon) points onto a clear mask, keeping each one
+        in `stamps` - including those past the mask's edge, which paint
+        nothing here but belong to the map on disk."""
+        self.mask = Image.new("L", (MASK_PX, MASK_PX), 0)
+        self.stamps = []
+        for lat, lon in points:
+            x, y = self.xy(lat, lon)
+            if abs(x) <= REACH_M + SCAN_RADIUS_M and abs(y) <= REACH_M + SCAN_RADIUS_M:
+                self._stamp(x, y)
+            self.stamps.append((lat, lon))
+        self.version += 1
+        self._last = None
+
+    def recenter(self, lat, lon):
+        """The player says this is the middle of the location: the mask is
+        rebuilt around it from the saved points, and the rings follow."""
+        self.origin = (lat, lon)
+        self.centered = True
+        self._repaint(list(self.stamps))
+
+    def anchor(self):
+        """(x, y) metres the rings are drawn around: the centre once set, the
+        latest droppoint until then."""
+        return (0.0, 0.0) if self.centered else self.xy(*self.drop)
+
     def xy(self, lat, lon):
-        """Metres east and north of the first droppoint."""
+        """Metres east and north of the map's centre."""
         # Longitude taken the short way round: a body straddling the 180th
         # meridian is one step across it, not most of the way round the planet.
         lon = self.origin[1] + (lon - self.origin[1] + 180.0) % 360.0 - 180.0
@@ -157,11 +183,10 @@ class Coverage:
         return abs(x) <= REACH_M and abs(y) <= REACH_M
 
     def launched(self, lat, lon):
-        """The SRV has come out of the ship again, here. A new droppoint, and
-        the first fix is painted rather than measured against where the last
-        launch ended - the ship flew between them and painted nothing."""
-        self.drops.append(self.xy(lat, lon))
-        self.drop_fixes.append((lat, lon))
+        """The SRV has come out of the ship again, here. The first fix is
+        painted rather than measured against where the last launch ended - the
+        ship flew between them and painted nothing."""
+        self.drop = (lat, lon)
         self._last = None
 
     def add(self, lat, lon):
@@ -201,9 +226,10 @@ class Coverage:
     def layer(self, side):
         """The whole mask drawn at the scale of a map this big, kept until
         something new is painted."""
-        key = (self.version, len(self.drops), side)
+        ring_at = tuple(round(v) for v in self.anchor())
+        key = (self.version, side, ring_at)
         if self._layer is None or self._layer[0] != key:
-            self._layer = (key, _draw_layer(self.mask, self.drops, side))
+            self._layer = (key, _draw_layer(self.mask, side, ring_at))
         return self._layer[1]
 
 
@@ -212,8 +238,8 @@ def follow(coverage, fix, was_in_srv, saved=None):
 
     The same one while the body is the same and the fix is inside its mask,
     so a ship hop of a few km carries on painting the same map. Anything else
-    is a map saved on this body that reaches here - the last one saved, carried on
-    with a new droppoint - or a new map.
+    is a map saved on this body that reaches here - the last one saved - or a
+    new map.
 
     `saved(body)` gives coverstore.maps' [(name, data), ...].
     """
@@ -261,7 +287,7 @@ def _pick_saved(found, body, lat, lon, skip=None):
 
 def map_at(found, body, lat, lon):
     """The name of the saved map a point belongs to, or None: of the maps that
-    reach it, the one whose first droppoint is nearest. No repaint - reach is
+    reach it, the one whose centre is nearest. No repaint - reach is
     measured from each map's origin. `found` is coverstore.maps' list."""
     best = None
     for name, data in found:
@@ -282,20 +308,18 @@ def map_at(found, body, lat, lon):
 PICTURE_SIDE = int(round(MASK_PX * VIEW_M / REACH_M))
 
 
-def picture(mask, drops, marks=(), title=(), legend=()):
+def picture(mask, marks=(), title=(), legend=()):
     """The whole map as a PIL image, north up, bookmarks on it.
 
-    Takes a copy of the mask, the droppoints and the bookmarks (metres) rather
-    than the Coverage, so it can run off the Tk thread while the SRV keeps
-    painting.
+    Takes a copy of the mask and the bookmarks (metres) rather than the
+    Coverage, so it can run off the Tk thread while the SRV keeps painting.
 
     `title` is lines of text above the map, the first one larger; `legend` is
     (code, text) rows below it, one per bookmark. Both optional - without them
     the picture is the bare map.
     """
-    # No droppoints and no range rings: they say where the ship was, which is
-    # nothing to come back for. The ground and the bookmarks are.
-    image = _draw_layer(mask, (), PICTURE_SIDE)
+    # No rings: the ground and the bookmarks are what the picture is kept for.
+    image = _draw_layer(mask, PICTURE_SIDE)
     scale = image.width / (2 * REACH_M)
     _bookmarks(image, [(image.width / 2 + mx * scale, image.height / 2 - my * scale, *rest)
                        for mx, my, *rest in marks], PICTURE_SIDE)
@@ -341,8 +365,6 @@ def _mix(a, b, share):
 
 FILL = _mix(palette.BG, palette.ACCENT, 0.22)
 EDGE = _mix(palette.BG, palette.ACCENT, 0.85)
-# Earlier droppoints: still worth seeing, not where the ship is.
-DROP_OLD = _mix(palette.BG, palette.GOOD, 0.45)
 RING = _mix(palette.BG, palette.GOOD, 0.4)
 # Bookmarks: a colour nothing else on the map uses.
 MARK = palette.rgb(palette.ALERT)
@@ -350,8 +372,7 @@ MARK = palette.rgb(palette.ALERT)
 
 def _bookmarks(image, points, side):
     """A dot per bookmark at these pixel positions, its material's code beside
-    it. Radius 1.8% of the map side against the latest droppoint's 2.4%: smaller
-    than it, still a dot at 180 px.
+    it. Radius 1.8% of the map side: small, and still a dot at 180 px.
 
     `points` are (x, y) or (x, y, code) - grounds.Sheet.codes gives the code.
     """
@@ -364,14 +385,15 @@ def _bookmarks(image, points, side):
                          outline=palette.rgb(palette.BG))
             if rest and rest[0]:
                 # Outlined in the background colour: readable over the painted
-                # area, the grid and the droppoints alike.
+                # area, the grid and the rings alike.
                 draw.text((cx + r + 1, cy), rest[0], fill=MARK, font=font, anchor="lm",
                           stroke_width=2, stroke_fill=palette.rgb(palette.BG))
 
 
-def _draw_layer(mask, drops, side):
-    """Painted area, grid, the edge of the mask and the droppoints, over all of
-    REACH_M, at `side` pixels to 2 * VIEW_M."""
+def _draw_layer(mask, side, ring_at=None):
+    """Painted area, grid, the edge of the mask and the rings around `ring_at`
+    (metres, or None for no rings), over all of REACH_M, at `side` pixels to
+    2 * VIEW_M."""
     size = int(round(side * REACH_M / VIEW_M))
     big = size * SS
     scale = big / (2 * REACH_M)                   # pixels a metre
@@ -395,21 +417,13 @@ def _draw_layer(mask, drops, side):
     # Where the mask ends - past it nothing is painted.
     draw.rectangle([0, 0, big - 1, big - 1], outline=palette.rgb(palette.WARN), width=SS)
 
-    # Distance rings around the latest droppoint, RANGE_RINGS_M. A pixel wide
-    # after the reduce, and dim - a scale, not a claim.
-    if drops:
-        dx, dy = at(*drops[-1])
+    # Distance rings, RANGE_RINGS_M. A pixel wide after the reduce, and dim -
+    # a scale, not a claim.
+    if ring_at is not None:
+        dx, dy = at(*ring_at)
         for radius_m in RANGE_RINGS_M:
             r = radius_m * scale
             draw.ellipse([dx - r, dy - r, dx + r, dy + r], outline=RING, width=SS)
-
-    for number, (mx, my) in enumerate(drops, 1):
-        latest = number == len(drops)
-        dx, dy = at(mx, my)
-        s = side * SS * (0.024 if latest else 0.02)
-        draw.polygon([(dx, dy - s), (dx + s, dy), (dx, dy + s), (dx - s, dy)],
-                     fill=palette.rgb(palette.GOOD) if latest else DROP_OLD,
-                     outline=palette.rgb(palette.BG))
 
     # A box average is all two-times supersampling needs, and a tenth of what
     # LANCZOS costs.
@@ -448,7 +462,7 @@ def render(coverage, x, y, heading, side, marks=()):
 
     A crop of the kept layer with the bookmarks and the marker on top - the
     painting itself is only redone when coverage.version moves. `marks` are
-    bookmarks in metres from the first droppoint.
+    bookmarks in metres from the map's centre.
     """
     layer = coverage.layer(side)
     scale = side / (2 * VIEW_M)

@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.7.0
+
+**Added**
+
+- **Ctrl+Alt+Z** sets the map's center where the SRV stands. The map is
+  rebuilt around it from the saved points, the 3 and 5 km rings move there,
+  and the footer points to the Center instead of the droppoint. The center is
+  saved with the map as one `center` entry and named in the map picture's
+  title. The minimap shows the hotkey under its footer. Windows-wide while
+  EDMC runs; if another program holds the combination, a warning says so.
+
+**Removed**
+
+- Droppoints as map marks and in the saved map. Until a center is set, the
+  latest droppoint is still what the rings sit around and the footer points
+  to; it is kept in memory only. Older map files load, their droppoints
+  ignored.
+
 ## 3.6.1
 
 **Changed**

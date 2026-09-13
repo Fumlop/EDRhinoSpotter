@@ -26,7 +26,7 @@ import tkinter as tk
 
 from rs_core import arrow, cards, coverage, coverstore, grounds, guide, palette, spotcard, spotmark, store
 from rs_core.logging import logger
-from rs_ui import overlay
+from rs_ui import hotkey, overlay
 
 try:
     import myNotebook as nb
@@ -64,7 +64,8 @@ _placed = None
 _photo = None            # the PhotoImage on the canvas - Tk drops it unreferenced
 _drawn = None            # what the last picture was of, so standing still is free
 _coverage = None
-_saved = None            # (map, version, droppoints, location) last handed to _writes
+_saved = None            # (map, version, centered, location) last handed to _writes
+_here = None             # (lat, lon) of the last SRV fix, for the centre hotkey
 _writes = store.Debounced(write=coverstore.save)
 _in_srv = False
 _failed = False          # a draw that raised: stay down until the next launch
@@ -91,7 +92,7 @@ def update(root, status, system=None):
     Nothing raises out of here: the caller is the panel's poll, and a raise
     would stop it rescheduling - Bookmark would stop greying out with it.
     """
-    global _coverage, _in_srv, _failed
+    global _coverage, _in_srv, _failed, _here
     if not status:
         # A read that landed mid-write. Not a reason to take the map down and
         # count the next fix as a fresh launch.
@@ -113,6 +114,7 @@ def update(root, status, system=None):
             _writes.flush()
         _in_srv = True
         body, lat, lon, _, heading = fix
+        _here = (lat, lon)
         in_reach = _coverage.add(lat, lon)
         index = spotmark.location_index(status)
         if index is not None:
@@ -152,17 +154,31 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
     per_px = 2 * coverage.VIEW_M / side
     state = (int(x // per_px), int(y // per_px),
              None if heading is None else arrow.bucket(heading),
-             side, where, in_reach, header, _coverage.version, len(_coverage.drops), marks)
+             side, where, in_reach, header, _coverage.version,
+             tuple(round(v) for v in _coverage.anchor()), _coverage.centered, marks)
     if state != _drawn:
         _draw(side, x, y, heading, in_reach, header, marks)
         _drawn = state
     _place(side, where, rect)
 
 
+def center_here():
+    """The hotkey: where the SRV is now becomes the map's centre. Nothing
+    outside the SRV - there is no fix to take and no map to move."""
+    global _drawn
+    if not _in_srv or _coverage is None or _here is None:
+        logger.debug("minimap: centre hotkey outside the SRV, ignored")
+        return
+    _coverage.recenter(*_here)
+    _drawn = None
+    _remember()
+    logger.debug(f"minimap: centre set at {_here[0]:.6f} / {_here[1]:.6f}")
+
+
 def _remember():
     """Hand the map to the two-second writer when it has changed."""
     global _saved
-    state = (_coverage, _coverage.version, len(_coverage.drops), _coverage.location)
+    state = (_coverage, _coverage.version, _coverage.centered, _coverage.location)
     if state == _saved:
         return
     if _coverage.name is None:
@@ -235,13 +251,13 @@ def _docked(system):
     if _coverage is None or _coverage.name is None:
         return
     body, name = _coverage.body, _coverage.name
-    mask, drops = _coverage.mask.copy(), list(_coverage.drops)
+    mask = _coverage.mask.copy()
     marks = [(*_coverage.xy(lat, lon), code) for lat, lon, code in _bookmarks(system, body)]
     title, legend = picture_text(_coverage, system)
 
     def draw():
         try:
-            coverstore.save_png(body, name, coverage.picture(mask, drops, marks, title, legend))
+            coverstore.save_png(body, name, coverage.picture(mask, marks, title, legend))
         except Exception:
             logger.exception(f"minimap: could not draw the picture of {name} on {body}")
 
@@ -281,6 +297,8 @@ def picture_text(cover, system, when=None):
     if not locations and cover.location is not None:
         locations = [cover.location]
     about = [cover.name or "map"]
+    if cover.centered:
+        about.append(f"center {cover.origin[0]:.6f} / {cover.origin[1]:.6f}")
     if locations:
         about.append("loc " + ", ".join(str(n) for n in locations))
     about.append(f"{cover.painted_km2():.0f} km² prospected")
@@ -445,7 +463,7 @@ def _layout(side):
     unit = side / 240.0
     pad = max(6, round(8 * unit))
     band = max(18, round(22 * unit))
-    return unit, pad, band, side + 2 * pad, side + 2 * band + 2 * pad
+    return unit, pad, band, side + 2 * pad, side + 3 * band + 2 * pad
 
 
 def _place(side, where, rect):
@@ -510,7 +528,6 @@ def _draw(side, x, y, heading, in_reach, header, marks=()):
                         font=small, anchor="e")
     _canvas.create_image(pad, top, image=_photo, anchor="nw")
 
-    drops = _coverage.drops
     _canvas.create_rectangle(pad - 1, top - 1, pad + side, top + side, outline=palette.RULE)
 
     # Scale bar: one grid square.
@@ -520,15 +537,18 @@ def _draw(side, x, y, heading, in_reach, header, marks=()):
     _canvas.create_text(bx + bar + 4 * unit, by, text=guide.metres(coverage.GRID_M),
                         fill=palette.FG, font=small, anchor="w")
 
-    # The latest droppoint is where the ship is. Short on the right: at the
-    # smallest map both lines share 196 px.
+    # To the centre once one is set, to the latest droppoint - the ship - until
+    # then. Short on the right: at the smallest map both lines share 196 px.
     foot = top + side + band / 2 + pad / 2
-    to_x, to_y = drops[-1]
+    to_x, to_y = _coverage.anchor()
     distance = ((to_x - x) ** 2 + (to_y - y) ** 2) ** 0.5
+    label = "Center" if _coverage.centered else "Droppoint"
     _canvas.create_text(pad, foot,
-                        text=f"Droppoint  {guide.metres(distance)} "
+                        text=f"{label}  {guide.metres(distance)} "
                              f"{guide.compass(coverage.bearing(x, y, to_x, to_y))}",
                         fill=palette.GOOD, font=small, anchor="w")
+    _canvas.create_text(pad, foot + band, text=f"{hotkey.LABEL}  set center",
+                        fill=palette.MUTED, font=small, anchor="w")
     if in_reach:
         _canvas.create_text(width - pad, foot, text=f"{_coverage.painted_km2():.0f} km²",
                             fill=palette.ACCENT, font=bold, anchor="e")

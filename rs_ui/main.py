@@ -16,7 +16,7 @@ import tkinter as tk
 
 from rs_core import bodies, grounds, palette, spotcard, spotmark, store, update
 from rs_core.logging import logger
-from rs_ui import minimap, scan
+from rs_ui import hotkey, minimap, scan
 
 try:
     from theme import theme
@@ -141,6 +141,7 @@ def build(parent):
 
     _refresh_scan_count()
     update.check_async(_on_update_checked)
+    hotkey.start(lambda: _on_ui(minimap.center_here))
     return _frame
 
 
@@ -281,6 +282,7 @@ def stop():
     global _landed_after, _done_after
     _landed_after = _cancel_landed()
     _done_after = _cancel_done()
+    hotkey.stop()
     minimap.stop()
     # Last, and not through the timer: EDMC is going, and a scan waiting on a
     # two-second thread would go with it.

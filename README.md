@@ -141,31 +141,35 @@ Bookmarks land in `%LOCALAPPDATA%\RhinoSpotter\cards\<System>\`. The
 
 <p align="center">
   <img src="docs/minimap.png" width="260"
-       alt="The minimap: three droppoints, the painted area around them, the SRV in the middle">
+       alt="The minimap: the painted area, two bookmarks, rings around the droppoint, the SRV in the middle">
 </p>
 
 Launch the Rhino and a map comes up in a corner of the game. Wherever you
 drive, a 2 km disc - the scanner's range - is painted in, and the discs run
 together into the ground you have covered. North is up, the SRV stays in the
-middle and the ground scrolls under it. The green diamond is the
-**Droppoint**, where the SRV came out of the ship; the footer says how far and
-which way it is, and how many km² are painted.
+middle and the ground scrolls under it. Two thin rings, 3 and 5 km out, sit
+around the **Droppoint** - where the SRV came out of the ship - and the footer
+says how far and which way it is, and how many km² are painted.
+
+- **Ctrl+Alt+Z sets the center.** Drive to the middle of the mining location
+  and press it: the map is rebuilt around where you stand, the rings move
+  there, and the footer points to the **Center** instead of the droppoint.
+  The center is saved with the map. The hotkey is Windows-wide while EDMC
+  runs; if another program already holds it, EDMC's log says so.
 
 - **Painted means driven within 2 km, not scanned.** Nothing the game writes
   says a scan happened. The 2 km is the community figure; Frontier has not
   published one.
 - **Ship hops keep the map and paint nothing.** Dock, fly 3 km, launch again,
-  and it carries on painting the same area from the new droppoint. The latest
-  droppoint is bright, because that is where the ship is, and
-  the footer points to it. A launch more than 10 km from the first droppoint,
-  or on another body, starts a fresh map. Driving past 10 km says **out of
+  and it carries on painting the same area; the rings and the footer move to
+  the new droppoint, because that is where the ship is. A launch more than
+  10 km from the map's center, or on another body, starts a fresh map. Driving past 10 km says **out of
   range** and stops painting.
 - **Size follows the game window**: 22% of its height, between 180 and 480 px.
   The map always shows 12 km across with a 1 km grid, so 1080p is about 50 m a
   pixel, 85% opaque. Hidden while the game is minimised or not the window in front;
   painting carries on meanwhile.
-- **Bookmarks show as red dots** on the body they were made on, smaller than a
-  droppoint, with the material's code beside it: the most valuable material
+- **Bookmarks show as red dots** on the body they were made on, with the material's code beside it: the most valuable material
   gets one letter (Thortveitite **T**), a cheaper one sharing it gets two
   (Thorium **TH**, Titanium **TI**). A new bookmark is on the map the moment you press Bookmark. That
   press is a click in EDMC, which hides the map until you are back in the game.
@@ -192,8 +196,8 @@ Each time the SRV docks, the whole map is written as `map N.png`: body and
 system, the planet from the honk, the locations its bookmarks were made at,
 the km² prospected and when. Under the map, one row per bookmark on it - code,
 material, coordinates and rigs - so whoever you send it to can fly straight
-to the patch. Droppoints and range rings are left out; they only say where
-your ship was.
+to the patch. The rings are left out; they only say where your ship was. A
+centered map names its center coordinates in the title.
 ## Logging
 
 RhinoSpotter keeps out of EDMC's log: only warnings and errors are written.

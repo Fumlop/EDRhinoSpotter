@@ -81,7 +81,7 @@ No tkinter anywhere in here.
 - **[coverstore.py](rs_core/coverstore.py)** - the minimap's maps under
   `%LOCALAPPDATA%\RhinoSpotter\coverage\<Body>\map N.json.gz`, a folder per
   body and a file per map, so a save never merges. The points that painted new
-  ground and the droppoints, lat/lon to six decimals, gzipped: an hour's drive
+  ground, and the center once one is set, lat/lon to six decimals, gzipped: an hour's drive
   is about 2.4 KB. Plain `.json` is read too. A file that will not parse is
   skipped and logged. `map N.png` beside it is written, never read.
 - **[replay.py](rs_core/replay.py)** - recent journals through the same
@@ -102,10 +102,12 @@ No tkinter anywhere in here.
 - **[coverage.py](rs_core/coverage.py)** - the minimap's painting. Every
   Status.json fix in the SRV stamps a 2 km disc onto a 400 x 400 mask, 50 m
   a pixel, anchored at the first droppoint and reaching 10 km either way.
-  `follow()` decides when a launch is the same map (same body, inside the
-  mask) and adds a droppoint, and when it is a new map. A disc that paints
-  nothing new does not move `version`, and the drawn layer is only rebuilt
-  when `version` or the droppoints change - a tick is a crop of that layer and
+  `recenter()` moves the anchor to where the player pressed the hotkey and
+  repaints the mask from the saved points. `follow()` decides when a launch is
+  the same map (same body, inside the mask) and moves the droppoint, and when
+  it is a new map. A disc that paints nothing new does not move `version`, and
+  the drawn layer is only rebuilt when `version` or the ring centre changes -
+  a tick is a crop of that layer and
   a cached chevron. Longitude is wrapped, so a body across the 180th meridian
   is one map. Painted means driven within range: nothing the game writes says
   a scan happened.
@@ -159,6 +161,10 @@ Everything in here imports tkinter.
   widen the panel on the one day it matters, and a permanent one every day. The bookmark write and the update check run off the UI thread and come
   back through `_frame.after`, because Tk is not thread-safe and a widget
   written from a worker fails minutes later somewhere unrelated.
+- **[hotkey.py](rs_ui/hotkey.py)** - Ctrl+Alt+Z, registered with
+  RegisterHotKey on a thread with its own message loop, since the game holds
+  the focus while you drive. The press is bounced to Tk and sets the map's
+  center. A combination already held elsewhere is a logged warning.
 - **[overlay.py](rs_ui/overlay.py)** - the arrow over the game. A borderless
   always-on-top window keyed to a colour it then makes a hole of, so only what
   is drawn shows, and click-through on top of that - a shape over the cockpit
@@ -229,8 +235,8 @@ Everything in here imports tkinter.
   and punch a hole through its own arrow.
 - **test_coverage.py** - one stamp is one disc, a drive is a strip, driving
   back over it moves nothing, the mask edge clips without counting as new
-  ground, the 180th meridian, when a launch keeps the map and adds a
-  droppoint and when it is a new map, a ship hop painting nothing, the
+  ground, the 180th meridian, when a launch keeps the map and moves the
+  droppoint and when it is a new map, centring and its round trip, a ship hop painting nothing, the
   window-height clamp, north up, and the layer kept until new ground is
   painted. Saved maps: the points repaint the same mask, a launch within reach
   carries the last saved map on (nearest on a tie), one out of reach starts a new one.

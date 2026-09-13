@@ -138,11 +138,11 @@ class TestFollow:
         again = coverage.follow(cover, self.fix(x=coverage.REACH_M + 1000), was_in_srv=True)
         assert again is cover
 
-    def test_a_relaunch_adds_a_droppoint_where_the_ship_is_now(self):
+    def test_a_relaunch_moves_the_droppoint_to_where_the_ship_is_now(self):
         cover = coverage.follow(None, self.fix(), was_in_srv=False)
         cover = coverage.follow(cover, self.fix(x=3300, y=-500), was_in_srv=False)
         cover = coverage.follow(cover, self.fix(x=3400, y=-400), was_in_srv=True)
-        assert [tuple(round(v) for v in d) for d in cover.drops] == [(0, 0), (3300, -500)]
+        assert tuple(round(v) for v in cover.anchor()) == (3300, -500)
 
     def test_the_ship_hop_itself_paints_nothing(self):
         # Only fixes in the SRV reach add(); the flight between two launches
@@ -198,9 +198,7 @@ class TestSaved:
         cover = self.driven()
         back = coverage.Coverage.from_dict("A 2", cover.to_dict(), "map 1")
         assert back.mask.tobytes() == cover.mask.tobytes()
-        flat = lambda drops: [v for drop in drops for v in drop]
-        assert flat(back.drops) == pytest.approx(flat(cover.drops), abs=0.1)
-        assert back.name == "map 1"
+        assert back.name == "map 1" and "drops" not in cover.to_dict()
 
     def test_only_new_ground_is_kept(self):
         cover = fresh()
@@ -220,7 +218,7 @@ class TestSaved:
         again = coverage.follow(None, self.fix(x=8000, y=-3000), was_in_srv=False, saved=saved)
         assert again.name == "map 1"
         assert again.painted_km2() == pytest.approx(cover.painted_km2())
-        assert len(again.drops) == len(cover.drops) + 1
+        assert tuple(round(v) for v in again.anchor()) == (8000, -3000)
 
     def test_a_launch_out_of_reach_is_a_new_map(self):
         cover = self.driven()
@@ -256,6 +254,34 @@ class TestSaved:
         assert coverage.map_at(found, "A 2", *at(0, 0)) == "map 2"
         assert coverage.map_at(found, "A 2", *at(coverage.REACH_M + 5000, 0)) is None
 
+    def test_centring_moves_the_map_and_keeps_the_ground(self):
+        cover = self.driven()
+        area = cover.painted_km2()
+        cover.recenter(*at(3000, 1000))
+        assert cover.centered and cover.anchor() == (0.0, 0.0)
+        # All of the drive lies within reach of the new centre, so nothing is lost.
+        assert cover.painted_km2() == pytest.approx(area, rel=0.02)
+        assert cover.xy(*at(3000, 1000)) == pytest.approx((0, 0), abs=0.5)
+
+    def test_a_centre_is_saved_and_comes_back(self):
+        cover = self.driven()
+        # Six decimals, as the hotkey takes it from Status.json.
+        centre = [round(v, 6) for v in at(3000, 1000)]
+        cover.recenter(*centre)
+        data = cover.to_dict()
+        assert data["center"] == centre
+        back = coverage.Coverage.from_dict("A 2", data, "map 1")
+        assert back.centered and back.mask.tobytes() == cover.mask.tobytes()
+
+    def test_an_uncentred_map_saves_no_centre(self):
+        assert "center" not in self.driven().to_dict()
+
+    def test_points_past_a_new_centres_reach_stay_on_disk(self):
+        cover = self.driven()
+        stamps = len(cover.stamps)
+        cover.recenter(*at(-9000, -9000))
+        assert len(cover.stamps) == stamps
+
     def test_another_bodys_map_of_the_same_name_is_not_skipped(self):
         # 'map 1' on A 3 and 'map 1' on A 2 are different files.
         other = coverage.follow(None, self.fix(body="A 3"), was_in_srv=False)
@@ -265,7 +291,7 @@ class TestSaved:
 
     def test_the_picture_is_the_whole_mask_at_mask_size(self):
         cover = self.driven()
-        image = coverage.picture(cover.mask.copy(), list(cover.drops))
+        image = coverage.picture(cover.mask.copy())
         assert image.size == (coverage.MASK_PX, coverage.MASK_PX)
 
 
@@ -345,18 +371,18 @@ class TestRender:
 
     def test_the_picture_grows_for_title_and_legend(self):
         cover = fresh()
-        bare = coverage.picture(cover.mask.copy(), list(cover.drops))
-        full = coverage.picture(cover.mask.copy(), list(cover.drops),
+        bare = coverage.picture(cover.mask.copy())
+        full = coverage.picture(cover.mask.copy(),
                                 title=["8 b  -  r Velorum", "Rocky World", "map 1"],
                                 legend=[("T", "Thortveitite  ·  loc 2  ·  2 rigs")])
         assert full.width == bare.width and full.height > bare.height + 60
-        long = coverage.picture(cover.mask.copy(), list(cover.drops),
+        long = coverage.picture(cover.mask.copy(),
                                 title=["A 2  -  Col 285 Sector LS-P b7-1 with a much longer name"])
         assert long.width > bare.width
 
     def test_the_picture_carries_the_bookmarks(self):
         cover = fresh()
-        image = coverage.picture(cover.mask.copy(), list(cover.drops), marks=[(4000, 4000)])
+        image = coverage.picture(cover.mask.copy(), marks=[(4000, 4000)])
         scale = image.width / (2 * coverage.REACH_M)
         assert image.getpixel((int(image.width / 2 + 4000 * scale),
                                int(image.height / 2 - 4000 * scale))) == coverage.MARK
