@@ -387,7 +387,10 @@ def _place(side, where, rect):
     if _handle:
         user32 = _user32()
         user32.SetWindowPos(_handle, HWND_TOPMOST, x, y, width, height, SWP_NOACTIVATE)
-        if not _shown:
+        # Asked every tick, not trusted from _shown: after a hide through Win32
+        # the map stayed down once Guide and RhinoScan had been used, with
+        # _shown saying it was up. Showing a shown window again costs nothing.
+        if not _shown or not user32.IsWindowVisible(_handle):
             user32.ShowWindow(_handle, SW_SHOWNOACTIVATE)
     elif not _shown:
         _window.deiconify()
@@ -414,7 +417,6 @@ def _draw(side, x, y, heading, in_reach, header, marks=()):
     small = ("Consolas", max(8, round(9 * unit)))
     bold = ("Segoe UI", max(9, round(10 * unit)), "bold")
     top = pad + band
-    per_m = side / (2 * coverage.VIEW_M)
 
     _canvas.delete("all")
     _canvas.create_text(pad, pad + band / 2, text=header, fill=palette.MUTED,
@@ -423,19 +425,7 @@ def _draw(side, x, y, heading, in_reach, header, marks=()):
                         font=small, anchor="e")
     _canvas.create_image(pad, top, image=_photo, anchor="nw")
 
-    # Numbers beside the droppoints once there is more than one. Canvas text
-    # rather than PIL, for the same fonts as the rest of the panel.
     drops = _coverage.drops
-    if len(drops) > 1:
-        for number, (mx, my) in enumerate(drops, 1):
-            px = pad + side / 2 + (mx - x) * per_m + 9 * unit
-            py = top + side / 2 - (my - y) * per_m
-            if pad <= px <= pad + side - 6 * unit and top <= py <= top + side:
-                latest = number == len(drops)
-                _canvas.create_text(px, py, text=str(number), anchor="w",
-                                    fill=palette.GOOD if latest else palette.MUTED,
-                                    font=bold if latest else small)
-
     _canvas.create_rectangle(pad - 1, top - 1, pad + side, top + side, outline=palette.RULE)
 
     # Scale bar: one grid square.
@@ -450,9 +440,8 @@ def _draw(side, x, y, heading, in_reach, header, marks=()):
     foot = top + side + band / 2 + pad / 2
     to_x, to_y = drops[-1]
     distance = ((to_x - x) ** 2 + (to_y - y) ** 2) ** 0.5
-    label = f"Droppoint {len(drops)}" if len(drops) > 1 else "Droppoint"
     _canvas.create_text(pad, foot,
-                        text=f"{label}  {guide.metres(distance)} "
+                        text=f"Droppoint  {guide.metres(distance)} "
                              f"{guide.compass(coverage.bearing(x, y, to_x, to_y))}",
                         fill=palette.GOOD, font=small, anchor="w")
     if in_reach:

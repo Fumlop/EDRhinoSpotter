@@ -18,5 +18,6 @@ except ImportError:                                  # bare interpreter, tests
     if not logger.handlers:
         logger.addHandler(logging.NullHandler())
 
-if os.environ.get("RHINOSPOTTER_DEBUG"):
-    logger.setLevel(logging.DEBUG)
+# Debug lines only on a machine that asks for them. EDMC's plugin logger passes
+# DEBUG by default, so without this every scan-window fit lands in a player's log.
+logger.setLevel(logging.DEBUG if os.environ.get("RHINOSPOTTER_DEBUG") else logging.INFO)

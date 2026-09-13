@@ -260,8 +260,7 @@ PICTURE_SIDE = int(round(MASK_PX * VIEW_M / REACH_M))
 
 
 def picture(mask, drops, marks=()):
-    """The whole map as a PIL image, north up, droppoints numbered, bookmarks
-    on it.
+    """The whole map as a PIL image, north up, droppoints and bookmarks on it.
 
     Takes a copy of the mask, the droppoints and the bookmarks (metres) rather
     than the Coverage, so it can run off the Tk thread while the SRV keeps
@@ -271,12 +270,6 @@ def picture(mask, drops, marks=()):
     scale = image.width / (2 * REACH_M)
     _bookmarks(image, [(image.width / 2 + mx * scale, image.height / 2 - my * scale, *rest)
                        for mx, my, *rest in marks], PICTURE_SIDE)
-    draw = ImageDraw.Draw(image)
-    font = spotcard._font("consola.ttf", 16)
-    for number, (mx, my) in enumerate(drops, 1):
-        dx, dy = image.width / 2 + mx * scale, image.height / 2 - my * scale
-        draw.text((dx + PICTURE_SIDE * 0.035, dy - 8), str(number),
-                  fill=palette.rgb(palette.FG), font=font)
     return image
 
 
@@ -303,7 +296,7 @@ MARK = palette.rgb(palette.ALERT)
 
 def _bookmarks(image, points, side):
     """A dot per bookmark at these pixel positions, its material's code beside
-    it. Radius 1.8% of the map side against the latest droppoint's 3%: smaller
+    it. Radius 1.8% of the map side against the latest droppoint's 2.4%: smaller
     than it, still a dot at 180 px.
 
     `points` are (x, y) or (x, y, code) - grounds.Sheet.codes gives the code.
@@ -351,7 +344,7 @@ def _draw_layer(mask, drops, side):
     for number, (mx, my) in enumerate(drops, 1):
         latest = number == len(drops)
         dx, dy = at(mx, my)
-        s = side * SS * (0.03 if latest else 0.025)
+        s = side * SS * (0.024 if latest else 0.02)
         draw.polygon([(dx, dy - s), (dx + s, dy), (dx, dy + s), (dx - s, dy)],
                      fill=palette.rgb(palette.GOOD) if latest else DROP_OLD,
                      outline=palette.rgb(palette.BG))

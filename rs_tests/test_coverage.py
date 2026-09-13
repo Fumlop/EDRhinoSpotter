@@ -309,7 +309,7 @@ class TestRender:
         image = coverage.render(fresh(), 5000, 0, None, side, marks=[(0, 0)])
         dot = sum(1 for i in range(side) for j in range(side)
                   if image.getpixel((i, j)) == coverage.MARK)
-        diamond = (2 * side * 0.03) ** 2 / 2          # the latest droppoint's area
+        diamond = (2 * side * 0.024) ** 2 / 2         # the latest droppoint's area
         assert 0 < dot < diamond
 
     def test_a_bookmark_carries_its_code_beside_it(self):

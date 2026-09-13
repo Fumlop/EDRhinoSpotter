@@ -160,8 +160,8 @@ which way it is, and how many km² are painted.
   says a scan happened. The 2 km is the community figure; Frontier has not
   published one.
 - **Ship hops keep the map and paint nothing.** Dock, fly 3 km, launch again,
-  and it carries on painting the same area from the new droppoint. Droppoints
-  are numbered; the latest is bright, because that is where the ship is, and
+  and it carries on painting the same area from the new droppoint. The latest
+  droppoint is bright, because that is where the ship is, and
   the footer points to it. A launch more than 10 km from the first droppoint,
   or on another body, starts a fresh map. Driving past 10 km says **out of
   range** and stops painting.

@@ -9,6 +9,19 @@
   two: Thortveitite T, Thorium TH, Titanium TI, Tritium TR. Every code on the
   sheet is different.
 
+**Changed**
+
+- Droppoints lose their numbers, on the map, in its footer and in the saved
+  picture, and are drawn a fifth smaller.
+- Debug lines are written only with `RHINOSPOTTER_DEBUG` set. Info and errors
+  still go to EDMC's log.
+
+**Fixed**
+
+- The minimap could stay hidden for good after RhinoScan and Guide had been
+  used, while the arrow came back. It now asks Windows every tick whether it
+  is visible and shows itself again if not.
+
 ## 3.2.0
 
 **Added**
