@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.6.1
+
+**Changed**
+
+- The thin rings around the latest droppoint are at 3 and 5 km, were 2 and 4.
+  The first scan disc sits on the droppoint and already paints its 2 km edge.
+
 ## 3.6.0
 
 **Removed**

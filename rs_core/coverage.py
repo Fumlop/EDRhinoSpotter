@@ -50,8 +50,10 @@ STAMP_M = 250.0
 # Grid lines, pinned to the droppoint so they move with the ground.
 GRID_M = 1000.0
 
-# Thin rings around the latest droppoint: one scan radius and two.
-RANGE_RINGS_M = (SCAN_RADIUS_M, 2 * SCAN_RADIUS_M)
+# Thin rings around the latest droppoint. At 3 and 5 km rather than one and two
+# scan radii: the first scan disc sits on the droppoint and paints its own
+# 2 km edge, so a ring there only traced it again.
+RANGE_RINGS_M = (3000.0, 5000.0)
 
 # How big the map is drawn, as a share of the game window's height, and the
 # limits either side - a laptop window should not get a stamp, a 4K screen
@@ -393,8 +395,7 @@ def _draw_layer(mask, drops, side):
     # Where the mask ends - past it nothing is painted.
     draw.rectangle([0, 0, big - 1, big - 1], outline=palette.rgb(palette.WARN), width=SS)
 
-    # Scan range around the latest droppoint, one and two discs out: what the
-    # scanner covers from the ship, and from one disc further. A pixel wide
+    # Distance rings around the latest droppoint, RANGE_RINGS_M. A pixel wide
     # after the reduce, and dim - a scale, not a claim.
     if drops:
         dx, dy = at(*drops[-1])

@@ -340,8 +340,8 @@ class TestRender:
             bg = palette.rgb(palette.BG)
             return any(self.pixel(image, side / 2 + d + k, side / 2 - d - k) != bg
                        for k in (-1, 0, 1))
-        assert ring_near(2000) and ring_near(4000)
-        assert not ring_near(3000)
+        assert ring_near(3000) and ring_near(5000)
+        assert not ring_near(4000)
 
     def test_the_picture_grows_for_title_and_legend(self):
         cover = fresh()
