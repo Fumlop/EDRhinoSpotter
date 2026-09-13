@@ -49,6 +49,7 @@ ALL_MATERIALS = "All"
 
 _card_button = None      # Bookmark, until there is an update to install
 _landed_after = None     # the pending look at whether we are on the ground
+_update_after = None     # the pending hourly look for a new release
 _loc = None              # tk.StringVar - mining location index
 _rigs = None             # tk.StringVar - rigs on the patch
 _material = None         # tk.StringVar - the material this spot is mined for
@@ -140,7 +141,7 @@ def build(parent):
     _poll_landed()
 
     _refresh_scan_count()
-    update.check_async(_on_update_checked)
+    _check_updates()
     hotkey.start({hotkey.CENTER: lambda: _on_ui(minimap.center_here),
                   hotkey.BORDER: lambda: _on_ui(minimap.border_here)})
     return _frame
@@ -280,9 +281,15 @@ def stop():
     teardown by design; left alone it fires once against a frame that is no
     longer there.
     """
-    global _landed_after, _done_after
+    global _landed_after, _done_after, _update_after
     _landed_after = _cancel_landed()
     _done_after = _cancel_done()
+    if _update_after and _frame:
+        try:
+            _frame.after_cancel(_update_after)
+        except (ValueError, tk.TclError):
+            pass
+    _update_after = None
     hotkey.stop()
     minimap.stop()
     # Last, and not through the timer: EDMC is going, and a scan waiting on a
@@ -381,6 +388,20 @@ def _report(message, token):
     _set_done("" if message else DONE_TEXT)
 
 
+# How often a running EDMC looks for a new release. Once at start was all it
+# did, and a session left open for a day never heard of one.
+UPDATE_CHECK_MS = 60 * 60 * 1000
+
+
+def _check_updates():
+    """Look for a release now, and again in an hour."""
+    global _update_after
+    if not _frame:
+        return
+    update.check_async(_on_update_checked)
+    _update_after = _frame.after(UPDATE_CHECK_MS, _check_updates)
+
+
 def _on_update_checked(tag, newer):
     """Called on a worker thread - bounce to Tk before touching a widget."""
     _on_ui(_show_update, tag, newer)
@@ -397,10 +418,15 @@ def _show_update(tag, newer):
     """
     if not _card_button or not newer:
         return
+    if str(_card_button.cget("text")) in ("Updating...", "Restart EDMC"):
+        return          # an hourly check must not undo an install under way
     # "Update", not "Update v2.1.0": the tag would be the one string wider
     # than the button, and widening the panel is what this design avoids. The
     # version it is going to goes in the status line instead.
-    _card_button.config(text="Update", fg=palette.WARN, command=_install_update)
+    # Enabled: the button starts disabled and only the landed poll turns it on,
+    # and that poll leaves anything not reading "Bookmark" alone - so starting
+    # EDMC docked gave a grey Update nobody could press.
+    _card_button.config(text="Update", fg=palette.WARN, command=_install_update, state="normal")
     _set_status(f"{tag} is out")
 
 

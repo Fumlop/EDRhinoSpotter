@@ -1,5 +1,25 @@
 # Changelog
 
+## 4.0.1
+
+**Fixed**
+
+- The Update button could not be pressed. It took over the Bookmark button,
+  which starts disabled and is only enabled on the ground - so starting EDMC
+  docked or in space showed a grey Update nobody could click. It is enabled
+  now.
+- A running EDMC looks for a new release every hour, not only at start.
+
+**Changed**
+
+- The update check no longer uses the GitHub API, which allows 60 anonymous
+  requests an hour per address. The version comes from where the
+  releases/latest page redirects, the zip from codeload for that tag. Both
+  go through `requests`, as EliteMeritTracker does, with urllib only where
+  `requests` is missing.
+- A failed check is a warning in EDMC's log once a session, so it can be
+  seen without debug logging.
+
 ## 4.0.0
 
 **Added**

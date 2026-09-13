@@ -12,7 +12,6 @@ of its entries may overwrite what is here. See rs_tests/test_update.py.
 """
 
 import io
-import json
 import os
 import re
 import shutil
@@ -23,7 +22,12 @@ import zipfile
 
 from rs_core.logging import logger
 
-VERSION = "4.0.0"
+try:
+    import requests         # ships inside EDMC, with its own certificates
+except ImportError:         # a bare interpreter without it
+    requests = None
+
+VERSION = "4.0.1"
 
 # For testing the update path without publishing a throwaway release: set
 # RHINOSPOTTER_VERSION to something older and the running plugin will see the
@@ -31,8 +35,13 @@ VERSION = "4.0.0"
 # still whatever the release actually contains.
 RUNNING = os.environ.get("RHINOSPOTTER_VERSION") or VERSION
 REPO = "Fumlop/EDRhinoSpotter"
-RELEASES_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
+# Not the GitHub API: it allows 60 requests an hour per address without a
+# login, shared by everyone behind one router, and a player who hits it simply
+# never hears of an update. The releases page redirects to the newest tag, and
+# codeload serves that tag's source zip - the same <owner>-<repo>-<sha> folder
+# inside that the API's zipball had. Neither is rate limited that way.
 RELEASES_PAGE = f"https://github.com/{REPO}/releases/latest"
+CODELOAD_ZIP = f"https://codeload.github.com/{REPO}/legacy.zip/refs/tags/{{tag}}"
 TIMEOUT = 10
 DOWNLOAD_TIMEOUT = 60
 
@@ -67,25 +76,65 @@ def is_newer(latest, current=None):
     return parse(latest) > parse(current if current is not None else RUNNING)
 
 
-def fetch_release(url=RELEASES_URL, opener=urllib.request.urlopen):
-    """The latest release as GitHub describes it, or None.
+def _open(url, timeout):
+    """GET `url`, following redirects, as a context manager with read() and
+    geturl() - the shape urlopen has, so tests hand in either.
 
-    None covers every failure the same way: no network, rate limited, repo has
-    no releases yet. The plugin works offline, so none of them is worth a
-    different message.
+    Through `requests` when it is there, as EliteMeritTracker does: EDMC ships
+    it with certifi and the system proxy settings, which is the path players'
+    machines are known to allow. urllib otherwise.
     """
+    if requests is None:
+        return urllib.request.urlopen(url, timeout=timeout)
+    response = requests.get(url, timeout=timeout, allow_redirects=True)
+    response.raise_for_status()
+
+    class Answer:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            response.close()
+            return False
+
+        def read(self):
+            return response.content
+
+        def geturl(self):
+            return response.url
+    return Answer()
+
+
+_warned = False
+
+
+def fetch_latest(page=RELEASES_PAGE, opener=_open):
+    """The newest release's tag, from where the releases/latest page redirects
+    to, or None.
+
+    None covers every failure the same way: no network, no releases yet, a page
+    that did not land on a tag. The plugin works offline. A failure is a warning
+    once a session - the check repeats hourly, and an offline evening is not
+    worth 24 lines in EDMC's log.
+    """
+    global _warned
     try:
-        with opener(url, timeout=TIMEOUT) as response:
-            return json.loads(response.read().decode("utf-8"))
+        with opener(page, timeout=TIMEOUT) as response:
+            final = response.geturl()
     except Exception as err:                        # noqa: BLE001 - see docstring
-        logger.debug(f"update check failed: {err}")
-        return None
-
-
-def fetch_latest(url=RELEASES_URL, opener=urllib.request.urlopen):
-    """Just the tag of the latest release, or None."""
-    release = fetch_release(url, opener)
-    return release.get("tag_name") if release else None
+        final = None
+        reason = err
+    else:
+        reason = f"landed on {final}"
+    match = re.search(r"/releases/tag/([^/?#]+)$", final or "")
+    if match:
+        return match.group(1)
+    if not _warned:
+        logger.warning(f"update check failed: {reason}; it tries again every hour")
+        _warned = True
+    else:
+        logger.debug(f"update check failed: {reason}")
+    return None
 
 
 def check_async(callback):
@@ -164,7 +213,7 @@ def _replace(source, target):
         shutil.copy2(source, target)
 
 
-def download(url, opener=urllib.request.urlopen):
+def download(url, opener=_open):
     """The bytes of a release zip, or None."""
     try:
         with opener(url, timeout=DOWNLOAD_TIMEOUT) as response:
@@ -183,21 +232,16 @@ def install_async(callback, plugin_dir=None):
     target = plugin_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     def run():
-        release = fetch_release()
-        if not release:
+        tag = fetch_latest()
+        if not tag:
             callback(False, "no answer from GitHub")
             return
-        url = release.get("zipball_url")
-        if not url:
-            callback(False, "release has no zip")
-            return
-        payload = download(url)
+        payload = download(CODELOAD_ZIP.format(tag=tag))
         if not payload:
             callback(False, "download failed")
             return
         ok = install(payload, target)
-        callback(ok, f"{release.get('tag_name', 'update')} installed, restart EDMC"
-                 if ok else "install failed, see the log")
+        callback(ok, f"{tag} installed, restart EDMC" if ok else "install failed, see the log")
 
     thread = threading.Thread(target=run, daemon=True)
     thread.start()

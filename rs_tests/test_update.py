@@ -79,13 +79,13 @@ class TestIsNewer:
 
 
 class TestFetch:
-    def test_reads_the_tag(self):
-        assert update.fetch_latest(opener=_serving({"tag_name": "v9.9.9"})) == "v9.9.9"
+    def test_reads_the_tag_off_the_redirect(self):
+        assert update.fetch_latest(opener=_landing(
+            "https://github.com/Fumlop/EDRhinoSpotter/releases/tag/v9.9.9")) == "v9.9.9"
 
-    def test_reads_the_whole_release(self):
-        release = update.fetch_release(
-            opener=_serving({"tag_name": "v9.9.9", "zipball_url": "https://x/z"}))
-        assert release["zipball_url"] == "https://x/z"
+    def test_the_zip_comes_from_codeload_for_that_tag(self):
+        assert update.CODELOAD_ZIP.format(tag="v9.9.9") == \
+            "https://codeload.github.com/Fumlop/EDRhinoSpotter/legacy.zip/refs/tags/v9.9.9"
 
     @pytest.mark.parametrize("boom", [
         OSError("no network"),
@@ -98,10 +98,22 @@ class TestFetch:
         def opener(url, timeout=None):
             raise boom
         assert update.fetch_latest(opener=opener) is None
-        assert update.fetch_release(opener=opener) is None
 
-    def test_a_release_without_a_tag(self):
-        assert update.fetch_latest(opener=_serving({})) is None
+    def test_a_page_that_does_not_land_on_a_tag(self):
+        """No releases yet: releases/latest lands on the releases list."""
+        assert update.fetch_latest(opener=_landing(
+            "https://github.com/Fumlop/EDRhinoSpotter/releases")) is None
+
+    def test_a_failure_warns_once_a_session(self, monkeypatch):
+        warnings = []
+        monkeypatch.setattr(update, "_warned", False)
+        monkeypatch.setattr(update.logger, "warning", warnings.append)
+
+        def opener(url, timeout=None):
+            raise OSError("offline")
+        update.fetch_latest(opener=opener)
+        update.fetch_latest(opener=opener)
+        assert len(warnings) == 1
 
     def test_download_returns_bytes(self):
         assert update.download("https://x/z", opener=_serving_bytes(b"zip")) == b"zip"
@@ -208,6 +220,23 @@ def _zipball(files, root=None):
         for name, content in files.items():
             archive.writestr(f"{root}/{name}", content)
     return buffer.getvalue()
+
+
+def _landing(final_url):
+    """An opener whose response ended at final_url after redirects."""
+    class Response:
+        def __init__(self, url, timeout=None):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def geturl(self):
+            return final_url
+    return Response
 
 
 def _serving(payload):
