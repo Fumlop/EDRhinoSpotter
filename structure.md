@@ -209,7 +209,7 @@ Everything in here imports tkinter.
 
 ## Tests (`rs_tests/`)
 
-`pytest` from the plugin folder. 274 checks, no network, no game, no display.
+`pytest` from the plugin folder. 351 checks, no network, no game, no display.
 
 - **conftest.py** - puts the plugin folder on `sys.path`, and builds Scan
   events carrying only the fields the code reads. The `sheet` fixture is a
