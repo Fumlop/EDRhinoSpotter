@@ -135,6 +135,18 @@ class Sheet:
         rows = [row for row in self.grounds.get(ground, []) if row['pct'] >= minimum]
         return rows[:limit] if limit else rows
 
+    def best(self, ground, limit=None, minimum=0.0):
+        """What that ground pays, most per location first: pct times median.
+
+        Likeliest-first put copper, haematite and titanium at the top of
+        high-metal ground once the sheet carried the cheap half - common and
+        worth nothing. A median of 0 is unpriced; those sort last rather than
+        vanish, so a ground with nothing priced still says what it holds.
+        """
+        rows = sorted(self.materials(ground, minimum=minimum),
+                      key=lambda row: -row['pct'] * (row.get('median') or 0))
+        return rows[:limit] if limit else rows
+
     def rate(self, ground, material):
         """What that ground reads for one material, or None if it never has.
 

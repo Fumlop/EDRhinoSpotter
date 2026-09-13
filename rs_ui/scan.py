@@ -301,12 +301,12 @@ def _group(parent, ground, found, sheet, wrap, focus=None, marked=None):
     tk.Label(head, text=f"{len(found)} of them", bg=BG, fg=DIM,
              font=("Segoe UI", 9), anchor="w").pack(side="left", padx=8)
 
-    materials = sheet.materials(ground, limit=TOP_MATERIALS, minimum=MIN_PCT)
+    materials = sheet.best(ground, limit=TOP_MATERIALS, minimum=MIN_PCT)
     if focus:
         # The chosen material leads, whatever its rate, and in the accent
         # colour so it is not read as one of the others. A ground listed
         # because it carries jadeite has to say what it carries it at, even
-        # when three likelier things sit under it.
+        # when three better-paying things sit under it.
         rate = sheet.rate(ground, focus)
         tk.Label(block, text=f"{focus} {rate}%", bg=BG, fg=ACCENT, anchor="w",
                  font=("Consolas", 10, "bold")).pack(fill="x", pady=(2, 0))

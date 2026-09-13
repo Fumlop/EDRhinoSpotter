@@ -209,7 +209,7 @@ def main(argv=None):
         counted = sum(body.get("locations") or 0 for body in seen)
         print(f"\n{system}   score {value}, {len(seen)} landable, {counted} locations counted")
         for ground, found in _by_ground(seen):
-            rows = sheet.materials(ground, limit=3, minimum=2.0)
+            rows = sheet.best(ground, limit=3, minimum=2.0)
             best_of = "  ".join(f"{row['material']} {row['pct']}%" for row in rows) or "-"
             print(f"   {grounds.label(ground):<28} {len(found):>2} body(s)   {best_of}")
     return 0

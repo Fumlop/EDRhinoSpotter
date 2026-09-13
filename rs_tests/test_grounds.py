@@ -76,6 +76,23 @@ class TestSheet:
         kept = sheet.materials("volcanic magma", minimum=2.0)
         assert [row["material"] for row in kept] == ["Olivine", "Monazite"]
 
+    def test_best_puts_what_pays_first(self, sheet):
+        # Monazite 45.6% x 400k beats Olivine 56.1% x 50k.
+        rows = sheet.best("volcanic magma", minimum=2.0)
+        assert [row["material"] for row in rows] == ["Monazite", "Olivine"]
+
+    def test_best_sorts_unpriced_last_and_keeps_them(self, tmp_path):
+        """The high-metal case: copper is likeliest and has no price."""
+        import json
+        path = tmp_path / "ground_rules.json"
+        path.write_text(json.dumps({"grounds": {"high-metal-content": [
+            {"material": "Copper", "pct": 55.5, "median": 0, "best": 0},
+            {"material": "Osmium", "pct": 40.1, "median": 46638, "best": 273000},
+            {"material": "Iridium", "pct": 19.8, "median": 182000, "best": 400000},
+        ]}}), encoding="utf-8")
+        rows = grounds.Sheet(str(path)).best("high-metal-content")
+        assert [row["material"] for row in rows] == ["Iridium", "Osmium", "Copper"]
+
     def test_unknown_ground_is_empty_not_an_error(self, sheet):
         assert sheet.materials("volcanic silicate") == []
         assert sheet.sample("volcanic silicate") == 0

@@ -22,6 +22,10 @@
 
 - The panel's once-a-second Status.json read feeds the minimap too, so there
   is still one parse a second.
+- RhinoScan's three materials per ground are the ones that pay most per
+  location - share of locations times median price - not the likeliest. On
+  high-metal ground that was copper, haematite and titanium, all unpriced;
+  it is now iridium, platinum and osmium. Unpriced materials sort last.
 
 **Not flown**
 
