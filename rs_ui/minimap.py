@@ -44,6 +44,10 @@ KEY = overlay.KEY
 # title bar. No map over the desktop then.
 MIN_GAME_HEIGHT = 200
 
+# How much of the map covers the game behind it. 85%: the cockpit shows through
+# faintly, and the painted area, dots and text still read at a glance.
+MAP_ALPHA = 0.85
+
 # Bookmarks are read again at least this often, seconds.
 MARKS_S = 10
 
@@ -336,6 +340,7 @@ def _build(root):
             # click-through style needs a layered window to have been given
             # attributes, and this is the call that gives them.
             _window.attributes("-transparentcolor", KEY)
+            _window.attributes("-alpha", MAP_ALPHA)
         except tk.TclError:
             pass
         _canvas = tk.Canvas(_window, bg=palette.PANEL, highlightthickness=0, borderwidth=0)

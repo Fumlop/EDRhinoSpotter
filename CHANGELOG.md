@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.5.0
+
+**Changed**
+
+- The minimap is 85% opaque: the game shows faintly through it.
+
 ## 3.4.0
 
 **Changed**

@@ -167,7 +167,7 @@ which way it is, and how many km² are painted.
   range** and stops painting.
 - **Size follows the game window**: 22% of its height, between 180 and 480 px.
   The map always shows 12 km across with a 1 km grid, so 1080p is about 50 m a
-  pixel. Hidden while the game is minimised or not the window in front;
+  pixel, 85% opaque. Hidden while the game is minimised or not the window in front;
   painting carries on meanwhile.
 - **Bookmarks show as red dots** on the body they were made on, smaller than a
   droppoint, with the material's code beside it: the most valuable material
