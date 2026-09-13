@@ -246,7 +246,7 @@ Everything in here imports tkinter.
 - **test_names.py** - every character Windows refuses, spaces kept for a folder
   and replaced for a file, and that the cache and the cards folder spell one
   system the same way.
-- **test_palette.py** - that the card and the window draw the same black, and
+- **test_palette.py** - that the window draws from the one palette, and
   that a colour which is not six hex digits raises rather than silently
   becoming black.
 - **test_replay.py** - which files count as recent, that a second visit does
