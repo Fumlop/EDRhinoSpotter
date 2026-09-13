@@ -248,7 +248,7 @@ def picture_text(cover, system, when=None):
 
     Title: the body, what kind of planet it is from the system's honk, and the
     map with the locations its bookmarks were made at. Legend: one row per
-    bookmark on the map - its code, material, location and rigs.
+    bookmark on the map - its code, material, coordinates and rigs.
     """
     body = cover.body
     records = []
@@ -290,9 +290,9 @@ def picture_text(cover, system, when=None):
 
     legend = []
     for r in records:
-        parts = [r.get("commodity") or "?"]
-        if r.get("location_index") is not None:
-            parts.append(f"loc {r['location_index']}")
+        # Coordinates rather than the location: the title already names the
+        # locations, and a latitude and longitude is what gets you back.
+        parts = [r.get("commodity") or "?", f"{float(r['latitude']):.6f} / {float(r['longitude']):.6f}"]
         if r.get("rigs") is not None:
             parts.append(f"{r['rigs']} rig" + ("" if r["rigs"] == 1 else "s"))
         legend.append((_code(r.get("commodity")), "  ·  ".join(parts)))
