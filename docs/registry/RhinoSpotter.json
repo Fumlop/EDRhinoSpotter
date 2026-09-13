@@ -1,12 +1,12 @@
 {
   "pluginName": "RhinoSpotter",
-  "pluginVer": "2.9.1",
-  "pluginZip": "https://github.com/Fumlop/EDRhinoSpotter/releases/download/v2.9.1/RhinoSpotter-2.9.1.zip",
+  "pluginVer": "2.10.0",
+  "pluginZip": "https://github.com/Fumlop/EDRhinoSpotter/releases/download/v2.10.0/RhinoSpotter-2.10.0.zip",
   "autoUpdateEnabled": false,
   "autoInstallEnabled": false,
   "pluginAuthors": ["Fumlop"],
   "pluginMainLink": "https://github.com/Fumlop/EDRhinoSpotter",
-  "pluginLastUpdate": "2026-09-12",
+  "pluginLastUpdate": "2026-09-13",
   "pluginDirName": "RhinoSpotter",
   "pluginCategory": ["Exploration", "Utility"],
   "pluginDesc": "Surface mining: which landable bodies in this system are worth prospecting, a card for the patch you are standing on, and an arrow over the game that guides you back to it.",
@@ -15,5 +15,5 @@
   "pluginLicense": "GPL-3.0-or-later",
   "pluginIcon": "",
   "pluginVT": "",
-  "pluginHash": "e1a6a7bd078a066405ddb9556cfa10b7b87081a4a4a42e43d9d8f9851a4a59b9"
+  "pluginHash": "d6a43faa62154196d6373e0552e8cf294b4e1604c9475f455a4af1f3b2d39809"
 }
