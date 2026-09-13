@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.5.2
+
+**Changed**
+
+- A body's bookmarks are grouped by location, and **Share map** sits beside
+  each location rather than the planet name. It opens the map picture the
+  location's bookmarks lie on, found from their coordinates; greyed when none
+  of them lies on a saved map.
+
 ## 3.5.1
 
 **Changed**

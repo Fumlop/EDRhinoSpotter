@@ -257,6 +257,24 @@ def _pick_saved(found, body, lat, lon, skip=None):
     return None
 
 
+def map_at(found, body, lat, lon):
+    """The name of the saved map a point belongs to, or None: of the maps that
+    reach it, the one whose first droppoint is nearest. No repaint - reach is
+    measured from each map's origin. `found` is coverstore.maps' list."""
+    best = None
+    for name, data in found:
+        try:
+            probe = Coverage(body, float(data["origin"][0]), float(data["origin"][1]),
+                             float(data["radius"]))
+        except (KeyError, IndexError, TypeError, ValueError):
+            continue
+        if probe.reaches(lat, lon):
+            distance = math.hypot(*probe.xy(lat, lon))
+            if best is None or distance < best[0]:
+                best = (distance, name)
+    return best[1] if best else None
+
+
 # The map side that makes the saved picture come out at the mask's own size:
 # the whole mask, 400 x 400 at 50 m a pixel.
 PICTURE_SIDE = int(round(MASK_PX * VIEW_M / REACH_M))

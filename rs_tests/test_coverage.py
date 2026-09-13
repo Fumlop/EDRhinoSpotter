@@ -249,6 +249,13 @@ class TestSaved:
         saved = lambda body: [("map 1", far), ("map 2", near)]
         assert coverage.follow(None, self.fix(), was_in_srv=False, saved=saved).name == "map 1"
 
+    def test_a_point_belongs_to_the_map_with_the_nearest_origin(self):
+        near = coverage.Coverage("A 2", *at(2000, 0), RADIUS).to_dict()
+        far = coverage.Coverage("A 2", *at(-8000, 0), RADIUS).to_dict()
+        found = [("map 1", far), ("map 2", near)]
+        assert coverage.map_at(found, "A 2", *at(0, 0)) == "map 2"
+        assert coverage.map_at(found, "A 2", *at(coverage.REACH_M + 5000, 0)) is None
+
     def test_another_bodys_map_of_the_same_name_is_not_skipped(self):
         # 'map 1' on A 3 and 'map 1' on A 2 are different files.
         other = coverage.follow(None, self.fix(body="A 3"), was_in_srv=False)

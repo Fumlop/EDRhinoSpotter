@@ -15,7 +15,7 @@ import tkinter as tk
 import webbrowser
 from tkinter import font as tkfont, messagebox
 
-from rs_core import cards, coverstore, grounds, palette
+from rs_core import cards, coverage, coverstore, grounds, palette
 from rs_core.logging import logger
 from rs_ui import overlay
 
@@ -383,23 +383,19 @@ def _bookmarks_view(window, system, body, records):
     back.pack(fill="x", pady=(0, 6))
     _button(back, "‹ Back", lambda: _scan_view(window)).pack(side="left")
 
-    title = tk.Frame(outer, bg=BG)
-    title.pack(fill="x")
-    tk.Label(title, text=body, bg=BG, fg=FG, anchor="w",
-             font=("Segoe UI", 15, "bold")).pack(side="left")
-    # The last map saved on this body, opened like a card. Greyed when the
-    # body has never been driven.
-    picture = coverstore.latest_png(body)
-    _button(title, "Share map", (lambda: _open_card(picture)) if picture else None).pack(
-        side="left", padx=(10, 0))
+    tk.Label(outer, text=body, bg=BG, fg=FG, anchor="w",
+             font=("Segoe UI", 15, "bold")).pack(fill="x")
     count = len(records)
     tk.Label(outer, text=f"{system or ''}  -  {count} bookmark{'' if count == 1 else 's'}",
              bg=BG, fg=DIM, anchor="w", font=("Segoe UI", 9)).pack(fill="x", pady=(0, 10))
 
     _column_header(outer)
     listing, _ = _scrollable(outer)
-    for record in cards.ordered(records):
-        _bookmark_row(listing, record)
+    maps = coverstore.maps(body)
+    for index, group in _by_location(records):
+        _location_header(listing, body, index, group, maps)
+        for record in cards.ordered(group):
+            _bookmark_row(listing, record)
 
     note = tk.Label(outer, text="Guide puts an arrow over the game, top middle - "
                                 "borderless or windowed only. Card opens the PNG.",
@@ -408,6 +404,39 @@ def _bookmarks_view(window, system, body, records):
     note.pack(side="top", fill="x", pady=(8, 0))
     _Wrapper(window, margin=40)(note)
     _fit(window, listing, extra=BUTTONS)
+
+
+def _by_location(records):
+    """[(location, [bookmark, ...]), ...], by location, unnumbered last."""
+    groups = {}
+    for record in records:
+        groups.setdefault(record.get("location_index"), []).append(record)
+    return sorted(groups.items(), key=lambda item: (item[0] is None, item[0] or 0))
+
+
+def _location_header(parent, body, index, group, maps):
+    """'loc 2' over its bookmarks, and Share map for the map they were made on.
+
+    The map is found from the bookmarks' own coordinates - maps are kept by
+    where the SRV came down, not by location number. Greyed when none of them
+    lies on a saved map with a picture.
+    """
+    head = tk.Frame(parent, bg=BG)
+    head.pack(fill="x", pady=(8, 2))
+    tk.Label(head, text="loc " + (str(index) if index is not None else "-"), bg=BG, fg=ACCENT,
+             anchor="w", font=("Segoe UI", 10, "bold")).pack(side="left")
+    picture = None
+    for record in group:
+        lat, lon = record.get("latitude"), record.get("longitude")
+        if lat is None or lon is None:
+            continue
+        name = coverage.map_at(maps, body, float(lat), float(lon))
+        path = os.path.join(coverstore.folder(body), f"{name}.png") if name else None
+        if path and os.path.isfile(path):
+            picture = path
+            break
+    _button(head, "Share map", (lambda: _open_card(picture)) if picture else None).pack(
+        side="left", padx=(10, 0))
 
 
 def _column_header(parent):
