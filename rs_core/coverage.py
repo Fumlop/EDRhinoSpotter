@@ -263,7 +263,7 @@ PICTURE_SIDE = int(round(MASK_PX * VIEW_M / REACH_M))
 
 
 def picture(mask, drops, marks=(), title=(), legend=()):
-    """The whole map as a PIL image, north up, droppoints and bookmarks on it.
+    """The whole map as a PIL image, north up, bookmarks on it.
 
     Takes a copy of the mask, the droppoints and the bookmarks (metres) rather
     than the Coverage, so it can run off the Tk thread while the SRV keeps
@@ -273,7 +273,9 @@ def picture(mask, drops, marks=(), title=(), legend=()):
     (code, text) rows below it, one per bookmark. Both optional - without them
     the picture is the bare map.
     """
-    image = _draw_layer(mask, drops, PICTURE_SIDE)
+    # No droppoints and no range rings: they say where the ship was, which is
+    # nothing to come back for. The ground and the bookmarks are.
+    image = _draw_layer(mask, (), PICTURE_SIDE)
     scale = image.width / (2 * REACH_M)
     _bookmarks(image, [(image.width / 2 + mx * scale, image.height / 2 - my * scale, *rest)
                        for mx, my, *rest in marks], PICTURE_SIDE)
@@ -376,10 +378,11 @@ def _draw_layer(mask, drops, side):
     # Scan range around the latest droppoint, one and two discs out: what the
     # scanner covers from the ship, and from one disc further. A pixel wide
     # after the reduce, and dim - a scale, not a claim.
-    dx, dy = at(*drops[-1])
-    for radius_m in RANGE_RINGS_M:
-        r = radius_m * scale
-        draw.ellipse([dx - r, dy - r, dx + r, dy + r], outline=RING, width=SS)
+    if drops:
+        dx, dy = at(*drops[-1])
+        for radius_m in RANGE_RINGS_M:
+            r = radius_m * scale
+            draw.ellipse([dx - r, dy - r, dx + r, dy + r], outline=RING, width=SS)
 
     for number, (mx, my) in enumerate(drops, 1):
         latest = number == len(drops)
