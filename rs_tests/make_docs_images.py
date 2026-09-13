@@ -16,6 +16,7 @@ somebody's flight log otherwise, and the numbers here only have to be
 plausible.
 """
 
+import math
 import os
 import sys
 import time
@@ -24,10 +25,10 @@ import tkinter as tk
 PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PLUGIN_DIR)
 
-from PIL import ImageGrab                                   # noqa: E402
+from PIL import Image, ImageGrab                            # noqa: E402
 
 from rs_core import bodies, spotcard, spotmark              # noqa: E402
-from rs_ui import main, overlay, scan                       # noqa: E402
+from rs_ui import main, minimap, overlay, scan              # noqa: E402
 
 DOCS = os.path.join(PLUGIN_DIR, "docs")
 SYSTEM = "Hyperion Reach AB-C d1-42"
@@ -167,6 +168,7 @@ def main_images():
     window.destroy()
 
     overlay_image(root, scale, marks[0])
+    minimap_image(root, scale)
     root.destroy()
 
 
@@ -212,6 +214,54 @@ def overlay_image(root, scale, mark):
     spotmark.read_status = was
     overlay._game_rect = was_rect
 
+
+def minimap_image(root, scale):
+    """The minimap after three launches with two ship hops between them, fed
+    invented Status.json readings.
+
+    A pretend 1080p game window at the top left of the screen, so the map comes
+    out the size most people will see it at and not whatever this monitor is.
+    """
+    was_rect = overlay._game_rect
+    overlay._game_rect = lambda: (0, 0, 1920, 1080)
+    radius = 1738000.0
+    per_degree = radius * math.pi / 180.0
+    lat0, lon0 = 12.3400, -98.7700
+    launches = [
+        [(0, 0), (1500, 2200), (3200, 2600), (2600, 400)],
+        [(6500, -2500), (8200, -1200), (9000, -3600), (7200, -4400)],
+        [(1500, -6000), (-600, -7400), (-1800, -5200), (400, -4300)],
+    ]
+
+    def reading(x, y, heading, flags):
+        return {
+            "Flags": flags, "BodyName": f"{SYSTEM} 4 a",
+            "Latitude": lat0 + y / per_degree,
+            "Longitude": lon0 + x / (per_degree * math.cos(math.radians(lat0))),
+            "Heading": heading, "PlanetRadius": radius,
+            "Destination": {"Name": "$SAA_Unknown_Signal:#index=22;"},
+        }
+
+    for track in launches:
+        for (x1, y1), (x2, y2) in zip(track, track[1:]):
+            steps = int(math.hypot(x2 - x1, y2 - y1) // 30)
+            heading = math.degrees(math.atan2(x2 - x1, y2 - y1)) % 360
+            for i in range(steps + 1):
+                minimap.update(root, reading(x1 + (x2 - x1) * i / steps,
+                                             y1 + (y2 - y1) * i / steps,
+                                             heading, minimap.coverage.IN_SRV), SYSTEM)
+        if track is not launches[-1]:
+            # Back in the ship for the hop: nothing painted until the next launch.
+            minimap.update(root, reading(*track[-1], 0, 0x1000000), SYSTEM)
+    window = minimap._window
+    settle(window, 20)
+    path = grab(window, "minimap.png", scale)
+    # grab() takes 6 px under the window for menu shadows. The map is a solid
+    # panel with none, and those 6 px are whatever desktop is behind it.
+    shot = Image.open(path)
+    shot.crop((0, 0, shot.width, shot.height - int(6 * scale))).save(path)
+    minimap.stop()
+    overlay._game_rect = was_rect
 
 if __name__ == "__main__":
     if not os.environ.get("RHINOSPOTTER_DOCS"):

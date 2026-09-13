@@ -93,6 +93,16 @@ No tkinter anywhere in here.
   half a plugin behind. `KEEP` names what an update may not overwrite -
   `ground_rules.json` above all, because a locally refreshed sheet is newer
   than the one in a release.
+- **[coverage.py](rs_core/coverage.py)** - the minimap's painting. Every
+  Status.json fix in the SRV stamps a 2 km disc onto an 880 x 880 mask, 50 m
+  a pixel, anchored at the first droppoint and reaching 22 km either way.
+  `follow()` decides when a launch is the same map (same body, inside the
+  mask) and adds a droppoint, and when it is a new map. A disc that paints
+  nothing new does not move `version`, and the drawn layer is only rebuilt
+  when `version` or the droppoints change - a tick is a crop of that layer and
+  a cached chevron. Longitude is wrapped, so a body across the 180th meridian
+  is one map. Painted means driven within range: nothing the game writes says
+  a scan happened.
 - **[arrow.py](rs_core/arrow.py)** - the guide arrow, as a picture. Two faces
   either side of a fold, drawn with PIL at four times the size and resized
   down, which is where the smooth edge comes from - the Tk canvas has no
@@ -165,6 +175,16 @@ Everything in here imports tkinter.
   and that material leads every group whatever its rate - the question has
   changed from "what is here" to "where is the jadeite", and a ground that
   answers at 4% still answers.
+- **[minimap.py](rs_ui/minimap.py)** - the minimap window and its settings
+  tab. No timer of its own: `main._poll_landed` hands it the Status.json it
+  already read, and nothing raises back into that poll. Shown while the InSRV
+  flag is set, hidden otherwise and while the game is minimised, sized from
+  the game window's height and parked in the corner picked under EDMC
+  Settings (`rhinospotter_minimap_enabled`, `rhinospotter_minimap_corner`).
+  Built once, hidden, and made click-through and no-activate before it is
+  first shown; then shown, moved and hidden with Win32 calls that do not take
+  the foreground, because it comes up mid-game on its own. A draw that raises
+  keeps it down until the next launch. The painted area is in memory only.
 
 ## Tests (`rs_tests/`)
 
@@ -193,6 +213,12 @@ Everything in here imports tkinter.
   the frame is the key colour everywhere the arrow is not, that the two faces
   are two colours, and that no colour shaded down can land on the key colour
   and punch a hole through its own arrow.
+- **test_coverage.py** - one stamp is one disc, a drive is a strip, driving
+  back over it moves nothing, the mask edge clips without counting as new
+  ground, the 180th meridian, when a launch keeps the map and adds a
+  droppoint and when it is a new map, a ship hop painting nothing, the
+  window-height clamp, north up, and the layer kept until new ground is
+  painted.
 - **test_names.py** - every character Windows refuses, spaces kept for a folder
   and replaced for a file, and that the cache and the cards folder spell one
   system the same way.

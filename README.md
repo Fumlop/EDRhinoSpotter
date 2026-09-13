@@ -141,6 +141,36 @@ for the same material twice gives you two cards, not one overwritten.
 Bookmarks land in `%LOCALAPPDATA%\RhinoSpotter\cards\<System>\`. The
 **bookmarks** link in the panel header opens the folder in Explorer.
 
+## Minimap - the ground the scanner has been driven over
+
+<p align="center">
+  <img src="docs/minimap.png" width="260"
+       alt="The minimap: three droppoints, the painted area around them, the SRV in the middle">
+</p>
+
+Launch the Rhino and a map comes up in a corner of the game. Wherever you
+drive, a 2 km disc - the scanner's range - is painted in, and the discs run
+together into the ground you have covered. North is up, the SRV stays in the
+middle and the ground scrolls under it. The green diamond is the
+**Droppoint**, where the SRV came out of the ship; the footer says how far and
+which way it is, and how many km² are painted.
+
+- **Painted means driven within 2 km, not scanned.** Nothing the game writes
+  says a scan happened. The 2 km is the community figure; Frontier has not
+  published one.
+- **Ship hops keep the map and paint nothing.** Dock, fly 3 km, launch again,
+  and it carries on painting the same area from the new droppoint. Droppoints
+  are numbered; the latest is bright, because that is where the ship is, and
+  the footer points to it. A launch more than 22 km from the first droppoint,
+  or on another body, starts a fresh map. Driving past 22 km says **out of
+  range** and stops painting.
+- **Size follows the game window**: 22% of its height, between 180 and 480 px.
+  The map always shows 24 km across, so 1080p is about 100 m a pixel. Hidden
+  while the game is minimised.
+- **Settings**: EDMC Settings, RhinoSpotter tab - the minimap on (default) or
+  off, and top left, top right, bottom left or bottom right.
+- The painted area is kept in memory. Restarting EDMC starts a clean map.
+
 ## Install
 
 See [INSTALL.md](INSTALL.md). Short version: unpack into

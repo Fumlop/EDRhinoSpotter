@@ -1,5 +1,34 @@
 # Changelog
 
+## 3.0.0
+
+**Added**
+
+- A minimap over the game while you are in the SRV. Every fix paints a 2 km
+  disc - the scanner's community-measured range - north up, the SRV in the
+  middle. Ship hops paint nothing; a launch inside 22 km of the first
+  droppoint carries on the same map and adds a numbered droppoint, the latest
+  bright - that is where the ship is, and the footer points to it. Another
+  body or a launch further out starts a new map.
+- Its size follows the game window: 22% of the height, 180 to 480 px. Hidden
+  while the game is minimised.
+- EDMC Settings has a RhinoSpotter tab: the minimap on (default) or off, and
+  which corner.
+- Cost on the Tk thread, measured: 2.0 ms a tick at 238 px and 8.2 ms at 475
+  px while driving over painted ground; 17 ms and 61 ms on a tick that paints
+  new ground, which rebuilds the layer.
+
+**Changed**
+
+- The panel's once-a-second Status.json read feeds the minimap too, so there
+  is still one parse a second.
+
+**Not flown**
+
+- Whether the map coming up on launch takes focus from the game. It is built
+  hidden and shown with SW_SHOWNOACTIVATE, which kept the foreground in
+  desktop testing; Tk's deiconify did not.
+
 ## 2.10.0
 
 **Changed**

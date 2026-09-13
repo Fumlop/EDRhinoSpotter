@@ -42,5 +42,13 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     return main.journal_entry(cmdr, is_beta, system, station, entry, state)
 
 
+def plugin_prefs(parent, cmdr, is_beta):
+    return main.prefs(parent)
+
+
+def prefs_changed(cmdr, is_beta):
+    return main.prefs_changed()
+
+
 def plugin_stop():
     return main.stop()

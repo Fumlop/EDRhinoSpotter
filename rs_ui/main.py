@@ -16,7 +16,7 @@ import tkinter as tk
 
 from rs_core import bodies, grounds, palette, spotcard, spotmark, store, update
 from rs_core.logging import logger
-from rs_ui import scan
+from rs_ui import minimap, scan
 
 try:
     from theme import theme
@@ -253,9 +253,12 @@ def _poll_landed():
     global _landed_after
     if not _frame or not _card_button:
         return
+    status = spotmark.read_status()
     if str(_card_button.cget("text")) == CARD_TEXT:
-        ready = spotmark.on_ground(spotmark.read_status())
+        ready = spotmark.on_ground(status)
         _card_button.config(state="normal" if ready else "disabled")
+    # The same reading, so the minimap costs no second parse.
+    minimap.update(_frame.winfo_toplevel(), status, _system)
     _landed_after = _frame.after(LANDED_POLL_MS, _poll_landed)
 
 
@@ -278,9 +281,18 @@ def stop():
     global _landed_after, _done_after
     _landed_after = _cancel_landed()
     _done_after = _cancel_done()
+    minimap.stop()
     # Last, and not through the timer: EDMC is going, and a scan waiting on a
     # two-second thread would go with it.
     _writes.flush()
+
+
+def prefs(parent):
+    return minimap.prefs(parent)
+
+
+def prefs_changed():
+    minimap.prefs_changed()
 
 
 def _focus():
