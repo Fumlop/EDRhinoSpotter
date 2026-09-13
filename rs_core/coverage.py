@@ -20,7 +20,7 @@ rs_tests/test_coverage.py.
 
 import math
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 from rs_core import arrow, measure, palette, spotcard
 
@@ -49,6 +49,26 @@ STAMP_M = 250.0
 
 # Grid lines, pinned to the centre so they move with the ground.
 GRID_M = 1000.0
+
+# Drive rings inside a known border: the scan radius on each side of a ring,
+# less this much overlap with the next, apart.
+DRIVE_OVERLAP_M = 250.0
+DRIVE_STEP_M = 2 * SCAN_RADIUS_M - DRIVE_OVERLAP_M
+
+
+def drive_radii(border_m):
+    """Radii of the rings to drive to cover a location of this border, outside
+    in. The outermost scans right up to the border; each next one overlaps it
+    by DRIVE_OVERLAP_M. A last 0 means the middle is still uncovered: drive to
+    the centre itself."""
+    radii = []
+    r = border_m - SCAN_RADIUS_M
+    while r - SCAN_RADIUS_M > 0:
+        radii.append(r)
+        r -= DRIVE_STEP_M
+    radii.append(max(r, 0.0))
+    return radii
+
 
 # Thin rings around the centre, or the latest droppoint until one is set. At 3
 # and 5 km rather than one and two scan radii: a scan disc there paints its own
@@ -120,6 +140,7 @@ class Coverage:
         # The mining location last targeted on this map. A label, not a key.
         self.location = None
         self._last = None
+        self._clip = None       # the border as a mask, while one is set
         self._layer = None      # ((version, side, ring centre, border), image)
 
     def to_dict(self):
@@ -157,9 +178,19 @@ class Coverage:
         in `stamps` - including those past the mask's edge, which paint
         nothing here but belong to the map on disk."""
         self.mask = Image.new("L", (MASK_PX, MASK_PX), 0)
+        self._clip = None
+        if self.border_m is not None:
+            self._clip = Image.new("L", (MASK_PX, MASK_PX), 0)
+            cx, cy = _mask_px(0.0, 0.0)
+            r = self.border_m / MASK_M_PER_PX
+            ImageDraw.Draw(self._clip).ellipse([cx - r, cy - r, cx + r, cy + r], fill=255)
         self.stamps = []
         for lat, lon in points:
             x, y = self.xy(lat, lon)
+            # Outside a known border the point is gone, from the mask and the
+            # file: the player said the location ends there.
+            if not self._inside(x, y):
+                continue
             if abs(x) <= REACH_M + SCAN_RADIUS_M and abs(y) <= REACH_M + SCAN_RADIUS_M:
                 self._stamp(x, y)
             self.stamps.append((lat, lon))
@@ -171,6 +202,8 @@ class Coverage:
         rebuilt around it from the saved points, and the rings follow."""
         self.origin = (lat, lon)
         self.centered = True
+        # A border already set keeps its radius around the new centre, and
+        # what falls outside it now is dropped.
         self._repaint(list(self.stamps))
 
     def set_border(self, lat, lon):
@@ -179,7 +212,11 @@ class Coverage:
         if not self.centered:
             return False
         self.border_m = math.hypot(*self.xy(lat, lon))
+        self._repaint(list(self.stamps))
         return True
+
+    def _inside(self, x, y):
+        return self.border_m is None or math.hypot(x, y) <= self.border_m
 
     def anchor(self):
         """(x, y) metres the rings are drawn around: the centre once set, the
@@ -212,6 +249,8 @@ class Coverage:
         if self._last is not None and math.hypot(x - self._last[0], y - self._last[1]) < STAMP_M:
             return True
         self._last = (x, y)
+        if not self._inside(x, y):
+            return True             # outside the border: in reach, not painted
         if self._stamp(x, y):
             self.stamps.append((lat, lon))
         return True
@@ -229,6 +268,8 @@ class Coverage:
         before = region.histogram()[255]
         ImageDraw.Draw(region).ellipse(
             [px - r - box[0], py - r - box[1], px + r - box[0], py + r - box[1]], fill=255)
+        if self._clip is not None:
+            region = ImageChops.multiply(region, self._clip.crop(box))
         if region.histogram()[255] > before:
             self.mask.paste(region, box[:2])
             self.version += 1
@@ -334,7 +375,7 @@ def picture(mask, marks=(), title=(), legend=(), border_m=None):
     the picture is the bare map.
     """
     # No rings: the ground and the bookmarks are what the picture is kept for.
-    image = _draw_layer(mask, PICTURE_SIDE, border_m=border_m)
+    image = _draw_layer(mask, PICTURE_SIDE, border_m=border_m, drive=False)
     scale = image.width / (2 * REACH_M)
     _bookmarks(image, [(image.width / 2 + mx * scale, image.height / 2 - my * scale, *rest)
                        for mx, my, *rest in marks], PICTURE_SIDE)
@@ -406,7 +447,7 @@ def _bookmarks(image, points, side):
                           stroke_width=2, stroke_fill=palette.rgb(palette.BG))
 
 
-def _draw_layer(mask, side, ring_at=None, border_m=None):
+def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True):
     """Painted area, grid, the edge of the mask, the rings around `ring_at`
     (metres, or None for no rings) and the location's border around the centre
     (metres, or None), over all of REACH_M, at `side` pixels to 2 * VIEW_M."""
@@ -434,8 +475,19 @@ def _draw_layer(mask, side, ring_at=None, border_m=None):
     draw.rectangle([0, 0, big - 1, big - 1], outline=palette.rgb(palette.WARN), width=SS)
 
     # Distance rings, RANGE_RINGS_M. A pixel wide after the reduce, and dim -
-    # a scale, not a claim.
-    if ring_at is not None:
+    # a scale, not a claim. With a border they give way to the rings to drive.
+    if border_m and drive:
+        cx, cy = at(0.0, 0.0)
+        for radius_m in drive_radii(border_m):
+            if radius_m > 0:
+                r = radius_m * scale
+                draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=RING, width=SS)
+            else:
+                # The middle is not covered by any ring: drive to the centre.
+                s = side * SS * 0.02
+                draw.line([cx - s, cy, cx + s, cy], fill=RING, width=SS)
+                draw.line([cx, cy - s, cx, cy + s], fill=RING, width=SS)
+    elif ring_at is not None:
         dx, dy = at(*ring_at)
         for radius_m in RANGE_RINGS_M:
             r = radius_m * scale

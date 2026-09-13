@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.8.0
+## 4.0.0
 
 **Added**
 
@@ -10,6 +10,19 @@
   picture's title. It needs a center; pressed without one, the map says
   "set center first" for a few seconds. Both hotkeys are listed under the
   map.
+- With a center and a border, the thin rings become the circles to drive:
+  the outermost 2 km inside the border, then one every 3.75 km inward - 2 km
+  of scan on each side, 250 m overlap with the next. A small circle or cross
+  in the middle when the center itself still needs driving to.
+
+**Changed**
+
+- Setting a border deletes the painted ground outside it, from the map and
+  its saved file, and cuts discs off at the border. Driving outside a known
+  border paints nothing. A new center keeps the border's radius and deletes
+  what falls outside it then.
+- The README shows the minimap three ways: droppoint, center, center and
+  border.
 
 ## 3.7.0
 

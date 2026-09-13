@@ -257,21 +257,30 @@ def minimap_image(root, scale):
             # Back in the ship for the hop: nothing painted until the next launch.
             minimap.update(root, reading(*track[-1], 0, 0x1000000), SYSTEM)
 
-    # The player's two hotkeys, pressed where they would be: the centre in the
-    # middle of the drive, the border at its southern edge. Then one more fix
-    # so the map draws what they did.
+    # Three pictures of the same drive: as it is, after the centre hotkey in
+    # the middle of it, and after the border hotkey at its southern edge. One
+    # more fix after each press so the map draws what it did.
     last = launches[-1][-1]
-    for x, y, press in ((2500, -2500, minimap.center_here), (2500, -7000, minimap.border_here)):
+
+    def shoot(name):
+        minimap.update(root, reading(*last, 0, minimap.coverage.IN_SRV), SYSTEM)
+        window = minimap._window
+        settle(window, 20)
+        path = grab(window, name, scale)
+        # grab() takes 6 px under the window for menu shadows. The map is a
+        # solid panel with none, and those 6 px are whatever desktop is behind.
+        shot = Image.open(path)
+        shot.crop((0, 0, shot.width, shot.height - int(6 * scale))).save(path)
+
+    def press(x, y, hotkey):
         minimap._here = (reading(x, y, 0, 0)["Latitude"], reading(x, y, 0, 0)["Longitude"])
-        press()
-    minimap.update(root, reading(*last, 0, minimap.coverage.IN_SRV), SYSTEM)
-    window = minimap._window
-    settle(window, 20)
-    path = grab(window, "minimap.png", scale)
-    # grab() takes 6 px under the window for menu shadows. The map is a solid
-    # panel with none, and those 6 px are whatever desktop is behind it.
-    shot = Image.open(path)
-    shot.crop((0, 0, shot.width, shot.height - int(6 * scale))).save(path)
+        hotkey()
+
+    shoot("minimap.png")
+    press(2500, -2500, minimap.center_here)
+    shoot("minimap-center.png")
+    press(2500, -8500, minimap.border_here)
+    shoot("minimap-border.png")
 
     # The same drive as a shared map picture, with the title and legend the
     # plugin writes. Spelled out rather than read from cards and the system
@@ -286,7 +295,7 @@ def minimap_image(root, scale):
                              f"  ·  {rigs} rigs"))
     centre = cover.origin
     title = ["4 a  -  " + SYSTEM, "Rocky World  ·  0.16 g  ·  1,284 Ls  ·  22 locations",
-             f"map 1  ·  loc 22  ·  center {centre[0]:.6f} / {centre[1]:.6f}  ·  border 4.5 km",
+             f"map 1  ·  loc 22  ·  center {centre[0]:.6f} / {centre[1]:.6f}  ·  border 6.0 km",
              f"{cover.painted_km2():.0f} km² prospected  ·  3311-05-14 18:40"]
     coverage.picture(cover.mask, marks, title, legend, cover.border_m).save(
         os.path.join(DOCS, "mapshare.png"))

@@ -139,10 +139,21 @@ Bookmarks land in `%LOCALAPPDATA%\RhinoSpotter\cards\<System>\`. The
 
 ## Minimap - the ground the scanner has been driven over
 
-<p align="center">
-  <img src="docs/minimap.png" width="260"
-       alt="The minimap: the painted area, two bookmarks, rings and a bold border around the center, the SRV in the middle">
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><img src="docs/minimap.png" width="230"
+         alt="The minimap before a center is set: painted ground, two bookmarks, rings around the droppoint"></td>
+    <td align="center"><img src="docs/minimap-center.png" width="230"
+         alt="The minimap with a center set: the rings sit around the center"></td>
+    <td align="center"><img src="docs/minimap-border.png" width="230"
+         alt="The minimap with center and border: bold border, drive rings inside, ground outside cut away"></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Droppoint</em></td>
+    <td align="center"><em>Center set</em></td>
+    <td align="center"><em>Center and border</em></td>
+  </tr>
+</table>
 
 Launch the Rhino and a map comes up in a corner of the game. Wherever you
 drive, a 2 km disc - the scanner's range - is painted in, and the discs run
@@ -159,6 +170,12 @@ says how far and which way it is, and how many km² are painted.
   it: its distance from the center becomes the location's border, drawn as a
   bold circle and saved with the map. Needs a center first - without one the
   map says "set center first". No border set is fine; nothing is drawn.
+- **With center and border, the map plans the drive.** The thin rings become
+  the circles to drive: the outermost 2 km inside the border, then one every
+  3.75 km inward - the 2 km scan range on each side, overlapping the next ring
+  by 250 m. A small circle or cross in the middle means drive to the center
+  too. Painted ground outside the border is deleted from the map, and driving
+  outside it paints nothing.
 - Both hotkeys are Windows-wide while EDMC runs, and listed under the map. If
   another program already holds one, EDMC's log says so and the other still
   works.

@@ -309,6 +309,43 @@ class TestSaved:
                   for k in (-1, 0, 1)]
         assert coverage.BORDER in column
 
+    def test_drive_rings_cover_the_location_with_the_overlap(self):
+        radii = coverage.drive_radii(10000)
+        assert radii == pytest.approx([8000, 4250, 500])
+        # Each ring's scanned band overlaps the next by 250 m, and the last
+        # one reaches the middle.
+        for outer, inner in zip(radii, radii[1:]):
+            assert (outer - 2000) - (inner + 2000) == pytest.approx(-250)
+        assert radii[-1] - 2000 <= 0 and radii[0] + 2000 == pytest.approx(10000)
+
+    def test_a_small_location_ends_at_the_centre(self):
+        # 4.5 km: one ring at 2.5 km scans 0.5-4.5 km, the middle needs a stop.
+        assert coverage.drive_radii(4500) == pytest.approx([2500, 0])
+        assert coverage.drive_radii(1500) == [0.0]
+
+    def test_ground_outside_the_border_is_deleted(self):
+        cover = fresh()
+        drive(cover, [(0, 0), (8000, 0)])
+        stamps = len(cover.stamps)
+        cover.recenter(LAT, LON)
+        cover.set_border(*at(0, 4000))
+        assert len(cover.stamps) < stamps
+        assert all(math.hypot(*cover.xy(*p)) <= 4000 for p in cover.stamps)
+        # Nothing painted past the border, not even the edge of a disc inside it.
+        per_px = coverage.MASK_M_PER_PX
+        cx, cy = coverage._mask_px(0, 0)
+        assert cover.mask.getpixel((int(cx + 4500 / per_px), int(cy))) == 0
+        assert cover.mask.getpixel((int(cx + 3000 / per_px), int(cy))) == 255
+        assert "stamps" in cover.to_dict() and len(cover.to_dict()["stamps"]) == len(cover.stamps)
+
+    def test_driving_outside_the_border_paints_nothing(self):
+        cover = fresh()
+        cover.recenter(LAT, LON)
+        cover.set_border(*at(0, 3000))
+        version = cover.version
+        assert cover.add(*at(6000, 0)) is True
+        assert cover.version == version and cover.painted_km2() == 0
+
     def test_another_bodys_map_of_the_same_name_is_not_skipped(self):
         # 'map 1' on A 3 and 'map 1' on A 2 are different files.
         other = coverage.follow(None, self.fix(body="A 3"), was_in_srv=False)
