@@ -28,7 +28,7 @@ Checked 2026-09-13 against EDMC 6.1.2 as installed.
 
 RhinoSpotter is submitted: EDCD/EDMC-Plugin-Registry PR #77, open, awaiting
 review. Its branch `add-rhinospotter` on the Fumlop fork carries
-`plugins/RhinoSpotter.json` for 4.1.1, the same fields as
+`plugins/RhinoSpotter.json` for 4.1.4, the same fields as
 `docs/registry/RhinoSpotter.json` here in the fork's two-space-indented
 layout. Each release updates both: version, zip URL, hash - verified against
 the zip as GitHub serves it.
