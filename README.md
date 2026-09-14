@@ -54,7 +54,7 @@ bookmarks**; it offers only materials this body has bookmarks for.
 location's bookmarks were made on - see [Sharing a map](#sharing-a-map).
 
 **Tons left.** A bookmark with Rigs and Amount shows a range under it:
-`Low density · High amount · ≈ 620-1,200 t left`. A deposit holds about
+`High amount · Low density · ≈ 620-1,200 t left`. A deposit holds about
 275-300 t for every rig position that fits on it - measured on one Monazite
 deposit, High Amount / Low Density, four positions, 1,150 t mined to Depleted
 by two commanders - and Amount reads as the share left (High 57-100 %, Medium
@@ -169,7 +169,7 @@ what you will find.
 1. Land and put the rigs down.
 2. Pick the **Material**, set **Rigs**. `Location` fills itself when a mining
    location is the selected destination; otherwise type the signal number.
-   Target the deposit and pick its **Density** and **Amount** as the HUD shows
+   Target the deposit and pick its **Amount** and **Density** as the HUD shows
    them - optional, but without them the bookmark cannot estimate the tons left.
 3. Press **Bookmark**. `completed` appears on the button once it is on disk.
 

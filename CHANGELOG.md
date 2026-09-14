@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.1.10
+
+**Changed**
+
+- Amount comes before Density in the panel and in the bookmark line, the order
+  the HUD lists them. Side by side the other way round, they were easy to pick
+  into each other's box.
+
 ## 4.1.9
 
 **Added**

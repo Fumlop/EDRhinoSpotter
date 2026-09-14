@@ -108,16 +108,18 @@ def build(parent):
     # What the HUD says about the targeted deposit. Neither is in the journal.
     # Amount and Rigs give the bookmark a range of tons left; Density is kept
     # for when there is data to use it - see rs_core/deposit.py.
+    # Amount first, Density second: the order the HUD lists them, top to
+    # bottom. The other way round, both got picked into each other's box.
     _density = tk.StringVar(value=NOT_READ)
     _amount = tk.StringVar(value=NOT_READ)
-    tk.Label(_frame, text="Density", anchor="w").grid(row=3, column=0, sticky="w", padx=2)
-    density_menu = tk.OptionMenu(_frame, _density, NOT_READ, *deposit.DENSITIES)
-    _style_menu(density_menu)
-    density_menu.grid(row=3, column=1, sticky="we", padx=2)
-    tk.Label(_frame, text="Amount", anchor="w").grid(row=3, column=2, sticky="e", padx=2)
+    tk.Label(_frame, text="Amount", anchor="w").grid(row=3, column=0, sticky="w", padx=2)
     amount_menu = tk.OptionMenu(_frame, _amount, NOT_READ, *deposit.AMOUNTS)
     _style_menu(amount_menu)
-    amount_menu.grid(row=3, column=3, sticky="we", padx=2)
+    amount_menu.grid(row=3, column=1, sticky="we", padx=2)
+    tk.Label(_frame, text="Density", anchor="w").grid(row=3, column=2, sticky="e", padx=2)
+    density_menu = tk.OptionMenu(_frame, _density, NOT_READ, *deposit.DENSITIES)
+    _style_menu(density_menu)
+    density_menu.grid(row=3, column=3, sticky="we", padx=2)
 
     # Own frame: column 1 stretches, and the buttons have to sit against each
     # other rather than spread to the far edge of the panel. Both are one
