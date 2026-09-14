@@ -18,7 +18,7 @@ RhinoSpotter/
 ├── rs_core/             everything that is not a widget
 ├── rs_ui/               everything that is
 ├── rs_tests/            pytest suite, 239 checks
-├── ground_rules.json    the mining sheet, frozen when the plugin was packaged
+├── mining_sheet.json    the mining sheet, frozen when the plugin was packaged
 ├── cards/               rendered cards (gitignored)
 ├── data/                screenshots and sidecars (gitignored)
 ├── lib/                 vendored, unused, gitignored - see below
@@ -52,8 +52,8 @@ No tkinter anywhere in here.
   bookmark, not a replacement), `CARDS_ROOT`, and `_font()` for the map
   picture's text. It drew a PNG card until the map picture replaced it.
 - **[grounds.py](rs_core/grounds.py)** - what a body is, and what that kind of
-  body holds. `classify()` turns a journal Scan into one of nine grounds;
-  `Sheet` reads `ground_rules.json`. The classifier mirrors the CASE in
+  body holds. `classify()` turns a journal Scan into one of ten grounds;
+  `Sheet` reads `mining_sheet.json`. The classifier mirrors the CASE in
   the classifier the sheet was measured with, so a body lands in the bucket its percentages
   were measured on.
 - **[bodies.py](rs_core/bodies.py)** - `Register`, the landable bodies of the
@@ -97,9 +97,10 @@ No tkinter anywhere in here.
   from the releases/latest redirect, not the API, and repeated hourly. Also
   puts a release in place, if there is one. The zipball is extracted to a temp folder inside the
   plugin and copied in a second pass, so a truncated download cannot leave
-  half a plugin behind. `KEEP` names what an update may not overwrite -
-  `ground_rules.json` above all, because a locally refreshed sheet is newer
-  than the one in a release.
+  half a plugin behind. `KEEP` names what an update may not overwrite. The
+  mining sheet is not in it: a release carries the current one, which is why
+  it moved from `ground_rules.json` to `mining_sheet.json` in 4.1.4 - older
+  updaters kept the old name.
 - **[coverage.py](rs_core/coverage.py)** - the minimap's painting. Every
   Status.json fix in the SRV stamps a 2 km disc onto a 400 x 400 mask, 50 m
   a pixel, anchored at the first droppoint and reaching 10 km either way.
@@ -215,7 +216,7 @@ Everything in here imports tkinter.
 
 - **conftest.py** - puts the plugin folder on `sys.path`, and builds Scan
   events carrying only the fields the code reads. The `sheet` fixture is a
-  small hand-written table, never the shipped `ground_rules.json` - that file
+  small hand-written table, never the shipped `mining_sheet.json` - that file
   is regenerated from live data and its numbers move.
 - **test_grounds.py** - every bucket against real PlanetClass strings, and a
   Sheet whose file is missing or broken.
@@ -270,7 +271,7 @@ Everything in here imports tkinter.
 | Bodies in this system | journal `Scan` events, via EDMC | the game, live |
 | Mining locations on a body | journal `FSSBodySignals` / `SAASignalsFound` | the FSS, then a surface scan |
 | Systems visited before | `%LOCALAPPDATA%\RhinoSpotter\data\<System>.json` | written on every change |
-| What a ground holds | `ground_rules.json` | shipped with the release |
+| What a ground holds | `mining_sheet.json` | shipped with the release |
 | What a location holds | nothing - it is in no feed | screenshot and read by eye |
 | Where you are, while guiding | `Status.json` | the game, twice a second |
 

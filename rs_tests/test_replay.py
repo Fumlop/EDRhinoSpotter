@@ -58,7 +58,7 @@ class TestReplay:
         ])
         systems = replay.replay(replay.journal_files(str(tmp_path)))
         assert sorted(systems) == ["Andel", "Loha"]
-        assert systems["Andel"][0]["ground"] == "rock 80%+ [magma]"
+        assert systems["Andel"][0]["ground"] == "rock 80%+ [metallic magma]"
 
     def test_location_counts_come_through(self, tmp_path):
         write_journal(tmp_path, "Journal.a.log", [
@@ -103,7 +103,7 @@ class TestReplay:
         ], age_days=0)
         systems = replay.replay(replay.journal_files(str(tmp_path)))
         assert len(systems["Andel"]) == 1
-        assert systems["Andel"][0]["ground"] == "rock 80%+ [magma]"
+        assert systems["Andel"][0]["ground"] == "rock 80%+ [metallic magma]"
 
     def test_broken_lines_are_skipped(self, tmp_path):
         path = tmp_path / "Journal.a.log"

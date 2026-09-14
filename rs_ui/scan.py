@@ -2,7 +2,7 @@
 
 One row per landable body, grouped by what kind of body it is, with the
 materials that kind of body has been found to hold underneath. The body list
-comes from the journal; the percentages come from ground_rules.json, which
+comes from the journal; the percentages come from mining_sheet.json, which
 ships with the plugin. Neither needs the network.
 
 The window is deliberately read-only and disposable. Nothing is saved from it,
@@ -226,7 +226,7 @@ def _header(parent, register, sheet, focus=None, variable=None, materials=()):
     count = len(register)
     line = f"{count} landable {'body' if count == 1 else 'bodies'} scanned"
     if not sheet.loaded:
-        line += "  -  no ground_rules.json, types only"
+        line += "  -  no mining_sheet.json, types only"
     tk.Label(parent, text=line, bg=BG, fg=DIM, anchor="w",
              font=("Segoe UI", 9)).pack(fill="x", pady=(0, 10))
 
@@ -708,7 +708,7 @@ def _footer(parent, sheet, wrap):
         text = (f"Rates from every mining location read so far, {sheet.generated}. "
                 "Where to prospect, not what you will find.")
     else:
-        text = ("ground_rules.json is missing, so only the body types are "
+        text = ("mining_sheet.json is missing, so only the body types are "
                 "shown. Reinstall the plugin, or drop the file back beside "
                 "load.py.")
     note = tk.Label(parent, text=text, bg=BG, fg=DIM, justify="left",

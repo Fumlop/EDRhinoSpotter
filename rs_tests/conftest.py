@@ -44,11 +44,11 @@ def make_scan():
 def sheet(tmp_path):
     """A Sheet over a small hand-written table.
 
-    Not the shipped ground_rules.json: that file is regenerated from live data
+    Not the shipped mining_sheet.json: that file is regenerated from live data
     and its numbers move, which would make any assertion here a time bomb.
     """
     import json
-    path = tmp_path / "ground_rules.json"
+    path = tmp_path / "mining_sheet.json"
     path.write_text(json.dumps({
         "generated": "2026-01-01 00:00 UTC",
         "locations": {"rock 80%+ [magma]": 57, "rock 80%+ [none]": 164},

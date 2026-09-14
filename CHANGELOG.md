@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.1.4
+
+**Changed**
+
+- Metallic and rocky magma are separate grounds, **Rocky World [metallic
+  magma]** and **Rocky World [rocky magma]**, as on the mining sheet. They carry
+  different materials: sapphire 29% on metallic and never read on rocky, silver
+  17% against 44%. Systems scanned before are split by the volcanism they
+  were stored with.
+- The mining sheet is now `mining_sheet.json` and every update replaces it.
+  `ground_rules.json` was kept across updates, so an updated install never
+  got a newer sheet; the old file is left where it is and no longer read.
+
 ## 4.1.3
 
 **Changed**

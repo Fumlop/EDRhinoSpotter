@@ -120,7 +120,7 @@ anything you scan after that is added to it. Nothing is asked of EDSM or
 anyone else's server - this is your own scan data going to disk and coming
 back.
 
-The percentages come from `ground_rules.json`, the mining sheet shipped beside
+The percentages come from `mining_sheet.json`, the mining sheet shipped beside
 `load.py`. Neither half touches the network. Losing the JSON costs the
 percentages, not the body list.
 
@@ -253,7 +253,7 @@ does not hit the API's hourly limit.
 and unpressable when EDMC started docked. Download `RhinoSpotter-4.0.1.zip` (or
 newer) from the releases page and unpack it over the plugin folder once.
 
-Your exported `ground_rules.json` is kept, and bookmarks, maps and scans are
+An update brings the current mining sheet. Bookmarks, maps and scans are
 never touched - they live under `%LOCALAPPDATA%\RhinoSpotter\`, not in the
 plugin folder.
 

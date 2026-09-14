@@ -27,7 +27,7 @@ try:
 except ImportError:         # a bare interpreter without it
     requests = None
 
-VERSION = "4.1.3"
+VERSION = "4.1.4"
 
 # For testing the update path without publishing a throwaway release: set
 # RHINOSPOTTER_VERSION to something older and the running plugin will see the
@@ -49,13 +49,14 @@ DOWNLOAD_TIMEOUT = 60
 ZIP_PREFIX = REPO.replace("/", "-") + "-"
 
 # Never overwritten by an update:
-#   ground_rules.json  a locally refreshed sheet is newer than the one in a
-#                      release, so the release must not overwrite it.
 #   lib/               vendored, gitignored, and therefore not in the zip - it
 #                      is named here so a future release cannot quietly drop it.
 # Cards and scans are not in this list because they do not live here: both sit
 # under %LOCALAPPDATA%\RhinoSpotter, which an update never touches.
-KEEP = ("ground_rules.json", "lib", "data", "cards")
+# The mining sheet is not kept either: a release carries the current one. It is
+# mining_sheet.json since 4.1.4 because 4.1.3 and older keep ground_rules.json,
+# and the updater doing the install is the old version's.
+KEEP = ("lib", "data", "cards")
 
 
 def parse(version):

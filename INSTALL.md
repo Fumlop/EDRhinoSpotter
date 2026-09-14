@@ -22,7 +22,7 @@ it:
 
 ```
 plugins\RhinoSpotter\load.py
-plugins\RhinoSpotter\ground_rules.json
+plugins\RhinoSpotter\mining_sheet.json
 plugins\RhinoSpotter\rs_core\
 plugins\RhinoSpotter\rs_ui\
 ```
@@ -124,7 +124,7 @@ On 2.9.0 to 4.0.0 the button could stay grey when EDMC started docked. If you
 never saw a working Update there, download `RhinoSpotter-4.0.1.zip` (or newer)
 from the releases page and unpack it over the plugin folder once.
 
-Kept across an update: `ground_rules.json`, and everything under
+The mining sheet is replaced by every update. Kept: everything under
 `%LOCALAPPDATA%\RhinoSpotter\` - your bookmarks, maps and scanned systems are
 not in the plugin folder and are never touched.
 
@@ -157,7 +157,7 @@ level too deep. `plugins\RhinoSpotter\load.py` has to exist exactly.
 **The scan window is empty in a system you honked.** See above: honking is not
 scanning. Resolve the bodies in the FSS.
 
-**"ground_rules.json is missing".** The file did not come along. Copy it back
+**"mining_sheet.json is missing".** The file did not come along. Copy it back
 beside `load.py` from the release zip; the body list still works without it,
 the percentages do not.
 

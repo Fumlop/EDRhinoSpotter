@@ -59,7 +59,7 @@ def start(plugin_dir):
     global _sheet
     _sheet = grounds.Sheet()
     if not _sheet.loaded:
-        logger.warning(f"no ground_rules.json: {_sheet.error}")
+        logger.warning(f"no mining_sheet.json: {_sheet.error}")
     return "RhinoSpotter"
 
 

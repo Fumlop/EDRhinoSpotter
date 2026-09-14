@@ -10,7 +10,7 @@ Two buttons.
     RhinoScan   lists the landable bodies of the system you are in, grouped by
                 what kind of body they are, with what that kind has been found
                 to hold. Bodies come from the journal, rates from the mining
-                sheet shipped as ground_rules.json. Neither asks the network
+                sheet shipped as mining_sheet.json. Neither asks the network
                 for anything.
 
 Nothing is written to a database. The card is the record, and the scan window

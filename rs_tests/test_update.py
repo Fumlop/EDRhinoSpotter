@@ -142,11 +142,14 @@ class TestShouldCopy:
     def test_code_is_replaced(self, name):
         assert update.should_copy(name)
 
-    @pytest.mark.parametrize("name", ["ground_rules.json", "lib", "data", "cards"])
+    @pytest.mark.parametrize("name", ["lib", "data", "cards"])
     def test_local_things_are_kept(self, name):
-        """A locally refreshed sheet is newer than the one in a release, so
-        the release must not overwrite it."""
         assert not update.should_copy(name)
+
+    def test_the_mining_sheet_is_replaced(self):
+        """A release carries the current sheet; keeping the local one left
+        every updated install on the sheet it was first installed with."""
+        assert update.should_copy("mining_sheet.json")
 
 
 class TestInstall:
@@ -161,14 +164,14 @@ class TestInstall:
         assert (target / "load.py").read_text(encoding="utf-8") == "new"
         assert (target / "rs_core" / "grounds.py").read_text(encoding="utf-8") == "new module"
 
-    def test_the_exported_sheet_survives(self, tmp_path):
+    def test_the_release_sheet_replaces_the_local_one(self, tmp_path):
         target = tmp_path / "plugin"
         target.mkdir()
-        (target / "ground_rules.json").write_text('{"generated": "mine"}', encoding="utf-8")
+        (target / "mining_sheet.json").write_text('{"generated": "mine"}', encoding="utf-8")
 
-        payload = _zipball({"load.py": "new", "ground_rules.json": '{"generated": "theirs"}'})
+        payload = _zipball({"load.py": "new", "mining_sheet.json": '{"generated": "theirs"}'})
         assert update.install(payload, str(target))
-        assert "mine" in (target / "ground_rules.json").read_text(encoding="utf-8")
+        assert "theirs" in (target / "mining_sheet.json").read_text(encoding="utf-8")
 
     def test_a_directory_is_replaced_not_merged(self, tmp_path):
         """A module deleted upstream has to disappear here too, or it keeps

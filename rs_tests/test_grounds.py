@@ -21,9 +21,9 @@ class TestClassify:
         ("Icy body",                "water geysers",   "icy"),
         ("Rocky ice body",          "",                "rocky-ice"),
         # A rocky body splits on what its volcanism is.
-        ("Rocky body", "major metallic magma",          "rock 80%+ [magma]"),
-        ("Rocky body", "minor rocky magma",             "rock 80%+ [magma]"),
-        ("Rocky body", "major silicate vapour geysers", "rock 80%+ [silicate geysers]"),
+        ("Rocky body", "major metallic magma",          "rock 80%+ [metallic magma]"),
+        ("Rocky body", "minor rocky magma",             "rock 80%+ [rocky magma]"),
+        ("Rocky body", "major silicate vapour geysers", "rock 80%+ [silicate vapour geysers]"),
         ("Rocky body", "minor silicate magma volcanism", "rock 80%+ [silicate magma]"),
         ("Rocky body", "major water geysers",           "rock 80%+ [other volcanism]"),
         ("Rocky body", "",                              "rock 80%+ [none]"),
@@ -35,11 +35,11 @@ class TestClassify:
         """'silicate' and 'rocky' both appear in some volcanism strings, and
         silicate is the one that changes which materials are there."""
         body = make_scan("B 1 a", "Rocky body", "minor rocky silicate vapour geysers")
-        assert grounds.classify(body) == "rock 80%+ [silicate geysers]"
+        assert grounds.classify(body) == "rock 80%+ [silicate vapour geysers]"
 
     def test_case_does_not_matter(self, make_scan):
         assert grounds.classify(make_scan("B", "ROCKY BODY", "MAJOR METALLIC MAGMA")) \
-            == "rock 80%+ [magma]"
+            == "rock 80%+ [metallic magma]"
 
     @pytest.mark.parametrize("body", [
         None,
@@ -85,7 +85,7 @@ class TestSheet:
     def test_best_sorts_unpriced_last_and_keeps_them(self, tmp_path):
         """The high-metal case: copper is likeliest and has no price."""
         import json
-        path = tmp_path / "ground_rules.json"
+        path = tmp_path / "mining_sheet.json"
         path.write_text(json.dumps({"grounds": {"high-metal-content": [
             {"material": "Copper", "pct": 55.5, "median": 0, "best": 0},
             {"material": "Osmium", "pct": 40.1, "median": 46638, "best": 273000},
@@ -96,7 +96,7 @@ class TestSheet:
 
     def test_codes_give_the_valuable_material_the_single_letter(self, tmp_path):
         import json
-        path = tmp_path / "ground_rules.json"
+        path = tmp_path / "mining_sheet.json"
         path.write_text(json.dumps({"grounds": {"rock 80%+ [none]": [
             {"material": "Titanium", "pct": 52.6, "median": 0, "best": 0},
             {"material": "Thorium", "pct": 47.6, "median": 0, "best": 0},
@@ -114,10 +114,10 @@ class TestSheet:
         assert all(len(code) <= 3 for code in codes.values())
 
     def test_a_sheet_from_before_4_1_3_reads_under_the_current_names(self, tmp_path):
-        """An update keeps the local ground_rules.json, which can still carry
-        the old names. Its rows must not vanish behind the rename."""
+        """A hand-copied older sheet can still carry the old names. Its rows
+        must not vanish behind the rename."""
         import json
-        path = tmp_path / "ground_rules.json"
+        path = tmp_path / "mining_sheet.json"
         path.write_text(json.dumps({
             "locations": {"volcanic magma": 58, "rocky": 164},
             "grounds": {"volcanic magma": [{"material": "Monazite", "pct": 44.8,
@@ -132,6 +132,31 @@ class TestSheet:
         assert sheet.rate("volcanic magma", "monazite") == 44.8
         assert grounds.label("volcanic silicate") == "Rocky World [silicate]"
 
+    def test_split_magma_serves_a_body_cached_as_magma(self, tmp_path):
+        """A body classified before 4.1.4 says [magma]. Its rate is the two
+        kinds joined from their hits: 14 of 35 and 12 of 23 is 26 of 58."""
+        import json
+        path = tmp_path / "mining_sheet.json"
+        path.write_text(json.dumps({
+            "locations": {"rock 80%+ [metallic magma]": 35, "rock 80%+ [rocky magma]": 23},
+            "grounds": {
+                "rock 80%+ [metallic magma]": [{"material": "Monazite", "pct": 40.0,
+                                                "median": 1, "best": 1}],
+                "rock 80%+ [rocky magma]": [{"material": "Monazite", "pct": 52.2,
+                                             "median": 1, "best": 1}],
+            },
+        }), encoding="utf-8")
+        sheet = grounds.Sheet(str(path))
+        assert sheet.rate("rock 80%+ [rocky magma]", "monazite") == 52.2
+        assert sheet.rate("volcanic magma", "monazite") == 44.8
+        assert sheet.sample("rock 80%+ [magma]") == 58
+
+    def test_a_combined_magma_sheet_answers_for_both_kinds(self, sheet):
+        """An older sheet knows one [magma]; a body split by this version still
+        gets that rate rather than nothing."""
+        assert sheet.rate("rock 80%+ [metallic magma]", "monazite") == 45.6
+        assert sheet.sample("rock 80%+ [rocky magma]") == 57
+
     def test_unknown_ground_is_empty_not_an_error(self, sheet):
         assert sheet.materials("rock 80%+ [silicate geysers]") == []
         assert sheet.sample("rock 80%+ [silicate geysers]") == 0
@@ -145,7 +170,7 @@ class TestSheet:
         assert empty_sheet.sample("rock 80%+ [none]") == 0
 
     def test_broken_json_is_the_same_as_missing(self, tmp_path):
-        path = tmp_path / "ground_rules.json"
+        path = tmp_path / "mining_sheet.json"
         path.write_text("{not json", encoding="utf-8")
         broken = grounds.Sheet(str(path))
         assert not broken.loaded
@@ -156,6 +181,6 @@ class TestSheet:
         keyed by a ground nothing classifies into would be silently empty."""
         shipped = grounds.Sheet()
         if not shipped.loaded:
-            pytest.skip("ground_rules.json not exported into this checkout")
+            pytest.skip("mining_sheet.json not exported into this checkout")
         unknown = set(shipped.grounds) - set(grounds.GROUND_ORDER)
         assert not unknown, f"sheet has grounds the classifier never returns: {unknown}"

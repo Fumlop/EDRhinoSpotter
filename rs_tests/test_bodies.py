@@ -26,7 +26,7 @@ class TestTracking:
         register.track(make_scan("Andel 1 a", "Rocky body", "major metallic magma"),
                        system="Andel")
         assert len(register) == 1
-        assert register.bodies()[0]["ground"] == "rock 80%+ [magma]"
+        assert register.bodies()[0]["ground"] == "rock 80%+ [metallic magma]"
 
     def test_unlandable_bodies_never_enter(self, make_scan):
         register = bodies.Register()
@@ -305,7 +305,7 @@ class TestAdopting:
         assert register.track(make_scan("Andel 1 a", "Rocky body", "major metallic magma"),
                               system="Andel")
         body = register.bodies()[0]
-        assert body["ground"] == "rock 80%+ [magma]"
+        assert body["ground"] == "rock 80%+ [metallic magma]"
         assert body["locations"] == 17
 
 
@@ -317,6 +317,18 @@ class TestAdopting:
         ])
         assert [(ground, len(found)) for ground, found in register.by_ground()] \
             == [("rock 80%+ [magma]", 2)]
+
+
+    def test_a_cached_magma_body_is_split_by_its_stored_volcanism(self):
+        register = bodies.Register()
+        register.adopt("Andel", [
+            {"name": "Andel 1 a", "ground": "rock 80%+ [magma]", "distance": 412.0,
+             "planet_class": "Rocky body", "volcanism": "minor rocky magma volcanism"},
+            {"name": "Andel 1 b", "ground": "volcanic magma", "distance": 418.0},
+        ])
+        grounds_seen = {body["name"]: body["ground"] for body in register.bodies()}
+        assert grounds_seen == {"Andel 1 a": "rock 80%+ [rocky magma]",
+                                "Andel 1 b": "rock 80%+ [magma]"}
 
 
 class TestArriving:
@@ -352,7 +364,7 @@ class TestArriving:
         register.track(make_scan("Andel 1 a", "Rocky body", "major metallic magma"),
                        system="Andel")
         body = register.bodies()[0]
-        assert body["ground"] == "rock 80%+ [magma]"
+        assert body["ground"] == "rock 80%+ [metallic magma]"
         assert body["locations"] == 5
 
     def test_arriving_does_not_write_back_what_it_just_read(self):

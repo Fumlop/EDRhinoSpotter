@@ -91,7 +91,8 @@ class Register:
     def adopt(self, system, bodies):
         """Fill the register from the cache, for a system already visited."""
         self.system = system
-        self._bodies = {body['name']: dict(body) for body in bodies if body.get('name')}
+        self._bodies = {body['name']: dict(body, ground=grounds.reground(body))
+                        for body in bodies if body.get('name')}
         self._locations = {name: body['locations']
                            for name, body in self._bodies.items()
                            if body.get('locations') is not None}
