@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.1.12
+
+**Changed**
+
+- The minimap's thin rings are counted out from the center, the way the
+  location is driven: the first at 3.75 km, each next 1.75 km further. Without
+  a border there are two; with one, rings are added until one scans out to it.
+  They were worked back inward from the border.
+
 ## 4.1.11
 
 **Fixed**

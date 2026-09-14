@@ -206,8 +206,8 @@ Bookmarks land in `%LOCALAPPDATA%\RhinoSpotter\cards\<System>\`. The
 Launch the Rhino and a map comes up in a corner of the game. Wherever you
 drive, a 2 km disc - the scanner's range - is painted in, and the discs run
 together into the ground you have covered. North is up, the SRV stays in the
-middle and the ground scrolls under it. Two thin rings, 3 and 5 km out, sit
-around the **Droppoint** - where the SRV came out of the ship - and the footer
+middle and the ground scrolls under it. Two thin rings, 3.75 and 5.5 km out,
+sit around the **Droppoint** - where the SRV came out of the ship - and the footer
 says how far and which way it is, and how many km² are painted.
 
 - **Ctrl+Alt+Z sets the center.** Drive to the middle of the mining location
@@ -218,12 +218,11 @@ says how far and which way it is, and how many km² are painted.
   it: its distance from the center becomes the location's border, drawn as a
   bold circle and saved with the map. Needs a center first - without one the
   map says "set center first". No border set is fine; nothing is drawn.
-- **With center and border, the map plans the drive.** The thin rings become
-  the circles to drive: the outermost 2 km inside the border, then one every
-  3.75 km inward - the 2 km scan range on each side, overlapping the next ring
-  by 250 m. A small circle or cross in the middle means drive to the center
-  too. Painted ground outside the border is deleted from the map, and driving
-  outside it paints nothing.
+- **With center and border, the map plans the drive.** The thin rings are the
+  circles to drive round the center, counted out from it: the first at 3.75 km,
+  each next 1.75 km further, until one scans out to the border (2 km scanner
+  range). Painted ground outside the border is deleted from the map, and
+  driving outside it paints nothing.
 - Both hotkeys are Windows-wide while EDMC runs, and listed under the map. If
   another program already holds one, EDMC's log says so and the other still
   works.

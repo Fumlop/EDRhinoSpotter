@@ -50,30 +50,25 @@ STAMP_M = 250.0
 # Grid lines, pinned to the centre so they move with the ground.
 GRID_M = 1000.0
 
-# Drive rings inside a known border: the scan radius on each side of a ring,
-# less this much overlap with the next, apart.
-DRIVE_OVERLAP_M = 250.0
-DRIVE_STEP_M = 2 * SCAN_RADIUS_M - DRIVE_OVERLAP_M
+# The circles to drive round the centre, counted out from it: the first at
+# 3.75 km, each next 1.75 km further. Measured from the centre, not back from
+# the border - the drive goes round the centre, and the border is only where
+# to stop. Without a border there are two; with one, rings are added until one
+# scans out to it.
+FIRST_RING_M = 3750.0
+RING_STEP_M = 1750.0
+RINGS_WITHOUT_BORDER = 2
 
 
-def drive_radii(border_m):
-    """Radii of the rings to drive to cover a location of this border, outside
-    in. The outermost scans right up to the border; each next one overlaps it
-    by DRIVE_OVERLAP_M. A last 0 means the middle is still uncovered: drive to
-    the centre itself."""
-    radii = []
-    r = border_m - SCAN_RADIUS_M
-    while r - SCAN_RADIUS_M > 0:
-        radii.append(r)
-        r -= DRIVE_STEP_M
-    radii.append(max(r, 0.0))
+def ring_radii(border_m=None):
+    """Radii of the circles to drive, inside out."""
+    radii = [FIRST_RING_M + k * RING_STEP_M for k in range(RINGS_WITHOUT_BORDER)]
+    if not border_m:
+        return radii
+    radii = radii[:1]
+    while radii[-1] + SCAN_RADIUS_M < border_m:
+        radii.append(radii[-1] + RING_STEP_M)
     return radii
-
-
-# Thin rings around the centre, or the latest droppoint until one is set. At 3
-# and 5 km rather than one and two scan radii: a scan disc there paints its own
-# 2 km edge, so a ring at 2 km only traced it again.
-RANGE_RINGS_M = (3000.0, 5000.0)
 
 # How big the map is drawn, as a share of the game window's height, and the
 # limits either side - a laptop window should not get a stamp, a 4K screen
@@ -515,22 +510,16 @@ def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True):
     # Where the mask ends - past it nothing is painted.
     draw.rectangle([0, 0, big - 1, big - 1], outline=palette.rgb(palette.WARN), width=SS)
 
-    # Distance rings, RANGE_RINGS_M. A pixel wide after the reduce, and dim -
-    # a scale, not a claim. With a border they give way to the rings to drive.
+    # The circles to drive, ring_radii. A pixel wide after the reduce, and dim.
+    # With a border they sit round the centre and run out to the border;
+    # without one, two round the centre or the latest droppoint.
     if border_m and drive:
-        cx, cy = at(0.0, 0.0)
-        for radius_m in drive_radii(border_m):
-            if radius_m > 0:
-                r = radius_m * scale
-                draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=RING, width=SS)
-            else:
-                # The middle is not covered by any ring: drive to the centre.
-                s = side * SS * 0.02
-                draw.line([cx - s, cy, cx + s, cy], fill=RING, width=SS)
-                draw.line([cx, cy - s, cx, cy + s], fill=RING, width=SS)
-    elif ring_at is not None:
+        ring_at, radii = (0.0, 0.0), ring_radii(border_m)
+    else:
+        radii = ring_radii()
+    if ring_at is not None:
         dx, dy = at(*ring_at)
-        for radius_m in RANGE_RINGS_M:
+        for radius_m in radii:
             r = radius_m * scale
             draw.ellipse([dx - r, dy - r, dx + r, dy + r], outline=RING, width=SS)
 

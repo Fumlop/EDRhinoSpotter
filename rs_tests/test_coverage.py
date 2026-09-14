@@ -326,19 +326,19 @@ class TestSaved:
                   for k in (-1, 0, 1)]
         assert coverage.BORDER in column
 
-    def test_drive_rings_cover_the_location_with_the_overlap(self):
-        radii = coverage.drive_radii(10000)
-        assert radii == pytest.approx([8000, 4250, 500])
-        # Each ring's scanned band overlaps the next by 250 m, and the last
-        # one reaches the middle.
-        for outer, inner in zip(radii, radii[1:]):
-            assert (outer - 2000) - (inner + 2000) == pytest.approx(-250)
-        assert radii[-1] - 2000 <= 0 and radii[0] + 2000 == pytest.approx(10000)
+    def test_two_rings_round_the_centre_without_a_border(self):
+        assert coverage.ring_radii() == [3750, 5500]
 
-    def test_a_small_location_ends_at_the_centre(self):
-        # 4.5 km: one ring at 2.5 km scans 0.5-4.5 km, the middle needs a stop.
-        assert coverage.drive_radii(4500) == pytest.approx([2500, 0])
-        assert coverage.drive_radii(1500) == [0.0]
+    def test_rings_run_out_until_one_scans_to_the_border(self):
+        # 3.75 km scans to 5.75: a 5.66 km border needs no second ring.
+        assert coverage.ring_radii(5659) == [3750]
+        assert coverage.ring_radii(7000) == [3750, 5500]
+        # 9.5 km: 7.25 scans to 9.25, one more at 9.0 reaches past it.
+        assert coverage.ring_radii(9500) == [3750, 5500, 7250, 9000]
+
+    def test_rings_are_counted_from_the_centre_not_the_border(self):
+        for border in (4000, 6500, 8800):
+            assert coverage.ring_radii(border)[0] == 3750
 
     def test_ground_outside_the_border_is_deleted(self):
         cover = fresh()
@@ -447,8 +447,8 @@ class TestRender:
             bg = palette.rgb(palette.BG)
             return any(self.pixel(image, side / 2 + d + k, side / 2 - d - k) != bg
                        for k in (-1, 0, 1))
-        assert ring_near(3000) and ring_near(5000)
-        assert not ring_near(4000)
+        assert ring_near(3750) and ring_near(5500)
+        assert not ring_near(4600)
 
     def test_the_picture_grows_for_title_and_legend(self):
         cover = fresh()
