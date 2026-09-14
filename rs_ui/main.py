@@ -49,6 +49,7 @@ ALL_MATERIALS = "All"
 
 _card_button = None      # Bookmark, until there is an update to install
 _landed_after = None     # the pending look at whether we are on the ground
+_poll_error = None       # the last failure the poll logged, so it logs each kind once
 _update_after = None     # the pending hourly look for a new release
 _loc = None              # tk.StringVar - mining location index
 _rigs = None             # tk.StringVar - rigs on the patch
@@ -277,16 +278,27 @@ def _poll_landed():
     Only while the button is still Bookmark. It doubles as the update button,
     and an update that is downloading has its own reasons for being disabled.
     """
-    global _landed_after
+    global _landed_after, _poll_error
     if not _frame or not _card_button:
         return
-    status = spotmark.read_status()
-    if str(_card_button.cget("text")) == CARD_TEXT:
-        ready = spotmark.on_ground(status)
-        _card_button.config(state="normal" if ready else "disabled")
-    # The same reading, so the minimap costs no second parse.
-    minimap.update(_frame.winfo_toplevel(), status, _system)
+    # Rescheduled first, whatever happens below. This poll is what brings the
+    # minimap back after an alt-tab and turns Bookmark on; rescheduled only at
+    # the end, one raise anywhere above it stopped both until EDMC restarted,
+    # and a Tk callback error never reaches EDMC's log to say so.
     _landed_after = _frame.after(LANDED_POLL_MS, _poll_landed)
+    try:
+        status = spotmark.read_status()
+        if str(_card_button.cget("text")) == CARD_TEXT:
+            ready = spotmark.on_ground(status)
+            _card_button.config(state="normal" if ready else "disabled")
+        # The same reading, so the minimap costs no second parse.
+        minimap.update(_frame.winfo_toplevel(), status, _system)
+        _poll_error = None
+    except Exception as err:
+        # Once per kind of failure, not once a second.
+        if repr(err) != _poll_error:
+            logger.warning(f"landed poll failed, retrying every second: {err!r}", exc_info=True)
+            _poll_error = repr(err)
 
 
 def _cancel_landed():

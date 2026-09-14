@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.1.11
+
+**Fixed**
+
+- The once-a-second check behind the minimap and the Bookmark button could stop
+  for good on a single error, leaving the minimap gone until EDMC was
+  restarted. It now always carries on, and logs the error once as a warning.
+
 ## 4.1.10
 
 **Changed**
