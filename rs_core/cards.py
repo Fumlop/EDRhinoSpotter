@@ -150,10 +150,11 @@ def nearby(spot, root=None, within=SAME_SPOT_M):
 
 
 # A drop this close to a bookmark is taken to be at that bookmark's mining
-# location. Bookmarks of two different locations have sat 2.7 km apart, so the
-# reach stays under that; one location's own bookmarks spread up to 6-7 km, so a
-# drop further out simply finds none and falls back to the game's guess.
-SAME_LOCATION_M = 2000.0
+# location: a location is up to about 5 km in radius, so two points in it are
+# up to 10 km apart. The nearest bookmark wins. Bookmarks of two different
+# locations have sat 2.7 km apart, so at a location not bookmarked yet a
+# neighbour's number can come up - the panel says which bookmark it used.
+SAME_LOCATION_M = 10000.0
 
 
 def location_at(system, body, lat, lon, radius, root=None, within=SAME_LOCATION_M):

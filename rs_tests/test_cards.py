@@ -300,7 +300,7 @@ class TestUpdated:
 
 
 class TestLocationAt:
-    """A drop within 2 km of a bookmark takes that bookmark's location."""
+    """A drop within 10 km of a bookmark takes that bookmark's location."""
 
     RADIUS = 381784.9
 
@@ -322,14 +322,14 @@ class TestLocationAt:
         assert index == 13 and round(metres) == 900
 
     def test_the_nearest_bookmark_wins(self, tmp_path):
-        self.write(tmp_path, "far.json", latitude=self.north(1500), location_index=2)
-        self.write(tmp_path, "near.json", latitude=self.north(300), location_index=7)
+        self.write(tmp_path, "far.json", latitude=self.north(6500), location_index=2)
+        self.write(tmp_path, "near.json", latitude=self.north(3200), location_index=7)
         assert cards.location_at("Andel", "Andel 8 b", 10.0, 20.0, self.RADIUS,
                                  root=str(tmp_path))[0] == 7
 
-    def test_beyond_two_km_there_is_no_answer(self, tmp_path):
+    def test_beyond_ten_km_there_is_no_answer(self, tmp_path):
         self.write(tmp_path, "a.json")
-        assert cards.location_at("Andel", "Andel 8 b", self.north(2100), 20.0,
+        assert cards.location_at("Andel", "Andel 8 b", self.north(10100), 20.0,
                                  self.RADIUS, root=str(tmp_path)) is None
 
     def test_a_bookmark_without_a_location_or_on_another_body_is_ignored(self, tmp_path):

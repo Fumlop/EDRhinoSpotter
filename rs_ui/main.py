@@ -355,8 +355,8 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     if cmdr:
         _cmdr = cmdr
 
-    # Landing or dropping the SRV fills Loc in. A bookmark within 2 km on this
-    # body says which location this is, and it was checked when it was made;
+    # Landing or dropping the SRV fills Loc in. The nearest bookmark within 10 km
+    # on this body says which location this is, and it was checked when it was made;
     # only without one does Touchdown's nearest-location guess stand in, which
     # names the wrong one when two locations are close.
     if entry.get("event") in ("Touchdown", "LaunchSRV") and _loc is not None:

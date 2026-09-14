@@ -84,12 +84,12 @@ a patch takes to refill, that can be counted from it.
 **Delete** removes that bookmark from disk, after asking. The last one on a
 body takes you back to the body list.
 
-**Loc fills itself in when you land or drop the SRV.** Within 2 km of a
-bookmark on that body, it takes that bookmark's location - the panel says
+**Loc fills itself in when you land or drop the SRV.** Within 10 km of a
+bookmark on that body, it takes the nearest bookmark's location - the panel says
 "loc 13 from a bookmark 350 m away". Otherwise the `Touchdown` journal event's
-nearest location stands in: the nearest one, not the one you targeted, so two
-locations close together can give the wrong number. Either way it is a
-suggestion you can type over.
+nearest location stands in. Two locations close together can give the wrong
+number either way - at a location you have not bookmarked yet, a neighbour's
+bookmark can be the nearest - so it is a suggestion you can type over.
 
 **Guide** puts an arrow over the game: top middle of the Elite window,
 click-through, showing the direction to that patch and how far. It works from
