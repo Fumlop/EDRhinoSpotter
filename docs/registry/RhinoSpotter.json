@@ -1,7 +1,7 @@
 {
   "pluginName": "RhinoSpotter",
-  "pluginVer": "4.1.6",
-  "pluginZip": "https://github.com/Fumlop/EDRhinoSpotter/releases/download/v4.1.6/RhinoSpotter-4.1.6.zip",
+  "pluginVer": "4.1.7",
+  "pluginZip": "https://github.com/Fumlop/EDRhinoSpotter/releases/download/v4.1.7/RhinoSpotter-4.1.7.zip",
   "autoUpdateEnabled": false,
   "autoInstallEnabled": false,
   "pluginAuthors": ["Fumlop"],
@@ -15,5 +15,5 @@
   "pluginLicense": "GPL-3.0-or-later",
   "pluginIcon": "",
   "pluginVT": "",
-  "pluginHash": "6680fb556d82dd90b90fbaf34b8e28b7b9026a2805fe6123f431e9c5c94ed930"
+  "pluginHash": "c16baa14a33e8d1c660bc2c6f169e08cd29cfaae6301fd77a5cb14e692e3cd04"
 }
