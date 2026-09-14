@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.1.7
+
+**Added**
+
+- **Density** and **Amount** pickers in the panel, for the deposit the HUD has
+  targeted. Both are saved in the bookmark, and the bookmarks list shows an
+  estimate of the tons left under it, as a range. The numbers come from public
+  community depletion traces and reserve bands (Rhino Evidence Register PE-004,
+  PE-042-044, PE-071, PE-072); both pickers are optional.
+
 ## 4.1.6
 
 **Changed**

@@ -54,10 +54,12 @@ def bookmarks(body, card):
     return [
         {"system": SYSTEM, "planet_name": body, "location_index": 22,
          "commodity": "Jadeite", "rigs": 4, "heading": 214,
+         "density": "Low", "amount": "High",
          "latitude": 12.345678, "longitude": -98.765432,
          "marked_at": "3311-05-14T18:40:00", "path": card},
         {"system": SYSTEM, "planet_name": body, "location_index": 9,
          "commodity": "Monazite", "rigs": 2, "heading": 77,
+         "density": "Medium", "amount": "Low",
          "latitude": 12.401233, "longitude": -98.712001,
          "marked_at": "3311-05-14T19:12:44", "path": card},
         {"system": SYSTEM, "planet_name": body, "location_index": 15,
@@ -155,6 +157,8 @@ def main_images():
     main._material.set("Monazite")
     main._loc.set("22")
     main._rigs.set("4")
+    main._density.set("Low")
+    main._amount.set("High")
     settle(panel, 15)
     grab(panel, "plugin.png", scale)
     panel.destroy()

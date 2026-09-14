@@ -14,7 +14,7 @@ import subprocess
 import threading
 import tkinter as tk
 
-from rs_core import bodies, grounds, palette, spotcard, spotmark, store, update
+from rs_core import bodies, deposit, grounds, palette, spotcard, spotmark, store, update
 from rs_core.logging import logger
 from rs_ui import hotkey, minimap, scan
 
@@ -53,6 +53,11 @@ _update_after = None     # the pending hourly look for a new release
 _loc = None              # tk.StringVar - mining location index
 _rigs = None             # tk.StringVar - rigs on the patch
 _material = None         # tk.StringVar - the material this spot is mined for
+_density = None          # tk.StringVar - the deposit's HUD Density, or NOT_READ
+_amount = None           # tk.StringVar - the deposit's HUD Amount, or NOT_READ
+# Density and Amount before anything is picked. Not required: a bookmark without
+# them is still a bookmark, it just cannot say how many tons are left.
+NOT_READ = "-"
 
 
 def start(plugin_dir):
@@ -65,7 +70,7 @@ def start(plugin_dir):
 
 def build(parent):
     global _frame, _status, _scan_count, _card_button, _landed_after
-    global _loc, _rigs, _material
+    global _loc, _rigs, _material, _density, _amount
 
     _frame = tk.Frame(parent)
     _frame.columnconfigure(1, weight=1)
@@ -100,11 +105,25 @@ def build(parent):
     _style_menu(_menu)
     _menu.grid(row=2, column=1, columnspan=3, sticky="we", padx=2)
 
+    # What the HUD says about the targeted deposit. Neither is in the journal,
+    # and together they give the bookmark a range of tons left - see
+    # rs_core/deposit.py for where the numbers come from.
+    _density = tk.StringVar(value=NOT_READ)
+    _amount = tk.StringVar(value=NOT_READ)
+    tk.Label(_frame, text="Density", anchor="w").grid(row=3, column=0, sticky="w", padx=2)
+    density_menu = tk.OptionMenu(_frame, _density, NOT_READ, *deposit.DENSITIES)
+    _style_menu(density_menu)
+    density_menu.grid(row=3, column=1, sticky="we", padx=2)
+    tk.Label(_frame, text="Amount", anchor="w").grid(row=3, column=2, sticky="e", padx=2)
+    amount_menu = tk.OptionMenu(_frame, _amount, NOT_READ, *deposit.AMOUNTS)
+    _style_menu(amount_menu)
+    amount_menu.grid(row=3, column=3, sticky="we", padx=2)
+
     # Own frame: column 1 stretches, and the buttons have to sit against each
     # other rather than spread to the far edge of the panel. Both are one
     # press with no confirmation, so they get a gap between them.
     row = tk.Frame(_frame)
-    row.grid(row=3, column=0, columnspan=4, sticky="w", padx=2, pady=(4, 2))
+    row.grid(row=4, column=0, columnspan=4, sticky="w", padx=2, pady=(4, 2))
     _card_button = tk.Button(row, text=CARD_TEXT, width=13, command=make_card)
     _card_button.pack(side="left")
     tk.Button(row, text="RhinoScan", width=13, command=open_scan).pack(side="left", padx=(8, 0))
@@ -114,11 +133,11 @@ def build(parent):
     # a resolved body carries PlanetClass and Volcanism, which is all this
     # reads. Said here, before you press the button and wonder.
     tk.Label(_frame, text="FSS unknown systems", anchor="w",
-             fg=palette.MUTED).grid(row=4, column=0, columnspan=4,
+             fg=palette.MUTED).grid(row=5, column=0, columnspan=4,
                                     sticky="w", padx=2, pady=(0, 2))
 
     _status = tk.Label(_frame, text="", anchor="w", wraplength=320, justify="left")
-    _status.grid(row=5, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
+    _status.grid(row=6, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
 
     if theme:
         theme.update(_frame)
@@ -362,6 +381,8 @@ def make_card():
     # Tk variables belong to the main thread - read them here, not in the worker.
     spot["commodity"] = _material.get()
     spot["rigs"] = _int(_rigs.get())
+    spot["density"] = None if _density.get() == NOT_READ else _density.get()
+    spot["amount"] = None if _amount.get() == NOT_READ else _amount.get()
 
     _set_status("")
     minimap.bookmarked(spot)

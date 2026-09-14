@@ -15,7 +15,7 @@ import tkinter as tk
 import webbrowser
 from tkinter import font as tkfont, messagebox
 
-from rs_core import cards, coverage, coverstore, grounds, palette
+from rs_core import cards, coverage, coverstore, deposit, grounds, palette
 from rs_core.logging import logger
 from rs_ui import overlay
 
@@ -757,7 +757,21 @@ def _bookmark_detail(record):
     marked = str(record.get("marked_at") or "").split(".")[0].replace("T", " ")
     depleted = str(record.get("depleted_at") or "").split("+")[0].replace("T", " ")
     return "  ".join(part for part in (_coords(record), marked,
-                                       f"depleted {depleted}" if depleted else "") if part)
+                                       f"depleted {depleted}" if depleted else "",
+                                       _deposit_text(record)) if part)
+
+
+def _deposit_text(record):
+    """'Low density · High amount · ≈ 970-2,670 t left', or '' for a bookmark
+    made without the HUD readings. A marked-depleted bookmark says nothing
+    here: the date before it already does."""
+    if record.get("depleted_at"):
+        return ""
+    density, amount = record.get("density"), record.get("amount")
+    parts = [f"{density} density" if density else "",
+             f"{amount} amount" if amount else "",
+             deposit.describe(density, amount)]
+    return " · ".join(part for part in parts if part)
 
 
 def _coords(record):
