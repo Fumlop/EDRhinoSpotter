@@ -22,7 +22,8 @@ been found to hold above it.
 *Example system. Percentages are the share of that ground's mining locations
 that carried the material; `unprobed` means nobody has counted that body yet,
 and those rows are dimmed. A body you have already marked shows how many
-bookmarks it has - click and the window lists them.*
+bookmarks it has, and one you have driven a map on shows how many of its
+locations are mapped - click either and the window lists them.*
 
 ### The bookmarks of one body
 
@@ -39,6 +40,20 @@ returns to the body list.
 
 **Share map**, beside each location, opens the picture of the map that
 location's bookmarks were made on - see [Sharing a map](#sharing-a-map).
+
+### Which locations you have mapped
+
+`Mapped 3/22` on a body row counts the mining locations you have driven a map
+on, out of all the body has. Click it and the window lists them, with
+**Back** top left: each location, the maps on it, how many bookmarks it has
+and **Share map**. A location counts when you had it targeted while driving
+the map, or when one of its bookmarks lies on the map. A map tied to neither
+is listed under *location unknown*, so no drive goes missing.
+
+<p align="center">
+  <img src="docs/mapped.png" width="520"
+       alt="The mapped locations of one body: loc 9, 15 and 22 with their maps and bookmark counts, one map under location unknown, each with Share map">
+</p>
 
 **Active** / **Depleted**, before Guide, marks a patch as mined out: green
 while it still has something, red once marked, a press flips it. The bookmark

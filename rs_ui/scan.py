@@ -409,7 +409,14 @@ def _mapped_view(window, body, total, records):
     of = f"{len(mapped)} of {total} locations mapped" if total is not None \
         else f"{len(mapped)} location{'' if len(mapped) == 1 else 's'} mapped"
     tk.Label(outer, text=f"{system or ''}  -  {of}", bg=BG, fg=DIM, anchor="w",
-             font=("Segoe UI", 9)).pack(fill="x", pady=(0, 10))
+             font=("Segoe UI", 9)).pack(fill="x")
+    # Above the list, not under it: a short list opens a short window, and a
+    # wrapped note at the bottom of one was cut off.
+    note = tk.Label(outer, text="A location counts as mapped when it was targeted while the map "
+                                "was driven, or when one of its bookmarks lies on the map.",
+                    bg=BG, fg=DIM, anchor="w", justify="left", font=("Segoe UI", 8))
+    note.pack(fill="x", pady=(2, 10))
+    _Wrapper(window, margin=40)(note)
 
     listing, _ = _scrollable(outer)
     counts = {}
@@ -425,11 +432,6 @@ def _mapped_view(window, body, total, records):
         for name in unknown:
             _mapped_row(listing, body, "", [name], "")
 
-    note = tk.Label(outer, text="A location counts as mapped when it was targeted while the map "
-                                "was driven, or when one of its bookmarks lies on the map.",
-                    bg=BG, fg=DIM, anchor="w", justify="left", font=("Segoe UI", 8))
-    note.pack(side="top", fill="x", pady=(8, 0))
-    _Wrapper(window, margin=40)(note)
     _fit(window, listing, extra=110)
 
 

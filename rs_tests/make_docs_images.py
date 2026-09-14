@@ -18,6 +18,7 @@ plausible.
 
 import math
 import os
+import shutil
 import sys
 import tempfile
 import time
@@ -66,6 +67,25 @@ def bookmarks(body, card):
     ]
 
 
+# Maps on the bookmarked body, for "Mapped 3/22" and its page. Two sit on the
+# bookmarks - one saved with the location targeted, one tied only by the
+# bookmarks on it - and one lies away from all of them, so the page shows its
+# "location unknown" section too. Written into the scratch coverage folder and
+# removed again before the minimap pictures, which must not find them.
+RADIUS_4A = 1352744.5
+
+
+def plant_maps(body):
+    from PIL import Image
+    for name, lat, lon, location in (("map 1", 12.345678, -98.765432, None),
+                                     ("map 2", 12.401233, -98.712001, 9),
+                                     ("map 3", 12.910000, -98.100000, None)):
+        data = coverage.Coverage(body, lat, lon, RADIUS_4A).to_dict()
+        data["location"] = location
+        coverstore.save(body, name, data)
+        coverstore.save_png(body, name, Image.new("RGB", (8, 8)))
+
+
 def settle(window, ticks=40):
     """Tk lays out on idle, and a grab of a window mid-layout is a grab of
     whatever was behind it."""
@@ -106,6 +126,20 @@ def main_images():
     root = tk.Tk()
     root.withdraw()
     scale = ImageGrab.grab().width / root.winfo_screenwidth()
+    # A plain screen behind everything grabbed. The grab box reaches past the
+    # window's edges for the title bar and the corners, and without this they
+    # carried whatever was open behind - the terminal running this, into a
+    # public README.
+    backdrop = tk.Toplevel(root)
+    backdrop.configure(bg="#0a0a0a")
+    backdrop.overrideredirect(True)
+    backdrop.geometry(f"{root.winfo_screenwidth()}x{root.winfo_screenheight()}+0+0")
+    # Pinned on top once, then released: that puts it above every other
+    # program, and the windows built after it still stack above it.
+    backdrop.attributes("-topmost", True)
+    settle(backdrop, 5)
+    backdrop.attributes("-topmost", False)
+    settle(backdrop, 5)
     main.start(PLUGIN_DIR)
     sheet = main._sheet
 
@@ -126,6 +160,13 @@ def main_images():
     panel.destroy()
 
     found = register()
+    plant_maps(f"{SYSTEM} 4 a")
+    # The body list reads bookmarks off disk, which holds the commander's own.
+    # The invented ones stand in, so the row reads "3 bookmarks  Mapped 3/22"
+    # like the pages behind it.
+    from rs_core import cards
+    was_by_body = cards.by_body
+    cards.by_body = lambda system: {f"{SYSTEM} 4 a": bookmarks(f"{SYSTEM} 4 a", None)}
     picker = ("All",) + tuple(("Alexandrite", "Jadeite", "Monazite", "Olivine"))
     for focus, name in ((None, "rhinoscan.png"), ("Monazite", "rhinoscan-filtered.png")):
         main._material.set(focus or "All")
@@ -161,8 +202,22 @@ def main_images():
     grab(window, "bookmarks.png", scale, top_margin=34)
     window.destroy()
 
+    scan.show(root, found, sheet, None,
+              variable=main._material, materials=picker)
+    window = scan._window
+    scan._mapped_view(window, body, 22, marks)
+    window.attributes("-topmost", True)
+    window.deiconify()
+    window.lift()
+    settle(window)
+    grab(window, "mapped.png", scale, top_margin=34)
+    window.destroy()
+    shutil.rmtree(coverstore.folder(body), ignore_errors=True)
+    cards.by_body = was_by_body
+
     overlay_image(root, scale, marks[0])
     minimap_image(root, scale)
+    backdrop.destroy()
     root.destroy()
 
 
