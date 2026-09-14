@@ -1,5 +1,16 @@
 # Changelog
 
+## 4.1.5
+
+**Added**
+
+- **Mapped 3/20 ›** behind a body in RhinoScan that has saved maps: how many
+  of its mining locations you have driven a map on. It opens a page with Back
+  that lists those locations, the maps on each, their bookmark count and Share
+  map. A location counts when it was targeted while the map was driven, or
+  when one of its bookmarks lies on the map; maps tied to neither are listed
+  under "location unknown".
+
 ## 4.1.4
 
 **Changed**

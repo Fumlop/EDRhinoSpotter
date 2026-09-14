@@ -185,8 +185,10 @@ Everything in here imports tkinter.
   rather than PIL's ImageTk, which is the one part of PIL that EDMC's build
   cannot be relied on to carry. A window it cannot build is logged and
   skipped - the bookmark list works without an arrow over the game.
-- **[scan.py](rs_ui/scan.py)** - the RhinoScan window, in two views: the
-  body list, and the bookmarks of one body with Back at the top left. One
+- **[scan.py](rs_ui/scan.py)** - the RhinoScan window, in three views: the
+  body list, the bookmarks of one body, and the mapped locations of one body
+  ("Mapped 3/20 ›" on its row, from `coverage.mapped_locations`), each with
+  Back at the top left. One
   window, rebuilt rather than stacked - the bookmarks are a step into the row
   you clicked, not a second thing on the screen. Read-only and disposable:
   nothing is saved from it, so pressing the button twice costs

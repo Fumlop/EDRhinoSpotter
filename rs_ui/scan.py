@@ -335,6 +335,7 @@ def _group(parent, ground, found, sheet, wrap, focus=None, marked=None):
                  fg=FG if probed else DIM, anchor="w",
                  font=("Consolas", 9)).pack(side="left")
         _cards_link(row, (marked or {}).get(body["name"]))
+        _mapped_link(row, body, (marked or {}).get(body["name"]))
 
 
 def _cards_link(parent, records):
@@ -355,6 +356,95 @@ def _cards_link(parent, records):
     body = records[0].get("planet_name")
     label.bind("<Button-1>",
                lambda event: _bookmarks_view(label.winfo_toplevel(), system, body, records))
+
+
+def _mapped_link(parent, body, records):
+    """"Mapped 3/20 ›" behind a body with saved maps, opening which locations.
+
+    Only on bodies with a map, for the same reason as the bookmarks link: the
+    signal is "you have driven here", and nothing is worth saying where you
+    have not. The count is locations, not maps - two maps on one location is
+    still one location done.
+    """
+    name = body["name"]
+    maps = coverstore.maps(name)
+    if not maps:
+        return
+    mapped, _ = coverage.mapped_locations(maps, name, records or [])
+    total = body.get("locations")
+    text = f"  Mapped {len(mapped)}/{total} ›" if total is not None else f"  Mapped {len(mapped)} ›"
+    label = tk.Label(parent, text=text, bg=BG, fg=ACCENT, anchor="w", cursor="hand2",
+                     font=("Consolas", 9))
+    label.pack(side="left")
+    label.bind("<Button-1>",
+               lambda event: _mapped_view(label.winfo_toplevel(), name, total, records or []))
+
+
+def _mapped_view(window, body, total, records):
+    """The locations of one body that have a saved map, in the same window.
+
+    Mapped locations only, numbered, each with its maps, how many bookmarks it
+    has and Share map for its picture. Maps that no targeted location and no
+    bookmark tie to anything are listed after, so no drive goes missing.
+    """
+    global _body
+    _body = None            # the overlay's refresh must not draw bookmarks over this
+    maps = coverstore.maps(body)
+    mapped, unknown = coverage.mapped_locations(maps, body, records)
+    logger.debug(f"scan: building the maps of {body}, {len(mapped)} location(s), "
+                 f"{len(unknown)} untied")
+    _clear(window)
+    window.title(f"RhinoScan - {body} - mapped")
+
+    outer = tk.Frame(window, bg=BG)
+    outer.pack(fill="both", expand=True, padx=14, pady=12)
+
+    back = tk.Frame(outer, bg=BG)
+    back.pack(fill="x", pady=(0, 6))
+    _button(back, "‹ Back", lambda: _scan_view(window)).pack(side="left")
+
+    tk.Label(outer, text=body, bg=BG, fg=FG, anchor="w",
+             font=("Segoe UI", 15, "bold")).pack(fill="x")
+    system = _scan[0].system if _scan else None
+    of = f"{len(mapped)} of {total} locations mapped" if total is not None \
+        else f"{len(mapped)} location{'' if len(mapped) == 1 else 's'} mapped"
+    tk.Label(outer, text=f"{system or ''}  -  {of}", bg=BG, fg=DIM, anchor="w",
+             font=("Segoe UI", 9)).pack(fill="x", pady=(0, 10))
+
+    listing, _ = _scrollable(outer)
+    counts = {}
+    for record in records:
+        counts[record.get("location_index")] = counts.get(record.get("location_index"), 0) + 1
+    for location in sorted(mapped):
+        count = counts.get(location, 0)
+        marks = f"{count} bookmark{'' if count == 1 else 's'}" if count else "no bookmarks"
+        _mapped_row(listing, body, f"loc {location}", mapped[location], marks)
+    if unknown:
+        tk.Label(listing, text="location unknown", bg=BG, fg=DIM, anchor="w",
+                 font=("Segoe UI", 10, "bold")).pack(fill="x", pady=(10, 2))
+        for name in unknown:
+            _mapped_row(listing, body, "", [name], "")
+
+    note = tk.Label(outer, text="A location counts as mapped when it was targeted while the map "
+                                "was driven, or when one of its bookmarks lies on the map.",
+                    bg=BG, fg=DIM, anchor="w", justify="left", font=("Segoe UI", 8))
+    note.pack(side="top", fill="x", pady=(8, 0))
+    _Wrapper(window, margin=40)(note)
+    _fit(window, listing, extra=110)
+
+
+def _mapped_row(parent, body, location, names, marks):
+    """loc 7   map 2, map 5   2 bookmarks   [Share map] - the newest picture of them."""
+    row = tk.Frame(parent, bg=BG)
+    row.pack(fill="x", pady=1)
+    text = f"{location:<8} {', '.join(names)[:24]:<24} {marks}"
+    tk.Label(row, text="   " + text, bg=BG, fg=FG, anchor="w",
+             font=("Consolas", 9)).pack(side="left")
+    pictures = [os.path.join(coverstore.folder(body), f"{name}.png") for name in names]
+    pictures = [path for path in pictures if os.path.isfile(path)]
+    picture = max(pictures, key=os.path.getmtime) if pictures else None
+    _button(row, "Share map", (lambda: _open_card(picture)) if picture else None).pack(
+        side="right")
 
 
 # The three buttons on every bookmark row. Buttons are not labels, so the width

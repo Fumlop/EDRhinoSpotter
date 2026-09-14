@@ -359,6 +359,42 @@ def map_at(found, body, lat, lon):
     return best[1] if best else None
 
 
+def mapped_locations(found, body, records=()):
+    """({location: [map name, ...]}, [map name, ...]) for one body.
+
+    A location is mapped when a map saved it as the location targeted while
+    driving, or when one of its bookmarks lies on a map - most maps never had
+    a location targeted, so the stored number alone misses them. The second
+    list is the maps neither way ties to a location. `found` is
+    coverstore.maps' list, `records` the body's bookmarks.
+    """
+    by_location = {}
+    for name, data in found:
+        location = data.get("location")
+        if isinstance(location, int) and not isinstance(location, bool):
+            by_location.setdefault(location, set()).add(name)
+    for record in records or ():
+        location = record.get("location_index")
+        lat, lon = record.get("latitude"), record.get("longitude")
+        if location is None or lat is None or lon is None:
+            continue
+        try:
+            name = map_at(found, body, float(lat), float(lon))
+        except (TypeError, ValueError):
+            continue
+        if name:
+            by_location.setdefault(int(location), set()).add(name)
+    tied = set().union(*by_location.values()) if by_location else set()
+
+    def number(name):
+        tail = name.rsplit(" ", 1)[-1]
+        return (0, int(tail), name) if tail.isdigit() else (1, 0, name)
+
+    mapped = {location: sorted(names, key=number) for location, names in by_location.items()}
+    unknown = sorted((name for name, _ in found if name not in tied), key=number)
+    return mapped, unknown
+
+
 # The map side that makes the saved picture come out at the mask's own size:
 # the whole mask, 400 x 400 at 50 m a pixel.
 PICTURE_SIDE = int(round(MASK_PX * VIEW_M / REACH_M))

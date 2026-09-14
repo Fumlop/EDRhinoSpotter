@@ -254,6 +254,23 @@ class TestSaved:
         assert coverage.map_at(found, "A 2", *at(0, 0)) == "map 2"
         assert coverage.map_at(found, "A 2", *at(coverage.REACH_M + 5000, 0)) is None
 
+    def test_mapped_locations_from_the_stored_location_and_from_bookmarks(self):
+        targeted = dict(coverage.Coverage("A 2", *at(-8000, 0), RADIUS).to_dict(), location=3)
+        driven = coverage.Coverage("A 2", *at(2000, 0), RADIUS).to_dict()
+        elsewhere = coverage.Coverage("A 2", *at(0, 200000), RADIUS).to_dict()
+        found = [("map 1", targeted), ("map 10", driven), ("map 2", elsewhere)]
+        lat, lon = at(0, 0)
+        records = [{"location_index": 7, "latitude": lat, "longitude": lon},
+                   {"location_index": None, "latitude": lat, "longitude": lon},
+                   {"location_index": 9}]
+        mapped, unknown = coverage.mapped_locations(found, "A 2", records)
+        assert mapped == {3: ["map 1"], 7: ["map 10"]}
+        assert unknown == ["map 2"]
+
+    def test_no_maps_no_locations(self):
+        assert coverage.mapped_locations([], "A 2", [{"location_index": 1,
+                                                      "latitude": 0, "longitude": 0}]) == ({}, [])
+
     def test_centring_moves_the_map_and_keeps_the_ground(self):
         cover = self.driven()
         area = cover.painted_km2()
