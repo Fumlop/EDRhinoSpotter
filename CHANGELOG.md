@@ -10,6 +10,13 @@
   community depletion traces and reserve bands (Rhino Evidence Register PE-004,
   PE-042-044, PE-071, PE-072); both pickers are optional.
 
+**Fixed**
+
+- The mining sheet no longer counts one body's material reads twice. 25
+  locations read on a metallic-magma body had also been filed under a
+  neighbouring silicate-geyser body, so Rocky World [silicate] showed rare
+  minerals it does not carry: Monazite reads 1.4 % there now, not 7.9 %.
+
 ## 4.1.6
 
 **Changed**
