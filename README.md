@@ -162,9 +162,12 @@ what you will find.
 3. Press **Bookmark**. `completed` appears on the button once it is on disk.
 
 Coordinates, body, heading and location are read out of `Status.json` at the
-press - it is live-only, so bookmark before you fly off. Marking the same
-location for the same material twice gives you two bookmarks, not one
-overwritten. The bookmark shows on the minimap at once, and in the map picture
+press - it is live-only, so bookmark before you fly off. Bookmarking the same
+material again within 96 m of an existing bookmark on that body updates it
+instead of adding one: only **Amount** and **Density** change (the ones you
+picked), position, rigs and time stay, and an Amount other than Depleted takes
+its Depleted mark off. 96 m is an eight-rig patch on flat ground plus 10 %.
+Further away, or another material, is a new bookmark. The bookmark shows on the minimap at once, and in the map picture
 the next time the SRV docks.
 
 Bookmarks land in `%LOCALAPPDATA%\RhinoSpotter\cards\<System>\`. The

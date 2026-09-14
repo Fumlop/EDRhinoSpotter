@@ -214,3 +214,84 @@ class TestSave:
         }, str(tmp_path / "spot.json"))
         record = cards.for_system("Andel", root=str(tmp_path))[0]
         assert "3311" in record["marked_at"]
+
+
+class TestNearby:
+    """A new mark within SAME_SPOT_M of the same material on the same body updates it."""
+
+    RADIUS = 1352744.5
+
+    def write(self, folder, name, **fields):
+        import json
+        record = {"system": "Andel", "planet_name": "Andel 1 a", "commodity": "Monazite",
+                  "latitude": 10.0, "longitude": 20.0, "marked_at": "2026-09-13 18:40:00"}
+        record.update(fields)
+        (folder / name).write_text(json.dumps(record), encoding="utf-8")
+
+    def spot(self, **fields):
+        spot = {"system": "Andel", "planet_name": "Andel 1 a", "commodity": "Monazite",
+                "latitude": 10.0, "longitude": 20.0, "planet_radius": self.RADIUS}
+        spot.update(fields)
+        return spot
+
+    def metres_north(self, metres):
+        import math
+        return 10.0 + math.degrees(metres / self.RADIUS)
+
+    def test_the_radius_is_an_eight_rig_patch_plus_ten_percent(self):
+        assert cards.SAME_SPOT_M == 96
+
+    def test_same_material_inside_the_radius_is_found(self, tmp_path):
+        self.write(tmp_path, "a.json")
+        old = cards.nearby(self.spot(latitude=self.metres_north(90)), root=str(tmp_path))
+        assert old is not None and round(old["distance_m"]) == 90
+
+    def test_outside_the_radius_is_a_new_bookmark(self, tmp_path):
+        self.write(tmp_path, "a.json")
+        assert cards.nearby(self.spot(latitude=self.metres_north(100)), root=str(tmp_path)) is None
+
+    def test_another_material_close_by_is_not_touched(self, tmp_path):
+        self.write(tmp_path, "a.json", commodity="Jadeite")
+        assert cards.nearby(self.spot(), root=str(tmp_path)) is None
+
+    def test_another_body_is_not_touched(self, tmp_path):
+        self.write(tmp_path, "a.json", planet_name="Andel 1 b")
+        assert cards.nearby(self.spot(), root=str(tmp_path)) is None
+
+    def test_the_nearest_of_two_wins(self, tmp_path):
+        self.write(tmp_path, "far.json", latitude=self.metres_north(80))
+        self.write(tmp_path, "near.json", latitude=self.metres_north(40))
+        old = cards.nearby(self.spot(), root=str(tmp_path))
+        assert old["sidecar"].endswith("near.json")
+
+    def test_no_radius_no_update(self, tmp_path):
+        self.write(tmp_path, "a.json")
+        assert cards.nearby(self.spot(planet_radius=None), root=str(tmp_path)) is None
+
+
+class TestUpdated:
+    OLD = {"marked_at": "2026-09-13 18:40:00", "latitude": 10.0, "longitude": 20.0,
+           "heading": 77, "rigs": 4, "location_index": 13, "amount": "High",
+           "density": "Low", "sidecar": "x.json", "distance_m": 12.0}
+
+    def test_only_amount_and_density_change(self):
+        new = cards.updated(self.OLD, {"marked_at": "2026-09-13 20:30:00", "latitude": 10.001,
+                                       "longitude": 20.001, "heading": 200, "rigs": 6,
+                                       "location_index": 14, "amount": "Low", "density": "Medium"})
+        assert new["amount"] == "Low" and new["density"] == "Medium"
+        for key in ("marked_at", "latitude", "longitude", "heading", "rigs", "location_index"):
+            assert new[key] == self.OLD[key]
+        assert "updated_at" in new
+        assert "sidecar" not in new and "distance_m" not in new
+
+    def test_an_unpicked_reading_keeps_the_old_one(self):
+        new = cards.updated(self.OLD, {"amount": None, "density": None})
+        assert new["amount"] == "High" and new["density"] == "Low"
+
+    def test_a_live_amount_clears_depleted(self):
+        old = {"marked_at": "a", "depleted_at": "2026-09-13T20:37:35+00:00"}
+        assert "depleted_at" not in cards.updated(old, {"amount": "Medium"})
+
+    def test_no_amount_keeps_depleted(self):
+        old = {"marked_at": "a", "depleted_at": "2026-09-13T20:37:35+00:00"}
+        assert cards.updated(old, {"amount": None})["depleted_at"] == old["depleted_at"]

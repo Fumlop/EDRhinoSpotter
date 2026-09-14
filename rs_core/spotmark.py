@@ -83,6 +83,7 @@ def mark(status, system=None, commander=None, marked_at=None):
         "longitude": status.get("Longitude"),
         "heading": status.get("Heading"),
         "altitude": status.get("Altitude"),
+        "planet_radius": status.get("PlanetRadius"),
         "commander": commander,
         "marked_at": marked_at or datetime.now(timezone.utc),
     }

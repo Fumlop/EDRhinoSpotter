@@ -14,7 +14,7 @@ import subprocess
 import threading
 import tkinter as tk
 
-from rs_core import bodies, deposit, grounds, palette, spotcard, spotmark, store, update
+from rs_core import bodies, cards, deposit, grounds, palette, spotcard, spotmark, store, update
 from rs_core.logging import logger
 from rs_ui import hotkey, minimap, scan
 
@@ -394,8 +394,14 @@ def _render_card(spot, token):
     """The file name is not worth reading - either the bookmark is there or
     the reason it is not."""
     try:
-        spotcard.save(spot)
-        message = None
+        old = cards.nearby(spot)
+        if old is None:
+            spotcard.save(spot)
+            message = None
+        else:
+            spotcard.save(cards.updated(old, spot), out_path=old["sidecar"])
+            message = (f"updated Amount/Density of the {spot.get('commodity')} "
+                       f"bookmark {old['distance_m']:.0f} m away")
     except Exception as err:
         message = f"no bookmark: {err}"
     _on_ui(_report, message, token)
@@ -406,7 +412,7 @@ def _report(message, token):
     if token != _card_token:
         return
     _set_status(message or "")
-    _set_done("" if message else DONE_TEXT)
+    _set_done(DONE_TEXT if not message or message.startswith("updated") else "")
 
 
 # How often a running EDMC looks for a new release. Once at start was all it

@@ -13,8 +13,18 @@ import os
 import tempfile
 from datetime import datetime, timezone
 
+import math
+
+from rs_core import guide
 from rs_core.logging import logger
 from rs_core.spotcard import card_dir
+
+# A new bookmark this close to one for the same material on the same body is
+# the same deposit read again - on leaving, say, with Amount gone from High to
+# Low - and updates it instead of adding a second. The distance is the largest
+# patch assumed on flat ground: eight rigs, seven round one in the middle at
+# the 76 m rig spacing, is a circle of 76 / (2 sin(pi/7)) = 87.6 m; plus 10 %.
+SAME_SPOT_M = round(76.0 / (2 * math.sin(math.pi / 7)) * 1.1)
 
 
 def for_system(system, root=None):
@@ -108,6 +118,57 @@ def set_depleted(record, depleted, when=None):
     else:
         record.pop("depleted_at", None)
     return True
+
+
+def nearby(spot, root=None, within=SAME_SPOT_M):
+    """The bookmark a new mark updates, or None: same body, same material,
+    within `within` metres, the nearest one. None too when the mark carries no
+    planet radius, since without it there is no distance to measure."""
+    radius = spot.get("planet_radius")
+    lat, lon = spot.get("latitude"), spot.get("longitude")
+    material = (spot.get("commodity") or "").lower()
+    if not radius or lat is None or lon is None or not material:
+        return None
+    best = None
+    for record in for_system(spot.get("system"), root):
+        if record.get("planet_name") != spot.get("planet_name"):
+            continue
+        if (record.get("commodity") or "").lower() != material:
+            continue
+        if record.get("latitude") is None or record.get("longitude") is None:
+            continue
+        try:
+            metres = guide.distance(float(lat), float(lon), float(record["latitude"]),
+                                    float(record["longitude"]), float(radius))
+        except (TypeError, ValueError):
+            continue
+        if metres <= within and (best is None or metres < best[0]):
+            best = (metres, record)
+    if best is None:
+        return None
+    best[1]["distance_m"] = best[0]
+    return best[1]
+
+
+def updated(old, spot):
+    """The old bookmark with the new mark's Amount and Density, nothing else.
+
+    The first mark is where the deposit is: its position, heading, location,
+    rigs and time stay. Only the readings that change as it is mined are taken
+    from the new one, and only the ones picked - a picker left at "-" does not
+    wipe what was there. `updated_at` says when. An Amount other than Depleted
+    takes the Depleted mark off: the deposit reads live again.
+    """
+    record = {key: value for key, value in old.items()
+              if key not in ("path", "sidecar", "distance_m")}
+    for key in ("amount", "density"):
+        if spot.get(key) is not None:
+            record[key] = spot[key]
+    record["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    amount = spot.get("amount")
+    if amount is not None and amount != "Depleted":
+        record.pop("depleted_at", None)
+    return record
 
 
 def by_body(system, root=None):
