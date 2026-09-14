@@ -615,8 +615,9 @@ def _material_filter(parent, window, system, body, records, marked, chosen):
 
 
 def _top_here(parent, body):
-    """The three likeliest materials on this body's ground, each with its median
-    price, under the bookmark count. From the mining sheet, so a body the
+    """The three best-paying materials on this body's ground - rate times median
+    price, the same pick as the body list - each with its price, under the
+    bookmark count. From the mining sheet, so a body the
     journal has not described yet has no ground and gets a line saying so."""
     register, sheet = (_scan[0], _scan[1]) if _scan else (None, None)
     ground = None
@@ -631,7 +632,7 @@ def _top_here(parent, body):
         tk.Label(row, text="no body type yet - FSS or scan the body for its likely materials",
                  bg=BG, fg=DIM, anchor="w", font=("Segoe UI", 9)).pack(side="left")
         return
-    rows = sheet.materials(ground, limit=TOP_HERE)
+    rows = sheet.best(ground, limit=TOP_HERE, minimum=MIN_PCT)
     if not rows:
         tk.Label(row, text=f"{grounds.label(ground)}: nothing measured on this ground yet",
                  bg=BG, fg=WARN, anchor="w", font=("Segoe UI", 9)).pack(side="left")

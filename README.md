@@ -42,8 +42,9 @@ returns to the body list.
        alt="The bookmarks of one body, grouped by location, each with Share map; rows with Guide and Delete">
 </p>
 
-Under the bookmark count: the **three likeliest materials** for that kind of
-body, each with its rate and median price per tonne, from the mining sheet. A
+Under the bookmark count: the **three best-paying materials** for that kind of
+body - rate times median price, the same pick as the body list - each with its
+rate and median price per tonne. A
 body the journal has not described yet says so instead.
 
 The dropdown beside the body name narrows the list to **one material's
