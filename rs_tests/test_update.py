@@ -185,6 +185,27 @@ class TestInstall:
         assert not (target / "rs_core" / "gone.py").exists()
         assert (target / "rs_core" / "kept.py").exists()
 
+    def test_old_release_zips_are_removed(self, tmp_path):
+        target = tmp_path / "plugin"
+        target.mkdir()
+        (target / "RhinoSpotter-4.1.3.zip").write_bytes(b"old")
+        (target / "RhinoSpotter-4.1.4.zip").write_bytes(b"old")
+        (target / "notes.zip").write_bytes(b"mine")
+        (target / "RhinoSpotter-backup").mkdir()
+
+        assert update.install(_zipball({"load.py": "new"}), str(target))
+        assert not list(target.glob("RhinoSpotter-*.zip"))
+        assert (target / "notes.zip").exists()
+        assert (target / "RhinoSpotter-backup").is_dir()
+
+    def test_a_failed_update_leaves_the_zips(self, tmp_path):
+        """Nothing went in, so the zip may be the only way back."""
+        target = tmp_path / "plugin"
+        target.mkdir()
+        (target / "RhinoSpotter-4.1.4.zip").write_bytes(b"old")
+        assert not update.install(_zipball({"load.py": "new"}, root="Someone-Else-1"), str(target))
+        assert (target / "RhinoSpotter-4.1.4.zip").exists()
+
     def test_a_zip_from_somewhere_else_changes_nothing(self, tmp_path):
         target = tmp_path / "plugin"
         target.mkdir()

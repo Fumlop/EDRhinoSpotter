@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.1.5
+
+**Changed**
+
+- Update deletes `RhinoSpotter-*.zip` files left in the plugin folder, once the
+  new version is in place. Nothing else there is touched, and a failed update
+  leaves them.
+
 ## 4.1.4
 
 **Changed**
