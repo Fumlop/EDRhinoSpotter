@@ -27,6 +27,10 @@ locations are mapped - click either and the window lists them.*
 
 ### The bookmarks of one body
 
+**On or over a body** - in the SRV, landed, or in orbital cruise - **RhinoScan
+opens straight on that body's bookmarks**, even before it has any. **Back**
+goes to the body list.
+
 Clicking `3 bookmarks` puts the list in the same window: one row per bookmark
 with the location, material, rigs, heading, coordinates and when it was
 marked, grouped by location. **Most rigs first** within a location - of the
@@ -37,6 +41,13 @@ returns to the body list.
   <img src="docs/bookmarks.png" width="620"
        alt="The bookmarks of one body, grouped by location, each with Share map; rows with Guide and Delete">
 </p>
+
+Under the bookmark count: the **five likeliest materials** for that kind of
+body, each with its rate and median price per tonne, from the mining sheet. A
+body the journal has not described yet says so instead.
+
+The dropdown beside the body name narrows the list to **one material's
+bookmarks**; it offers only materials this body has bookmarks for.
 
 **Share map**, beside each location, opens the picture of the map that
 location's bookmarks were made on - see [Sharing a map](#sharing-a-map).

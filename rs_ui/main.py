@@ -224,8 +224,9 @@ def open_cards():
         _set_status(f"cannot open {spotcard.CARDS_ROOT}: {err}")
 
 
-def open_scan():
-    """The RhinoScan window for the system the journal last named.
+def open_scan(at_body=True):
+    """The RhinoScan window for the system the journal last named, opened on
+    the bookmarks of the body under the ship when there is one and `at_body`.
 
     The window gets the panel's own material variable, not a copy of its
     value: the picker it draws under the system name writes straight back
@@ -237,7 +238,8 @@ def open_scan():
     try:
         scan.show(_frame.winfo_toplevel(), _register, _sheet, _focus(),
                   variable=_material,
-                  materials=(ALL_MATERIALS,) + tuple(spotmark.MATERIALS))
+                  materials=(ALL_MATERIALS,) + tuple(spotmark.MATERIALS),
+                  here=spotmark.body_here(spotmark.read_status()) if at_body else None)
     except Exception as err:                       # a broken window must not
         logger.exception("RhinoScan failed")       # take the card flow with it
         _set_status(f"no scan window: {err}")
@@ -258,7 +260,8 @@ def _on_material_changed(*_):
     logger.debug(f"material changed to {_material.get()!r}, "
                  f"scan open={open_now} - {'reopening' if open_now else 'nothing to do'}")
     if open_now:
-        _frame.after_idle(open_scan)
+        at_body = scan.on_body_here()
+        _frame.after_idle(lambda: open_scan(at_body))
 
 
 # How often Status.json is read to see whether Bookmark has anything to mark.

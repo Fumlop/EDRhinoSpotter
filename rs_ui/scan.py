@@ -45,13 +45,17 @@ WARN = palette.WARN
 _window = None           # only ever one, so the button cannot bury the panel
 _scan = None             # what show() was last given, so Back can rebuild
 _body = None             # the bookmark view's own arguments, for the same reason
+_here = None             # the body Status.json put us on or over when the window opened
+_filter = {}             # body name -> the material its bookmarks are filtered to
+ALL = "All materials"
+TOP_HERE = 5             # materials listed under a body's bookmark count
 
 
 def is_open():
     return _window is not None and bool(_window.winfo_exists())
 
 
-def show(parent, register, sheet, focus=None, variable=None, materials=()):
+def show(parent, register, sheet, focus=None, variable=None, materials=(), here=None):
     """Open the window, or raise the one already open.
 
     `focus` is one material. Given one, only the grounds that have ever
@@ -59,13 +63,17 @@ def show(parent, register, sheet, focus=None, variable=None, materials=()):
     - the question has changed from "what is here" to "where is the jadeite",
     and a ground that answers it at 4% still answers it.
 
+    `here` is the body name when Status.json has us on or over one - in the
+    SRV, landed, or in orbital cruise. Then the window opens on that body's
+    bookmarks, whether it has any yet or not; Back goes to the body list.
+
     `variable` is the panel's own material StringVar, not a copy. The picker
     under the system name writes to it, so choosing here is the same act as
     choosing down in the panel and the two can never disagree. Watching that
     variable is the panel's job - one watcher, added once, rather than another
     one on every open.
     """
-    global _window, _scan
+    global _window, _scan, _here
 
     if _window is not None and _window.winfo_exists():
         _window.destroy()
@@ -78,8 +86,21 @@ def show(parent, register, sheet, focus=None, variable=None, materials=()):
     # behind it is the one thing the stack cannot be asked about afterwards.
     _window.bind("<Destroy>", _log_destroy, add="+")
     _scan = (register, sheet, focus, variable, materials)
-    _scan_view(_window)
+    _here = here
+    if here and register.system:
+        _bookmarks_view(_window, register.system, here,
+                        cards.by_body(register.system).get(here, []))
+    else:
+        _scan_view(_window)
     return _window
+
+
+def on_body_here():
+    """Whether the open window is showing the bookmarks of the body it opened
+    on. The panel reopens the window when its material changes, and a window
+    the commander has taken Back to the body list must come back as the list."""
+    return (_window is not None and _window.winfo_exists()
+            and _body is not None and _body[2] == _here)
 
 
 def _log_destroy(event):
@@ -99,8 +120,10 @@ def _scan_view(window):
     list kept alive behind the bookmarks is a list that missed every scan that
     landed while it was behind them.
     """
+    global _body
     register, sheet, focus, variable, materials = _scan
     logger.debug("scan: building the body list")
+    _body = None            # the overlay's refresh must not draw bookmarks over the list
     _clear(window)
     window.title(f"RhinoScan - {register.system or 'unknown system'}"
                  + (f" - {focus}" if focus else ""))
@@ -528,16 +551,35 @@ def _bookmarks_view(window, system, body, records):
     back.pack(fill="x", pady=(0, 6))
     _button(back, "‹ Back", lambda: _scan_view(window)).pack(side="left")
 
-    tk.Label(outer, text=body, bg=BG, fg=FG, anchor="w",
-             font=("Segoe UI", 15, "bold")).pack(fill="x")
+    # The body, and beside it the material its bookmarks are narrowed to. Only
+    # materials that have a bookmark here are offered: a filter that can come
+    # up empty is a filter that looks broken.
+    title = tk.Frame(outer, bg=BG)
+    title.pack(fill="x")
+    tk.Label(title, text=body, bg=BG, fg=FG, anchor="w",
+             font=("Segoe UI", 15, "bold")).pack(side="left")
+    marked = sorted({r.get("commodity") for r in records if r.get("commodity")})
+    chosen = _filter.get(body, ALL)
+    if chosen != ALL and chosen not in marked:
+        chosen = _filter[body] = ALL
+    if len(marked) > 1:
+        _material_filter(title, window, system, body, records, marked, chosen)
+    shown = [r for r in records if chosen == ALL or r.get("commodity") == chosen]
+
     count = len(records)
-    tk.Label(outer, text=f"{system or ''}  -  {count} bookmark{'' if count == 1 else 's'}",
-             bg=BG, fg=DIM, anchor="w", font=("Segoe UI", 9)).pack(fill="x", pady=(0, 10))
+    counted = (f"{len(shown)} of {count} bookmarks" if len(shown) != count
+               else f"{count} bookmark{'' if count == 1 else 's'}")
+    tk.Label(outer, text=f"{system or ''}  -  {counted}",
+             bg=BG, fg=DIM, anchor="w", font=("Segoe UI", 9)).pack(fill="x")
+    _top_here(outer, body)
 
     _column_header(outer)
     listing, _ = _scrollable(outer)
+    if not records:
+        tk.Label(listing, text="   no bookmarks on this body yet", bg=BG, fg=DIM, anchor="w",
+                 font=("Segoe UI", 9)).pack(fill="x", pady=(6, 0))
     maps = coverstore.maps(body)
-    for index, group in _by_location(records):
+    for index, group in _by_location(shown):
         _location_header(listing, body, index, group, maps)
         for record in cards.ordered(group):
             _bookmark_row(listing, record)
@@ -550,6 +592,61 @@ def _bookmarks_view(window, system, body, records):
     note.pack(side="top", fill="x", pady=(8, 0))
     _Wrapper(window, margin=40)(note)
     _fit(window, listing, extra=BUTTONS)
+
+
+def _material_filter(parent, window, system, body, records, marked, chosen):
+    """The dropdown beside the body name: all bookmarks, or one material's."""
+    variable = tk.StringVar(value=chosen)
+
+    def pick(value):
+        _filter[body] = value
+        # After the menu has closed: rebuilding the window destroys the menu
+        # that is still handing out this call.
+        window.after_idle(lambda: _bookmarks_view(window, system, body, records))
+
+    menu = tk.OptionMenu(parent, variable, ALL, *marked, command=pick)
+    menu.config(relief="solid", borderwidth=1, highlightthickness=0,
+                bg=PANEL, fg=FG, activebackground=PANEL, activeforeground=ACCENT,
+                anchor="w", padx=6, pady=0, font=("Segoe UI", 9))
+    menu["menu"].config(bg=PANEL, fg=FG, activebackground=ACCENT, activeforeground=BG,
+                        borderwidth=1, activeborderwidth=0, tearoff=False,
+                        font=("Segoe UI", 9))
+    menu.pack(side="left", padx=(12, 0))
+
+
+def _top_here(parent, body):
+    """The five likeliest materials on this body's ground, each with its median
+    price, under the bookmark count. From the mining sheet, so a body the
+    journal has not described yet has no ground and gets a line saying so."""
+    register, sheet = (_scan[0], _scan[1]) if _scan else (None, None)
+    ground = None
+    if register is not None:
+        for known in register.bodies():
+            if known.get("name") == body:
+                ground = known.get("ground")
+                break
+    row = tk.Frame(parent, bg=BG)
+    row.pack(fill="x", pady=(2, 10))
+    if ground is None or sheet is None:
+        tk.Label(row, text="no body type yet - FSS or scan the body for its likely materials",
+                 bg=BG, fg=DIM, anchor="w", font=("Segoe UI", 9)).pack(side="left")
+        return
+    rows = sheet.materials(ground, limit=TOP_HERE)
+    if not rows:
+        tk.Label(row, text=f"{grounds.label(ground)}: nothing measured on this ground yet",
+                 bg=BG, fg=WARN, anchor="w", font=("Segoe UI", 9)).pack(side="left")
+        return
+    text = "   ·   ".join(f"{r['material']} {r['pct']}% {_price(r.get('median'))}" for r in rows)
+    tk.Label(row, text=text, bg=BG, fg=GOOD, anchor="w", font=("Consolas", 9)).pack(side="left")
+
+
+def _price(credits):
+    """208k, 1.2M, or 'no price' - the median a market pays per tonne."""
+    if not credits:
+        return "(no price)"
+    if credits >= 1_000_000:
+        return f"({credits / 1_000_000:.1f}M)"
+    return f"({round(credits / 1000):,}k)"
 
 
 def _by_location(records):
@@ -703,7 +800,9 @@ def _reload():
         return
     window, system, body, _records = _body
     records = cards.by_body(system).get(body, [])
-    if records:
+    # The body you are on stays open with nothing on it: its likely materials
+    # are still worth reading.
+    if records or body == _here:
         _bookmarks_view(window, system, body, records)
     else:
         _scan_view(window)

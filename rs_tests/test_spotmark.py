@@ -134,3 +134,15 @@ class TestOnGround:
 
     def test_an_empty_status(self):
         assert spotmark.on_ground({}) is False
+
+
+class TestBodyHere:
+    def test_over_a_body(self):
+        status = {"BodyName": "Andel 1 a", "Latitude": 12.3, "Longitude": -45.6}
+        assert spotmark.body_here(status) == "Andel 1 a"
+
+    def test_supercruise_names_no_body(self):
+        assert spotmark.body_here({"BodyName": "Andel 1 a"}) is None
+
+    def test_empty_status(self):
+        assert spotmark.body_here({}) is None

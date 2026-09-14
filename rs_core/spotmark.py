@@ -89,6 +89,18 @@ def mark(status, system=None, commander=None, marked_at=None):
     }
 
 
+def body_here(status):
+    """The body Status.json has us on or over, or None.
+
+    Latitude and longitude are only in Status.json near a body - orbital
+    cruise, glide, landed, in the SRV - so their presence is the test, and the
+    body is whatever it names. Deep space and supercruise give None.
+    """
+    if status.get("Latitude") is None or status.get("Longitude") is None:
+        return None
+    return status.get("BodyName") or None
+
+
 def on_surface(spot):
     """A mark without coordinates is not a place anyone can fly back to."""
     return spot.get("latitude") is not None and spot.get("longitude") is not None
