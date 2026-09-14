@@ -224,7 +224,7 @@ class Register:
         """
         buckets = {}
         for body in self.bodies():
-            buckets.setdefault(body['ground'], []).append(body)
+            buckets.setdefault(grounds.canonical(body['ground']), []).append(body)
         order = {ground: index for index, ground in enumerate(grounds.GROUND_ORDER)}
         return sorted(buckets.items(), key=lambda item: order.get(item[0], len(order)))
 

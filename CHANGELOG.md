@@ -1,5 +1,17 @@
 # Changelog
 
+## 4.1.3
+
+**Changed**
+
+- The rocky grounds in `ground_rules.json` are named composition first,
+  volcanism second: `rock 80%+ [magma]`, `rock 80%+ [silicate geysers]`,
+  `rock 80%+ [none]`, the way the mining sheet now heads them. "Volcanic magma"
+  read as if any magma body counted, and the magma materials want rock 80% or
+  more. The names on the panel are unchanged - Rocky World [magma].
+- A `ground_rules.json` kept from an earlier version, and systems cached under
+  the old names, read under the new ones. Nothing has to be rescanned.
+
 ## 4.1.2
 
 **Changed**

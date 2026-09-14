@@ -1,18 +1,18 @@
 {
- "generated": "2026-09-14 14:07 UTC",
+ "generated": "2026-09-14 14:26 UTC",
  "source": "EDIntel prospecting guide",
- "note": "Percentages are the share of a ground's mining locations that carried the material. A ground is the body class, and a Rocky body splits on its volcanism; magma on a metal-rich or high-metal body counts under that class, not under volcanic magma. The magma material rules ask rock >= 80%: every Rocky body read clears it, no metal-rich or high-metal body does. Prices exclude Ega, fleet carriers, on-foot settlements and rows reading demand 999999, which are a placeholder rather than a market.",
+ "note": "Percentages are the share of a ground's mining locations that carried the material. A ground is the body class, and a Rocky body splits on its volcanism; magma on a metal-rich or high-metal body counts under that class, not under rock 80%+ [magma]. The magma material rules ask rock >= 80%: every Rocky body read clears it, no metal-rich or high-metal body does. Prices exclude Ega, fleet carriers, on-foot settlements and rows reading demand 999999, which are a placeholder rather than a market.",
  "locations": {
-  "volcanic magma": 58,
-  "volcanic silicate": 164,
-  "rocky": 164,
+  "rock 80%+ [magma]": 58,
+  "rock 80%+ [silicate geysers]": 164,
+  "rock 80%+ [none]": 164,
   "rocky-ice": 14,
   "high-metal-content": 247,
   "metal-rich": 114,
   "icy": 131
  },
  "grounds": {
-  "volcanic magma": [
+  "rock 80%+ [magma]": [
    {
     "material": "Olivine",
     "pct": 55.2,
@@ -158,7 +158,7 @@
     "best": 655631
    }
   ],
-  "volcanic silicate": [
+  "rock 80%+ [silicate geysers]": [
    {
     "material": "Jadeite",
     "pct": 55.5,
@@ -310,7 +310,7 @@
     "best": 419142
    }
   ],
-  "rocky": [
+  "rock 80%+ [none]": [
    {
     "material": "Copper",
     "pct": 66.5,

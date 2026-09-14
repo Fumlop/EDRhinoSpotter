@@ -58,7 +58,7 @@ class TestReplay:
         ])
         systems = replay.replay(replay.journal_files(str(tmp_path)))
         assert sorted(systems) == ["Andel", "Loha"]
-        assert systems["Andel"][0]["ground"] == "volcanic magma"
+        assert systems["Andel"][0]["ground"] == "rock 80%+ [magma]"
 
     def test_location_counts_come_through(self, tmp_path):
         write_journal(tmp_path, "Journal.a.log", [
@@ -103,7 +103,7 @@ class TestReplay:
         ], age_days=0)
         systems = replay.replay(replay.journal_files(str(tmp_path)))
         assert len(systems["Andel"]) == 1
-        assert systems["Andel"][0]["ground"] == "volcanic magma"
+        assert systems["Andel"][0]["ground"] == "rock 80%+ [magma]"
 
     def test_broken_lines_are_skipped(self, tmp_path):
         path = tmp_path / "Journal.a.log"
@@ -124,7 +124,7 @@ class TestReplay:
 
 class TestScoring:
     def test_every_body_is_worth_its_best_rate(self, sheet):
-        seen = [{"ground": "volcanic magma"}, {"ground": "rocky"}]
+        seen = [{"ground": "rock 80%+ [magma]"}, {"ground": "rock 80%+ [none]"}]
         assert replay.score(seen, sheet) == pytest.approx(56.1 + 43.3)
 
     def test_ground_the_sheet_never_measured_is_worth_nothing(self, sheet):
@@ -134,14 +134,14 @@ class TestScoring:
     def test_more_of_the_same_good_ground_scores_higher(self, sheet):
         """The question is not "is there something here" but "is there enough
         here to be worth the trip"."""
-        one = replay.score([{"ground": "volcanic magma"}], sheet)
-        five = replay.score([{"ground": "volcanic magma"}] * 5, sheet)
+        one = replay.score([{"ground": "rock 80%+ [magma]"}], sheet)
+        five = replay.score([{"ground": "rock 80%+ [magma]"}] * 5, sheet)
         assert five > one
 
     def test_ranking_puts_the_best_first(self, sheet):
         systems = {
-            "Thin":  [{"ground": "rocky", "locations": None}],
-            "Rich":  [{"ground": "volcanic magma", "locations": None}] * 3,
+            "Thin":  [{"ground": "rock 80%+ [none]", "locations": None}],
+            "Rich":  [{"ground": "rock 80%+ [magma]", "locations": None}] * 3,
         }
         assert [name for name, _, _ in replay.rank(systems, sheet)] == ["Rich", "Thin"]
 
@@ -149,8 +149,8 @@ class TestScoring:
         """Equal ground, so the separator is how much someone has already
         probed - a probed body is one you can fly straight to."""
         systems = {
-            "Unprobed": [{"ground": "rocky", "locations": None}],
-            "Probed":   [{"ground": "rocky", "locations": 20}],
+            "Unprobed": [{"ground": "rock 80%+ [none]", "locations": None}],
+            "Probed":   [{"ground": "rock 80%+ [none]", "locations": 20}],
         }
         assert [name for name, _, _ in replay.rank(systems, sheet)] == ["Probed", "Unprobed"]
 

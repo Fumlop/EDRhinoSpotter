@@ -36,14 +36,14 @@ SYSTEM = "Hyperion Reach AB-C d1-42"
 BODIES = [
     ("6 a", "high-metal-content",  210.0,   14, ""),
     ("6 b", "high-metal-content",  214.0, None, ""),
-    ("1 a", "volcanic magma",      412.0,   19, "major metallic magma"),
-    ("1 b", "volcanic magma",      418.0,    8, "minor metallic magma"),
-    ("2 a", "volcanic magma",      903.0,   12, "major rocky magma"),
-    ("4 a", "volcanic silicate",  1284.0,   22, "major silicate vapour geysers"),
-    ("4 c", "volcanic silicate",  1291.0,    9, "minor silicate vapour geysers"),
-    ("9 a", "rocky",              2165.0,   13, ""),
-    ("9 b", "rocky",              2168.0,   10, ""),
-    ("9 c", "rocky",              2172.0, None, ""),
+    ("1 a", "rock 80%+ [magma]",      412.0,   19, "major metallic magma"),
+    ("1 b", "rock 80%+ [magma]",      418.0,    8, "minor metallic magma"),
+    ("2 a", "rock 80%+ [magma]",      903.0,   12, "major rocky magma"),
+    ("4 a", "rock 80%+ [silicate geysers]",  1284.0,   22, "major silicate vapour geysers"),
+    ("4 c", "rock 80%+ [silicate geysers]",  1291.0,    9, "minor silicate vapour geysers"),
+    ("9 a", "rock 80%+ [none]",              2165.0,   13, ""),
+    ("9 b", "rock 80%+ [none]",              2168.0,   10, ""),
+    ("9 c", "rock 80%+ [none]",              2172.0, None, ""),
 ]
 
 

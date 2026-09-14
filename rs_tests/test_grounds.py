@@ -21,12 +21,12 @@ class TestClassify:
         ("Icy body",                "water geysers",   "icy"),
         ("Rocky ice body",          "",                "rocky-ice"),
         # A rocky body splits on what its volcanism is.
-        ("Rocky body", "major metallic magma",          "volcanic magma"),
-        ("Rocky body", "minor rocky magma",             "volcanic magma"),
-        ("Rocky body", "major silicate vapour geysers", "volcanic silicate"),
-        ("Rocky body", "minor silicate magma volcanism", "silicate magma"),
-        ("Rocky body", "major water geysers",           "volcanic rocky"),
-        ("Rocky body", "",                              "rocky"),
+        ("Rocky body", "major metallic magma",          "rock 80%+ [magma]"),
+        ("Rocky body", "minor rocky magma",             "rock 80%+ [magma]"),
+        ("Rocky body", "major silicate vapour geysers", "rock 80%+ [silicate geysers]"),
+        ("Rocky body", "minor silicate magma volcanism", "rock 80%+ [silicate magma]"),
+        ("Rocky body", "major water geysers",           "rock 80%+ [other volcanism]"),
+        ("Rocky body", "",                              "rock 80%+ [none]"),
     ])
     def test_buckets(self, make_scan, planet_class, volcanism, expected):
         assert grounds.classify(make_scan("B 1 a", planet_class, volcanism)) == expected
@@ -35,11 +35,11 @@ class TestClassify:
         """'silicate' and 'rocky' both appear in some volcanism strings, and
         silicate is the one that changes which materials are there."""
         body = make_scan("B 1 a", "Rocky body", "minor rocky silicate vapour geysers")
-        assert grounds.classify(body) == "volcanic silicate"
+        assert grounds.classify(body) == "rock 80%+ [silicate geysers]"
 
     def test_case_does_not_matter(self, make_scan):
         assert grounds.classify(make_scan("B", "ROCKY BODY", "MAJOR METALLIC MAGMA")) \
-            == "volcanic magma"
+            == "rock 80%+ [magma]"
 
     @pytest.mark.parametrize("body", [
         None,
@@ -66,20 +66,20 @@ class TestSheet:
     def test_reads_the_table(self, sheet):
         assert sheet.loaded
         assert sheet.generated == "2026-01-01 00:00 UTC"
-        assert sheet.sample("volcanic magma") == 57
+        assert sheet.sample("rock 80%+ [magma]") == 57
 
     def test_materials_come_back_likeliest_first(self, sheet):
-        rows = sheet.materials("volcanic magma")
+        rows = sheet.materials("rock 80%+ [magma]")
         assert [row["material"] for row in rows] == ["Olivine", "Monazite", "Tiny"]
 
     def test_limit_and_minimum_trim_the_tail(self, sheet):
-        assert len(sheet.materials("volcanic magma", limit=2)) == 2
-        kept = sheet.materials("volcanic magma", minimum=2.0)
+        assert len(sheet.materials("rock 80%+ [magma]", limit=2)) == 2
+        kept = sheet.materials("rock 80%+ [magma]", minimum=2.0)
         assert [row["material"] for row in kept] == ["Olivine", "Monazite"]
 
     def test_best_puts_what_pays_first(self, sheet):
         # Monazite 45.6% x 400k beats Olivine 56.1% x 50k.
-        rows = sheet.best("volcanic magma", minimum=2.0)
+        rows = sheet.best("rock 80%+ [magma]", minimum=2.0)
         assert [row["material"] for row in rows] == ["Monazite", "Olivine"]
 
     def test_best_sorts_unpriced_last_and_keeps_them(self, tmp_path):
@@ -97,7 +97,7 @@ class TestSheet:
     def test_codes_give_the_valuable_material_the_single_letter(self, tmp_path):
         import json
         path = tmp_path / "ground_rules.json"
-        path.write_text(json.dumps({"grounds": {"rocky": [
+        path.write_text(json.dumps({"grounds": {"rock 80%+ [none]": [
             {"material": "Titanium", "pct": 52.6, "median": 0, "best": 0},
             {"material": "Thorium", "pct": 47.6, "median": 0, "best": 0},
             {"material": "Thortveitite", "pct": 12.2, "median": 160947, "best": 1},
@@ -113,17 +113,36 @@ class TestSheet:
         assert codes and len(set(codes.values())) == len(codes)
         assert all(len(code) <= 3 for code in codes.values())
 
+    def test_a_sheet_from_before_4_1_3_reads_under_the_current_names(self, tmp_path):
+        """An update keeps the local ground_rules.json, which can still carry
+        the old names. Its rows must not vanish behind the rename."""
+        import json
+        path = tmp_path / "ground_rules.json"
+        path.write_text(json.dumps({
+            "locations": {"volcanic magma": 58, "rocky": 164},
+            "grounds": {"volcanic magma": [{"material": "Monazite", "pct": 44.8,
+                                            "median": 1, "best": 1}],
+                        "rocky": [{"material": "Copper", "pct": 66.5,
+                                   "median": 1, "best": 1}]},
+        }), encoding="utf-8")
+        sheet = grounds.Sheet(str(path))
+        assert sheet.rate("rock 80%+ [magma]", "monazite") == 44.8
+        assert sheet.sample("rock 80%+ [none]") == 164
+        # And a body classified under an old name still finds its rows.
+        assert sheet.rate("volcanic magma", "monazite") == 44.8
+        assert grounds.label("volcanic silicate") == "Rocky World [silicate]"
+
     def test_unknown_ground_is_empty_not_an_error(self, sheet):
-        assert sheet.materials("volcanic silicate") == []
-        assert sheet.sample("volcanic silicate") == 0
+        assert sheet.materials("rock 80%+ [silicate geysers]") == []
+        assert sheet.sample("rock 80%+ [silicate geysers]") == 0
 
     def test_missing_file_still_gives_a_usable_object(self, empty_sheet):
         """The body list comes from the journal and owes nothing to this file.
         Losing it must cost the percentages, not the panel."""
         assert not empty_sheet.loaded
         assert empty_sheet.error
-        assert empty_sheet.materials("rocky") == []
-        assert empty_sheet.sample("rocky") == 0
+        assert empty_sheet.materials("rock 80%+ [none]") == []
+        assert empty_sheet.sample("rock 80%+ [none]") == 0
 
     def test_broken_json_is_the_same_as_missing(self, tmp_path):
         path = tmp_path / "ground_rules.json"

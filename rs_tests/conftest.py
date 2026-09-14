@@ -51,14 +51,14 @@ def sheet(tmp_path):
     path = tmp_path / "ground_rules.json"
     path.write_text(json.dumps({
         "generated": "2026-01-01 00:00 UTC",
-        "locations": {"volcanic magma": 57, "rocky": 164},
+        "locations": {"rock 80%+ [magma]": 57, "rock 80%+ [none]": 164},
         "grounds": {
-            "volcanic magma": [
+            "rock 80%+ [magma]": [
                 {"material": "Olivine",  "pct": 56.1, "median": 50000, "best": 90000},
                 {"material": "Monazite", "pct": 45.6, "median": 400000, "best": 700000},
                 {"material": "Tiny",     "pct": 1.2, "median": 1000, "best": 2000},
             ],
-            "rocky": [
+            "rock 80%+ [none]": [
                 {"material": "Magnesite", "pct": 43.3, "median": 40000, "best": 60000},
             ],
         },

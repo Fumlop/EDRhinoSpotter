@@ -28,11 +28,11 @@ RULES_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file
 GROUND_ORDER = (
     'metal-rich',
     'high-metal-content',
-    'volcanic magma',
-    'volcanic silicate',
-    'silicate magma',
-    'volcanic rocky',
-    'rocky',
+    'rock 80%+ [magma]',
+    'rock 80%+ [silicate geysers]',
+    'rock 80%+ [silicate magma]',
+    'rock 80%+ [other volcanism]',
+    'rock 80%+ [none]',
     'rocky-ice',
     'icy',
 )
@@ -40,14 +40,30 @@ GROUND_ORDER = (
 GROUND_LABEL = {
     'metal-rich':         'Metal-Rich World',
     'high-metal-content': 'High Metal Content World',
-    'volcanic magma':     'Rocky World [magma]',
-    'volcanic silicate':  'Rocky World [silicate]',
-    'silicate magma':     'Rocky World [silicate magma]',
-    'volcanic rocky':     'Rocky World [volcanic]',
-    'rocky':              'Rocky World',
-    'rocky-ice':          'Rocky Ice World',
-    'icy':                'Icy World',
+    'rock 80%+ [magma]':            'Rocky World [magma]',
+    'rock 80%+ [silicate geysers]': 'Rocky World [silicate]',
+    'rock 80%+ [silicate magma]':   'Rocky World [silicate magma]',
+    'rock 80%+ [other volcanism]':  'Rocky World [volcanic]',
+    'rock 80%+ [none]':             'Rocky World',
+    'rocky-ice':                    'Rocky Ice World',
+    'icy':                          'Icy World',
 }
+
+# The names before 4.1.3. An update keeps the local ground_rules.json (see
+# update.KEEP) and the system cache holds bodies classified back then, so both
+# can still say 'volcanic magma'. canonical() reads them as the current key.
+LEGACY = {
+    'volcanic magma':    'rock 80%+ [magma]',
+    'volcanic silicate': 'rock 80%+ [silicate geysers]',
+    'silicate magma':    'rock 80%+ [silicate magma]',
+    'volcanic rocky':    'rock 80%+ [other volcanism]',
+    'rocky':             'rock 80%+ [none]',
+}
+
+
+def canonical(ground):
+    """A ground key as this version names it, whichever version wrote it."""
+    return LEGACY.get(ground, ground)
 
 # Magma and silicate carry opposite materials - monazite reads 45.6% on magma
 # and 7.9% on silicate - so the volcanism decides the ground before the
@@ -55,7 +71,7 @@ GROUND_LABEL = {
 _MAGMA = ('metallic', 'rocky')
 _SILICATE = 'silicate'
 # Silicate magma is not a geyser. The sheet keeps it apart (geology.py buckets it
-# as sil_magma), so it must not fall into 'volcanic silicate' here on the word.
+# as sil_magma), so it must not fall into silicate geysers here on the word.
 _SILICATE_MAGMA = 'silicate magma'
 
 
@@ -86,18 +102,19 @@ def classify(body):
 
     volcanism = ' '.join((body.get('Volcanism') or '').lower().split())
     if _SILICATE_MAGMA in volcanism:
-        return 'silicate magma'
+        return 'rock 80%+ [silicate magma]'
     if _SILICATE in volcanism:
-        return 'volcanic silicate'
+        return 'rock 80%+ [silicate geysers]'
     if any(word in volcanism for word in _MAGMA):
-        return 'volcanic magma'
+        return 'rock 80%+ [magma]'
     if volcanism:
-        return 'volcanic rocky'
-    return 'rocky'
+        return 'rock 80%+ [other volcanism]'
+    return 'rock 80%+ [none]'
 
 
 def label(ground):
     """The ground said the way the system map says it."""
+    ground = canonical(ground)
     return GROUND_LABEL.get(ground, ground or 'unknown')
 
 
@@ -125,8 +142,8 @@ class Sheet:
             self.error = str(err)
             return
         self.generated = data.get('generated')
-        self.locations = data.get('locations') or {}
-        self.grounds = data.get('grounds') or {}
+        self.locations = {canonical(k): v for k, v in (data.get('locations') or {}).items()}
+        self.grounds = {canonical(k): v for k, v in (data.get('grounds') or {}).items()}
 
     @property
     def loaded(self):
@@ -167,7 +184,7 @@ class Sheet:
         tail: on rocky ground sixteen materials qualify and nobody reads past
         the fourth.
         """
-        rows = [row for row in self.grounds.get(ground, []) if row['pct'] >= minimum]
+        rows = [row for row in self.grounds.get(canonical(ground), []) if row['pct'] >= minimum]
         return rows[:limit] if limit else rows
 
     def best(self, ground, limit=None, minimum=0.0):
@@ -189,11 +206,11 @@ class Sheet:
         found on none of its locations are different claims, and only the
         second one is a measurement.
         """
-        for row in self.grounds.get(ground, []):
+        for row in self.grounds.get(canonical(ground), []):
             if row['material'].lower() == (material or '').lower():
                 return row['pct']
         return None
 
     def sample(self, ground):
         """How many mining locations the percentages for that ground rest on."""
-        return self.locations.get(ground, 0)
+        return self.locations.get(canonical(ground), 0)

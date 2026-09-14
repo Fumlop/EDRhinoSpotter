@@ -8,7 +8,7 @@ import pytest
 from rs_core import store
 
 BODIES = [
-    {"name": "Andel 1 a", "ground": "volcanic magma", "distance": 412.0,
+    {"name": "Andel 1 a", "ground": "rock 80%+ [magma]", "distance": 412.0,
      "locations": 17, "volcanism": "major metallic magma", "planet_class": "Rocky body"},
     {"name": "Andel 4 c", "ground": "icy", "distance": 1016.0,
      "locations": None, "volcanism": "", "planet_class": "Icy body"},

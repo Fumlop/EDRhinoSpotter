@@ -26,7 +26,7 @@ class TestTracking:
         register.track(make_scan("Andel 1 a", "Rocky body", "major metallic magma"),
                        system="Andel")
         assert len(register) == 1
-        assert register.bodies()[0]["ground"] == "volcanic magma"
+        assert register.bodies()[0]["ground"] == "rock 80%+ [magma]"
 
     def test_unlandable_bodies_never_enter(self, make_scan):
         register = bodies.Register()
@@ -74,7 +74,7 @@ class TestLearningTheSystem:
 
     def test_learning_the_name_still_loads_the_cache(self):
         register = bodies.Register(on_arrive=lambda system: [
-            {"name": "Andel 1 a", "ground": "rocky", "distance": 1.0, "locations": 5}])
+            {"name": "Andel 1 a", "ground": "rock 80%+ [none]", "distance": 1.0, "locations": 5}])
         register.track({"event": "Music"}, system="Andel")
         assert len(register) == 1
 
@@ -142,7 +142,7 @@ class TestOrdering:
         register.track(make_scan("Rock", "Rocky body"), system="A")
         register.track(make_scan("Metal", "Metal rich body"), system="A")
         assert [ground for ground, _ in register.by_ground()] == [
-            "metal-rich", "rocky", "icy"]
+            "metal-rich", "rock 80%+ [none]", "icy"]
 
     def test_grouping_keeps_every_body(self, make_scan):
         register = bodies.Register()
@@ -288,7 +288,7 @@ class TestAdopting:
     def test_adopting_a_cached_system(self):
         register = bodies.Register()
         count = register.adopt("Andel", [
-            {"name": "Andel 1 a", "ground": "volcanic magma", "distance": 412.0,
+            {"name": "Andel 1 a", "ground": "rock 80%+ [magma]", "distance": 412.0,
              "locations": 17},
             {"name": "Andel 4 c", "ground": "icy", "distance": 1016.0, "locations": None},
         ])
@@ -296,24 +296,34 @@ class TestAdopting:
         assert len(register) == 2
         assert register.system == "Andel"
         assert register.bodies()[0]["locations"] == 17
-        assert [ground for ground, _ in register.by_ground()] == ["volcanic magma", "icy"]
+        assert [ground for ground, _ in register.by_ground()] == ["rock 80%+ [magma]", "icy"]
 
     def test_a_scan_after_adopting_still_updates(self, make_scan):
         register = bodies.Register()
-        register.adopt("Andel", [{"name": "Andel 1 a", "ground": "rocky",
+        register.adopt("Andel", [{"name": "Andel 1 a", "ground": "rock 80%+ [none]",
                                   "distance": 412.0, "locations": 17}])
         assert register.track(make_scan("Andel 1 a", "Rocky body", "major metallic magma"),
                               system="Andel")
         body = register.bodies()[0]
-        assert body["ground"] == "volcanic magma"
+        assert body["ground"] == "rock 80%+ [magma]"
         assert body["locations"] == 17
+
+
+    def test_a_body_cached_under_an_old_ground_name_groups_under_the_new_one(self):
+        register = bodies.Register()
+        register.adopt("Andel", [
+            {"name": "Andel 1 a", "ground": "volcanic magma", "distance": 412.0, "locations": 17},
+            {"name": "Andel 1 b", "ground": "rock 80%+ [magma]", "distance": 418.0, "locations": 8},
+        ])
+        assert [(ground, len(found)) for ground, found in register.by_ground()] \
+            == [("rock 80%+ [magma]", 2)]
 
 
 class TestArriving:
     """Jumping in loads what is known and the scans that follow add to it."""
 
     def cached(self, *names):
-        return [{"name": name, "ground": "rocky", "distance": float(index),
+        return [{"name": name, "ground": "rock 80%+ [none]", "distance": float(index),
                  "locations": 5, "volcanism": "", "planet_class": "Rocky body"}
                 for index, name in enumerate(names)]
 
@@ -342,7 +352,7 @@ class TestArriving:
         register.track(make_scan("Andel 1 a", "Rocky body", "major metallic magma"),
                        system="Andel")
         body = register.bodies()[0]
-        assert body["ground"] == "volcanic magma"
+        assert body["ground"] == "rock 80%+ [magma]"
         assert body["locations"] == 5
 
     def test_arriving_does_not_write_back_what_it_just_read(self):
