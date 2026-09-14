@@ -6,7 +6,7 @@ from rs_core import grounds
 
 
 class TestClassify:
-    """The eight buckets, matched against real PlanetClass strings.
+    """The nine buckets, matched against real PlanetClass strings.
 
     These have to agree with the classifier the sheet was measured with. Two
     tables that look alike and disagree are worse than one table.
@@ -24,6 +24,7 @@ class TestClassify:
         ("Rocky body", "major metallic magma",          "volcanic magma"),
         ("Rocky body", "minor rocky magma",             "volcanic magma"),
         ("Rocky body", "major silicate vapour geysers", "volcanic silicate"),
+        ("Rocky body", "minor silicate magma volcanism", "silicate magma"),
         ("Rocky body", "major water geysers",           "volcanic rocky"),
         ("Rocky body", "",                              "rocky"),
     ])

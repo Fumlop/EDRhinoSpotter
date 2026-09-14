@@ -52,7 +52,7 @@ No tkinter anywhere in here.
   bookmark, not a replacement), `CARDS_ROOT`, and `_font()` for the map
   picture's text. It drew a PNG card until the map picture replaced it.
 - **[grounds.py](rs_core/grounds.py)** - what a body is, and what that kind of
-  body holds. `classify()` turns a journal Scan into one of eight grounds;
+  body holds. `classify()` turns a journal Scan into one of nine grounds;
   `Sheet` reads `ground_rules.json`. The classifier mirrors the CASE in
   the classifier the sheet was measured with, so a body lands in the bucket its percentages
   were measured on.

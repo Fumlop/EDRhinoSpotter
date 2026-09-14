@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.1.2
+
+**Changed**
+
+- A rocky body with silicate magma is its own ground, **Rocky World [silicate
+  magma]**, the way the mining sheet counts it. It used to land under silicate
+  geysers and show their rates, which are a different set of materials.
+- The mining sheet is refreshed. Its note now says what a ground is: the body
+  class, with a Rocky body split on its volcanism. Magma on a metal-rich or
+  high-metal body counts under that body, and the magma materials (monazite,
+  olivine, bastnasite) want rock 80% or more, which only Rocky bodies have
+  shown. Prices are filled in for copper, titanium and the other cheap
+  materials, so the best-paying order and some minimap letters can move.
+
 ## 4.1.1
 
 **Changed**

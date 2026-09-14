@@ -5,7 +5,7 @@ way. See rs_tests/test_grounds.py.
 
 Two halves:
 
-  classify()  turns a journal Scan into one of the eight grounds the mining
+  classify()  turns a journal Scan into one of the nine grounds the mining
               sheet measures. PlanetClass and Volcanism arrive with any Scan
               event - the FSS resolving a body, or the auto-scan on arrival.
               The honk itself emits none: it finds the bodies, it does not
@@ -30,6 +30,7 @@ GROUND_ORDER = (
     'high-metal-content',
     'volcanic magma',
     'volcanic silicate',
+    'silicate magma',
     'volcanic rocky',
     'rocky',
     'rocky-ice',
@@ -41,6 +42,7 @@ GROUND_LABEL = {
     'high-metal-content': 'High Metal Content World',
     'volcanic magma':     'Rocky World [magma]',
     'volcanic silicate':  'Rocky World [silicate]',
+    'silicate magma':     'Rocky World [silicate magma]',
     'volcanic rocky':     'Rocky World [volcanic]',
     'rocky':              'Rocky World',
     'rocky-ice':          'Rocky Ice World',
@@ -52,6 +54,9 @@ GROUND_LABEL = {
 # composition does, for a rocky body.
 _MAGMA = ('metallic', 'rocky')
 _SILICATE = 'silicate'
+# Silicate magma is not a geyser. The sheet keeps it apart (geology.py buckets it
+# as sil_magma), so it must not fall into 'volcanic silicate' here on the word.
+_SILICATE_MAGMA = 'silicate magma'
 
 
 def classify(body):
@@ -79,7 +84,9 @@ def classify(body):
     if planet.startswith('icy'):
         return 'icy'
 
-    volcanism = (body.get('Volcanism') or '').strip().lower()
+    volcanism = ' '.join((body.get('Volcanism') or '').lower().split())
+    if _SILICATE_MAGMA in volcanism:
+        return 'silicate magma'
     if _SILICATE in volcanism:
         return 'volcanic silicate'
     if any(word in volcanism for word in _MAGMA):
