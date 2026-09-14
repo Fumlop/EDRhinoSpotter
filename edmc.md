@@ -174,21 +174,27 @@ to exist first.
    which is not a folder EDMC can load - our own updater handles that, a
    person unpacking by hand does not.
 
-   Build it from what git tracks, so the zip and the tag cannot disagree:
+   Build it from what git tracks, so the zip and the tag cannot disagree, and
+   build it in `%TEMP%`: this checkout is often the live plugin folder, and a
+   zip left beside `load.py` is clutter nobody needs.
 
    ```bash
    python - <<'EOF'
-   import subprocess, zipfile, hashlib
+   import os, subprocess, tempfile, zipfile, hashlib
    from rs_core.update import VERSION
-   out = f"RhinoSpotter-{VERSION}.zip"
+   out = os.path.join(tempfile.gettempdir(), f"RhinoSpotter-{VERSION}.zip")
    tracked = subprocess.run(["git", "ls-files"], capture_output=True,
                             text=True).stdout.split()
    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
        for rel in sorted(tracked):
            archive.write(rel, f"RhinoSpotter/{rel}")
-   print(hashlib.sha256(open(out, "rb").read()).hexdigest())
+   print(out, hashlib.sha256(open(out, "rb").read()).hexdigest())
    EOF
    ```
+
+   Upload it with `gh release create vX.Y.Z "$TEMP/RhinoSpotter-X.Y.Z.zip" ...`,
+   check the hash of the zip as GitHub serves it (step 6), then delete the
+   local one.
 
    Unpack it once and check `load.py` sits directly inside a folder called
    `RhinoSpotter`. That is the whole contract with EDMC.
