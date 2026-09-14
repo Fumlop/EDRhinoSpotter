@@ -42,7 +42,7 @@ returns to the body list.
        alt="The bookmarks of one body, grouped by location, each with Share map; rows with Guide and Delete">
 </p>
 
-Under the bookmark count: the **five likeliest materials** for that kind of
+Under the bookmark count: the **three likeliest materials** for that kind of
 body, each with its rate and median price per tonne, from the mining sheet. A
 body the journal has not described yet says so instead.
 

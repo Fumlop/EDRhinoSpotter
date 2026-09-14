@@ -48,7 +48,7 @@ _body = None             # the bookmark view's own arguments, for the same reaso
 _here = None             # the body Status.json put us on or over when the window opened
 _filter = {}             # body name -> the material its bookmarks are filtered to
 ALL = "All materials"
-TOP_HERE = 5             # materials listed under a body's bookmark count
+TOP_HERE = 3             # materials listed under a body's bookmark count
 
 
 def is_open():
@@ -615,7 +615,7 @@ def _material_filter(parent, window, system, body, records, marked, chosen):
 
 
 def _top_here(parent, body):
-    """The five likeliest materials on this body's ground, each with its median
+    """The three likeliest materials on this body's ground, each with its median
     price, under the bookmark count. From the mining sheet, so a body the
     journal has not described yet has no ground and gets a line saying so."""
     register, sheet = (_scan[0], _scan[1]) if _scan else (None, None)

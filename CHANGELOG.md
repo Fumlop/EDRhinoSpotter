@@ -7,7 +7,7 @@
 - On or over a body - SRV, landed or orbital cruise - RhinoScan opens on that
   body's bookmarks, even with none yet. Back goes to the body list, and stays
   there when the material is changed.
-- The five likeliest materials for the body's ground, with rate and median
+- The three likeliest materials for the body's ground, with rate and median
   price, under the bookmark count.
 - A material filter beside the body name, listing only materials the body has
   bookmarks for.
