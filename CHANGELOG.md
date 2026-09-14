@@ -10,10 +10,10 @@
   Low Monazite gave 1,150 t, where they predicted 1,700 t and more. Density is
   still saved and shown, and not used until confirmed. Set Rigs to the rig
   circles the deposit draws.
-- Bookmarking the same material within 96 m of an existing bookmark on the
+- Bookmarking the same material within 100 m of an existing bookmark on the
   same body updates that bookmark's Amount and Density instead of adding a
   second one; its position, rigs and time stay, and `updated_at` records when.
-  96 m is an eight-rig patch at 76 m spacing plus 10 %. Bookmarks now save
+  100 m covers an eight-rig patch at 76 m spacing plus 10 %. Bookmarks now save
   the planet radius.
 
 ## 4.1.7

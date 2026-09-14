@@ -238,8 +238,10 @@ class TestNearby:
         import math
         return 10.0 + math.degrees(metres / self.RADIUS)
 
-    def test_the_radius_is_an_eight_rig_patch_plus_ten_percent(self):
-        assert cards.SAME_SPOT_M == 96
+    def test_the_radius_covers_an_eight_rig_patch_plus_ten_percent(self):
+        import math
+        assert cards.SAME_SPOT_M == 100.0
+        assert 76.0 / (2 * math.sin(math.pi / 7)) * 1.1 <= cards.SAME_SPOT_M
 
     def test_same_material_inside_the_radius_is_found(self, tmp_path):
         self.write(tmp_path, "a.json")
@@ -248,7 +250,7 @@ class TestNearby:
 
     def test_outside_the_radius_is_a_new_bookmark(self, tmp_path):
         self.write(tmp_path, "a.json")
-        assert cards.nearby(self.spot(latitude=self.metres_north(100)), root=str(tmp_path)) is None
+        assert cards.nearby(self.spot(latitude=self.metres_north(105)), root=str(tmp_path)) is None
 
     def test_another_material_close_by_is_not_touched(self, tmp_path):
         self.write(tmp_path, "a.json", commodity="Jadeite")

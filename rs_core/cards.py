@@ -13,8 +13,6 @@ import os
 import tempfile
 from datetime import datetime, timezone
 
-import math
-
 from rs_core import guide
 from rs_core.logging import logger
 from rs_core.spotcard import card_dir
@@ -23,8 +21,9 @@ from rs_core.spotcard import card_dir
 # the same deposit read again - on leaving, say, with Amount gone from High to
 # Low - and updates it instead of adding a second. The distance is the largest
 # patch assumed on flat ground: eight rigs, seven round one in the middle at
-# the 76 m rig spacing, is a circle of 76 / (2 sin(pi/7)) = 87.6 m; plus 10 %.
-SAME_SPOT_M = round(76.0 / (2 * math.sin(math.pi / 7)) * 1.1)
+# the 76 m rig spacing, is a circle of 76 / (2 sin(pi/7)) = 87.6 m; with 10 %
+# on top that is 96 m, set to a round 100 m.
+SAME_SPOT_M = 100.0
 
 
 def for_system(system, root=None):
