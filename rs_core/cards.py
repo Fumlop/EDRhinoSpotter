@@ -149,6 +149,35 @@ def nearby(spot, root=None, within=SAME_SPOT_M):
     return best[1]
 
 
+# A drop this close to a bookmark is taken to be at that bookmark's mining
+# location. Bookmarks of two different locations have sat 2.7 km apart, so the
+# reach stays under that; one location's own bookmarks spread up to 6-7 km, so a
+# drop further out simply finds none and falls back to the game's guess.
+SAME_LOCATION_M = 2000.0
+
+
+def location_at(system, body, lat, lon, radius, root=None, within=SAME_LOCATION_M):
+    """(location index, metres) of the nearest bookmark on `body` that knows its
+    location and lies within `within` metres, or None."""
+    if not radius or lat is None or lon is None:
+        return None
+    best = None
+    for record in for_system(system, root):
+        index = record.get("location_index")
+        if record.get("planet_name") != body or not isinstance(index, int):
+            continue
+        if record.get("latitude") is None or record.get("longitude") is None:
+            continue
+        try:
+            metres = guide.distance(float(lat), float(lon), float(record["latitude"]),
+                                    float(record["longitude"]), float(radius))
+        except (TypeError, ValueError):
+            continue
+        if metres <= within and (best is None or metres < best[1]):
+            best = (index, metres)
+    return best
+
+
 def updated(old, spot):
     """The old bookmark with the new mark's Amount and Density, nothing else.
 

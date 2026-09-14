@@ -297,3 +297,47 @@ class TestUpdated:
     def test_no_amount_keeps_depleted(self):
         old = {"marked_at": "a", "depleted_at": "2026-09-13T20:37:35+00:00"}
         assert cards.updated(old, {"amount": None})["depleted_at"] == old["depleted_at"]
+
+
+class TestLocationAt:
+    """A drop within 2 km of a bookmark takes that bookmark's location."""
+
+    RADIUS = 381784.9
+
+    def write(self, folder, name, **fields):
+        import json
+        record = {"system": "Andel", "planet_name": "Andel 8 b", "commodity": "Monazite",
+                  "latitude": 10.0, "longitude": 20.0, "location_index": 13}
+        record.update(fields)
+        (folder / name).write_text(json.dumps(record), encoding="utf-8")
+
+    def north(self, metres):
+        import math
+        return 10.0 + math.degrees(metres / self.RADIUS)
+
+    def test_a_drop_near_a_bookmark_takes_its_location(self, tmp_path):
+        self.write(tmp_path, "a.json")
+        index, metres = cards.location_at("Andel", "Andel 8 b", self.north(900), 20.0,
+                                          self.RADIUS, root=str(tmp_path))
+        assert index == 13 and round(metres) == 900
+
+    def test_the_nearest_bookmark_wins(self, tmp_path):
+        self.write(tmp_path, "far.json", latitude=self.north(1500), location_index=2)
+        self.write(tmp_path, "near.json", latitude=self.north(300), location_index=7)
+        assert cards.location_at("Andel", "Andel 8 b", 10.0, 20.0, self.RADIUS,
+                                 root=str(tmp_path))[0] == 7
+
+    def test_beyond_two_km_there_is_no_answer(self, tmp_path):
+        self.write(tmp_path, "a.json")
+        assert cards.location_at("Andel", "Andel 8 b", self.north(2100), 20.0,
+                                 self.RADIUS, root=str(tmp_path)) is None
+
+    def test_a_bookmark_without_a_location_or_on_another_body_is_ignored(self, tmp_path):
+        self.write(tmp_path, "a.json", location_index=None)
+        self.write(tmp_path, "b.json", planet_name="Andel 8 c")
+        assert cards.location_at("Andel", "Andel 8 b", 10.0, 20.0, self.RADIUS,
+                                 root=str(tmp_path)) is None
+
+    def test_no_radius_no_answer(self, tmp_path):
+        self.write(tmp_path, "a.json")
+        assert cards.location_at("Andel", "Andel 8 b", 10.0, 20.0, None, root=str(tmp_path)) is None

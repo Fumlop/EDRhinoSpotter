@@ -355,13 +355,12 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     if cmdr:
         _cmdr = cmdr
 
-    # Landing fills Loc in. Touchdown names the mining location it came down
-    # at, and that is the one number a bookmark cannot work out for itself -
-    # Status.json has forgotten it by the time the ship has settled.
-    if entry.get("event") == "Touchdown" and _loc is not None:
-        index = spotmark.nearest_index(entry)
-        if index is not None:
-            _loc.set(str(index))
+    # Landing or dropping the SRV fills Loc in. A bookmark within 2 km on this
+    # body says which location this is, and it was checked when it was made;
+    # only without one does Touchdown's nearest-location guess stand in, which
+    # names the wrong one when two locations are close.
+    if entry.get("event") in ("Touchdown", "LaunchSRV") and _loc is not None:
+        _fill_location(entry, system)
 
     # Arriving in a system scanned before fills the list straight from disk -
     # EDMC replays one journal file, and last week's honk is in an older one.
@@ -369,6 +368,23 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     if _register.track(entry, system=system):
         _refresh_scan_count()
 
+
+
+def _fill_location(entry, system):
+    status = spotmark.read_status()
+    body = entry.get("Body") or status.get("BodyName")
+    lat = entry.get("Latitude", status.get("Latitude"))
+    lon = entry.get("Longitude", status.get("Longitude"))
+    known = cards.location_at(system or _system, body, lat, lon, status.get("PlanetRadius"))
+    if known is not None:
+        index, metres = known
+        _loc.set(str(index))
+        _set_status(f"loc {index} from a bookmark {metres:.0f} m away")
+        return
+    if entry.get("event") == "Touchdown":
+        index = spotmark.nearest_index(entry)
+        if index is not None:
+            _loc.set(str(index))
 
 
 def make_card():

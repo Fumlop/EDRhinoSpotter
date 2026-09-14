@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.1.13
+
+**Changed**
+
+- Landing or dropping the SRV within 2 km of a bookmark on that body sets
+  Location to that bookmark's location, and the panel says which bookmark it
+  came from. Without one nearby, Touchdown's nearest-location guess is used as
+  before. Dropping the SRV from a hover now fills Location too.
+
 ## 4.1.12
 
 **Changed**
