@@ -11,7 +11,6 @@ worth checking are pure: which folder inside the zip is the release, and which
 of its entries may overwrite what is here. See rs_tests/test_update.py.
 """
 
-import fnmatch
 import io
 import os
 import re
@@ -28,7 +27,7 @@ try:
 except ImportError:         # a bare interpreter without it
     requests = None
 
-VERSION = "4.1.5"
+VERSION = "4.1.4"
 
 # For testing the update path without publishing a throwaway release: set
 # RHINOSPOTTER_VERSION to something older and the running plugin will see the
@@ -199,38 +198,11 @@ def install(zip_bytes, plugin_dir, keep=KEEP):
                              os.path.join(plugin_dir, name))
             finally:
                 shutil.rmtree(temp_dir, ignore_errors=True)
-        remove_release_zips(plugin_dir)
     except Exception as err:                        # noqa: BLE001
         logger.exception("update failed")
         logger.error(f"update failed: {err}")
         return False
     return True
-
-
-# A release zip unpacked in place tends to be left beside load.py. It is not
-# part of the plugin and the update that replaced it makes it stale.
-RELEASE_ZIPS = "RhinoSpotter-*.zip"
-
-
-def remove_release_zips(plugin_dir):
-    """Delete RhinoSpotter-*.zip from the plugin folder. Returns the names.
-
-    Only that pattern, only files, only the folder itself - nothing else a
-    commander keeps there is touched. A zip that cannot be removed is logged
-    and left; it does not fail the update that already went in.
-    """
-    removed = []
-    for name in sorted(os.listdir(plugin_dir)):
-        path = os.path.join(plugin_dir, name)
-        if not fnmatch.fnmatch(name, RELEASE_ZIPS) or not os.path.isfile(path):
-            continue
-        try:
-            os.remove(path)
-            removed.append(name)
-            logger.info(f"removed old release zip {name}")
-        except OSError as err:
-            logger.warning(f"could not remove {name}: {err}")
-    return removed
 
 
 def _replace(source, target):
