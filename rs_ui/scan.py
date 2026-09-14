@@ -140,11 +140,53 @@ OUTER_PAD = 14
 SCROLLBAR = 18
 # The three spaces every body row starts with.
 INDENT = 24
+# What Tk adds around a label's text, left and right together.
+LABEL_PAD = 6
+# Borders, the canvas's own edge and rounding: without it the last word of the
+# widest material line wrapped onto a second line by a few pixels.
+SLACK = 24
 # Header, the two lines above the list, and the footer under it. Generous on
 # purpose: the footer wraps to two lines in a narrow window, and a height that
 # is a little too large costs empty space while one that is too small eats the
 # footer.
 CHROME = 200
+
+
+def _row(parent):
+    """A frame whose labels sit side by side, and are measured as one line.
+
+    _measure sees labels one at a time, so a body row with its bookmarks and
+    Mapped links beside it was sized by its widest single piece and opened
+    with the links cut off at the right edge.
+    """
+    frame = tk.Frame(parent, bg=BG)
+    frame.rs_row = True
+    return frame
+
+
+def _rows(container):
+    """Every side-by-side row in the list, however deeply nested."""
+    found = []
+    for child in container.winfo_children():
+        if getattr(child, "rs_row", False):
+            found.append(child)
+        else:
+            found.extend(_rows(child))
+    return found
+
+
+def _row_width(row, fonts):
+    """The labels of one row laid end to end, with the padding Tk puts on each."""
+    total = 0
+    for label in row.winfo_children():
+        if not isinstance(label, tk.Label) or not label.cget("text"):
+            continue
+        spec = str(label.cget("font"))
+        metrics = fonts.get(spec)
+        if metrics is None:
+            metrics = fonts[spec] = tkfont.Font(font=spec)
+        total += metrics.measure(label.cget("text")) + LABEL_PAD
+    return total
 
 
 def _lines(container):
@@ -206,8 +248,11 @@ def _fit(window, listing, wrapped=(), extra=0):
     """
     window.update_idletasks()
     # The rows, plus the scrollbar they sit beside and the padding around them.
-    content = (_measure(_lines(listing), wrapped) + extra
-               + SCROLLBAR + 2 * OUTER_PAD + INDENT)
+    # A row of labels side by side counts as the sum of them, not its widest.
+    fonts = {}
+    rows = max((_row_width(row, fonts) for row in _rows(listing)), default=0)
+    content = (max(_measure(_lines(listing), wrapped), rows) + extra
+               + SCROLLBAR + 2 * OUTER_PAD + INDENT + SLACK)
     width = min(max(content, 420), MAX_WIDTH)
     wanted = max(window.winfo_reqheight(), listing.winfo_reqheight() + CHROME)
     height = min(max(wanted, 260), MAX_HEIGHT)
@@ -307,12 +352,20 @@ def _group(parent, ground, found, sheet, wrap, focus=None, marked=None):
         # colour so it is not read as one of the others. A ground listed
         # because it carries jadeite has to say what it carries it at, even
         # when three better-paying things sit under it.
+        # On one line with the other two: three materials side by side read as
+        # one answer, and the focus stacked above them read as a heading.
         rate = sheet.rate(ground, focus)
-        tk.Label(block, text=f"{focus} {rate}%", bg=BG, fg=ACCENT, anchor="w",
-                 font=("Consolas", 10, "bold")).pack(fill="x", pady=(2, 0))
-        materials = [row for row in materials
-                     if row["material"].lower() != focus.lower()][:TOP_MATERIALS - 1]
-    if materials:
+        line = _row(block)
+        line.pack(fill="x", pady=(2, 5))
+        tk.Label(line, text=f"{focus} {rate}%", bg=BG, fg=ACCENT, anchor="w",
+                 font=("Consolas", 9, "bold")).pack(side="left")
+        rest = [row for row in materials
+                if row["material"].lower() != focus.lower()][:TOP_MATERIALS - 1]
+        if rest:
+            tk.Label(line, text="   ·   " + "   ·   ".join(
+                         f"{row['material']} {row['pct']}%" for row in rest),
+                     bg=BG, fg=GOOD, anchor="w", font=("Consolas", 9)).pack(side="left")
+    elif materials:
         # Separated, not just spaced: "Olivine 56.1%  Monazite 45.6%" reads as
         # one run of words, and the eye has to find the pairs itself.
         text = "   ·   ".join(f"{row['material']} {row['pct']}%" for row in materials)
@@ -329,7 +382,7 @@ def _group(parent, ground, found, sheet, wrap, focus=None, marked=None):
         # ground, but nobody has counted them, so they are where you go once
         # the counted ones are worked out.
         probed = body.get("locations") is not None
-        row = tk.Frame(block, bg=BG)
+        row = _row(block)
         row.pack(fill="x")
         tk.Label(row, text="   " + _body_line(body), bg=BG,
                  fg=FG if probed else DIM, anchor="w",

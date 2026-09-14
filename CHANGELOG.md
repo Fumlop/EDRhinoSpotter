@@ -1,5 +1,17 @@
 # Changelog
 
+## 4.1.6
+
+**Changed**
+
+- RhinoScan opens wide enough for every row. A body row with its bookmarks
+  and Mapped links was sized by its widest single piece and came up with the
+  links cut off at the right edge.
+- With a material picked, it leads its ground's line in bold with the other
+  two beside it, instead of a line of its own above them.
+- The note on the mapped page sits above the list, where a short window no
+  longer cuts it off.
+
 ## 4.1.5
 
 **Added**
