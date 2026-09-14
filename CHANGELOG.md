@@ -1,5 +1,16 @@
 # Changelog
 
+## 4.1.8
+
+**Changed**
+
+- The tons-left range counts rig positions: 275-300 t for each position the
+  deposit takes, times the share its Amount leaves. The Density-based reserve
+  bands from 4.1.7 did not fit a measured deposit - four positions of High /
+  Low Monazite gave 1,150 t, where they predicted 1,700 t and more. Density is
+  still saved and shown, and not used until confirmed. Set Rigs to the rig
+  circles the deposit draws.
+
 ## 4.1.7
 
 **Added**

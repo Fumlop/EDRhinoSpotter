@@ -41,13 +41,14 @@ returns to the body list.
 **Share map**, beside each location, opens the picture of the map that
 location's bookmarks were made on - see [Sharing a map](#sharing-a-map).
 
-**Tons left.** A bookmark made with Density and Amount shows a range under it:
-`Low density · High amount · ≈ 970-2,670 t left`. It is an estimate from public
-community data - deposits mined to Depleted (1,716-1,841 t at Low Density,
-1,013 t at Medium) and reported reserve bands of about 2,600 / 1,500 / 500
-chunks at Low / Medium / High Density, at 0.90-0.99 t a chunk - with Amount
-read as the share left (High 57-100 %, Medium 27-67 %, Low up to 34 %). It says
-nothing about how many rigs fit.
+**Tons left.** A bookmark with Rigs and Amount shows a range under it:
+`Low density · High amount · ≈ 620-1,200 t left`. A deposit holds about
+275-300 t for every rig position that fits on it - measured on one Monazite
+deposit, High Amount / Low Density, four positions, 1,150 t mined to Depleted
+by two commanders - and Amount reads as the share left (High 57-100 %, Medium
+27-67 %, Low up to 34 %). Density is saved and shown, but not used until an
+effect is confirmed. Set **Rigs** to the rig circles the deposit draws, not the
+rigs you happened to put down.
 
 ### Which locations you have mapped
 

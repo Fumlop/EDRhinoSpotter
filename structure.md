@@ -131,10 +131,10 @@ No tkinter anywhere in here.
   `ordered()` is the order a body's bookmarks are read in: most rigs first,
   uncounted ones last; `delete()` removes one, JSON and any old PNG at once;
   `set_depleted()` writes or removes `depleted_at` in the bookmark's JSON.
-- **[deposit.py](rs_core/deposit.py)** - a deposit's HUD Density and Amount
-  into a range of tons left, with the public data it rests on in the
-  docstring. The panel's two pickers write both into the bookmark; the
-  bookmarks list shows the range.
+- **[deposit.py](rs_core/deposit.py)** - rig positions and HUD Amount into a
+  range of tons left, 275-300 t a position, with the measured deposit behind
+  it in the docstring. The panel's Density and Amount pickers write into the
+  bookmark; the bookmarks list shows the range.
 - **[measure.py](rs_core/measure.py)** - area and rig count for a border
   driven in the SRV. Shoelace for the area, ray casting for what is inside,
   and a 76 m grid for the rigs. Flat earth on purpose: a spot is a few hundred

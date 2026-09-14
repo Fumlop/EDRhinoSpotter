@@ -762,15 +762,16 @@ def _bookmark_detail(record):
 
 
 def _deposit_text(record):
-    """'Low density · High amount · ≈ 970-2,670 t left', or '' for a bookmark
-    made without the HUD readings. A marked-depleted bookmark says nothing
-    here: the date before it already does."""
+    """'Low density · High amount · ≈ 620-1,200 t left', or '' for a bookmark
+    made without the HUD readings. The range needs rigs and Amount; Density is
+    shown but not counted - see rs_core/deposit.py. A marked-depleted bookmark
+    says nothing here: the date before it already does."""
     if record.get("depleted_at"):
         return ""
     density, amount = record.get("density"), record.get("amount")
     parts = [f"{density} density" if density else "",
              f"{amount} amount" if amount else "",
-             deposit.describe(density, amount)]
+             deposit.describe(record.get("rigs"), amount)]
     return " · ".join(part for part in parts if part)
 
 

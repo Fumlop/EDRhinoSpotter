@@ -1,4 +1,4 @@
-"""Density and Amount into a range of tons left."""
+"""Rig positions and Amount into a range of tons left."""
 
 import pytest
 
@@ -6,39 +6,41 @@ from rs_core import deposit
 
 
 class TestTonsLeft:
-    def test_a_fresh_low_density_deposit_spans_both_sources(self):
-        # 1,716 t is the smallest deposit mined dry, 2,673 t the top of the
-        # chunk band; High Amount can already be 43 % mined.
-        assert deposit.tons_left("Low", "High") == (970, 2670)
+    def test_the_measured_deposit_sits_inside_its_own_range(self):
+        """Four positions, High Amount, 1,150 t mined to Depleted."""
+        low, high = deposit.tons_left(4, "High")
+        assert (low, high) == (620, 1200)
+        assert low <= 1150 <= high
+
+    def test_six_positions_reach_the_public_traces(self):
+        """1,716 t falls inside six positions; 1,841 t is 41 t over the top -
+        307 t a position, just past the range."""
+        low, high = deposit.tons_left(6, "High")
+        assert low <= 1716 <= high
+        assert 1841 - high == 41
 
     def test_low_amount_can_be_nearly_empty(self):
-        low, high = deposit.tons_left("Medium", "Low")
-        assert low == 0
-        assert high == 540
+        assert deposit.tons_left(6, "Low") == (0, 620)
 
     def test_depleted_is_nothing(self):
-        assert deposit.tons_left("High", "Depleted") == (0, 0)
+        assert deposit.tons_left(4, "Depleted") == (0, 0)
 
-    @pytest.mark.parametrize("density,amount", [
-        (None, "High"), ("Low", None), ("", ""), ("Dense", "High"), ("Low", "Plenty"),
+    @pytest.mark.parametrize("rigs,amount", [
+        (None, "High"), (0, "High"), (-2, "High"), ("4", "High"), (True, "High"),
+        (4, None), (4, "Plenty"),
     ])
-    def test_a_missing_or_unknown_reading_gives_no_range(self, density, amount):
-        assert deposit.tons_left(density, amount) is None
-
-    def test_higher_density_holds_less(self):
-        """The ordering the reserve bands claim, Low > Medium > High."""
-        tops = [deposit.tons_left(d, "High")[1] for d in deposit.DENSITIES]
-        assert tops == sorted(tops, reverse=True)
+    def test_a_missing_or_unknown_reading_gives_no_range(self, rigs, amount):
+        assert deposit.tons_left(rigs, amount) is None
 
 
 class TestDescribe:
     def test_range(self):
-        assert deposit.describe("Low", "High") == "≈ 970-2,670 t left"
+        assert deposit.describe(4, "High") == "≈ 620-1,200 t left"
 
     def test_open_lower_end(self):
-        assert deposit.describe("High", "Low") == "≈ up to 200 t left"
+        assert deposit.describe(2, "Low") == "≈ up to 210 t left"
 
-    def test_depleted_needs_no_density(self):
+    def test_depleted_needs_no_rigs(self):
         assert deposit.describe(None, "Depleted") == "depleted"
 
     def test_nothing_to_say(self):

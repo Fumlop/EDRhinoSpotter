@@ -105,9 +105,9 @@ def build(parent):
     _style_menu(_menu)
     _menu.grid(row=2, column=1, columnspan=3, sticky="we", padx=2)
 
-    # What the HUD says about the targeted deposit. Neither is in the journal,
-    # and together they give the bookmark a range of tons left - see
-    # rs_core/deposit.py for where the numbers come from.
+    # What the HUD says about the targeted deposit. Neither is in the journal.
+    # Amount and Rigs give the bookmark a range of tons left; Density is kept
+    # for when there is data to use it - see rs_core/deposit.py.
     _density = tk.StringVar(value=NOT_READ)
     _amount = tk.StringVar(value=NOT_READ)
     tk.Label(_frame, text="Density", anchor="w").grid(row=3, column=0, sticky="w", padx=2)
