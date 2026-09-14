@@ -1,12 +1,12 @@
 {
   "pluginName": "RhinoSpotter",
-  "pluginVer": "4.1.1",
-  "pluginZip": "https://github.com/Fumlop/EDRhinoSpotter/releases/download/v4.1.1/RhinoSpotter-4.1.1.zip",
+  "pluginVer": "4.1.2",
+  "pluginZip": "https://github.com/Fumlop/EDRhinoSpotter/releases/download/v4.1.2/RhinoSpotter-4.1.2.zip",
   "autoUpdateEnabled": false,
   "autoInstallEnabled": false,
   "pluginAuthors": ["Fumlop"],
   "pluginMainLink": "https://github.com/Fumlop/EDRhinoSpotter",
-  "pluginLastUpdate": "2026-09-13",
+  "pluginLastUpdate": "2026-09-14",
   "pluginDirName": "RhinoSpotter",
   "pluginCategory": ["Exploration", "Utility"],
   "pluginDesc": "Surface mining: which landable bodies in this system are worth prospecting, a minimap of the ground driven in the SRV with your bookmarks on it, and an arrow over the game that guides you back to them.",
@@ -15,5 +15,5 @@
   "pluginLicense": "GPL-3.0-or-later",
   "pluginIcon": "",
   "pluginVT": "",
-  "pluginHash": "0aa3864f640993b60818be911ac0eb6f158239a39ae6bd2ee10fdef905119896"
+  "pluginHash": "0520aa82a776cc53df2a943c265c92aef6ae98de2004891f9de5ac5d27310cfc"
 }

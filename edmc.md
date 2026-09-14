@@ -21,10 +21,10 @@ Checked 2026-09-13 against EDMC 6.1.2 as installed.
 |---|---|---|
 | Public repo | yes | yes |
 | Licence, GPL v2+ compatible | GPL-3.0 | GPL-3.0 |
-| `VERSION` and `__version__` on `load.py` | yes, 4.1.1 | yes, `v0.4.400.3.005` |
-| Semantic version | 4.1.1 | **no** - four parts and a leading `v` |
+| `VERSION` and `__version__` on `load.py` | yes, 4.1.2 | yes, `v0.4.400.3.005` |
+| Semantic version | 4.1.2 | **no** - four parts and a leading `v` |
 | Ships only what it needs | `lib/` is gitignored | `backup_legacy/` untracked |
-| Published release to point a zip at | v4.1.1, zip attached | yes, v0.4.400.3.005 |
+| Published release to point a zip at | v4.1.2, zip attached | yes, v0.4.400.3.005 |
 
 RhinoSpotter is submitted: EDCD/EDMC-Plugin-Registry PR #77, open, awaiting
 review. Its branch `add-rhinospotter` on the Fumlop fork carries
