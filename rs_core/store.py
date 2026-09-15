@@ -1,8 +1,8 @@
 r"""A system you have already seen, kept, so you do not have to honk it twice.
 
-EDMC replays the journal file it is watching and nothing older. Every game
-restart opens a new file, so a system honked last week is gone from the
-plugin's view even though the commander scanned it properly at the time.
+EDMC hands plugins only the journal lines written while it runs. A system
+honked last week is gone from the plugin's view even though the commander
+scanned it properly at the time.
 
 So each system's bodies go into the database and are read back when you
 arrive there again: the commander's own scans, and the bodies Spansh filled in
@@ -113,8 +113,8 @@ class Debounced:
     What a hard crash costs is the last `delay` seconds of scanning. EDMC
     closing normally costs nothing - `flush()` is called at plugin_stop.
 
-    One change waits per key - the first `key` positional arguments: the
-    system for bodies, (body, name) for a map. A second system or map inside
+    One change waits per key - every positional argument but the last, the
+    data: the system for bodies, (body, name) for a map. A second system or map inside
     the delay no longer replaces the first one's write; both are written.
 
     No tkinter: a daemon timer thread rather than Tk's `after`, so this can be
@@ -122,10 +122,9 @@ class Debounced:
     rs_tests/test_store.py.
     """
 
-    def __init__(self, delay=DEBOUNCE_S, write=save, key=1):
+    def __init__(self, delay=DEBOUNCE_S, write=save):
         self.delay = delay
         self._write = write
-        self._key = key
         self._lock = threading.Lock()
         # Held while writing. A flush at plugin_stop that comes while the timer
         # is mid-write waits for it, so the backup after it has that write.
@@ -136,7 +135,7 @@ class Debounced:
     def __call__(self, *args, **kwargs):
         """Take a change. Drops in wherever `save` did."""
         with self._lock:
-            self._pending[args[:self._key]] = (args, kwargs)
+            self._pending[args[:-1]] = (args, kwargs)
             if self._timer is None:
                 self._timer = threading.Timer(self.delay, self.flush)
                 self._timer.daemon = True

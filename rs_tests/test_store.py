@@ -150,7 +150,7 @@ class TestDebounced:
 
     def test_a_longer_key_keeps_maps_on_one_body_apart(self):
         calls, write = self.counter()
-        debounced = store.Debounced(delay=30, write=write, key=2)
+        debounced = store.Debounced(delay=30, write=write)
         debounced("Andel 1 a", "map 1", {"n": 1})
         debounced("Andel 1 a", "map 2", {"n": 2})
         debounced("Andel 1 a", "map 1", {"n": 3})

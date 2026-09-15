@@ -32,9 +32,10 @@ _card_token = 0          # only the newest render may write to the status line
 _writes = store.Debounced()
 _register = bodies.Register(on_change=_writes, on_arrive=store.load)
 _sheet = None            # rs_core.grounds.Sheet, read once at startup
-_spansh_asked = set()    # SystemAddresses Spansh was asked about this session
-_spansh_answer = {}      # SystemAddress -> how many bodies Spansh gave, or None when unreachable
-_undiscovered = set()    # SystemAddresses whose arrival star said WasDiscovered: false
+# SystemAddress -> this session's Spansh state: "undiscovered", "asking",
+# "unreachable" or "answered". Any entry means Spansh is not asked again.
+_spansh = {}
+_prefilled = None        # the material MiningRefined last put in the dropdown
 _hint = None             # the line under the buttons: honk, or FSS when the honk brought nothing
 
 _frame = None
@@ -356,16 +357,14 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 
     # Mining a material on the ground picks it in the dropdown, so the Bookmark
     # made there is already filled. Only on the ground: asteroid mining refines
-    # the same materials in space. Set only on a change - every write reopens
-    # an open RhinoScan window, and a load is dozens of these.
+    # the same materials in space. Never over a material picked by hand - a
+    # by-product must not rename the bookmark - and only on a change: every
+    # write reopens an open RhinoScan window, and a load is dozens of these.
     if entry.get("event") == "MiningRefined" and _material is not None:
-        refined = spotmark.refined_material(entry)
-        if (refined and _material.get() != refined
-                and spotmark.on_ground(spotmark.read_status())):
-            _material.set(refined)
+        _prefill_material(entry)
 
     # Arriving in a system scanned before fills the list straight from disk -
-    # EDMC replays one journal file, and last week's honk is in an older one.
+    # EDMC hands plugins only new journal lines, and last week's honk is gone.
     # The register does that itself through on_arrive; this only redraws.
     if _register.track(entry, system=system):
         _refresh_scan_count()
@@ -374,26 +373,43 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     # they are scanned - once a session per system, see spansh.should_ask. Off
     # the UI thread; what comes back only fills gaps.
     fresh = spansh.undiscovered(entry)
-    if fresh and fresh not in _undiscovered:
-        _undiscovered.add(fresh)
-        _refresh_hint()
-    address = spansh.should_ask(entry, _register, _spansh_asked, _undiscovered)
-    if entry.get("event") == "FSSDiscoveryScan":
-        _refresh_hint()         # a honk Spansh is not asked about still changes the hint
+    if fresh:
+        _spansh.setdefault(fresh, "undiscovered")
+    address = spansh.should_ask(entry, _register, _spansh)
     if address:
-        _spansh_asked.add(address)
-        _refresh_hint()
+        _spansh[address] = "asking"
         honked = _register.system
         spansh.fetch_async(address,
                            lambda address, found: _on_ui(_add_spansh, honked, address, found))
+    if fresh or entry.get("event") == "FSSDiscoveryScan":
+        _refresh_hint()
 
+
+def _prefill_material(entry):
+    global _prefilled
+    refined = spotmark.refined_material(entry)
+    current = _material.get()
+    if not refined or current == refined:
+        return
+    if current not in ("", NO_MATERIAL, ALL_MATERIALS, _prefilled):
+        return                  # picked by hand
+    if spotmark.on_ground(spotmark.read_status()):
+        _prefilled = refined
+        _material.set(refined)
 
 
 def _add_spansh(system, address, found):
-    """Spansh's answer, back on the UI thread. None - offline - changes nothing."""
-    _spansh_answer[address] = None if found is None else len(found)
-    if found and _register.add_known(system, address, found):
-        if scan.is_open():
+    """Spansh's answer, back on the UI thread."""
+    if found is None:
+        _spansh[address] = "unreachable"
+    elif system != _register.system:
+        # Jumped on before it came back. Forgotten, so the honk on the way
+        # back in asks again rather than the hint saying Spansh has nothing.
+        _spansh.pop(address, None)
+    else:
+        _spansh[address] = "answered"
+        spansh.mark_answered(address)
+        if _register.add_known(system, address, found) and scan.is_open():
             open_scan(scan.on_body_here())
     _refresh_scan_count()
 
@@ -567,17 +583,17 @@ def _refresh_hint():
     if not _hint:
         return
     address = _register.system_address
+    state = _spansh.get(address)
     if len(_register):
         text = ""
-    elif address in _undiscovered:
+    elif state == "undiscovered":
         text = "New system - FSS planets"
-    elif address in _spansh_asked and address not in _spansh_answer:
+    elif state == "asking":
         text = "Asking Spansh..."
-    elif _spansh_answer.get(address, 0) is None or (address not in _spansh_asked
-                                                     and spansh.paused()):
+    elif spansh.paused():
         text = "Spansh unreachable - FSS planets"
-    elif address in _spansh_answer or (address and spansh.known_empty(address)):
-        text = "No Spansh data - FSS planets"
+    elif state == "answered" or (address and spansh.recently_answered(address)):
+        text = "No Spansh bodies - FSS planets"
     else:
         text = "Honk on missing data"
     _hint.config(text=text)

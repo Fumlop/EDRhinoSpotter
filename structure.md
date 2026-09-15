@@ -21,7 +21,6 @@ RhinoSpotter/
 ├── mining_sheet.json    the mining sheet, frozen when the plugin was packaged
 ├── cards/               rendered cards (gitignored)
 ├── data/                screenshots and sidecars (gitignored)
-├── lib/                 vendored, unused, gitignored - see below
 ├── docs/                screenshots for the README and INSTALL
 ├── INSTALL.md
 ├── pytest.ini
@@ -70,10 +69,11 @@ No tkinter anywhere in here.
   were measured on.
 - **[spansh.py](rs_core/spansh.py)** - on the honk (FSSDiscoveryScan), with a
   RhinoSpotter User-Agent, the system's landable bodies. `should_ask` keeps it
-  polite: once a session per system; not when the cache has them; not for an
-  undiscovered system (`undiscovered`: arrival star WasDiscovered false); not
-  for EMPTY_DAYS after an empty answer (`known_empty`, kept in `meta`); not
-  for PAUSE_S after a failed request (`paused`). The bodies come
+  polite: once a session per system; not for an undiscovered system
+  (`undiscovered`: arrival star WasDiscovered false); not for ANSWER_DAYS after
+  it answered (`recently_answered`, kept in `meta`); not for PAUSE_S after a
+  failed request (`paused`). EDMC hands plugins only new journal lines, so a
+  restart replays no honks. The bodies come
   from `spansh.co.uk/api/dump/<SystemAddress>`, mapped to the journal's words
   (`... world` -> `... body`, `Major Rocky Magma` -> `major rocky magma
   volcanism`, gravity g -> m/s²) and marked `source: spansh`. Off the UI
@@ -95,9 +95,9 @@ No tkinter anywhere in here.
   one transaction: EDMC can be closed at any moment, and half a system that
   still reads is worse than none.
   `Debounced` is what the panel hands the register instead of `save`: a honk
-  is one change per body and all of them rewrite the same file, so the first
-  starts a two-second timer and the last one before it fires is what gets
-  written. The timer is not restarted by the changes after it - a sweep longer
+  is one change per body and all of them rewrite the same system, so the first
+  starts a two-second timer and the last change per system (per map for the
+  minimap) before it fires is what gets written. The timer is not restarted by the changes after it - a sweep longer
   than the delay is written as it goes rather than held until it ends - and
   `flush()` at plugin_stop means a normal shutdown loses nothing.
 - **[coverstore.py](rs_core/coverstore.py)** - the minimap's maps under
@@ -288,12 +288,15 @@ Everything in here imports tkinter.
 - **test_replay.py** - which files count as recent, that a second visit does
   not lose the first, and that a ground the sheet never measured is worth
   nothing rather than guessed at.
-- **test_spansh.py** - the mapping to the journal's words, offline and garbage
-  answers, and `add_known`: fills gaps only, a scan or the commander's own
-  count replaces Spansh's, an answer for a system already left is dropped.
+- **test_spansh.py** - the mapping to the journal's words; the request (User-Agent,
+  404 as an answer, every failure pausing); the politeness rules (honk only,
+  once a session, 30-day answer mark across restarts, pause, undiscovered);
+  `add_known`: fills gaps only, a scan or the commander's own count replaces
+  Spansh's, an answer for a system already left is dropped; and whose count it
+  is surviving a reload.
 - **test_store.py** - round trip, system names Explorer refuses, a database
   or row that cannot be read, and the debounce: a
-  burst is one write, the last change is the one written, flush takes the
+  burst is one write, the last change per key is the one written and two keys are both written, flush takes the
   pending write with it, and a burst longer than the delay still reaches disk.
 - **test_update.py** - version comparison, that every network failure is the
   same silent no-answer, and the installer: a zip from somewhere else and a
@@ -327,8 +330,3 @@ one you happen to be sitting in.
 It writes the same cache the plugin writes, and the data is the commander's
 own scans, so there is nothing to undo afterwards - the next real jump
 replaces what is in the register anyway.
-
-## lib/
-
-`pg8000` and friends, vendored for a database path that no longer exists.
-Nothing imports it. Gitignored rather than deleted until someone is sure.

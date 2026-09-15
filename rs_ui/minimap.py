@@ -26,7 +26,7 @@ import tkinter as tk
 from tkinter import messagebox
 
 from rs_core import (arrow, cards, coverage, coverstore, database, grounds, guide, migrate,
-                     palette, spotmark, store)
+                     palette, spansh, spotmark, store)
 from rs_core.logging import logger
 from rs_ui import hotkey, overlay
 
@@ -73,7 +73,7 @@ _coverage = None
 _saved = None            # (map, version, centered, border, location) last handed to _writes
 _here = None             # (lat, lon) of the last SRV fix, for the hotkeys
 _notice = None           # (text, until monotonic) on the hint line, e.g. "set center first"
-_writes = store.Debounced(write=coverstore.save, key=2)     # one pending save per (body, name)
+_writes = store.Debounced(write=coverstore.save)     # one pending save per (body, name)
 _in_srv = False
 _failed = False          # a draw that raised: stay down until the next launch
 _marks = None            # ((system, body, bookmark revision), [(lat, lon, code, depleted), ...])
@@ -330,7 +330,7 @@ def picture_text(cover, system, when=None):
         facts.append(grounds.label(planet.get("ground")))
         if isinstance(planet.get("gravity"), (int, float)):
             # Stored as the journal's SurfaceGravity, m/s²; the picture says g.
-            facts.append(f"{planet['gravity'] / 9.80665:.2f} g")
+            facts.append(f"{planet['gravity'] / spansh.G:.2f} g")
         if isinstance(planet.get("distance"), (int, float)):
             facts.append(f"{planet['distance']:,.0f} Ls")
         if planet.get("locations") is not None:

@@ -1,5 +1,30 @@
 # Changelog
 
+## 4.3.5
+
+**Added**
+
+- RhinoScan marks bodies that came from Spansh with `spansh`, until your own
+  scan replaces them.
+
+**Changed**
+
+- Spansh is not asked again for 30 days after it answered for a system - with
+  bodies or without - so a system you scanned yourself is not asked every
+  session. An answer that comes back after you jumped on is forgotten, and the
+  next honk there asks again.
+- An answer from Spansh that is not a system counts as a failure (1 h pause),
+  not as "no bodies".
+- Mining no longer changes a material you picked by hand; it only fills the
+  dropdown when it is empty or was filled by mining before.
+- Hint: "No Spansh bodies - FSS planets".
+
+**Fixed**
+
+- Whose mining location count it is survives a restart: your own count is no
+  longer replaced by a smaller one later, and Spansh's count on a body you
+  scanned still gives way to yours.
+
 ## 4.3.4
 
 **Fixed**

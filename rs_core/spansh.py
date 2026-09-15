@@ -1,20 +1,5 @@
 """The bodies of a system from Spansh, for the ones the journal has not described.
 
-Spansh is one person's server, so it is asked as little as possible:
-
-- on the honk (FSSDiscoveryScan), not on every jump - a route jumped through
-  without honking costs it nothing;
-- at most once a session per system;
-- never for a system whose Spansh bodies are already in the cache;
-- never for a system nobody has discovered - the star scanned on arrival says
-  WasDiscovered: false, and Spansh cannot know what nobody has sent;
-- not again for EMPTY_DAYS after Spansh had nothing for a system - kept in
-  the database, so a restart does not ask again;
-- not at all for PAUSE_S after a failed request (timeout, 429, 5xx, garbage) -
-  one attempt, no retries.
-
-Requests say who is asking (User-Agent).
-
 The honk finds bodies and describes none of them: only an FSS resolve or a
 fly-by writes a Scan. In a system somebody else has already scanned, Spansh
 has the same fields - planet class, volcanism, gravity, distance - and the
@@ -22,44 +7,50 @@ mining location count on top.
 
     https://spansh.co.uk/api/dump/<SystemAddress>
 
-Spansh fills gaps and never overrides. A body the journal or the cache already
-holds is left alone, and a Scan of a Spansh body replaces it. Offline, a
-timeout or a bad answer is logged and changes nothing - the classic way goes
-on as before.
+Spansh is one person's server, so it is asked as little as possible:
 
-Each body from here carries "source": "spansh".
+- on the honk (FSSDiscoveryScan), not on every jump - a route jumped through
+  without honking costs it nothing;
+- at most once a session per system;
+- never for a system nobody has discovered - the star scanned on arrival says
+  WasDiscovered: false;
+- not again for ANSWER_DAYS after it answered for a system, bodies or none -
+  kept in the database, so a restart does not ask again;
+- not at all for PAUSE_S after a failed request (timeout, HTTP error, an
+  answer that is not a system) - one attempt, no retries.
+
+EDMC hands plugins only new journal lines - at startup it reads the old ones
+for itself and sends a synthetic StartUp - so an EDMC restart does not replay
+old honks at Spansh.
+
+Spansh fills gaps and never overrides: see bodies.Register.add_known. Each
+body from here carries "source": "spansh". Requests say who is asking.
 
 No tkinter. See rs_tests/test_spansh.py.
 """
 
-import json
 import threading
 import time
-import urllib.request
 from datetime import datetime, timedelta, timezone
+
+import requests             # ships inside EDMC, with its own certificates
 
 from rs_core import bodies, database, grounds
 from rs_core.logging import logger
 from rs_core.update import VERSION
 
-try:
-    import requests         # ships inside EDMC, with its own certificates
-except ImportError:         # pragma: no cover - bare interpreter
-    requests = None
-
 DUMP_URL = "https://spansh.co.uk/api/dump/{address}"
 TIMEOUT_S = 15
-SOURCE = "spansh"
+SOURCE = bodies.SPANSH
 G = 9.80665                 # Spansh gravity is in g, the journal's SurfaceGravity in m/s²
-
 HEADERS = {"User-Agent": f"RhinoSpotter/{VERSION} (EDMC plugin; github.com/Fumlop/EDRhinoSpotter)"}
 
-EMPTY_DAYS = 30             # a system Spansh had nothing for is not asked again for this long
+ANSWER_DAYS = 30            # a system Spansh answered for is not asked again for this long
 PAUSE_S = 3600              # after a failed request, nothing is asked for this long
 
 _warned = False             # a failure is a warning once a session, then debug
 _paused_until = 0.0         # time.monotonic() before which nothing is asked
-_empty = {}                 # SystemAddress -> bool, known_empty() answers already looked up
+_answered = {}              # SystemAddress -> bool, recently_answered() already looked up
 
 
 def undiscovered(entry):
@@ -76,61 +67,64 @@ def paused():
     return time.monotonic() < _paused_until
 
 
-def _meta_key(address):
-    return f"spansh-empty:{address}"
+# 4.3.3 kept only empty answers, under spansh-empty:. Both count.
+_KEYS = ("spansh:{address}", "spansh-empty:{address}")
 
 
-def known_empty(address, db=None):
-    """Whether Spansh had nothing for this system less than EMPTY_DAYS ago."""
-    if address in _empty:
-        return _empty[address]
+def recently_answered(address, db=None):
+    """Whether Spansh answered for this system less than ANSWER_DAYS ago."""
+    if address in _answered:
+        return _answered[address]
     try:
         with database.connect(db) as conn:
-            row = conn.execute("SELECT value FROM meta WHERE key = ?",
-                               (_meta_key(address),)).fetchone()
-        when = datetime.fromisoformat(row[0]) if row else None
+            rows = conn.execute("SELECT value FROM meta WHERE key IN (?, ?)",
+                                [key.format(address=address) for key in _KEYS]).fetchall()
+        newest = max((datetime.fromisoformat(value) for (value,) in rows), default=None)
     except Exception as err:                        # noqa: BLE001 - then just ask
-        logger.debug(f"spansh: could not read the empty mark of {address}: {err}")
+        logger.debug(f"spansh: could not read the answer mark of {address}: {err}")
         return False
-    _empty[address] = bool(when) and datetime.now(timezone.utc) - when < timedelta(days=EMPTY_DAYS)
-    return _empty[address]
+    _answered[address] = (newest is not None
+                          and datetime.now(timezone.utc) - newest < timedelta(days=ANSWER_DAYS))
+    return _answered[address]
 
 
-def _mark_empty(address, db=None):
-    _empty[address] = True
+def mark_answered(address, db=None):
+    """Spansh answered for this system and the answer was used: not again for
+    ANSWER_DAYS. A failure to keep the mark costs one more request next session."""
+    _answered[address] = True
     try:
         with database.connect(db) as conn:
             conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
-                         (_meta_key(address),
+                         (_KEYS[0].format(address=address),
                           datetime.now(timezone.utc).isoformat(timespec="seconds")))
-    except Exception as err:                        # noqa: BLE001 - asked again next session
-        logger.debug(f"spansh: could not keep the empty mark of {address}: {err}")
+    except Exception as err:                        # noqa: BLE001
+        logger.debug(f"spansh: could not keep the answer mark of {address}: {err}")
 
 
-def should_ask(entry, register, asked, undiscovered_systems=()):
+def should_ask(entry, register, known):
     """The SystemAddress to ask Spansh about for this journal event, or None.
 
-    Only the honk, only for the system the register holds, only once a session
-    (`asked` is the set of addresses already asked - the caller adds to it),
-    and never when any rule in the module docstring says not to.
+    `known` is the caller's {SystemAddress: state} for this session - asked,
+    answered or undiscovered; any entry means not now.
     """
     if (entry or {}).get("event") != "FSSDiscoveryScan":
         return None
     address = entry.get("SystemAddress")
-    if not address or address in asked or address in undiscovered_systems:
+    if not address or address in known:
         return None
     if entry.get("SystemName") and entry["SystemName"] != register.system:
         return None
-    if any(body.get("source") == SOURCE for body in register.bodies()):
-        return None
-    if paused() or known_empty(address):
+    if paused() or recently_answered(address):
         return None
     return address
 
 
 def to_bodies(dump, address):
-    """Spansh's dump -> landable bodies as the register holds them."""
-    system = (dump or {}).get("system") or {}
+    """Spansh's dump -> landable bodies as the register holds them. Raises
+    ValueError when the answer is not a system at all."""
+    system = dump.get("system") if isinstance(dump, dict) else None
+    if not isinstance(system, dict):
+        raise ValueError("not a Spansh system dump")
     found = []
     for body in system.get("bodies") or []:
         if not isinstance(body, dict) or not body.get("isLandable") or not body.get("name"):
@@ -167,27 +161,18 @@ def to_bodies(dump, address):
     return found
 
 
-def fetch(address, opener=None):
+def fetch(address):
     """The landable bodies Spansh has for that system, or None when it could
-    not be asked. [] is an answer - nothing known, or no landables - and is
-    remembered for EMPTY_DAYS. A failure pauses every request for PAUSE_S."""
+    not be asked. [] is an answer - a system nobody sent in (404), or no
+    landables. A failure pauses every request for PAUSE_S."""
     global _warned, _paused_until
-    url = DUMP_URL.format(address=address)
     try:
-        if opener is not None:
-            raw = opener(url, TIMEOUT_S)
-        elif requests is not None:
-            response = requests.get(url, timeout=TIMEOUT_S, headers=HEADERS)
-            if response.status_code == 404:
-                _mark_empty(address)    # a system nobody has sent in
-                return []
-            response.raise_for_status()
-            raw = response.content
-        else:
-            with urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS),
-                                        timeout=TIMEOUT_S) as response:
-                raw = response.read()
-        found = to_bodies(json.loads(raw), address)
+        response = requests.get(DUMP_URL.format(address=address), timeout=TIMEOUT_S,
+                                headers=HEADERS)
+        if response.status_code == 404:
+            return []
+        response.raise_for_status()
+        return to_bodies(response.json(), address)
     except Exception as err:                        # noqa: BLE001 - offline is normal
         _paused_until = time.monotonic() + PAUSE_S
         message = (f"spansh: no bodies for {address}: {err}; not asked again for "
@@ -198,9 +183,6 @@ def fetch(address, opener=None):
         else:
             logger.debug(message)
         return None
-    if not found:
-        _mark_empty(address)
-    return found
 
 
 def fetch_async(address, callback):

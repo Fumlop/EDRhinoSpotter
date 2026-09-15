@@ -1,17 +1,11 @@
-"""Bodies from Spansh: mapped to the journal's words, and only ever filling gaps."""
+"""Bodies from Spansh: mapped to the journal's words, asked politely, and only
+ever filling gaps."""
 
-import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from rs_core import bodies, spansh
-
-
-@pytest.fixture(autouse=True)
-def polite_state(monkeypatch):
-    """The pause and the empty marks are module state; every test starts clean."""
-    monkeypatch.setattr(spansh, "_paused_until", 0.0)
-    monkeypatch.setattr(spansh, "_empty", {})
+from rs_core import bodies, database, spansh
 
 ADDRESS = 3657332462290
 # Trimmed from the real dump of Eme and r Velorum, 2026-09-15.
@@ -28,6 +22,50 @@ DUMP = {"system": {"name": "Eme", "id64": ADDRESS, "bodies": [
     {"name": "Eme A", "bodyId": 1, "type": "Star", "subType": "K (Yellow-Orange) Star"},
     {"name": "Eme A 3", "bodyId": 20, "isLandable": False, "subType": "Gas giant"},
 ]}}
+
+
+@pytest.fixture(autouse=True)
+def polite_state(monkeypatch):
+    """The pause and the answer marks are module state; every test starts clean,
+    and no test reaches the network."""
+    monkeypatch.setattr(spansh, "_paused_until", 0.0)
+    monkeypatch.setattr(spansh, "_answered", {})
+    monkeypatch.setattr(spansh, "_warned", False)
+
+    def no_network(*args, **kwargs):
+        raise AssertionError("a test tried to reach Spansh")
+    monkeypatch.setattr(spansh.requests, "get", no_network)
+
+
+class Response:
+    def __init__(self, status=200, payload=None):
+        self.status_code, self._payload = status, payload
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise OSError(f"HTTP {self.status_code}")
+
+    def json(self):
+        if isinstance(self._payload, Exception):
+            raise self._payload
+        return self._payload
+
+
+@pytest.fixture
+def answer(monkeypatch):
+    """answer(status, payload) makes requests.get return that; the calls made
+    are in answer.calls."""
+    calls = []
+
+    def set_answer(status=200, payload=None, error=None):
+        def get(url, **kwargs):
+            calls.append((url, kwargs))
+            if error:
+                raise error
+            return Response(status, payload)
+        monkeypatch.setattr(spansh.requests, "get", get)
+    set_answer.calls = calls
+    return set_answer
 
 
 class TestToBodies:
@@ -52,108 +90,49 @@ class TestToBodies:
         icy = [b for b in spansh.to_bodies(DUMP, ADDRESS) if b["name"] == "Eme A 2 a"][0]
         assert "locations" not in icy
 
-    def test_nonsense_is_no_bodies(self):
-        assert spansh.to_bodies({}, ADDRESS) == []
+    def test_a_system_without_landables_is_no_bodies(self):
         assert spansh.to_bodies({"system": {"bodies": [None, 3]}}, ADDRESS) == []
+
+    def test_an_answer_that_is_not_a_system_raises(self):
+        with pytest.raises(ValueError):
+            spansh.to_bodies({"error": "maintenance"}, ADDRESS)
 
 
 class TestFetch:
 
-    def test_an_answer(self):
-        found = spansh.fetch(ADDRESS, opener=lambda url, timeout: json.dumps(DUMP).encode())
-        assert len(found) == 3
+    def test_an_answer_says_who_is_asking(self, answer):
+        answer(200, DUMP)
+        assert len(spansh.fetch(ADDRESS)) == 3
+        [(url, kwargs)] = answer.calls
+        assert url.endswith(f"/api/dump/{ADDRESS}")
+        assert kwargs["headers"]["User-Agent"].startswith("RhinoSpotter/")
+        assert kwargs["timeout"] == spansh.TIMEOUT_S
 
-    def test_offline_is_none_and_logged(self, caplog, monkeypatch):
-        monkeypatch.setattr(spansh, "_warned", False)
+    def test_404_is_an_answer_not_a_failure(self, answer):
+        answer(404)
+        assert spansh.fetch(ADDRESS) == [] and not spansh.paused()
 
-        def offline(url, timeout):
-            raise OSError("no route")
+    @pytest.mark.parametrize("kind", ["offline", "http 500", "http 429", "not json", "not a system"])
+    def test_every_failure_is_none_and_pauses(self, answer, kind):
+        answer(**{"offline": {"error": OSError("no route")},
+                  "http 500": {"status": 500},
+                  "http 429": {"status": 429},
+                  "not json": {"payload": ValueError("<html>")},
+                  "not a system": {"payload": {"error": "maintenance"}}}[kind])
+        assert spansh.fetch(ADDRESS) is None
+        assert spansh.paused()
+
+    def test_a_failure_is_a_warning_once(self, answer, caplog):
+        answer(error=OSError("no route"))
         with caplog.at_level("DEBUG", logger="RhinoSpotter"):
-            assert spansh.fetch(ADDRESS, opener=offline) is None
-            assert spansh.fetch(ADDRESS, opener=offline) is None
+            spansh.fetch(ADDRESS)
+            spansh.fetch(ADDRESS)
         assert [r.levelname for r in caplog.records] == ["WARNING", "DEBUG"]
-
-    def test_garbage_is_none(self):
-        assert spansh.fetch(ADDRESS, opener=lambda url, timeout: b"<html>") is None
 
 
 def honk(name="Eme", address=ADDRESS):
     return {"event": "FSSDiscoveryScan", "Progress": 1.0, "BodyCount": 19,
             "SystemName": name, "SystemAddress": address}
-
-
-class TestShouldAsk:
-    """Spansh is one person's server: ask on the honk, once, and only when needed."""
-
-    def test_the_honk_asks(self):
-        assert spansh.should_ask(honk(), arrived(), set()) == ADDRESS
-
-    def test_a_jump_does_not(self):
-        jump = {"event": "FSDJump", "StarSystem": "Eme", "SystemAddress": ADDRESS}
-        assert spansh.should_ask(jump, arrived(), set()) is None
-
-    def test_once_a_session(self):
-        assert spansh.should_ask(honk(), arrived(), {ADDRESS}) is None
-
-    def test_not_when_the_cache_has_spanshs_bodies(self):
-        register = arrived()
-        register.add_known("Eme", ADDRESS, spansh.to_bodies(DUMP, ADDRESS))
-        assert spansh.should_ask(honk(), register, set()) is None
-
-    def test_a_system_with_only_own_scans_still_asks(self):
-        register = arrived()
-        register.track(scan("Eme A 1 a"), system="Eme")
-        assert spansh.should_ask(honk(), register, set()) == ADDRESS
-
-    def test_a_honk_for_another_system_does_not(self):
-        assert spansh.should_ask(honk("Loha", 42), arrived(), set()) is None
-
-    def test_requests_say_who_is_asking(self):
-        assert spansh.HEADERS["User-Agent"].startswith("RhinoSpotter/")
-
-    def test_an_undiscovered_system_is_not_asked(self):
-        star = {"event": "Scan", "StarType": "K", "BodyName": "Eme A",
-                "DistanceFromArrivalLS": 0.0, "WasDiscovered": False, "SystemAddress": ADDRESS}
-        assert spansh.undiscovered(star) == ADDRESS
-        assert spansh.should_ask(honk(), arrived(), set(), {ADDRESS}) is None
-
-    def test_a_discovered_star_or_another_body_is_not_undiscovered(self):
-        star = {"event": "Scan", "StarType": "K", "DistanceFromArrivalLS": 0.0,
-                "WasDiscovered": True, "SystemAddress": ADDRESS}
-        assert spansh.undiscovered(star) is None
-        assert spansh.undiscovered(dict(star, WasDiscovered=False, DistanceFromArrivalLS=5.2)) is None
-        assert spansh.undiscovered(scan("Eme A 1 a")) is None
-
-    def test_a_failure_pauses_every_request(self, monkeypatch):
-        def offline(url, timeout):
-            raise OSError("no route")
-        assert spansh.fetch(ADDRESS, opener=offline) is None
-        assert spansh.paused()
-        assert spansh.should_ask(honk(), arrived(), set()) is None
-        monkeypatch.setattr(spansh, "_paused_until", 0.0)       # an hour later
-        assert spansh.should_ask(honk(), arrived(), set()) == ADDRESS
-
-    def test_an_empty_answer_is_remembered_across_a_restart(self, monkeypatch):
-        empty = {"system": {"bodies": [{"name": "Eme A", "type": "Star"}]}}
-        assert spansh.fetch(ADDRESS, opener=lambda url, timeout: json.dumps(empty).encode()) == []
-        monkeypatch.setattr(spansh, "_empty", {})               # EDMC restarted
-        assert spansh.known_empty(ADDRESS)
-        assert spansh.should_ask(honk(), arrived(), set()) is None
-
-    def test_an_old_empty_mark_asks_again(self, monkeypatch):
-        from datetime import datetime, timedelta, timezone
-        from rs_core import database
-        old = (datetime.now(timezone.utc) - timedelta(days=spansh.EMPTY_DAYS + 1)).isoformat()
-        with database.connect() as conn:
-            conn.execute("INSERT INTO meta (key, value) VALUES (?, ?)",
-                         (f"spansh-empty:{ADDRESS}", old))
-        assert not spansh.known_empty(ADDRESS)
-        assert spansh.should_ask(honk(), arrived(), set()) == ADDRESS
-
-    def test_bodies_found_are_not_marked_empty(self):
-        spansh.fetch(ADDRESS, opener=lambda url, timeout: json.dumps(DUMP).encode())
-        spansh._empty.clear()
-        assert not spansh.known_empty(ADDRESS)
 
 
 def arrived(saved=None):
@@ -167,6 +146,66 @@ def scan(name, planet_class="Rocky body", volcanism="", gravity=5.0):
     return {"event": "Scan", "BodyName": name, "Landable": True, "PlanetClass": planet_class,
             "Volcanism": volcanism, "SurfaceGravity": gravity, "DistanceFromArrivalLS": 470.0,
             "SystemAddress": ADDRESS, "BodyID": 8}
+
+
+def signals(name, count, event="FSSBodySignals"):
+    return {"event": event, "BodyName": name, "SystemAddress": ADDRESS,
+            "Signals": [{"Type": bodies.MINING_SIGNAL, "Count": count}]}
+
+
+class TestShouldAsk:
+    """Spansh is one person's server: ask on the honk, once, and only when needed."""
+
+    def test_the_honk_asks(self):
+        assert spansh.should_ask(honk(), arrived(), {}) == ADDRESS
+
+    def test_a_jump_does_not(self):
+        jump = {"event": "FSDJump", "StarSystem": "Eme", "SystemAddress": ADDRESS}
+        assert spansh.should_ask(jump, arrived(), {}) is None
+
+    @pytest.mark.parametrize("state", ["asking", "answered", "unreachable", "undiscovered"])
+    def test_once_a_session_whatever_happened(self, state):
+        assert spansh.should_ask(honk(), arrived(), {ADDRESS: state}) is None
+
+    def test_a_honk_for_another_system_does_not(self):
+        assert spansh.should_ask(honk("Loha", 42), arrived(), {}) is None
+
+    def test_not_while_paused(self, monkeypatch):
+        monkeypatch.setattr(spansh, "_paused_until", spansh.time.monotonic() + 60)
+        assert spansh.should_ask(honk(), arrived(), {}) is None
+
+    def test_an_answer_is_remembered_across_a_restart(self, monkeypatch):
+        spansh.mark_answered(ADDRESS)
+        monkeypatch.setattr(spansh, "_answered", {})            # EDMC restarted
+        assert spansh.recently_answered(ADDRESS)
+        assert spansh.should_ask(honk(), arrived(), {}) is None
+
+    def test_an_old_answer_asks_again(self):
+        old = (datetime.now(timezone.utc) - timedelta(days=spansh.ANSWER_DAYS + 1)).isoformat()
+        with database.connect() as conn:
+            conn.execute("INSERT INTO meta (key, value) VALUES (?, ?)", (f"spansh:{ADDRESS}", old))
+        assert spansh.should_ask(honk(), arrived(), {}) == ADDRESS
+
+    def test_a_433_empty_mark_still_counts(self):
+        with database.connect() as conn:
+            conn.execute("INSERT INTO meta (key, value) VALUES (?, ?)",
+                         (f"spansh-empty:{ADDRESS}", datetime.now(timezone.utc).isoformat()))
+        assert spansh.recently_answered(ADDRESS)
+
+
+class TestUndiscovered:
+
+    def test_the_arrival_star_says_so(self):
+        star = {"event": "Scan", "StarType": "K", "BodyName": "Eme A",
+                "DistanceFromArrivalLS": 0.0, "WasDiscovered": False, "SystemAddress": ADDRESS}
+        assert spansh.undiscovered(star) == ADDRESS
+
+    def test_a_discovered_star_or_another_body_is_not(self):
+        star = {"event": "Scan", "StarType": "K", "DistanceFromArrivalLS": 0.0,
+                "WasDiscovered": True, "SystemAddress": ADDRESS}
+        assert spansh.undiscovered(star) is None
+        assert spansh.undiscovered(dict(star, WasDiscovered=False, DistanceFromArrivalLS=5.2)) is None
+        assert spansh.undiscovered(scan("Eme A 1 a")) is None
 
 
 class TestAddKnown:
@@ -195,17 +234,13 @@ class TestAddKnown:
     def test_the_commanders_own_count_replaces_spanshs_even_if_lower(self):
         register = arrived()
         register.add_known("Eme", ADDRESS, spansh.to_bodies(DUMP, ADDRESS))
-        signals = {"event": "FSSBodySignals", "BodyName": "Eme A 1 a", "SystemAddress": ADDRESS,
-                   "Signals": [{"Type": bodies.MINING_SIGNAL, "Count": 7}]}
-        assert register.track(signals, system="Eme")
+        assert register.track(signals("Eme A 1 a", 7), system="Eme")
         assert [b["locations"] for b in register.bodies() if b["name"] == "Eme A 1 a"] == [7]
 
     def test_a_count_already_held_is_not_replaced(self):
         register = arrived()
         register.track(scan("Eme A 1 a"), system="Eme")
-        register.track({"event": "SAASignalsFound", "BodyName": "Eme A 1 a",
-                        "SystemAddress": ADDRESS,
-                        "Signals": [{"Type": bodies.MINING_SIGNAL, "Count": 4}]}, system="Eme")
+        register.track(signals("Eme A 1 a", 4, "SAASignalsFound"), system="Eme")
         register.add_known("Eme", ADDRESS, spansh.to_bodies(DUMP, ADDRESS))
         assert [b["locations"] for b in register.bodies() if b["name"] == "Eme A 1 a"] == [4]
 
@@ -222,3 +257,28 @@ class TestAddKnown:
         before = len(saved)
         assert not register.add_known("Eme", ADDRESS, spansh.to_bodies(DUMP, ADDRESS))
         assert len(saved) == before
+
+
+class TestWhoseCountAfterAReload:
+    """Whose count it is survives the cache: found by the 4.3.x review."""
+
+    def reload(self, register):
+        again = bodies.Register(on_arrive=lambda system: register.bodies())
+        again.track({"event": "FSDJump", "StarSystem": "Eme", "SystemAddress": ADDRESS})
+        return again
+
+    def test_the_commanders_count_is_not_taken_for_spanshs_after_a_reload(self):
+        register = arrived()
+        register.add_known("Eme", ADDRESS, spansh.to_bodies(DUMP, ADDRESS))    # Spansh 10
+        register.track(signals("Eme A 1 a", 12, "SAASignalsFound"), system="Eme")
+        again = self.reload(register)
+        again.track(signals("Eme A 1 a", 11), system="Eme")         # a smaller FSS count
+        assert [b["locations"] for b in again.bodies() if b["name"] == "Eme A 1 a"] == [12]
+
+    def test_spanshs_count_on_a_scanned_body_still_gives_way_after_a_reload(self):
+        register = arrived()
+        register.add_known("Eme", ADDRESS, spansh.to_bodies(DUMP, ADDRESS))    # Spansh 10
+        register.track(scan("Eme A 1 a"), system="Eme")             # source gone, count still Spansh's
+        again = self.reload(register)
+        again.track(signals("Eme A 1 a", 5), system="Eme")
+        assert [b["locations"] for b in again.bodies() if b["name"] == "Eme A 1 a"] == [5]

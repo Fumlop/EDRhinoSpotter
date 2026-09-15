@@ -985,7 +985,9 @@ def _body_line(body):
     locations = body.get("locations")
     counted = f"{locations} loc" if locations is not None else "unprobed"
 
-    return f"{name} {where:>10} {counted:>9}  {_strength(body)}"
+    # Not scanned by you: Spansh's data, until your own scan replaces it.
+    spansh = "  spansh" if body.get("source") == "spansh" else ""
+    return f"{name} {where:>10} {counted:>9}  {_strength(body)}{spansh}"
 
 
 def _strength(body):

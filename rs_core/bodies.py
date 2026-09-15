@@ -54,6 +54,9 @@ ID_EVENTS = ('Scan', 'FSSBodySignals', 'SAASignalsFound', 'ApproachBody',
 # whatever language the commander plays in, so the token is what we match.
 MINING_SIGNAL = '$PlanetaryMiningLocation_Name;'
 
+# What a body or a location count from rs_core/spansh.py is marked with.
+SPANSH = 'spansh'
+
 
 def mining_locations(entry):
     """How many mining locations a signals event reports, or None.
@@ -111,8 +114,11 @@ class Register:
                            if body.get('locations') is not None}
         self._ids = {name: body['body_id'] for name, body in self._bodies.items()
                      if body.get('body_id') is not None}
+        # Whose count it is survives a reload: a Spansh count still gives way
+        # to the commander's own after a restart, and one the commander has
+        # replaced is not taken for Spansh's again.
         self._guessed = {name for name, body in self._bodies.items()
-                         if body.get('source') == 'spansh'}
+                         if body.get('locations_from') == SPANSH}
         self.system_address = next((body['system_address'] for body in self._bodies.values()
                                     if body.get('system_address') is not None),
                                    self.system_address)
@@ -162,7 +168,7 @@ class Register:
             return False
 
         # EDMC names the system it believes you are in on every line it hands
-        # over, including the replay it does at startup. Waiting for an arrival
+        # over, including the StartUp it synthesises at startup. Waiting for an arrival
         # event instead meant the plugin knew nothing in a system EDMC could
         # name - start it while docked, and the next hundred journal lines were
         # Music and ShipLocker, none of which said where you were.
@@ -195,10 +201,9 @@ class Register:
         if not name or name == self.system:
             return False
 
-        # Learning the name is not arriving. EDMC starts with the game already
-        # running and replays the journal, so signals and scans can reach us
-        # before any line names the system - clearing here would throw away
-        # what those lines just told us.
+        # Learning the name is not arriving. A signal or scan can reach us
+        # before any line has named the system - clearing here would throw
+        # away what those lines just told us.
         if self.system is None:
             self.system = name
             known = self.on_arrive(name) if self.on_arrive else None
@@ -285,7 +290,7 @@ class Register:
             value = entry.get(field, held.get(key))
             if value is not None:
                 body[key] = value
-        if {k: v for k, v in held.items() if k != 'locations'} == body:
+        if {k: v for k, v in held.items() if k not in ('locations', 'locations_from')} == body:
             return False
         self._bodies[name] = body
         return True
@@ -297,6 +302,9 @@ class Register:
         for name, body in self._bodies.items():
             row = dict(body)
             row['locations'] = self._locations.get(name)
+            row.pop('locations_from', None)
+            if name in self._guessed:
+                row['locations_from'] = SPANSH
             out.append(row)
         return sorted(out, key=lambda body: (body['distance'] is None,
                                              body['distance'] or 0.0, body['name']))

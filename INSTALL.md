@@ -59,9 +59,9 @@ there being none.
 
 **Bodies come from Spansh and your journal.** When you honk, Spansh is asked
 for the system's known landable bodies - planet class, volcanism, gravity,
-mining location count. Your own scans replace them. Spansh is not asked for a
-system nobody has discovered, one already saved, one it had nothing for in the
-last 30 days, or at all for an hour after a failed request.
+mining location count - marked `spansh` in the list. Your own scans replace
+them. Spansh is not asked for a system nobody has discovered, one it answered
+for in the last 30 days, or at all for an hour after a failed request.
 
 In a system Spansh does not know, or offline, the honk is not enough:
 `FSSDiscoveryScan` finds the bodies but does not describe them, so:
@@ -160,9 +160,10 @@ whatever the release actually contains.
 **The panel is missing.** EDMC not restarted, or the folder is nested one
 level too deep. `plugins\RhinoSpotter\load.py` has to exist exactly.
 
-**The scan window is empty in a system you honked.** Spansh did not know the
-system, or could not be reached (EDMC's log says which), and honking is not
-scanning. Resolve the bodies in the FSS.
+**The scan window is empty in a system you honked.** The line under the
+buttons says why: a new system, no Spansh bodies, or Spansh unreachable (the
+first failure is also a warning in EDMC's log). Honking is not scanning -
+resolve the bodies in the FSS.
 
 **"mining_sheet.json is missing".** The file did not come along. Copy it back
 beside `load.py` from the release zip; the body list still works without it,
