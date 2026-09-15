@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.2.2
+
+**Fixed**
+
+- RhinoScan with a material picked: the bookmark count on a body counts only
+  that material's bookmarks, and clicking it opens the list filtered to it.
+  A body with none of that material shows no count.
+
+**Changed**
+
+- README cut down to what you need: install, the buttons, hotkeys, settings
+  and where the data lives.
+
 ## 4.2.1
 
 **Fixed**

@@ -425,28 +425,44 @@ def _group(parent, ground, found, sheet, wrap, focus=None, marked=None):
         tk.Label(row, text="   " + _body_line(body), bg=BG,
                  fg=FG if probed else DIM, anchor="w",
                  font=("Consolas", 9)).pack(side="left")
-        _cards_link(row, (marked or {}).get(body["name"]))
+        _cards_link(row, (marked or {}).get(body["name"]), focus)
         _mapped_link(row, body, (marked or {}).get(body["name"]))
 
 
-def _cards_link(parent, records):
+def _cards_link(parent, records, focus=None):
     """"2 bookmarks" behind a body you have already marked, opening the list.
 
     Only on bodies that have one. A count of zero on every other row would be
     nine pieces of nothing in a ten-body system, and the useful signal here is
     "you have been here before" - which is only worth saying when true.
+
+    With a material picked, only that material's bookmarks count, and the list
+    opens filtered to it - All is still one pick away there.
     """
-    if not records:
+    if focus:
+        picked = [r for r in records or []
+                  if (r.get("commodity") or "").lower() == focus.lower()]
+    else:
+        picked = records
+    if not picked:
         return
-    count = len(records)
+    count = len(picked)
     label = tk.Label(parent, text=f"  {count} bookmark{'' if count == 1 else 's'} ›",
                      bg=BG, fg=ACCENT, anchor="w", cursor="hand2",
                      font=("Consolas", 9))
     label.pack(side="left")
     system = records[0].get("system")
     body = records[0].get("planet_name")
-    label.bind("<Button-1>",
-               lambda event: _bookmarks_view(label.winfo_toplevel(), system, body, records))
+
+    def open_list(event):
+        # The list shows what the count counted.
+        if focus:
+            _filter[body] = picked[0].get("commodity")
+        else:
+            _filter.pop(body, None)
+        _bookmarks_view(label.winfo_toplevel(), system, body, records)
+
+    label.bind("<Button-1>", open_list)
 
 
 def _system_address():
