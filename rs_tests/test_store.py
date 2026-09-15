@@ -35,6 +35,22 @@ class TestRoundTrip:
         assert store.save("Andel", BODIES, root=str(tmp_path))
         assert store.load("Andel", root=str(tmp_path)) == BODIES
 
+    def test_the_address_is_written_once_under_the_system(self, tmp_path):
+        with_ids = [dict(body, system_address=111, body_id=index)
+                    for index, body in enumerate(BODIES)]
+        path = store.save("Andel", with_ids, root=str(tmp_path))
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+        assert data["system_address"] == 111
+        assert all("system_address" not in body for body in data["bodies"])
+        assert [body["body_id"] for body in data["bodies"]] == [0, 1]
+        assert store.load("Andel", root=str(tmp_path)) == with_ids
+
+    def test_saving_does_not_change_the_bodies_handed_in(self, tmp_path):
+        with_ids = [dict(BODIES[0], system_address=111)]
+        store.save("Andel", with_ids, root=str(tmp_path))
+        assert with_ids[0]["system_address"] == 111
+
     def test_an_unknown_system_is_empty(self, tmp_path):
         assert store.load("Nowhere", root=str(tmp_path)) == []
 

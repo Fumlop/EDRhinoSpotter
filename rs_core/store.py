@@ -67,7 +67,18 @@ def save(system, bodies, root=STORE_ROOT):
     try:
         os.makedirs(root, exist_ok=True)
         target = path_for(system, root)
-        payload = {"version": VERSION, "system": system, "bodies": bodies}
+        # The address belongs to the system, so it is written once under its
+        # name rather than on every body. A body that names another one - not
+        # something a journal does - keeps its own.
+        address = next((body["system_address"] for body in bodies
+                        if body.get("system_address") is not None), None)
+        payload = {"version": VERSION, "system": system}
+        if address is not None:
+            payload["system_address"] = address
+            bodies = [{key: value for key, value in body.items()
+                       if not (key == "system_address" and value in (None, address))}
+                      for body in bodies]
+        payload["bodies"] = bodies
         atomic.write_text(target, json.dumps(payload, indent=1))
         return target
     except OSError as err:
@@ -91,7 +102,14 @@ def load(system, root=STORE_ROOT):
         # it costs a wrong answer that looks right.
         return []
     bodies = data.get("bodies")
-    return bodies if isinstance(bodies, list) else []
+    if not isinstance(bodies, list):
+        return []
+    # Handed back on each body, which is how the register takes it in.
+    address = data.get("system_address")
+    if address is not None:
+        bodies = [dict(body, system_address=body.get("system_address", address))
+                  if isinstance(body, dict) else body for body in bodies]
+    return bodies
 
 
 def systems(root=STORE_ROOT):
