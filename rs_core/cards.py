@@ -10,10 +10,9 @@ rs_tests/test_cards.py.
 
 import json
 import os
-import tempfile
 from datetime import datetime, timezone
 
-from rs_core import guide
+from rs_core import atomic, guide
 from rs_core.logging import logger
 from rs_core.spotcard import card_dir
 
@@ -24,6 +23,10 @@ from rs_core.spotcard import card_dir
 # the 76 m rig spacing, is a circle of 76 / (2 sin(pi/7)) = 87.6 m; with 10 %
 # on top that is 96 m, set to a round 100 m.
 SAME_SPOT_M = 100.0
+
+# Bookmarks already reported as unreadable. The minimap reads the folder every
+# 10 s, and one broken file is one line in the log, not six a minute.
+_warned = set()
 
 
 def for_system(system, root=None):
@@ -48,7 +51,10 @@ def for_system(system, root=None):
         try:
             with open(path, encoding="utf-8") as handle:
                 record = json.load(handle)
-        except (OSError, ValueError):
+        except (OSError, ValueError) as err:
+            if path not in _warned:
+                _warned.add(path)
+                logger.warning(f"skipping unreadable bookmark {path}: {err}")
             continue
         if not isinstance(record, dict) or not record.get("planet_name"):
             continue
@@ -101,14 +107,7 @@ def set_depleted(record, depleted, when=None):
             data["depleted_at"] = when or datetime.now(timezone.utc).isoformat(timespec="seconds")
         else:
             data.pop("depleted_at", None)
-        folder = os.path.dirname(path) or "."
-        handle = tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=folder,
-                                             suffix=".tmp", delete=False)
-        try:
-            json.dump(data, handle, indent=1)
-        finally:
-            handle.close()
-        os.replace(handle.name, path)
+        atomic.write_text(path, json.dumps(data, indent=1))
     except (OSError, ValueError) as err:
         logger.warning(f"could not mark {path} depleted: {err}")
         return False

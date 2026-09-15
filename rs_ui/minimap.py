@@ -212,10 +212,9 @@ def _remember():
 def _bookmarks(system, body):
     """[(lat, lon, code, depleted), ...] of the bookmarks on this body.
 
-    Read again when the cards folder changes - a card written or deleted moves
-    its modified time - and every MARKS_S besides: the card is written on a
-    worker thread, a read that lands between the sidecar being created and
-    filled skips it, and filling it does not move the folder's time.
+    Read again when the cards folder changes - a bookmark written, updated or
+    deleted moves its modified time, since every write is a temp file moved
+    into place - and every MARKS_S besides, in case a change is missed.
     """
     global _marks
     if not system or not body:

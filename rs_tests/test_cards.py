@@ -48,6 +48,17 @@ class TestForSystem:
         (tmp_path / "Andel_1_a_loc1_jadeite.png").write_bytes(b"x")
         assert cards.for_system("Andel", root=str(tmp_path)) == []
 
+    def test_broken_json_says_which_file_in_the_log(self, tmp_path, caplog):
+        """A bookmark cannot be rebuilt from the journal, so one that stops
+        reading has to show up somewhere rather than just vanish from the list."""
+        broken = tmp_path / "Andel_1_a_loc1_jadeite.json"
+        broken.write_text("{not json", encoding="utf-8")
+        with caplog.at_level("WARNING", logger="RhinoSpotter"):
+            cards.for_system("Andel", root=str(tmp_path))
+            cards.for_system("Andel", root=str(tmp_path))    # the minimap, 10 s later
+        assert [r.levelname for r in caplog.records] == ["WARNING"]
+        assert str(broken) in caplog.records[0].getMessage()
+
     def test_a_sidecar_with_no_body_is_skipped(self, tmp_path):
         (tmp_path / "odd.json").write_text(json.dumps({"system": "Andel"}), encoding="utf-8")
         (tmp_path / "odd.png").write_bytes(b"x")

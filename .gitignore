@@ -14,3 +14,6 @@ lib/
 
 # Release zips, built from a tag and uploaded, not kept.
 RhinoSpotter-*.zip
+
+# Local plans and todos, not part of the plugin.
+plan/

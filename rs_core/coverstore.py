@@ -23,12 +23,12 @@ No tkinter. See rs_tests/test_coverstore.py.
 """
 
 import gzip
+import io
 import json
 import os
-import tempfile
 import time
 
-from rs_core import names
+from rs_core import atomic, names
 from rs_core.logging import logger
 
 ROOT = os.path.join(os.environ.get("LOCALAPPDATA")
@@ -99,12 +99,7 @@ def save(body, name, data, root=None):
         # coverage._pick_saved.
         payload = dict(data, version=VERSION, body=body, saved=round(time.time(), 3))
         raw = gzip.compress(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-        handle = tempfile.NamedTemporaryFile("wb", dir=where, suffix=".tmp", delete=False)
-        try:
-            handle.write(raw)
-        finally:
-            handle.close()
-        os.replace(handle.name, target)
+        atomic.write_bytes(target, raw)
         return target
     except OSError as err:
         logger.warning(f"minimap: could not save {name} on {body}: {err}")
@@ -119,12 +114,9 @@ def save_png(body, name, image, root=None):
         target = os.path.join(where, name + ".png")
         # Through a temp file, like the points: EDMC closing mid-save or two
         # docks close together must not leave half a picture.
-        handle = tempfile.NamedTemporaryFile("wb", dir=where, suffix=".tmp", delete=False)
-        try:
-            image.save(handle, "PNG")
-        finally:
-            handle.close()
-        os.replace(handle.name, target)
+        picture = io.BytesIO()
+        image.save(picture, "PNG")
+        atomic.write_bytes(target, picture.getvalue())
         return target
     except (OSError, ValueError) as err:
         logger.warning(f"minimap: could not save the picture of {name} on {body}: {err}")

@@ -17,7 +17,7 @@ import os
 
 from PIL import ImageFont
 
-from rs_core import names
+from rs_core import atomic, names
 
 # Outside the plugin folder on purpose: bookmarks outlive a plugin reinstall,
 # and %LOCALAPPDATA% is somewhere Explorer opens without hunting for it.
@@ -64,8 +64,7 @@ def save(spot, out_path=None):
     if out_path is None:
         out_path = _free(os.path.join(card_dir(spot.get("system")), filename(spot)))
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as handle:
-        json.dump(record, handle, indent=1)
+    atomic.write_text(out_path, json.dumps(record, indent=1))
     return out_path
 
 

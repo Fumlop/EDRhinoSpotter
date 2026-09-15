@@ -28,10 +28,9 @@ rs_tests/test_store.py.
 
 import json
 import os
-import tempfile
 import threading
 
-from rs_core import names
+from rs_core import atomic, names
 from rs_core.logging import logger
 
 # Beside the cards, and outside the plugin folder for the same reason: scans
@@ -69,13 +68,7 @@ def save(system, bodies, root=STORE_ROOT):
         os.makedirs(root, exist_ok=True)
         target = path_for(system, root)
         payload = {"version": VERSION, "system": system, "bodies": bodies}
-        handle = tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=root,
-                                             suffix=".tmp", delete=False)
-        try:
-            json.dump(payload, handle, indent=1)
-        finally:
-            handle.close()
-        os.replace(handle.name, target)
+        atomic.write_text(target, json.dumps(payload, indent=1))
         return target
     except OSError as err:
         logger.debug(f"could not cache {system}: {err}")
