@@ -171,9 +171,39 @@ class TestOnce:
         assert migrate.run(root=str(old)) is None
         assert store.load("Loha") == []
 
-    def test_a_second_run_without_the_marker_adds_nothing_and_keeps_newer_rows(self, old):
+    def test_a_lost_marker_is_written_again_without_importing(self, old):
+        """migrate.done failed to write after the commit, or was deleted: the
+        record in the database stands in, and a bookmark deleted since stays
+        deleted."""
+        migrate.run(root=str(old))
+        report = open(migrate.done_path(), encoding="utf-8").read()
+        os.remove(migrate.done_path())
+        cards.delete(dict(cards.for_system(SYSTEM)[0], path=None))
+        assert migrate.run(root=str(old)) is None
+        assert open(migrate.done_path(), encoding="utf-8").read() == report
+        assert cards.for_system(SYSTEM) == []
+
+    def test_a_marker_that_cannot_be_written_leaves_the_record(self, old, monkeypatch):
+        real, full = migrate.atomic.write_text, [True]
+
+        def refuse(path, text):
+            if full[0]:
+                raise OSError("disk full")
+            real(path, text)
+        # Not monkeypatch.undo(): that would also undo the test database path.
+        monkeypatch.setattr(migrate.atomic, "write_text", refuse)
+        with pytest.raises(OSError):
+            migrate.run(root=str(old))
+        full[0] = False
+        assert migrate.run(root=str(old)) is None
+        assert os.path.exists(migrate.done_path())
+        assert len(cards.for_system(SYSTEM)) == 1
+
+    def test_a_second_run_with_no_record_adds_nothing_and_keeps_newer_rows(self, old, db):
         migrate.run(root=str(old))
         os.remove(migrate.done_path())
+        with sqlite3.connect(db) as conn:
+            conn.execute("DELETE FROM meta")
         # Written by the plugin after the first import - newer than the files.
         store.save(SYSTEM, BODIES[:1])
         record = cards.for_system(SYSTEM)[0]

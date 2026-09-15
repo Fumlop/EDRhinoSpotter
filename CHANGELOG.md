@@ -1,5 +1,28 @@
 # Changelog
 
+## 4.3.0
+
+**Added**
+
+- Bodies from Spansh. On every jump (and at game start) the plugin asks
+  `spansh.co.uk/api/dump/<SystemAddress>` for the system's landable bodies,
+  so RhinoScan lists a honked system somebody else has scanned - planet class,
+  volcanism, gravity and mining location count. It only fills gaps: your own
+  FSS scans and fly-bys replace Spansh bodies, and your own location count
+  replaces Spansh's. Offline, the journal fills the list as before.
+- Mining a material on the ground picks it in the Material dropdown, so the
+  Bookmark made there is already filled.
+
+**Fixed**
+
+- Two systems, or two minimap maps, changed within the same two seconds are
+  both written; the second no longer replaced the first one's pending write.
+- EDMC closing while a write is under way waits for it, so the backup has it.
+- A database that is briefly locked no longer hides the minimap's bookmark
+  dots until the next bookmark change.
+- A lost `migrate.done` is written again from the database instead of
+  importing the old JSON a second time.
+
 ## 4.2.2
 
 **Fixed**

@@ -57,14 +57,17 @@ of that ground's mining locations that carried the material; `unprobed` means
 nobody has counted the locations on that body yet, which is not the same as
 there being none.
 
-**The honk is not enough.** `FSSDiscoveryScan` finds the bodies; it does not
-describe them. Only a body the FSS has resolved carries the planet class and
-volcanism this reads, so:
+**Bodies come from Spansh and your journal.** On every jump (and at game start)
+Spansh is asked for the system's known landable bodies - planet class,
+volcanism, gravity, mining location count. Your own scans replace them.
+
+In a system Spansh does not know, or offline, the honk is not enough:
+`FSSDiscoveryScan` finds the bodies but does not describe them, so:
 
 - honk, then work the FSS and resolve the bodies, or
 - fly in and let the auto-scan sweep the near ones.
 
-A system where you did neither shows nothing, and the window says so.
+A system where none of that happened shows nothing, and the window says so.
 
 **Bookmarks you already made.** A body you have marked before shows
 "2 bookmarks" behind it. Clicking lists them in the same window: one row per
@@ -140,9 +143,10 @@ whatever the release actually contains.
 
 ## What it does not do
 
-- **No network, except the update check.** Bodies come from your journal,
-  rates from the file shipped beside `load.py`. Nothing is asked of EDSM,
-  Inara, or anyone else's server.
+- **Network: the update check, and Spansh on every jump.** Bodies come from
+  your journal; on every jump Spansh is asked for the ones you have not
+  scanned (`spansh.co.uk/api/dump/<SystemAddress>`). Offline, the journal
+  alone fills the list. Rates come from the file shipped beside `load.py`.
 - **It cannot tell you what a mining location holds.** That list exists only
   in the in-game target panel - no journal event and no feed carries it. The
   percentages say where to prospect, not what you will find.
@@ -154,7 +158,8 @@ whatever the release actually contains.
 **The panel is missing.** EDMC not restarted, or the folder is nested one
 level too deep. `plugins\RhinoSpotter\load.py` has to exist exactly.
 
-**The scan window is empty in a system you honked.** See above: honking is not
+**The scan window is empty in a system you honked.** Spansh did not know the
+system, or could not be reached (EDMC's log says which), and honking is not
 scanning. Resolve the bodies in the FSS.
 
 **"mining_sheet.json is missing".** The file did not come along. Copy it back

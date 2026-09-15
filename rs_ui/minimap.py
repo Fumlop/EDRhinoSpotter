@@ -73,7 +73,7 @@ _coverage = None
 _saved = None            # (map, version, centered, border, location) last handed to _writes
 _here = None             # (lat, lon) of the last SRV fix, for the hotkeys
 _notice = None           # (text, until monotonic) on the hint line, e.g. "set center first"
-_writes = store.Debounced(write=coverstore.save)
+_writes = store.Debounced(write=coverstore.save, key=2)     # one pending save per (body, name)
 _in_srv = False
 _failed = False          # a draw that raised: stay down until the next launch
 _marks = None            # ((system, body, bookmark revision), [(lat, lon, code, depleted), ...])
@@ -126,8 +126,8 @@ def update(root, status, system=None, ids=None):
         if _coverage.body_id is None:
             _coverage.body_id = body_id
         if previous is not None and _coverage is not previous:
-            # Written now: the timer holds one pending save, and the next one
-            # is for another map.
+            # Written now rather than up to two seconds later: the old map is
+            # done with.
             _writes.flush()
         _in_srv = True
         body, lat, lon, _, heading = fix
@@ -234,20 +234,30 @@ def _bookmarks(system, body):
         return []
     key = (system, body, database.revision())
     if _marks is None or _marks[0] != key:
-        points = []
-        for record in cards.for_system(system):
-            lat, lon = record.get("latitude"), record.get("longitude")
-            if (record.get("planet_name") == body and isinstance(lat, (int, float))
-                    and isinstance(lon, (int, float))):
-                points.append((lat, lon, _code(record.get("commodity")),
-                               bool(record.get("depleted_at"))))
-        _marks = (key, points)
+        try:
+            records = cards.for_system(system, quiet=False)
+        except Exception as err:            # sqlite3.Error, OSError: locked, say
+            # Not cached: an empty answer kept under this revision would hide
+            # the dots until the next bookmark change. The next poll reads again.
+            logger.debug(f"minimap: bookmarks not read, retrying: {err}")
+            records = None
+        if records is not None:
+            points = []
+            for record in records:
+                lat, lon = record.get("latitude"), record.get("longitude")
+                if (record.get("planet_name") == body and isinstance(lat, (int, float))
+                        and isinstance(lon, (int, float))):
+                    points.append((lat, lon, _code(record.get("commodity")),
+                                   bool(record.get("depleted_at"))))
+            _marks = (key, points)
+    # While a read fails: the last good read of this body, nothing for another.
+    known = _marks[1] if _marks is not None and _marks[0][:2] == (system, body) else []
     now = time.monotonic()
     _fresh[:] = [f for f in _fresh if now - f[5] < FRESH_S]
-    on_disk = {(lat, lon) for lat, lon, _, _ in _marks[1]}
+    on_disk = {(lat, lon) for lat, lon, _, _ in known}
     fresh = [(lat, lon, code, False) for s, b, lat, lon, code, _ in _fresh
              if s == system and b == body and (lat, lon) not in on_disk]
-    return _marks[1] + fresh if fresh else _marks[1]
+    return known + fresh if fresh else known
 
 
 def _code(material):

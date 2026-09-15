@@ -28,18 +28,23 @@ SAME_SPOT_M = 100.0
 _warned = set()
 
 
-def for_system(system, db=None):
+def for_system(system, db=None, quiet=True):
     """Every bookmark marked in that system, in the order they were made.
 
     Each record carries its row as `id`. Older versions wrote a PNG card beside
     the bookmark; that card's path is kept in `path` when it is still there,
     so Delete takes it too, and None otherwise.
+
+    A database that cannot be read is logged and [] - or, with quiet=False,
+    raised, for a caller that must not take it for "no bookmarks".
     """
     try:
         with database.connect(db) as conn:
             rows = conn.execute("SELECT id, data FROM bookmarks WHERE system = ? ORDER BY id",
                                 (system,)).fetchall()
     except (sqlite3.Error, OSError) as err:
+        if not quiet:
+            raise
         logger.warning(f"could not read the bookmarks of {system}: {err}")
         return []
 

@@ -19,9 +19,8 @@ Three events carry the rest:
     SAASignalsFound   the same count after a detailed surface scan, which is
                       the authoritative one.
 
-Nothing here asks the network for anything. EDSM and Ardent are not involved:
-Ardent has no body endpoints at all, and the rest is the commander's own scan
-data.
+Nothing here asks the network for anything. rs_core/spansh.py does, and hands
+what it finds to add_known(), which only fills gaps: the journal wins.
 
 Signals can arrive before or after the Scan for the same body, so counts are
 kept beside the bodies and merged on the way out rather than written into a
@@ -91,6 +90,7 @@ class Register:
         self._bodies = {}
         self._locations = {}
         self._ids = {}
+        self._guessed = set()   # names whose location count is Spansh's, not ours
         self._from_cache = False
 
     def clear(self, system=None):
@@ -99,6 +99,7 @@ class Register:
         self._bodies = {}
         self._locations = {}
         self._ids = {}
+        self._guessed = set()
 
     def adopt(self, system, bodies):
         """Fill the register from the cache, for a system already visited."""
@@ -110,10 +111,38 @@ class Register:
                            if body.get('locations') is not None}
         self._ids = {name: body['body_id'] for name, body in self._bodies.items()
                      if body.get('body_id') is not None}
+        self._guessed = {name for name, body in self._bodies.items()
+                         if body.get('source') == 'spansh'}
         self.system_address = next((body['system_address'] for body in self._bodies.values()
                                     if body.get('system_address') is not None),
                                    self.system_address)
         return len(self._bodies)
+
+    def add_known(self, system, address, found):
+        """Bodies from Spansh for `system`. Only the ones not already held go
+        in - a journal Scan or the cache wins - and nothing at all when the
+        register has moved on to another system meanwhile. True when the list
+        changed; the change is written like any other."""
+        if not system or system != self.system:
+            return False
+        if self.system_address is not None and address != self.system_address:
+            return False
+        changed = False
+        for body in found or []:
+            name = body.get('name')
+            if not name or name in self._bodies:
+                continue
+            row = {key: value for key, value in body.items() if key != 'locations'}
+            self._bodies[name] = row
+            if row.get('body_id') is not None:
+                self._ids.setdefault(name, row['body_id'])
+            if body.get('locations') is not None and name not in self._locations:
+                self._locations[name] = body['locations']
+                self._guessed.add(name)
+            changed = True
+        if changed:
+            self._persist()
+        return changed
 
     def ids(self, system, name):
         """(system_address, body_id) of a body in this system. Either is None
@@ -218,8 +247,11 @@ class Register:
         if count is None or not name:
             return False
         # A detailed surface scan counts more than the FSS did, never fewer, so
-        # the larger number is the one that has been looked at hardest.
-        if self._locations.get(name, -1) >= count:
+        # the larger number is the one that has been looked at hardest. A count
+        # from Spansh gives way to the commander's own, whichever is larger.
+        if name in self._guessed:
+            self._guessed.discard(name)
+        elif self._locations.get(name, -1) >= count:
             return False
         self._locations[name] = count
         return name in self._bodies

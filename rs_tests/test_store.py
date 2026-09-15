@@ -138,6 +138,54 @@ class TestDebounced:
             time.sleep(0.15)
         assert len(calls) >= 2
 
+    def test_two_keys_inside_one_delay_are_both_written(self):
+        """A jump inside the delay: the system left behind is not lost."""
+        calls, write = self.counter()
+        debounced = store.Debounced(delay=30, write=write)
+        debounced("Andel", BODIES[:1])
+        debounced("Loha", BODIES)
+        debounced("Andel", BODIES)
+        debounced.flush()
+        assert calls == [("Andel", BODIES), ("Loha", BODIES)]
+
+    def test_a_longer_key_keeps_maps_on_one_body_apart(self):
+        calls, write = self.counter()
+        debounced = store.Debounced(delay=30, write=write, key=2)
+        debounced("Andel 1 a", "map 1", {"n": 1})
+        debounced("Andel 1 a", "map 2", {"n": 2})
+        debounced("Andel 1 a", "map 1", {"n": 3})
+        debounced.flush()
+        assert calls == [("Andel 1 a", "map 1", {"n": 3}), ("Andel 1 a", "map 2", {"n": 2})]
+
+    def test_the_timer_writes_every_key(self):
+        calls, write = self.counter()
+        debounced = store.Debounced(delay=0.05, write=write)
+        debounced("Andel", BODIES)
+        debounced("Loha", BODIES)
+        time.sleep(0.3)
+        assert sorted(call[0] for call in calls) == ["Andel", "Loha"]
+
+    def test_a_flush_waits_for_a_write_already_under_way(self):
+        """plugin_stop flushes and then backs up. A timer write in flight must
+        be finished by the time that flush returns."""
+        import threading
+        started, release, done = threading.Event(), threading.Event(), []
+
+        def slow(*args):
+            started.set()
+            release.wait(2)
+            done.append(args)
+        debounced = store.Debounced(delay=0.01, write=slow)
+        debounced("Andel", BODIES)
+        assert started.wait(2)                  # the timer is inside the write
+        flusher = threading.Thread(target=debounced.flush)
+        flusher.start()
+        flusher.join(0.2)
+        assert flusher.is_alive()               # waiting, not returned early
+        release.set()
+        flusher.join(2)
+        assert not flusher.is_alive() and done == [("Andel", BODIES)]
+
     def test_it_drops_in_where_save_was(self, tmp_path):
         debounced = store.Debounced(delay=0.05)
         debounced("Andel", BODIES)

@@ -83,6 +83,13 @@ class TestForSystem:
                          (id,))
         assert cards.for_system("Andel") == []
 
+    def test_not_quiet_raises_rather_than_answering_none(self, tmp_path):
+        """The minimap must not cache a locked database as a body with no dots."""
+        folder = tmp_path / "a folder, not a file"
+        folder.mkdir()
+        with pytest.raises((sqlite3.Error, OSError)):
+            cards.for_system("Andel", db=str(folder), quiet=False)
+
     def test_a_database_that_cannot_be_opened_is_no_bookmarks(self, tmp_path, caplog):
         folder = tmp_path / "a folder, not a file"
         folder.mkdir()

@@ -54,20 +54,29 @@ def run(root=None, db=None):
               "kept": {"bodies": 0, "bookmarks": 0, "maps": 0},
               "failed": []}
     with database.connect(db) as conn:
-        # Explicit, so the per-file savepoints nest inside one transaction
-        # rather than each committing on release.
-        conn.execute("BEGIN")
-        _bodies(conn, os.path.join(root, "data"), result)
-        _bookmarks(conn, os.path.join(root, "cards"), result)
-        _maps(conn, os.path.join(root, "coverage"), result)
+        # The report is kept in the database too, committed with the import: a
+        # migrate.done that failed to write after the commit is written again
+        # from it, instead of a second import bringing deleted bookmarks back.
+        row = conn.execute("SELECT value FROM meta WHERE key = ?", (DONE,)).fetchone()
+        if row is None:
+            # Explicit, so the per-file savepoints nest inside one transaction
+            # rather than each committing on release.
+            conn.execute("BEGIN")
+            _bodies(conn, os.path.join(root, "data"), result)
+            _bookmarks(conn, os.path.join(root, "cards"), result)
+            _maps(conn, os.path.join(root, "coverage"), result)
+            when = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            lines = [f"migrated {when} from {root}"]
+            lines += [f"{kind}: {count} imported, {result['kept'][kind]} already in the database"
+                      for kind, count in result["imported"].items()]
+            lines += [f"skipped {path}: {reason}" for path, reason in result["failed"]]
+            report = "\n".join(lines) + "\n"
+            conn.execute("INSERT INTO meta (key, value) VALUES (?, ?)", (DONE, report))
+    if row is not None:
+        atomic.write_text(marker, row[0])
+        return None
     database.changed()
-
-    when = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    lines = [f"migrated {when} from {root}"]
-    lines += [f"{kind}: {count} imported, {result['kept'][kind]} already in the database"
-              for kind, count in result["imported"].items()]
-    lines += [f"skipped {path}: {reason}" for path, reason in result["failed"]]
-    atomic.write_text(marker, "\n".join(lines) + "\n")
+    atomic.write_text(marker, report)
     for path, reason in result["failed"]:
         logger.warning(f"migrate: skipped {path}: {reason}")
     logger.info("migrate: " + "; ".join(lines[1:4]))

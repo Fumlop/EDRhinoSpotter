@@ -29,8 +29,9 @@ ROOT = os.path.join(os.environ.get("LOCALAPPDATA")
 DIR = os.path.join(ROOT, "db")
 PATH = os.path.join(DIR, "rhinospotter.db")
 
-# PRAGMA user_version. A later schema change reads it and upgrades.
-SCHEMA_VERSION = 1
+# PRAGMA user_version. 2 added meta. Every table is CREATE ... IF NOT EXISTS,
+# so an older file is upgraded by running the schema again.
+SCHEMA_VERSION = 2
 TIMEOUT_S = 5.0
 BACKUPS_KEPT = 2
 
@@ -63,6 +64,9 @@ CREATE TABLE IF NOT EXISTS maps (
     saved REAL,
     data BLOB NOT NULL,
     PRIMARY KEY (body, name));
+CREATE TABLE IF NOT EXISTS meta (
+    key TEXT PRIMARY KEY,
+    value TEXT);
 """
 
 # Bumped after every committed bookmark change, so the minimap knows when to
@@ -87,8 +91,9 @@ def connect(path=None):
 
 def _prepare(conn, path):
     version = conn.execute("PRAGMA user_version").fetchone()[0]
-    if version == 0:
-        conn.execute("PRAGMA journal_mode=WAL")
+    if version < SCHEMA_VERSION:
+        if version == 0:
+            conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript(SCHEMA)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     elif version > SCHEMA_VERSION:

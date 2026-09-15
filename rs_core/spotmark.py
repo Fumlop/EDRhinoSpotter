@@ -29,6 +29,26 @@ MATERIALS = (
 )
 
 
+# MiningRefined names the material by a language-independent slug. Most are the
+# dropdown name lowercased with everything but letters and digits gone
+# ($helium3_name; for Helium-3); the ones that are not are listed here.
+# Seen in journals: alexandrite deuterium grandidierite helium helium3 iridium
+# lowtemperaturediamond magnesite monazite periclasedunite ruby thortveitite.
+REFINED_ALIASES = {"lowtemperaturediamond": "Low Temp Diamonds"}
+
+
+def refined_material(entry):
+    """The dropdown material a MiningRefined event is for, or None."""
+    match = re.fullmatch(r"\$(\w+)_name;", entry.get("Type") or "")
+    if not match:
+        return None
+    slug = match.group(1).lower()
+    if slug in REFINED_ALIASES:
+        return REFINED_ALIASES[slug]
+    return next((name for name in MATERIALS
+                 if re.sub(r"[^a-z0-9]", "", name.lower()) == slug), None)
+
+
 def _index(name):
     """The number out of '$SAA_Unknown_Signal:#index=15;', or None."""
     match = re.search(r"#index=(\d+)", name or "")

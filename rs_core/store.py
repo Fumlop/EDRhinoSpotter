@@ -5,8 +5,8 @@ restart opens a new file, so a system honked last week is gone from the
 plugin's view even though the commander scanned it properly at the time.
 
 So each system's bodies go into the database and are read back when you
-arrive there again. No network, no EDSM: this is the commander's own scan data
-going to disk and coming back. A row per body, the body itself as JSON.
+arrive there again: the commander's own scans, and the bodies Spansh filled in
+(marked "source": "spansh"). A row per body, the body itself as JSON.
 
     %LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db    - rs_core/database.py
 
@@ -113,39 +113,49 @@ class Debounced:
     What a hard crash costs is the last `delay` seconds of scanning. EDMC
     closing normally costs nothing - `flush()` is called at plugin_stop.
 
+    One change waits per key - the first `key` positional arguments: the
+    system for bodies, (body, name) for a map. A second system or map inside
+    the delay no longer replaces the first one's write; both are written.
+
     No tkinter: a daemon timer thread rather than Tk's `after`, so this can be
     checked without a display and used by anything holding a Register. See
     rs_tests/test_store.py.
     """
 
-    def __init__(self, delay=DEBOUNCE_S, write=save):
+    def __init__(self, delay=DEBOUNCE_S, write=save, key=1):
         self.delay = delay
         self._write = write
+        self._key = key
         self._lock = threading.Lock()
+        # Held while writing. A flush at plugin_stop that comes while the timer
+        # is mid-write waits for it, so the backup after it has that write.
+        self._writing = threading.Lock()
         self._timer = None
-        self._pending = None
+        self._pending = {}
 
     def __call__(self, *args, **kwargs):
         """Take a change. Drops in wherever `save` did."""
         with self._lock:
-            self._pending = (args, kwargs)
+            self._pending[args[:self._key]] = (args, kwargs)
             if self._timer is None:
                 self._timer = threading.Timer(self.delay, self.flush)
                 self._timer.daemon = True
                 self._timer.start()
 
     def flush(self):
-        """Write what is waiting, now. Returns what `save` returned, or None.
+        """Write everything waiting, now, in the order it came. Returns what the
+        last `save` returned, or None.
 
         Safe to call with nothing pending, and safe to call from the timer it
         cancels - cancelling a timer that is already running does nothing.
         """
-        with self._lock:
-            timer, self._timer = self._timer, None
-            pending, self._pending = self._pending, None
-        if timer is not None:
-            timer.cancel()
-        if pending is None:
-            return None
-        args, kwargs = pending
-        return self._write(*args, **kwargs)
+        with self._writing:
+            with self._lock:
+                timer, self._timer = self._timer, None
+                pending, self._pending = self._pending, {}
+            if timer is not None:
+                timer.cancel()
+            result = None
+            for args, kwargs in pending.values():
+                result = self._write(*args, **kwargs)
+            return result

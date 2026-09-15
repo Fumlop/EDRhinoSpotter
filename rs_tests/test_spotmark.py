@@ -12,6 +12,31 @@ import pytest
 from rs_core import spotmark
 
 
+class TestRefinedMaterial:
+    """MiningRefined's slug -> the dropdown name, as the journal writes them."""
+
+    @pytest.mark.parametrize("slug,name", [
+        ("$monazite_name;", "Monazite"),
+        ("$helium3_name;", "Helium-3"),
+        ("$helium_name;", "Helium"),
+        ("$lowtemperaturediamond_name;", "Low Temp Diamonds"),
+        ("$periclasedunite_name;", "Periclase Dunite"),
+        ("$Thortveitite_Name;", None),          # not the journal's case
+    ])
+    def test_journal_slugs(self, slug, name):
+        assert spotmark.refined_material({"event": "MiningRefined", "Type": slug}) == name
+
+    def test_every_seen_slug_maps_to_a_dropdown_material(self):
+        seen = ("alexandrite deuterium grandidierite helium helium3 iridium "
+                "lowtemperaturediamond magnesite monazite periclasedunite ruby thortveitite")
+        for slug in seen.split():
+            assert spotmark.refined_material({"Type": f"${slug}_name;"}) in spotmark.MATERIALS
+
+    def test_not_a_material(self):
+        assert spotmark.refined_material({"Type": "$painite_name;"}) is None
+        assert spotmark.refined_material({}) is None
+
+
 class TestLocationIndex:
     @pytest.mark.parametrize("status,expected", [
         ({"Destination": {"Name": "$SAA_Unknown_Signal:#index=15;"}}, 15),

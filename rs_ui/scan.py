@@ -2,8 +2,8 @@
 
 One row per landable body, grouped by what kind of body it is, with the
 materials that kind of body has been found to hold underneath. The body list
-comes from the journal; the percentages come from mining_sheet.json, which
-ships with the plugin. Neither needs the network.
+comes from the journal, with gaps filled from Spansh on every jump; the
+percentages come from mining_sheet.json, which ships with the plugin.
 
 The window is deliberately read-only and disposable. Nothing is saved from it,
 so pressing the button twice costs nothing and the card flow is untouched.
@@ -357,8 +357,9 @@ def _empty(parent, register, focus=None):
                "have, or try the next one.")
     elif register.system:
         action = "FSS the system, or the planet you are heading for"
-        why = ("The honk finds the bodies. It does not describe them, and only "
-               "a body the FSS has resolved carries the type this reads. "
+        why = ("Spansh has no bodies for this system, or could not be reached. "
+               "The honk finds the bodies but does not describe them - only a "
+               "body the FSS has resolved carries the type this reads. "
                "Flying in works too - the auto-scan sweeps the near ones.")
     else:
         action = "Waiting for the journal"

@@ -17,7 +17,7 @@ RhinoSpotter/
 ├── load.py              EDMC lifecycle hooks, and nothing else
 ├── rs_core/             everything that is not a widget
 ├── rs_ui/               everything that is
-├── rs_tests/            pytest suite, 239 checks
+├── rs_tests/            pytest suite
 ├── mining_sheet.json    the mining sheet, frozen when the plugin was packaged
 ├── cards/               rendered cards (gitignored)
 ├── data/                screenshots and sidecars (gitignored)
@@ -68,6 +68,13 @@ No tkinter anywhere in here.
   `Sheet` reads `mining_sheet.json`. The classifier mirrors the CASE in
   the classifier the sheet was measured with, so a body lands in the bucket its percentages
   were measured on.
+- **[spansh.py](rs_core/spansh.py)** - on every jump (FSDJump, CarrierJump, and
+  Location at game start), the system's landable bodies
+  from `spansh.co.uk/api/dump/<SystemAddress>`, mapped to the journal's words
+  (`... world` -> `... body`, `Major Rocky Magma` -> `major rocky magma
+  volcanism`, gravity g -> m/s²) and marked `source: spansh`. Off the UI
+  thread; offline is None and one warning a session. Checked against 24
+  journal-scanned r Velorum bodies: identical ground, class, volcanism, gravity.
 - **[bodies.py](rs_core/bodies.py)** - `Register`, the landable bodies of the
   system you are in. Fed one journal event at a time, returns True when the
   list changed. Reads `Scan` for the ground, and `FSSBodySignals` /
@@ -228,7 +235,7 @@ Everything in here imports tkinter.
 
 ## Tests (`rs_tests/`)
 
-`pytest` from the plugin folder. 351 checks, no network, no game, no display.
+`pytest` from the plugin folder. No network, no game, no display.
 
 - **conftest.py** - puts the plugin folder on `sys.path`, and builds Scan
   events carrying only the fields the code reads. The `sheet` fixture is a
@@ -277,6 +284,9 @@ Everything in here imports tkinter.
 - **test_replay.py** - which files count as recent, that a second visit does
   not lose the first, and that a ground the sheet never measured is worth
   nothing rather than guessed at.
+- **test_spansh.py** - the mapping to the journal's words, offline and garbage
+  answers, and `add_known`: fills gaps only, a scan or the commander's own
+  count replaces Spansh's, an answer for a system already left is dropped.
 - **test_store.py** - round trip, system names Explorer refuses, a database
   or row that cannot be read, and the debounce: a
   burst is one write, the last change is the one written, flush takes the
@@ -291,6 +301,7 @@ Everything in here imports tkinter.
 | What | Source | Refreshed by |
 |---|---|---|
 | Bodies in this system | journal `Scan` events, via EDMC | the game, live |
+| Bodies not scanned yet | Spansh, `spansh.co.uk/api/dump/<SystemAddress>` | every jump |
 | Mining locations on a body | journal `FSSBodySignals` / `SAASignalsFound` | the FSS, then a surface scan |
 | Systems visited before | `%LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db` | written on every change |
 | What a ground holds | `mining_sheet.json` | shipped with the release |

@@ -20,6 +20,16 @@ class TestConnect:
         assert {"bodies", "bookmarks", "maps"} <= tables
         assert os.path.isfile(db)
 
+    def test_a_version_1_file_gets_the_newer_tables(self, db):
+        with database.connect():
+            pass
+        with sqlite3.connect(db) as conn:
+            conn.execute("DROP TABLE meta")
+            conn.execute("PRAGMA user_version = 1")
+        with database.connect() as conn:
+            conn.execute("INSERT INTO meta (key, value) VALUES ('a', 'b')")
+            assert conn.execute("PRAGMA user_version").fetchone()[0] == database.SCHEMA_VERSION
+
     def test_a_block_that_raises_writes_nothing(self):
         with pytest.raises(RuntimeError):
             with database.connect() as conn:

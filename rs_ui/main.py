@@ -12,8 +12,8 @@ worker fails minutes later somewhere unrelated.
 import threading
 import tkinter as tk
 
-from rs_core import (bodies, cards, database, deposit, grounds, migrate, palette, spotcard,
-                     spotmark, store, update)
+from rs_core import (bodies, cards, database, deposit, grounds, migrate, palette, spansh,
+                     spotcard, spotmark, store, update)
 from rs_core.logging import logger
 from rs_ui import hotkey, minimap, scan
 
@@ -352,12 +352,37 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     if entry.get("event") in ("Touchdown", "LaunchSRV") and _loc is not None:
         _fill_location(entry, system)
 
+    # Mining a material on the ground picks it in the dropdown, so the Bookmark
+    # made there is already filled. Only on the ground: asteroid mining refines
+    # the same materials in space. Set only on a change - every write reopens
+    # an open RhinoScan window, and a load is dozens of these.
+    if entry.get("event") == "MiningRefined" and _material is not None:
+        refined = spotmark.refined_material(entry)
+        if (refined and _material.get() != refined
+                and spotmark.on_ground(spotmark.read_status())):
+            _material.set(refined)
+
     # Arriving in a system scanned before fills the list straight from disk -
     # EDMC replays one journal file, and last week's honk is in an older one.
     # The register does that itself through on_arrive; this only redraws.
     if _register.track(entry, system=system):
         _refresh_scan_count()
 
+    # Every jump, and Location at game start: ask Spansh for the bodies the journal will not describe until
+    # they are scanned. Off the UI thread; what comes back only fills gaps.
+    if entry.get("event") in bodies.ARRIVAL_EVENTS and entry.get("SystemAddress"):
+        arrived = entry.get("StarSystem") or system
+        spansh.fetch_async(entry["SystemAddress"],
+                           lambda address, found: _on_ui(_add_spansh, arrived, address, found))
+
+
+
+def _add_spansh(system, address, found):
+    """Spansh's answer, back on the UI thread. None - offline - changes nothing."""
+    if found and _register.add_known(system, address, found):
+        _refresh_scan_count()
+        if scan.is_open():
+            open_scan(scan.on_body_here())
 
 
 def _fill_location(entry, system):
