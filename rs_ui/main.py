@@ -444,7 +444,7 @@ def _fill_location(entry, system):
     if known is not None:
         index, metres = known
         _loc.set(str(index))
-        _set_status(f"loc {index} from a bookmark {metres:.0f} m away")
+        _note(f"Location set to {index} - your bookmark {metres:.0f} m away is there")
         return
     if entry.get("event") == "Touchdown":
         index = spotmark.nearest_index(entry)
@@ -623,6 +623,20 @@ def _refresh_hint():
 def _set_status(text):
     if _status:
         _status.config(text=text)
+
+
+# How long a passing note stays on the status line. Errors and updates stay
+# until something replaces them; a note only says what was just filled in.
+NOTE_MS = 8000
+
+
+def _note(text):
+    """The status line for NOTE_MS, then empty again - unless something else
+    has been written there meanwhile."""
+    _set_status(text)
+    if _frame:
+        _frame.after(NOTE_MS, lambda: _status and _status.cget("text") == text
+                     and _set_status(""))
 
 
 # What the button says when it is itself, and what it says for a moment after

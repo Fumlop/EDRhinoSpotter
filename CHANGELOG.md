@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.3.7
+
+**Changed**
+
+- The note after landing says what happened - "Location set to 9 - your
+  bookmark 253 m away is there" - and clears itself after 8 seconds instead of
+  staying on the panel. Errors and update messages still stay.
+- README panel screenshot shows the current panel.
+
 ## 4.3.6
 
 **Added**
