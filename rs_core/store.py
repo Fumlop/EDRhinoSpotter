@@ -141,6 +141,14 @@ class Debounced:
                 self._timer.daemon = True
                 self._timer.start()
 
+    def flush_later(self):
+        """flush() on its own thread, for a caller on the Tk thread: a write
+        already under way, or a locked database, would otherwise hold the UI
+        for up to the database timeout. The thread is returned."""
+        thread = threading.Thread(target=self.flush, name="rhinospotter-flush", daemon=True)
+        thread.start()
+        return thread
+
     def flush(self):
         """Write everything waiting, now, in the order it came. Returns what the
         last `save` returned, or None.

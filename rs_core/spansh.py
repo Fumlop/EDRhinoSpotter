@@ -119,6 +119,16 @@ def should_ask(entry, register, known):
     return address
 
 
+def known_count(dump):
+    """Stars and planets Spansh knows in the system - the honk's BodyCount
+    counts the same (barycentres are in neither). Checked on six systems:
+    r Velorum 34, Col 285 Sector LM-V d2-73 40, Synuefe EW-U c19-3 36,
+    43 G. Canis Minoris 21, Col 285 Sector LS-P b7-1 32, Eme 19."""
+    system = dump.get("system") if isinstance(dump, dict) else None
+    return sum(1 for body in (system or {}).get("bodies") or []
+               if isinstance(body, dict) and body.get("type") in ("Star", "Planet"))
+
+
 def to_bodies(dump, address):
     """Spansh's dump -> landable bodies as the register holds them. Raises
     ValueError when the answer is not a system at all."""
@@ -162,17 +172,18 @@ def to_bodies(dump, address):
 
 
 def fetch(address):
-    """The landable bodies Spansh has for that system, or None when it could
-    not be asked. [] is an answer - a system nobody sent in (404), or no
-    landables. A failure pauses every request for PAUSE_S."""
+    """(landable bodies, stars and planets known) from Spansh for that system,
+    or None when it could not be asked. ([], 0) is an answer - a system nobody
+    sent in (404). A failure pauses every request for PAUSE_S."""
     global _warned, _paused_until
     try:
         response = requests.get(DUMP_URL.format(address=address), timeout=TIMEOUT_S,
                                 headers=HEADERS)
         if response.status_code == 404:
-            return []
+            return [], 0
         response.raise_for_status()
-        return to_bodies(response.json(), address)
+        dump = response.json()
+        return to_bodies(dump, address), known_count(dump)
     except Exception as err:                        # noqa: BLE001 - offline is normal
         _paused_until = time.monotonic() + PAUSE_S
         message = (f"spansh: no bodies for {address}: {err}; not asked again for "
@@ -186,7 +197,7 @@ def fetch(address):
 
 
 def fetch_async(address, callback):
-    """fetch() off the UI thread; callback(address, bodies or None) lands on the
+    """fetch() off the UI thread; callback(address, fetch's answer) lands on the
     worker - a Tk caller bounces it back with after()."""
     thread = threading.Thread(target=lambda: callback(address, fetch(address)),
                               name="rhinospotter-spansh", daemon=True)

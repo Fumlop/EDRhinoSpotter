@@ -127,8 +127,8 @@ def update(root, status, system=None, ids=None):
             _coverage.body_id = body_id
         if previous is not None and _coverage is not previous:
             # Written now rather than up to two seconds later: the old map is
-            # done with.
-            _writes.flush()
+            # done with. Off the Tk thread - see Debounced.flush_later.
+            _writes.flush_later()
         _in_srv = True
         body, lat, lon, _, heading = fix
         _here = (lat, lon)
@@ -287,7 +287,7 @@ def bookmarked(spot):
 def _docked(system):
     """The SRV is back in the ship: the points written now, and the picture
     drawn off the Tk thread - 70 to 160 ms measured, and nothing waits for it."""
-    _writes.flush()
+    _writes.flush_later()
     if _coverage is None or _coverage.name is None:
         return
     body, name = _coverage.body, _coverage.name

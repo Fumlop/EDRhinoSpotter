@@ -186,6 +186,25 @@ class TestDebounced:
         flusher.join(2)
         assert not flusher.is_alive() and done == [("Andel", BODIES)]
 
+    def test_flush_later_does_not_wait_for_a_write_under_way(self):
+        """The Tk thread hands the flush to a thread and carries on."""
+        import threading
+        started, release, done = threading.Event(), threading.Event(), []
+
+        def slow(*args):
+            started.set()
+            release.wait(2)
+            done.append(args)
+        debounced = store.Debounced(delay=0.01, write=slow)
+        debounced("Andel", BODIES)
+        assert started.wait(2)
+        debounced("Loha", BODIES)
+        thread = debounced.flush_later()        # returns at once
+        assert thread.is_alive() and done == []
+        release.set()
+        thread.join(2)
+        assert sorted(call[0] for call in done) == ["Andel", "Loha"]
+
     def test_it_drops_in_where_save_was(self, tmp_path):
         debounced = store.Debounced(delay=0.05)
         debounced("Andel", BODIES)

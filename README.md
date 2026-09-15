@@ -30,7 +30,8 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
 - **Bodies:** honk, and Spansh is asked for the system's known bodies - marked
   `spansh` in the list until your own FSS scan or fly-by replaces them. The line
   under the buttons says when to FSS instead: a new system, no Spansh bodies,
-  or Spansh unreachable.
+  Spansh unreachable, or Spansh knowing fewer bodies than the honk counted
+  ("Spansh 31/40 bodies - FSS for the rest").
 - **Spansh is asked as little as possible:** only on the honk, once a session per
   system, never for undiscovered systems, not again for 30 days after it
   answered for a system, and not for an hour after a failed request.

@@ -73,7 +73,9 @@ No tkinter anywhere in here.
   (`undiscovered`: arrival star WasDiscovered false); not for ANSWER_DAYS after
   it answered (`recently_answered`, kept in `meta`); not for PAUSE_S after a
   failed request (`paused`). EDMC hands plugins only new journal lines, so a
-  restart replays no honks. The bodies come
+  restart replays no honks. `known_count` - stars and planets, as the honk's
+  BodyCount counts them (checked on six systems) - lets the hint say how
+  complete Spansh is. The bodies come
   from `spansh.co.uk/api/dump/<SystemAddress>`, mapped to the journal's words
   (`... world` -> `... body`, `Major Rocky Magma` -> `major rocky magma
   volcanism`, gravity g -> m/s²) and marked `source: spansh`. Off the UI

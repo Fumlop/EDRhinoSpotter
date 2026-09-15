@@ -10,17 +10,17 @@ from rs_core import bodies, database, spansh
 ADDRESS = 3657332462290
 # Trimmed from the real dump of Eme and r Velorum, 2026-09-15.
 DUMP = {"system": {"name": "Eme", "id64": ADDRESS, "bodies": [
-    {"name": "Eme A 1 a", "bodyId": 8, "isLandable": True, "subType": "Rocky body",
+    {"name": "Eme A 1 a", "bodyId": 8, "type": "Planet", "isLandable": True, "subType": "Rocky body",
      "volcanismType": None, "gravity": 0.0528844702763332, "distanceToArrival": 471.305284,
      "signals": {"signals": {"$PlanetaryMiningLocation_Name;": 10,
                              "$SAA_SignalType_Biological;": 3}}},
-    {"name": "Eme A 2 a", "bodyId": 12, "isLandable": True, "subType": "Icy body",
+    {"name": "Eme A 2 a", "bodyId": 12, "type": "Planet", "isLandable": True, "subType": "Icy body",
      "gravity": 0.1, "distanceToArrival": 900.0},
-    {"name": "r Velorum 9 a", "bodyId": 40, "isLandable": True,
+    {"name": "r Velorum 9 a", "bodyId": 40, "type": "Planet", "isLandable": True,
      "subType": "High metal content world", "volcanismType": "Major Rocky Magma",
      "gravity": 0.367236871622311, "distanceToArrival": 1300.0},
     {"name": "Eme A", "bodyId": 1, "type": "Star", "subType": "K (Yellow-Orange) Star"},
-    {"name": "Eme A 3", "bodyId": 20, "isLandable": False, "subType": "Gas giant"},
+    {"name": "Eme A 3", "bodyId": 20, "type": "Planet", "isLandable": False, "subType": "Gas giant"},
 ]}}
 
 
@@ -93,6 +93,12 @@ class TestToBodies:
     def test_a_system_without_landables_is_no_bodies(self):
         assert spansh.to_bodies({"system": {"bodies": [None, 3]}}, ADDRESS) == []
 
+    def test_known_count_is_stars_and_planets_like_the_honk(self):
+        with_barycentre = {"system": {"bodies": DUMP["system"]["bodies"]
+                                      + [{"name": "Eme AB", "type": "Barycentre"}]}}
+        assert spansh.known_count(with_barycentre) == 5
+        assert spansh.known_count({}) == 0
+
     def test_an_answer_that_is_not_a_system_raises(self):
         with pytest.raises(ValueError):
             spansh.to_bodies({"error": "maintenance"}, ADDRESS)
@@ -102,7 +108,8 @@ class TestFetch:
 
     def test_an_answer_says_who_is_asking(self, answer):
         answer(200, DUMP)
-        assert len(spansh.fetch(ADDRESS)) == 3
+        found, known = spansh.fetch(ADDRESS)
+        assert len(found) == 3 and known == 5
         [(url, kwargs)] = answer.calls
         assert url.endswith(f"/api/dump/{ADDRESS}")
         assert kwargs["headers"]["User-Agent"].startswith("RhinoSpotter/")
@@ -110,7 +117,7 @@ class TestFetch:
 
     def test_404_is_an_answer_not_a_failure(self, answer):
         answer(404)
-        assert spansh.fetch(ADDRESS) == [] and not spansh.paused()
+        assert spansh.fetch(ADDRESS) == ([], 0) and not spansh.paused()
 
     @pytest.mark.parametrize("kind", ["offline", "http 500", "http 429", "not json", "not a system"])
     def test_every_failure_is_none_and_pauses(self, answer, kind):

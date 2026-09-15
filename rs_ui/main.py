@@ -32,9 +32,12 @@ _card_token = 0          # only the newest render may write to the status line
 _writes = store.Debounced()
 _register = bodies.Register(on_change=_writes, on_arrive=store.load)
 _sheet = None            # rs_core.grounds.Sheet, read once at startup
-# SystemAddress -> this session's Spansh state: "undiscovered", "asking",
-# "unreachable" or "answered". Any entry means Spansh is not asked again.
+# SystemAddress -> this session's Spansh state: "undiscovered", "asking" or
+# "answered". Any entry means Spansh is not asked again this session.
 _spansh = {}
+_honked = {}             # SystemAddress -> the honk's BodyCount (stars and planets)
+_spansh_known = {}       # SystemAddress -> stars and planets Spansh knows there
+_all_found = set()       # SystemAddresses with FSSAllBodiesFound: nothing left to FSS
 _prefilled = None        # the material MiningRefined last put in the dropdown
 _hint = None             # the line under the buttons: honk, or FSS when the honk brought nothing
 
@@ -375,13 +378,19 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     fresh = spansh.undiscovered(entry)
     if fresh:
         _spansh.setdefault(fresh, "undiscovered")
+    event = entry.get("event")
+    if event == "FSSDiscoveryScan" and entry.get("SystemAddress"):
+        _honked[entry["SystemAddress"]] = entry.get("BodyCount")
+    elif event == "FSSAllBodiesFound" and entry.get("SystemAddress"):
+        _all_found.add(entry["SystemAddress"])
+        _refresh_hint()
     address = spansh.should_ask(entry, _register, _spansh)
     if address:
         _spansh[address] = "asking"
         honked = _register.system
         spansh.fetch_async(address,
-                           lambda address, found: _on_ui(_add_spansh, honked, address, found))
-    if fresh or entry.get("event") == "FSSDiscoveryScan":
+                           lambda address, answer: _on_ui(_add_spansh, honked, address, answer))
+    if fresh or event == "FSSDiscoveryScan":
         _refresh_hint()
 
 
@@ -398,16 +407,24 @@ def _prefill_material(entry):
         _material.set(refined)
 
 
-def _add_spansh(system, address, found):
-    """Spansh's answer, back on the UI thread."""
-    if found is None:
-        _spansh[address] = "unreachable"
+def _add_spansh(system, address, answer):
+    """Spansh's answer - (bodies, stars and planets known) or None - back on
+    the UI thread."""
+    if answer is None:
+        # Forgotten: the pause stops a second request, and once it is over
+        # the next honk here may ask again. The hint is redrawn then, so it
+        # does not keep saying "unreachable".
+        _spansh.pop(address, None)
+        if _frame:
+            _frame.after(int(spansh.PAUSE_S * 1000) + 1000, _refresh_hint)
     elif system != _register.system:
         # Jumped on before it came back. Forgotten, so the honk on the way
         # back in asks again rather than the hint saying Spansh has nothing.
         _spansh.pop(address, None)
     else:
+        found, known = answer
         _spansh[address] = "answered"
+        _spansh_known[address] = known
         spansh.mark_answered(address)
         if _register.add_known(system, address, found) and scan.is_open():
             open_scan(scan.on_body_here())
@@ -578,13 +595,17 @@ def _refresh_scan_count():
 
 
 def _refresh_hint():
-    """Nothing while bodies are listed. Before the honk: honk. After it, when
-    Spansh brought nothing: FSS, and why."""
+    """Before the honk: honk. After it: FSS when Spansh brought nothing, or
+    fewer bodies than the honk counted. Nothing otherwise."""
     if not _hint:
         return
     address = _register.system_address
     state = _spansh.get(address)
-    if len(_register):
+    known, counted = _spansh_known.get(address), _honked.get(address)
+    if (isinstance(known, int) and isinstance(counted, int) and 0 < known < counted
+            and address not in _all_found):
+        text = f"Spansh {known}/{counted} bodies - FSS for the rest"
+    elif len(_register):
         text = ""
     elif state == "undiscovered":
         text = "New system - FSS planets"

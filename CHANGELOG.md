@@ -1,5 +1,20 @@
 # Changelog
 
+## 4.3.6
+
+**Added**
+
+- The hint says how complete Spansh is: when Spansh knows fewer stars and
+  planets than the honk counted, "Spansh 31/40 bodies - FSS for the rest". It
+  clears once the FSS reports all bodies found.
+
+**Fixed**
+
+- The minimap's map write after a map change or docking no longer runs on the
+  UI thread, so a locked database cannot freeze the panel.
+- "Spansh unreachable" no longer stays after the one-hour pause is over; the
+  next honk in that system asks again.
+
 ## 4.3.5
 
 **Added**
