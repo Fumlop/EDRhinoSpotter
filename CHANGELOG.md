@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.3.2
+
+**Changed**
+
+- Shorter hint under the buttons: "Honk on missing data", then
+  "No Spansh data - FSS planets" (or "Spansh unreachable - FSS planets") when
+  the honk brought nothing.
+
 ## 4.3.1
 
 **Changed**

@@ -563,13 +563,13 @@ def _refresh_hint():
     if len(_register):
         text = ""
     elif address not in _spansh_asked:
-        text = "Honk to load the bodies"
+        text = "Honk on missing data"
     elif address not in _spansh_answer:
         text = "Asking Spansh..."
     elif _spansh_answer[address] is None:
-        text = "Spansh unreachable - FSS the bodies"
+        text = "Spansh unreachable - FSS planets"
     else:
-        text = "Unknown to Spansh - FSS the bodies"
+        text = "No Spansh data - FSS planets"
     _hint.config(text=text)
 
 
