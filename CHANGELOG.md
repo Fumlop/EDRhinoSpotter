@@ -1,5 +1,16 @@
 # Changelog
 
+## 4.3.3
+
+**Changed**
+
+- Even fewer requests to Spansh. It is not asked for a system nobody has
+  discovered (the star scanned on arrival says so), not again for 30 days
+  after it had nothing for a system - remembered across restarts - and not at
+  all for an hour after a request fails. One attempt, no retries.
+- The line under the buttons says "New system - FSS planets" in an
+  undiscovered system.
+
 ## 4.3.2
 
 **Changed**

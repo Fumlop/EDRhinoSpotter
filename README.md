@@ -27,9 +27,12 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
 
 - Lists the landable bodies of the current system, grouped by ground type, with
   the share of that ground's mining locations that carried each material.
-- **Bodies:** honk, and Spansh is asked for the system's known bodies (once a
-  session per system). Your own FSS scans and fly-bys replace them. Offline or a
-  system Spansh does not know: resolve bodies in the FSS.
+- **Bodies:** honk, and Spansh is asked for the system's known bodies. Your own
+  FSS scans and fly-bys replace them. The line under the buttons says when to
+  FSS instead: a new system, no Spansh data, or Spansh unreachable.
+- **Spansh is asked as little as possible:** only on the honk, once a session per
+  system, never for undiscovered systems or ones already saved, not again for
+  30 days after an empty answer, and not for an hour after a failed request.
   `unprobed` = nobody counted the locations yet.
 - **Material** dropdown: pick one and only grounds that ever carried it are
   listed, with its rate first. Bookmark counts then count only that material.

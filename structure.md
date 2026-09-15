@@ -68,9 +68,12 @@ No tkinter anywhere in here.
   `Sheet` reads `mining_sheet.json`. The classifier mirrors the CASE in
   the classifier the sheet was measured with, so a body lands in the bucket its percentages
   were measured on.
-- **[spansh.py](rs_core/spansh.py)** - on the honk (FSSDiscoveryScan), once a
-  session per system and not when the cache already has them (`should_ask`),
-  with a RhinoSpotter User-Agent, the system's landable bodies
+- **[spansh.py](rs_core/spansh.py)** - on the honk (FSSDiscoveryScan), with a
+  RhinoSpotter User-Agent, the system's landable bodies. `should_ask` keeps it
+  polite: once a session per system; not when the cache has them; not for an
+  undiscovered system (`undiscovered`: arrival star WasDiscovered false); not
+  for EMPTY_DAYS after an empty answer (`known_empty`, kept in `meta`); not
+  for PAUSE_S after a failed request (`paused`). The bodies come
   from `spansh.co.uk/api/dump/<SystemAddress>`, mapped to the journal's words
   (`... world` -> `... body`, `Major Rocky Magma` -> `major rocky magma
   volcanism`, gravity g -> m/s²) and marked `source: spansh`. Off the UI

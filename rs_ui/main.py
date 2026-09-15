@@ -34,6 +34,7 @@ _register = bodies.Register(on_change=_writes, on_arrive=store.load)
 _sheet = None            # rs_core.grounds.Sheet, read once at startup
 _spansh_asked = set()    # SystemAddresses Spansh was asked about this session
 _spansh_answer = {}      # SystemAddress -> how many bodies Spansh gave, or None when unreachable
+_undiscovered = set()    # SystemAddresses whose arrival star said WasDiscovered: false
 _hint = None             # the line under the buttons: honk, or FSS when the honk brought nothing
 
 _frame = None
@@ -372,7 +373,13 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     # The honk: ask Spansh for the bodies the journal will not describe until
     # they are scanned - once a session per system, see spansh.should_ask. Off
     # the UI thread; what comes back only fills gaps.
-    address = spansh.should_ask(entry, _register, _spansh_asked)
+    fresh = spansh.undiscovered(entry)
+    if fresh and fresh not in _undiscovered:
+        _undiscovered.add(fresh)
+        _refresh_hint()
+    address = spansh.should_ask(entry, _register, _spansh_asked, _undiscovered)
+    if entry.get("event") == "FSSDiscoveryScan":
+        _refresh_hint()         # a honk Spansh is not asked about still changes the hint
     if address:
         _spansh_asked.add(address)
         _refresh_hint()
@@ -562,14 +569,17 @@ def _refresh_hint():
     address = _register.system_address
     if len(_register):
         text = ""
-    elif address not in _spansh_asked:
-        text = "Honk on missing data"
-    elif address not in _spansh_answer:
+    elif address in _undiscovered:
+        text = "New system - FSS planets"
+    elif address in _spansh_asked and address not in _spansh_answer:
         text = "Asking Spansh..."
-    elif _spansh_answer[address] is None:
+    elif _spansh_answer.get(address, 0) is None or (address not in _spansh_asked
+                                                     and spansh.paused()):
         text = "Spansh unreachable - FSS planets"
-    else:
+    elif address in _spansh_answer or (address and spansh.known_empty(address)):
         text = "No Spansh data - FSS planets"
+    else:
+        text = "Honk on missing data"
     _hint.config(text=text)
 
 

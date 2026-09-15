@@ -6,6 +6,13 @@ import pytest
 
 from rs_core import bodies, spansh
 
+
+@pytest.fixture(autouse=True)
+def polite_state(monkeypatch):
+    """The pause and the empty marks are module state; every test starts clean."""
+    monkeypatch.setattr(spansh, "_paused_until", 0.0)
+    monkeypatch.setattr(spansh, "_empty", {})
+
 ADDRESS = 3657332462290
 # Trimmed from the real dump of Eme and r Velorum, 2026-09-15.
 DUMP = {"system": {"name": "Eme", "id64": ADDRESS, "bodies": [
@@ -103,6 +110,50 @@ class TestShouldAsk:
 
     def test_requests_say_who_is_asking(self):
         assert spansh.HEADERS["User-Agent"].startswith("RhinoSpotter/")
+
+    def test_an_undiscovered_system_is_not_asked(self):
+        star = {"event": "Scan", "StarType": "K", "BodyName": "Eme A",
+                "DistanceFromArrivalLS": 0.0, "WasDiscovered": False, "SystemAddress": ADDRESS}
+        assert spansh.undiscovered(star) == ADDRESS
+        assert spansh.should_ask(honk(), arrived(), set(), {ADDRESS}) is None
+
+    def test_a_discovered_star_or_another_body_is_not_undiscovered(self):
+        star = {"event": "Scan", "StarType": "K", "DistanceFromArrivalLS": 0.0,
+                "WasDiscovered": True, "SystemAddress": ADDRESS}
+        assert spansh.undiscovered(star) is None
+        assert spansh.undiscovered(dict(star, WasDiscovered=False, DistanceFromArrivalLS=5.2)) is None
+        assert spansh.undiscovered(scan("Eme A 1 a")) is None
+
+    def test_a_failure_pauses_every_request(self, monkeypatch):
+        def offline(url, timeout):
+            raise OSError("no route")
+        assert spansh.fetch(ADDRESS, opener=offline) is None
+        assert spansh.paused()
+        assert spansh.should_ask(honk(), arrived(), set()) is None
+        monkeypatch.setattr(spansh, "_paused_until", 0.0)       # an hour later
+        assert spansh.should_ask(honk(), arrived(), set()) == ADDRESS
+
+    def test_an_empty_answer_is_remembered_across_a_restart(self, monkeypatch):
+        empty = {"system": {"bodies": [{"name": "Eme A", "type": "Star"}]}}
+        assert spansh.fetch(ADDRESS, opener=lambda url, timeout: json.dumps(empty).encode()) == []
+        monkeypatch.setattr(spansh, "_empty", {})               # EDMC restarted
+        assert spansh.known_empty(ADDRESS)
+        assert spansh.should_ask(honk(), arrived(), set()) is None
+
+    def test_an_old_empty_mark_asks_again(self, monkeypatch):
+        from datetime import datetime, timedelta, timezone
+        from rs_core import database
+        old = (datetime.now(timezone.utc) - timedelta(days=spansh.EMPTY_DAYS + 1)).isoformat()
+        with database.connect() as conn:
+            conn.execute("INSERT INTO meta (key, value) VALUES (?, ?)",
+                         (f"spansh-empty:{ADDRESS}", old))
+        assert not spansh.known_empty(ADDRESS)
+        assert spansh.should_ask(honk(), arrived(), set()) == ADDRESS
+
+    def test_bodies_found_are_not_marked_empty(self):
+        spansh.fetch(ADDRESS, opener=lambda url, timeout: json.dumps(DUMP).encode())
+        spansh._empty.clear()
+        assert not spansh.known_empty(ADDRESS)
 
 
 def arrived(saved=None):

@@ -59,7 +59,9 @@ there being none.
 
 **Bodies come from Spansh and your journal.** When you honk, Spansh is asked
 for the system's known landable bodies - planet class, volcanism, gravity,
-mining location count - once a session per system. Your own scans replace them.
+mining location count. Your own scans replace them. Spansh is not asked for a
+system nobody has discovered, one already saved, one it had nothing for in the
+last 30 days, or at all for an hour after a failed request.
 
 In a system Spansh does not know, or offline, the honk is not enough:
 `FSSDiscoveryScan` finds the bodies but does not describe them, so:
