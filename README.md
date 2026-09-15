@@ -53,14 +53,14 @@ bookmarks**; it offers only materials this body has bookmarks for.
 **Share map**, beside each location, opens the picture of the map that
 location's bookmarks were made on - see [Sharing a map](#sharing-a-map).
 
+<experimental>
 **Tons left.** A bookmark with Rigs and Amount shows a range under it:
 `High amount · Low density · ≈ 620-1,200 t left`. A deposit holds about
 275-300 t for every rig position that fits on it - measured on one Monazite
 deposit, High Amount / Low Density, four positions, 1,150 t mined to Depleted
 by two commanders - and Amount reads as the share left (High 57-100 %, Medium
 27-67 %, Low up to 34 %). Density is saved and shown, but not used until an
-effect is confirmed. Set **Rigs** to the rig circles the deposit draws, not the
-rigs you happened to put down.
+effect is confirmed. </experimemtal>
 
 ### Which locations you have mapped
 
