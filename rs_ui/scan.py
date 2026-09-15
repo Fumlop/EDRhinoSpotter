@@ -11,6 +11,7 @@ so pressing the button twice costs nothing and the card flow is untouched.
 
 import os
 import pathlib
+import re
 import tkinter as tk
 import webbrowser
 from tkinter import font as tkfont, messagebox
@@ -75,11 +76,18 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
     """
     global _window, _scan, _here
 
+    position = None
     if _window is not None and _window.winfo_exists():
+        # Reopened for another material: the new window goes where the old one
+        # was moved to, not where Tk puts a new one.
+        position = _position(_window.geometry())
         _window.destroy()
 
     logger.debug(f"scan: open, system={register.system!r} focus={focus!r}")
     _window = tk.Toplevel(parent)
+    if position:
+        # _fit sets only the size, which leaves this position alone.
+        _window.geometry(position)
     _window.configure(bg=BG)
     # Debug only, and only on the window itself: whatever takes it away, this
     # is the line that names it. A window that vanishes with no Python frame
@@ -93,6 +101,13 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
     else:
         _scan_view(_window)
     return _window
+
+
+def _position(geometry):
+    """'+X+Y' out of a Tk geometry 'WxH+X+Y', or None. X and Y can be
+    negative on a monitor left of or above the main one: 'WxH+-1900+120'."""
+    match = re.search(r"[+-]-?\d+[+-]-?\d+$", geometry)
+    return match.group(0) if match else None
 
 
 def on_body_here():

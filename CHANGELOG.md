@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.2.1
+
+**Fixed**
+
+- Picking a material in RhinoScan no longer moves the window back to where it
+  first opened; it stays where you moved it.
+
 ## 4.2.0
 
 **Changed**
