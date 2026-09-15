@@ -48,8 +48,9 @@ MIN_GAME_HEIGHT = 200
 # faintly, and the painted area, dots and text still read at a glance.
 MAP_ALPHA = 0.85
 
-# Bookmarks are read again at least this often, seconds.
-MARKS_S = 10
+# How long a bookmark just made is drawn from memory, seconds - long past the
+# worker thread writing its file and the folder change reading it back.
+FRESH_S = 20
 
 # How long a hotkey's refusal stays on the hint line, seconds.
 NOTICE_S = 4
@@ -224,7 +225,7 @@ def _bookmarks(system, body):
 
     Read again when the cards folder changes - a bookmark written, updated or
     deleted moves its modified time, since every write is a temp file moved
-    into place - and every MARKS_S besides, in case a change is missed.
+    into place. Nothing else changes a bookmark, so nothing else re-reads.
     """
     global _marks
     if not system or not body:
@@ -233,7 +234,7 @@ def _bookmarks(system, body):
         stamp = os.stat(spotcard.card_dir(system)).st_mtime_ns
     except OSError:
         stamp = None
-    key = (system, body, stamp, int(time.monotonic() // MARKS_S))
+    key = (system, body, stamp)
     if _marks is None or _marks[0] != key:
         points = []
         if stamp is not None:
@@ -245,7 +246,7 @@ def _bookmarks(system, body):
                                    bool(record.get("depleted_at"))))
         _marks = (key, points)
     now = time.monotonic()
-    _fresh[:] = [f for f in _fresh if now - f[5] < 2 * MARKS_S]
+    _fresh[:] = [f for f in _fresh if now - f[5] < FRESH_S]
     on_disk = {(lat, lon) for lat, lon, _, _ in _marks[1]}
     fresh = [(lat, lon, code, False) for s, b, lat, lon, code, _ in _fresh
              if s == system and b == body and (lat, lon) not in on_disk]
@@ -265,7 +266,7 @@ def bookmarked(spot):
 
     The card renders on a worker thread, and until its sidecar is written and
     read back the dot would be missing. Kept beside what is read from disk for
-    twice MARKS_S, by which time the sidecar has been read or the card failed.
+    FRESH_S, by which time the sidecar has been read or the card failed.
     """
     global _drawn
     lat, lon = spot.get("latitude"), spot.get("longitude")
