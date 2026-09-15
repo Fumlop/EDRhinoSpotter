@@ -110,8 +110,12 @@ class Coverage:
     picks one with the hotkey - see recenter().
     """
 
-    def __init__(self, body, lat, lon, radius):
+    def __init__(self, body, lat, lon, radius, system_address=None):
         self.body = body
+        # The game's IDs for the body, once known. The coverage folder is by
+        # body name only, and a name is only unique inside its system.
+        self.system_address = system_address
+        self.body_id = None
         self.origin = (lat, lon)
         self.radius = radius
         self.mask = Image.new("L", (MASK_PX, MASK_PX), 0)
@@ -149,6 +153,10 @@ class Coverage:
             data["center"] = points([self.origin])[0]
         if self.border_m is not None:
             data["border_m"] = round(self.border_m)
+        if self.system_address is not None:
+            data["system_address"] = self.system_address
+        if self.body_id is not None:
+            data["body_id"] = self.body_id
         return data
 
     @classmethod
@@ -166,6 +174,8 @@ class Coverage:
             return None
         cover.name = name
         cover.location = data.get("location")
+        cover.system_address = data.get("system_address")
+        cover.body_id = data.get("body_id")
         return cover
 
     def _repaint(self, points):
@@ -284,7 +294,7 @@ class Coverage:
         return self._layer[1]
 
 
-def follow(coverage, fix, was_in_srv, saved=None):
+def follow(coverage, fix, was_in_srv, saved=None, system_address=None):
     """The Coverage this fix belongs to.
 
     The same one while the body is the same and the fix is inside its mask,
@@ -292,15 +302,19 @@ def follow(coverage, fix, was_in_srv, saved=None):
     is a map saved on this body that reaches here - the last one saved - or a
     new map.
 
-    `saved(body)` gives coverstore.maps' [(name, data), ...].
+    `saved(body)` gives coverstore.maps' [(name, data), ...]. A body of the same
+    name in another system - both addresses known and different - is another
+    body.
     """
     body, lat, lon, radius, _ = fix
-    if coverage is None or coverage.body != body or (
-            not was_in_srv and not coverage.reaches(lat, lon)):
+    same = (coverage is not None and coverage.body == body
+            and (None in (coverage.system_address, system_address)
+                 or coverage.system_address == system_address))
+    if not same or (not was_in_srv and not coverage.reaches(lat, lon)):
         loaded = _pick_saved(saved(body) if saved else [], body, lat, lon,
-                                skip=coverage.name if coverage and coverage.body == body else None)
+                                skip=coverage.name if same else None)
         if loaded is None:
-            return Coverage(body, lat, lon, radius)
+            return Coverage(body, lat, lon, radius, system_address)
         coverage = loaded
         was_in_srv = False
     if not was_in_srv:

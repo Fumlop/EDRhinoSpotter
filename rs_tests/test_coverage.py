@@ -506,3 +506,30 @@ class TestRender:
         key = palette.rgb(coverage.arrow.KEY)
         raw = image.tobytes()
         assert all(tuple(raw[i:i + 3]) != key for i in range(0, len(raw), 3))
+
+
+@pytest.mark.unit
+class TestIds:
+
+    def test_the_ids_go_to_disk_and_back(self):
+        cover = coverage.Coverage("A 2", LAT, LON, RADIUS, system_address=111)
+        cover.body_id = 7
+        data = cover.to_dict()
+        assert data["system_address"] == 111 and data["body_id"] == 7
+        back = coverage.Coverage.from_dict("A 2", data, "map 1")
+        assert (back.system_address, back.body_id) == (111, 7)
+
+    def test_a_map_without_ids_writes_none(self):
+        data = coverage.Coverage("A 2", LAT, LON, RADIUS).to_dict()
+        assert "system_address" not in data and "body_id" not in data
+
+    def test_a_same_named_body_in_another_system_is_a_new_map(self):
+        fix = coverage.srv_fix(status())
+        cover = coverage.follow(None, fix, was_in_srv=False, system_address=111)
+        again = coverage.follow(cover, fix, was_in_srv=True, system_address=222)
+        assert again is not cover and again.system_address == 222
+
+    def test_the_same_system_keeps_the_map(self):
+        fix = coverage.srv_fix(status())
+        cover = coverage.follow(None, fix, was_in_srv=False, system_address=111)
+        assert coverage.follow(cover, fix, was_in_srv=True, system_address=111) is cover

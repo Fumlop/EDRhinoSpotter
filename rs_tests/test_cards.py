@@ -352,3 +352,46 @@ class TestLocationAt:
     def test_no_radius_no_answer(self, tmp_path):
         self.write(tmp_path, "a.json")
         assert cards.location_at("Andel", "Andel 8 b", 10.0, 20.0, None, root=str(tmp_path)) is None
+
+
+class TestSameBody:
+    """IDs decide when both sides have them; names only inside one system."""
+
+    def test_same_name_in_another_system_is_another_body(self):
+        record = {"planet_name": "Hyperion", "system_address": 111, "body_id": 3}
+        assert not cards.same_body(record, "Hyperion", system_address=222, body_id=3)
+
+    def test_same_ids_under_a_different_name_is_the_same_body(self):
+        record = {"planet_name": "Andel 1 a", "system_address": 111, "body_id": 3}
+        assert cards.same_body(record, "Hyperion", system_address=111, body_id=3)
+
+    def test_a_bookmark_without_ids_matches_by_name(self):
+        record = {"planet_name": "Andel 1 a"}
+        assert cards.same_body(record, "Andel 1 a", system_address=111, body_id=3)
+        assert not cards.same_body(record, "Andel 1 b", system_address=111, body_id=3)
+
+    def test_nearby_skips_a_same_named_body_elsewhere(self, tmp_path):
+        record = {"system": "Andel", "planet_name": "Hyperion", "commodity": "Monazite",
+                  "latitude": 10.0, "longitude": 20.0, "system_address": 111, "body_id": 3}
+        (tmp_path / "a.json").write_text(json.dumps(record), encoding="utf-8")
+        spot = dict(record, system_address=222, planet_radius=1352744.5)
+        assert cards.nearby(spot, root=str(tmp_path)) is None
+        assert cards.nearby(dict(spot, system_address=111), root=str(tmp_path)) is not None
+
+    def test_location_at_skips_a_same_named_body_elsewhere(self, tmp_path):
+        record = {"system": "Andel", "planet_name": "Hyperion", "latitude": 10.0,
+                  "longitude": 20.0, "location_index": 4, "system_address": 111, "body_id": 3}
+        (tmp_path / "a.json").write_text(json.dumps(record), encoding="utf-8")
+        args = ("Andel", "Hyperion", 10.0, 20.0, 1352744.5)
+        assert cards.location_at(*args, root=str(tmp_path), system_address=222) is None
+        assert cards.location_at(*args, root=str(tmp_path), system_address=111)[0] == 4
+
+    def test_an_update_gives_an_old_bookmark_the_ids(self):
+        new = cards.updated({"planet_name": "Andel 1 a"},
+                            {"system_address": 111, "body_id": 3, "amount": "Low"})
+        assert new["system_address"] == 111 and new["body_id"] == 3
+
+    def test_an_update_keeps_the_ids_already_there(self):
+        new = cards.updated({"system_address": 111, "body_id": 3},
+                            {"system_address": None, "body_id": None})
+        assert new["system_address"] == 111 and new["body_id"] == 3

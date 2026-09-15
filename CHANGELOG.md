@@ -1,5 +1,21 @@
 # Changelog
 
+## 4.1.14
+
+**Fixed**
+
+- A bookmark is written to a temporary file and moved into place, so a crash or
+  the minimap reading it mid-write can no longer leave a cut-off file that
+  drops out of the list. A bookmark that cannot be read is logged once, with
+  its path, instead of vanishing without a word.
+
+**Changed**
+
+- Bookmarks, the body cache and minimap maps keep the game's SystemAddress and
+  BodyID beside the names. A body of the same name in another system no
+  longer shares maps or bookmark matches. Files written before keep working
+  and are matched by name; they get the IDs the next time they are written.
+
 ## 4.1.13
 
 **Changed**

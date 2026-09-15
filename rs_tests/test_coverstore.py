@@ -92,3 +92,23 @@ class TestUsage:
 
     def test_no_folder_is_nothing(self, tmp_path):
         assert coverstore.usage(root=str(tmp_path / "missing")) == (0, 0)
+
+
+@pytest.mark.unit
+class TestSystemAddress:
+    """The folder is by body name; the address keeps a same-named body in
+    another system from sharing its maps."""
+
+    def test_a_same_named_body_elsewhere_does_not_get_the_map(self, tmp_path):
+        coverstore.save(BODY, "map 1", dict(DATA, system_address=111), root=str(tmp_path))
+        assert coverstore.maps(BODY, root=str(tmp_path), system_address=222) == []
+        [(name, data)] = coverstore.maps(BODY, root=str(tmp_path), system_address=111)
+        assert name == "map 1" and data["system_address"] == 111
+
+    def test_a_map_from_before_the_address_is_kept(self, tmp_path):
+        coverstore.save(BODY, "map 1", DATA, root=str(tmp_path))
+        assert len(coverstore.maps(BODY, root=str(tmp_path), system_address=222)) == 1
+
+    def test_no_address_asked_is_every_map(self, tmp_path):
+        coverstore.save(BODY, "map 1", dict(DATA, system_address=111), root=str(tmp_path))
+        assert len(coverstore.maps(BODY, root=str(tmp_path))) == 1

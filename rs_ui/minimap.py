@@ -90,8 +90,11 @@ def corner():
     return value if value in CORNERS else CORNERS[0]
 
 
-def update(root, status, system=None):
+def update(root, status, system=None, ids=None):
     """One Status.json reading. Paints, and shows or hides the map.
+
+    `ids(system, body)` gives the body's (system_address, body_id) - the
+    register's - so a map is kept apart from a body of the same name elsewhere.
 
     Nothing raises out of here: the caller is the panel's poll, and a raise
     would stop it rescheduling - Bookmark would stop greying out with it.
@@ -111,7 +114,14 @@ def update(root, status, system=None):
                   else "in the SRV, but Status.json has no body or coordinates")
             return
         previous = _coverage
-        _coverage = coverage.follow(_coverage, fix, _in_srv, saved=coverstore.maps)
+        address, body_id = ids(system, fix[0]) if ids else (None, None)
+        _coverage = coverage.follow(
+            _coverage, fix, _in_srv, system_address=address,
+            saved=lambda body: coverstore.maps(body, system_address=address))
+        if _coverage.system_address is None:
+            _coverage.system_address = address
+        if _coverage.body_id is None:
+            _coverage.body_id = body_id
         if previous is not None and _coverage is not previous:
             # Written now: the timer holds one pending save, and the next one
             # is for another map.
@@ -200,7 +210,7 @@ def _remember():
     """Hand the map to the two-second writer when it has changed."""
     global _saved
     state = (_coverage, _coverage.version, _coverage.centered, _coverage.border_m,
-             _coverage.location)
+             _coverage.location, _coverage.system_address, _coverage.body_id)
     if state == _saved:
         return
     if _coverage.name is None:

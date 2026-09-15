@@ -292,7 +292,7 @@ def _poll_landed():
             ready = spotmark.on_ground(status)
             _card_button.config(state="normal" if ready else "disabled")
         # The same reading, so the minimap costs no second parse.
-        minimap.update(_frame.winfo_toplevel(), status, _system)
+        minimap.update(_frame.winfo_toplevel(), status, _system, ids=_register.ids)
         _poll_error = None
     except Exception as err:
         # Once per kind of failure, not once a second.
@@ -375,7 +375,11 @@ def _fill_location(entry, system):
     body = entry.get("Body") or status.get("BodyName")
     lat = entry.get("Latitude", status.get("Latitude"))
     lon = entry.get("Longitude", status.get("Longitude"))
-    known = cards.location_at(system or _system, body, lat, lon, status.get("PlanetRadius"))
+    # Touchdown names the IDs itself; LaunchSRV does not, and the register has them.
+    address, body_id = _register.ids(system or _system, body)
+    known = cards.location_at(system or _system, body, lat, lon, status.get("PlanetRadius"),
+                              system_address=entry.get("SystemAddress", address),
+                              body_id=entry.get("BodyID", body_id))
     if known is not None:
         index, metres = known
         _loc.set(str(index))
@@ -397,6 +401,9 @@ def make_card():
         return
 
     spot = spotmark.mark(spotmark.read_status(), system=_system, commander=_cmdr)
+    # Status.json has no IDs; the register has them from the journal's Scan,
+    # ApproachBody or Touchdown for this body.
+    spot["system_address"], spot["body_id"] = _register.ids(_system, spot["planet_name"])
 
     # A typed Loc wins: Status.json only knows the location while it is the
     # selected destination, and it is often deselected by the time you land.

@@ -383,3 +383,76 @@ class TestArriving:
         register.track({"event": "FSDJump", "StarSystem": "Andel"})
         register.track(make_scan("Andel 4 c", "Icy body"), system="Andel")
         assert written == ["Andel"]
+
+
+class TestIds:
+    """SystemAddress and BodyID ride along with the names: a name is only
+    unique inside its system."""
+
+    def test_a_scan_keeps_the_ids_on_the_body(self, make_scan):
+        written = []
+        register = bodies.Register(on_change=lambda system, found: written.append(found))
+        register.track(make_scan("Andel 1 a", "Rocky body", SystemAddress=111, BodyID=7),
+                       system="Andel")
+        assert written[-1][0]["system_address"] == 111 and written[-1][0]["body_id"] == 7
+        assert register.ids("Andel", "Andel 1 a") == (111, 7)
+
+    def test_a_body_cached_without_ids_is_written_once_with_them(self, make_scan):
+        written = []
+        register = bodies.Register(on_change=lambda system, found: written.append(found))
+        register.adopt("Andel", [{"name": "Andel 1 a", "ground": "rock 80%+ [none]",
+                                  "distance": 100.0, "volcanism": "", "gravity": None,
+                                  "planet_class": "Rocky body"}])
+        scan = make_scan("Andel 1 a", "Rocky body", SystemAddress=111, BodyID=7)
+        assert register.track(scan, system="Andel")
+        assert not register.track(dict(scan), system="Andel")
+        assert len(written) == 1 and written[0][0]["body_id"] == 7
+
+    def test_a_scan_without_ids_keeps_the_ones_held(self, make_scan):
+        register = bodies.Register()
+        register.track(make_scan("Andel 1 a", "Rocky body", SystemAddress=111, BodyID=7),
+                       system="Andel")
+        assert not register.track(make_scan("Andel 1 a", "Rocky body"), system="Andel")
+        assert register.bodies()[0]["body_id"] == 7
+
+    def test_a_touchdown_names_a_body_no_scan_did(self):
+        register = bodies.Register()
+        register.track({"event": "FSDJump", "StarSystem": "Andel", "SystemAddress": 111})
+        assert not register.track({"event": "Touchdown", "Body": "Andel 2", "BodyID": 9,
+                                   "SystemAddress": 111}, system="Andel")
+        assert register.ids("Andel", "Andel 2") == (111, 9)
+
+    def test_a_jump_forgets_the_old_ids(self, make_scan):
+        register = bodies.Register()
+        register.track(make_scan("Andel 1 a", "Rocky body", SystemAddress=111, BodyID=7),
+                       system="Andel")
+        register.track({"event": "FSDJump", "StarSystem": "Loha", "SystemAddress": 222})
+        assert register.ids("Loha", "Andel 1 a") == (222, None)
+
+    def test_a_line_about_another_system_names_nothing(self):
+        register = bodies.Register()
+        register.track({"event": "FSDJump", "StarSystem": "Andel", "SystemAddress": 111})
+        register.track({"event": "ApproachBody", "Body": "Loha 3", "BodyID": 4,
+                        "SystemAddress": 222}, system="Andel")
+        assert register.ids("Andel", "Loha 3") == (111, None)
+
+    def test_a_jump_target_is_not_where_you_are(self):
+        """FSDTarget names the next system's address while you are still here."""
+        register = bodies.Register()
+        register.track({"event": "FSDTarget", "Name": "Loha", "SystemAddress": 222},
+                       system="Andel")
+        register.track({"event": "Touchdown", "Body": "Andel 2", "BodyID": 9,
+                        "SystemAddress": 111}, system="Andel")
+        assert register.ids("Andel", "Andel 2") == (111, 9)
+
+    def test_asking_about_another_system_gives_nothing(self, make_scan):
+        register = bodies.Register()
+        register.track(make_scan("Andel 1 a", "Rocky body", SystemAddress=111, BodyID=7),
+                       system="Andel")
+        assert register.ids("Loha", "Andel 1 a") == (None, None)
+
+    def test_adopting_a_cached_system_brings_its_ids(self):
+        register = bodies.Register()
+        register.adopt("Andel", [{"name": "Andel 1 a", "ground": "icy", "distance": 1.0,
+                                  "system_address": 111, "body_id": 7}])
+        assert register.ids("Andel", "Andel 1 a") == (111, 7)

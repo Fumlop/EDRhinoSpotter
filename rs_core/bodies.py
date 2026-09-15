@@ -44,6 +44,12 @@ from rs_core import grounds
 ARRIVAL_EVENTS = ('FSDJump', 'CarrierJump', 'Location')
 SIGNAL_EVENTS = ('FSSBodySignals', 'SAASignalsFound')
 
+# Events that name a body together with its BodyID and SystemAddress. Scan and
+# the signals events call the name BodyName, the rest call it Body. A name is
+# only unique inside its system; the IDs are what the game keys a body on.
+ID_EVENTS = ('Scan', 'FSSBodySignals', 'SAASignalsFound', 'ApproachBody',
+             'Touchdown', 'Liftoff', 'Location', 'StartUp')
+
 # The signal type the game uses for a numbered surface mining POI. Its
 # Type_Localised is "Planetary Mining Location", but the localised string is
 # whatever language the commander plays in, so the token is what we match.
@@ -68,6 +74,8 @@ class Register:
 
     Keyed by name rather than BodyID: a name is what the panel prints and what
     the system map shows, and two scans of one body must not become two rows.
+    The IDs ride along on each body, and `ids()` hands them to a bookmark or a
+    map made on a body the journal has named.
     """
 
     def __init__(self, on_change=None, on_arrive=None):
@@ -77,16 +85,20 @@ class Register:
         nothing. Both are where the cache hangs, so this file never has to know
         a cache exists."""
         self.system = None
+        self.system_address = None
         self.on_change = on_change
         self.on_arrive = on_arrive
         self._bodies = {}
         self._locations = {}
+        self._ids = {}
         self._from_cache = False
 
     def clear(self, system=None):
         self.system = system
+        self.system_address = None
         self._bodies = {}
         self._locations = {}
+        self._ids = {}
 
     def adopt(self, system, bodies):
         """Fill the register from the cache, for a system already visited."""
@@ -96,7 +108,20 @@ class Register:
         self._locations = {name: body['locations']
                            for name, body in self._bodies.items()
                            if body.get('locations') is not None}
+        self._ids = {name: body['body_id'] for name, body in self._bodies.items()
+                     if body.get('body_id') is not None}
+        self.system_address = next((body['system_address'] for body in self._bodies.values()
+                                    if body.get('system_address') is not None),
+                                   self.system_address)
         return len(self._bodies)
+
+    def ids(self, system, name):
+        """(system_address, body_id) of a body in this system. Either is None
+        when no journal line has said it, and both are when `system` is not the
+        one held."""
+        if not system or system != self.system:
+            return None, None
+        return self.system_address, self._ids.get(name)
 
     def track(self, entry, system=None):
         """Feed one journal event. Returns True if the body list changed.
@@ -122,7 +147,12 @@ class Register:
         elif event == 'Scan':
             changed = self._scan(entry, system) or changed
         elif not changed:
+            self._note_ids(entry)
             return False
+
+        # After the arrival, which empties the register: the address kept is
+        # the new system's.
+        self._note_ids(entry)
 
         # Nothing is written back on the way in. What was just read off disk
         # is already on disk, and rewriting it on every jump would turn a
@@ -167,6 +197,21 @@ class Register:
         if self.on_change and self.system and self._bodies:
             self.on_change(self.system, self.bodies())
 
+    def _note_ids(self, entry):
+        # Only lines about where you are. FSDTarget and StartJump carry the
+        # address of the system you are about to jump to.
+        event = entry.get('event')
+        address = entry.get('SystemAddress')
+        if address is None or event not in ARRIVAL_EVENTS + ID_EVENTS:
+            return
+        if event in ARRIVAL_EVENTS or self.system_address is None:
+            self.system_address = address
+        elif address != self.system_address:
+            return              # a line about somewhere else
+        name = entry.get('BodyName') or entry.get('Body')
+        if event in ID_EVENTS and name and entry.get('BodyID') is not None:
+            self._ids[name] = entry['BodyID']
+
     def _signals(self, entry):
         count = mining_locations(entry)
         name = entry.get('BodyName')
@@ -200,7 +245,15 @@ class Register:
             'volcanism':    (entry.get('Volcanism') or '').strip(),
             'planet_class': entry.get('PlanetClass'),
         }
-        if {k: v for k, v in self._bodies.get(name, {}).items() if k != 'locations'} == body:
+        # Only when known, so a body from an older cache and the same body
+        # scanned again differ by the IDs and get them written. A line without
+        # them keeps the ones already held.
+        held = self._bodies.get(name, {})
+        for key, field in (('system_address', 'SystemAddress'), ('body_id', 'BodyID')):
+            value = entry.get(field, held.get(key))
+            if value is not None:
+                body[key] = value
+        if {k: v for k, v in held.items() if k != 'locations'} == body:
             return False
         self._bodies[name] = body
         return True

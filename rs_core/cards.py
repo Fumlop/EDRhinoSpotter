@@ -118,6 +118,19 @@ def set_depleted(record, depleted, when=None):
     return True
 
 
+def same_body(record, name, system_address=None, body_id=None):
+    """Whether a bookmark is on that body. By the game's IDs when both sides
+    have them - a name is only unique inside its system - by name otherwise:
+    bookmarks from before the IDs were kept have none."""
+    theirs = record.get("system_address")
+    if system_address is not None and theirs is not None:
+        if theirs != system_address:
+            return False
+        if body_id is not None and record.get("body_id") is not None:
+            return record["body_id"] == body_id
+    return record.get("planet_name") == name
+
+
 def nearby(spot, root=None, within=SAME_SPOT_M):
     """The bookmark a new mark updates, or None: same body, same material,
     within `within` metres, the nearest one. None too when the mark carries no
@@ -129,7 +142,8 @@ def nearby(spot, root=None, within=SAME_SPOT_M):
         return None
     best = None
     for record in for_system(spot.get("system"), root):
-        if record.get("planet_name") != spot.get("planet_name"):
+        if not same_body(record, spot.get("planet_name"), spot.get("system_address"),
+                         spot.get("body_id")):
             continue
         if (record.get("commodity") or "").lower() != material:
             continue
@@ -156,15 +170,17 @@ def nearby(spot, root=None, within=SAME_SPOT_M):
 SAME_LOCATION_M = 10000.0
 
 
-def location_at(system, body, lat, lon, radius, root=None, within=SAME_LOCATION_M):
+def location_at(system, body, lat, lon, radius, root=None, within=SAME_LOCATION_M,
+                system_address=None, body_id=None):
     """(location index, metres) of the nearest bookmark on `body` that knows its
-    location and lies within `within` metres, or None."""
+    location and lies within `within` metres, or None. The IDs, when known,
+    decide which bookmarks are on `body` - see same_body."""
     if not radius or lat is None or lon is None:
         return None
     best = None
     for record in for_system(system, root):
         index = record.get("location_index")
-        if record.get("planet_name") != body or not isinstance(index, int):
+        if not same_body(record, body, system_address, body_id) or not isinstance(index, int):
             continue
         if record.get("latitude") is None or record.get("longitude") is None:
             continue
@@ -191,6 +207,10 @@ def updated(old, spot):
               if key not in ("path", "sidecar", "distance_m")}
     for key in ("amount", "density"):
         if spot.get(key) is not None:
+            record[key] = spot[key]
+    # A bookmark made before the IDs were kept takes them from the new mark.
+    for key in ("system_address", "body_id"):
+        if record.get(key) is None and spot.get(key) is not None:
             record[key] = spot[key]
     record["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     amount = spot.get("amount")

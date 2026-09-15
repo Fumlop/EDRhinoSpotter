@@ -434,6 +434,12 @@ def _cards_link(parent, records):
                lambda event: _bookmarks_view(label.winfo_toplevel(), system, body, records))
 
 
+def _system_address():
+    """The SystemAddress of the register's system, or None - what keeps a body's
+    maps apart from those of a body with the same name elsewhere."""
+    return _scan[0].system_address if _scan else None
+
+
 def _mapped_link(parent, body, records):
     """"Mapped 3/20 ›" behind a body with saved maps, opening which locations.
 
@@ -443,7 +449,7 @@ def _mapped_link(parent, body, records):
     still one location done.
     """
     name = body["name"]
-    maps = coverstore.maps(name)
+    maps = coverstore.maps(name, system_address=_system_address())
     if not maps:
         return
     mapped, _ = coverage.mapped_locations(maps, name, records or [])
@@ -465,7 +471,7 @@ def _mapped_view(window, body, total, records):
     """
     global _body
     _body = None            # the overlay's refresh must not draw bookmarks over this
-    maps = coverstore.maps(body)
+    maps = coverstore.maps(body, system_address=_system_address())
     mapped, unknown = coverage.mapped_locations(maps, body, records)
     logger.debug(f"scan: building the maps of {body}, {len(mapped)} location(s), "
                  f"{len(unknown)} untied")
@@ -578,7 +584,7 @@ def _bookmarks_view(window, system, body, records):
     if not records:
         tk.Label(listing, text="   no bookmarks on this body yet", bg=BG, fg=DIM, anchor="w",
                  font=("Segoe UI", 9)).pack(fill="x", pady=(6, 0))
-    maps = coverstore.maps(body)
+    maps = coverstore.maps(body, system_address=_system_address())
     for index, group in _by_location(shown):
         _location_header(listing, body, index, group, maps)
         for record in cards.ordered(group):

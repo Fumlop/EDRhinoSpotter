@@ -41,11 +41,16 @@ def folder(body, root=None):
     return os.path.join(root or ROOT, names.safe(body))
 
 
-def maps(body, root=None):
+def maps(body, root=None, system_address=None):
     """[(name, data), ...] for every map saved on that body.
 
     A file that cannot be read, or is from another version, is skipped and
     logged - one broken map must not cost the others.
+
+    The folder is by body name, and a name is only unique inside its system.
+    With `system_address` given, a map that names a different one is a body of
+    the same name elsewhere and is left out; a map from before the address was
+    kept names none and stays in.
     """
     where = folder(body, root)
     try:
@@ -71,6 +76,10 @@ def maps(body, root=None):
             continue
         if not isinstance(data, dict) or data.get("version") != VERSION:
             logger.warning(f"minimap: skipping {file} on {body}: not version {VERSION}")
+            continue
+        theirs = data.get("system_address")
+        if system_address is not None and theirs is not None and theirs != system_address:
+            logger.debug(f"minimap: {file} on {body} is in system {theirs}, not {system_address}")
             continue
         found.append((name, data))
     return found
