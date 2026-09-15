@@ -57,9 +57,9 @@ of that ground's mining locations that carried the material; `unprobed` means
 nobody has counted the locations on that body yet, which is not the same as
 there being none.
 
-**Bodies come from Spansh and your journal.** On every jump (and at game start)
-Spansh is asked for the system's known landable bodies - planet class,
-volcanism, gravity, mining location count. Your own scans replace them.
+**Bodies come from Spansh and your journal.** When you honk, Spansh is asked
+for the system's known landable bodies - planet class, volcanism, gravity,
+mining location count - once a session per system. Your own scans replace them.
 
 In a system Spansh does not know, or offline, the honk is not enough:
 `FSSDiscoveryScan` finds the bodies but does not describe them, so:
@@ -143,8 +143,8 @@ whatever the release actually contains.
 
 ## What it does not do
 
-- **Network: the update check, and Spansh on every jump.** Bodies come from
-  your journal; on every jump Spansh is asked for the ones you have not
+- **Network: the update check, and Spansh when you honk.** Bodies come from
+  your journal; on the honk Spansh is asked for the ones you have not
   scanned (`spansh.co.uk/api/dump/<SystemAddress>`). Offline, the journal
   alone fills the list. Rates come from the file shipped beside `load.py`.
 - **It cannot tell you what a mining location holds.** That list exists only

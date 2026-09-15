@@ -10,7 +10,7 @@ Two buttons.
     RhinoScan   lists the landable bodies of the system you are in, grouped by
                 what kind of body they are, with what that kind has been found
                 to hold. Bodies come from the journal, gaps filled from Spansh
-                on every jump; rates from the mining sheet shipped as
+                on the honk; rates from the mining sheet shipped as
                 mining_sheet.json.
 
 Bookmarks, scanned bodies and minimap maps go into one SQLite file,

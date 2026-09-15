@@ -1,6 +1,9 @@
 """The bodies of a system from Spansh, for the ones the journal has not described.
 
-Asked on every jump - FSDJump, CarrierJump, and Location at game start.
+Asked on the honk (FSSDiscoveryScan), not on every jump, and at most once a
+session per system: Spansh is one person's server, and a route jumped through
+without honking costs it nothing. A system whose Spansh bodies are already in
+the cache is not asked again. Requests say who is asking (User-Agent).
 
 The honk finds bodies and describes none of them: only an FSS resolve or a
 fly-by writes a Scan. In a system somebody else has already scanned, Spansh
@@ -25,6 +28,7 @@ import urllib.request
 
 from rs_core import bodies, grounds
 from rs_core.logging import logger
+from rs_core.update import VERSION
 
 try:
     import requests         # ships inside EDMC, with its own certificates
@@ -36,7 +40,28 @@ TIMEOUT_S = 15
 SOURCE = "spansh"
 G = 9.80665                 # Spansh gravity is in g, the journal's SurfaceGravity in m/s²
 
+HEADERS = {"User-Agent": f"RhinoSpotter/{VERSION} (EDMC plugin; github.com/Fumlop/EDRhinoSpotter)"}
+
 _warned = False             # a failure is a warning once a session, then debug
+
+
+def should_ask(entry, register, asked):
+    """The SystemAddress to ask Spansh about for this journal event, or None.
+
+    Only the honk, only for the system the register holds, only once a session
+    (`asked` is the set of addresses already asked - the caller adds to it), and
+    not when the register already has Spansh's bodies for it from the cache.
+    """
+    if (entry or {}).get("event") != "FSSDiscoveryScan":
+        return None
+    address = entry.get("SystemAddress")
+    if not address or address in asked:
+        return None
+    if entry.get("SystemName") and entry["SystemName"] != register.system:
+        return None
+    if any(body.get("source") == SOURCE for body in register.bodies()):
+        return None
+    return address
 
 
 def to_bodies(dump, address):
@@ -87,13 +112,14 @@ def fetch(address, opener=None):
         if opener is not None:
             raw = opener(url, TIMEOUT_S)
         elif requests is not None:
-            response = requests.get(url, timeout=TIMEOUT_S)
+            response = requests.get(url, timeout=TIMEOUT_S, headers=HEADERS)
             if response.status_code == 404:
                 return []           # a system nobody has sent in
             response.raise_for_status()
             raw = response.content
         else:
-            with urllib.request.urlopen(url, timeout=TIMEOUT_S) as response:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS),
+                                        timeout=TIMEOUT_S) as response:
                 raw = response.read()
         return to_bodies(json.loads(raw), address)
     except Exception as err:                        # noqa: BLE001 - offline is normal

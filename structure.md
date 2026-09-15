@@ -68,8 +68,9 @@ No tkinter anywhere in here.
   `Sheet` reads `mining_sheet.json`. The classifier mirrors the CASE in
   the classifier the sheet was measured with, so a body lands in the bucket its percentages
   were measured on.
-- **[spansh.py](rs_core/spansh.py)** - on every jump (FSDJump, CarrierJump, and
-  Location at game start), the system's landable bodies
+- **[spansh.py](rs_core/spansh.py)** - on the honk (FSSDiscoveryScan), once a
+  session per system and not when the cache already has them (`should_ask`),
+  with a RhinoSpotter User-Agent, the system's landable bodies
   from `spansh.co.uk/api/dump/<SystemAddress>`, mapped to the journal's words
   (`... world` -> `... body`, `Major Rocky Magma` -> `major rocky magma
   volcanism`, gravity g -> m/s²) and marked `source: spansh`. Off the UI
@@ -301,7 +302,7 @@ Everything in here imports tkinter.
 | What | Source | Refreshed by |
 |---|---|---|
 | Bodies in this system | journal `Scan` events, via EDMC | the game, live |
-| Bodies not scanned yet | Spansh, `spansh.co.uk/api/dump/<SystemAddress>` | every jump |
+| Bodies not scanned yet | Spansh, `spansh.co.uk/api/dump/<SystemAddress>` | the honk, once a session per system |
 | Mining locations on a body | journal `FSSBodySignals` / `SAASignalsFound` | the FSS, then a surface scan |
 | Systems visited before | `%LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db` | written on every change |
 | What a ground holds | `mining_sheet.json` | shipped with the release |

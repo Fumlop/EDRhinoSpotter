@@ -70,6 +70,41 @@ class TestFetch:
         assert spansh.fetch(ADDRESS, opener=lambda url, timeout: b"<html>") is None
 
 
+def honk(name="Eme", address=ADDRESS):
+    return {"event": "FSSDiscoveryScan", "Progress": 1.0, "BodyCount": 19,
+            "SystemName": name, "SystemAddress": address}
+
+
+class TestShouldAsk:
+    """Spansh is one person's server: ask on the honk, once, and only when needed."""
+
+    def test_the_honk_asks(self):
+        assert spansh.should_ask(honk(), arrived(), set()) == ADDRESS
+
+    def test_a_jump_does_not(self):
+        jump = {"event": "FSDJump", "StarSystem": "Eme", "SystemAddress": ADDRESS}
+        assert spansh.should_ask(jump, arrived(), set()) is None
+
+    def test_once_a_session(self):
+        assert spansh.should_ask(honk(), arrived(), {ADDRESS}) is None
+
+    def test_not_when_the_cache_has_spanshs_bodies(self):
+        register = arrived()
+        register.add_known("Eme", ADDRESS, spansh.to_bodies(DUMP, ADDRESS))
+        assert spansh.should_ask(honk(), register, set()) is None
+
+    def test_a_system_with_only_own_scans_still_asks(self):
+        register = arrived()
+        register.track(scan("Eme A 1 a"), system="Eme")
+        assert spansh.should_ask(honk(), register, set()) == ADDRESS
+
+    def test_a_honk_for_another_system_does_not(self):
+        assert spansh.should_ask(honk("Loha", 42), arrived(), set()) is None
+
+    def test_requests_say_who_is_asking(self):
+        assert spansh.HEADERS["User-Agent"].startswith("RhinoSpotter/")
+
+
 def arrived(saved=None):
     register = bodies.Register(on_change=(lambda system, found: saved.append(found))
                                if saved is not None else None)

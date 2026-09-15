@@ -1,5 +1,17 @@
 # Changelog
 
+## 4.3.1
+
+**Changed**
+
+- Spansh is asked when you honk, not on every jump, and at most once a session
+  per system; a system whose Spansh bodies are already saved is not asked
+  again. Jumping along a route no longer sends Spansh anything. Requests name
+  the plugin (User-Agent).
+- The line under the buttons follows the honk: "Honk to load the bodies",
+  then "Asking Spansh...", and only when Spansh has nothing - or cannot be
+  reached - "FSS the bodies". It is empty while bodies are listed.
+
 ## 4.3.0
 
 **Added**

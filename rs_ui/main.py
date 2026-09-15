@@ -32,6 +32,9 @@ _card_token = 0          # only the newest render may write to the status line
 _writes = store.Debounced()
 _register = bodies.Register(on_change=_writes, on_arrive=store.load)
 _sheet = None            # rs_core.grounds.Sheet, read once at startup
+_spansh_asked = set()    # SystemAddresses Spansh was asked about this session
+_spansh_answer = {}      # SystemAddress -> how many bodies Spansh gave, or None when unreachable
+_hint = None             # the line under the buttons: honk, or FSS when the honk brought nothing
 
 _frame = None
 _status = None
@@ -77,7 +80,7 @@ def start(plugin_dir):
 
 
 def build(parent):
-    global _frame, _status, _scan_count, _card_button, _landed_after
+    global _frame, _status, _scan_count, _card_button, _landed_after, _hint
     global _loc, _rigs, _material, _density, _amount, _search
 
     _frame = tk.Frame(parent)
@@ -143,13 +146,11 @@ def build(parent):
         tk.Entry(_frame, textvariable=_search).grid(row=5, column=1, columnspan=3,
                                                     sticky="we", padx=2, pady=(0, 2))
 
-    # The one thing RhinoScan cannot do for you, and the thing everyone gets
-    # wrong first: the honk finds the bodies, it does not describe them. Only
-    # a resolved body carries PlanetClass and Volcanism, which is all this
-    # reads. Said here, before you press the button and wonder.
-    tk.Label(_frame, text="FSS unknown systems", anchor="w",
-             fg=palette.MUTED).grid(row=6, column=0, columnspan=4,
-                                    sticky="w", padx=2, pady=(0, 2))
+    # What to do when the list is empty, said before you press the button and
+    # wonder. The honk asks Spansh; only when that brings nothing does the FSS
+    # have to describe the bodies. See _refresh_hint.
+    _hint = tk.Label(_frame, text="", anchor="w", fg=palette.MUTED)
+    _hint.grid(row=6, column=0, columnspan=4, sticky="w", padx=2, pady=(0, 2))
 
     _status = tk.Label(_frame, text="", anchor="w", wraplength=320, justify="left")
     _status.grid(row=7, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
@@ -368,21 +369,26 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     if _register.track(entry, system=system):
         _refresh_scan_count()
 
-    # Every jump, and Location at game start: ask Spansh for the bodies the journal will not describe until
-    # they are scanned. Off the UI thread; what comes back only fills gaps.
-    if entry.get("event") in bodies.ARRIVAL_EVENTS and entry.get("SystemAddress"):
-        arrived = entry.get("StarSystem") or system
-        spansh.fetch_async(entry["SystemAddress"],
-                           lambda address, found: _on_ui(_add_spansh, arrived, address, found))
+    # The honk: ask Spansh for the bodies the journal will not describe until
+    # they are scanned - once a session per system, see spansh.should_ask. Off
+    # the UI thread; what comes back only fills gaps.
+    address = spansh.should_ask(entry, _register, _spansh_asked)
+    if address:
+        _spansh_asked.add(address)
+        _refresh_hint()
+        honked = _register.system
+        spansh.fetch_async(address,
+                           lambda address, found: _on_ui(_add_spansh, honked, address, found))
 
 
 
 def _add_spansh(system, address, found):
     """Spansh's answer, back on the UI thread. None - offline - changes nothing."""
+    _spansh_answer[address] = None if found is None else len(found)
     if found and _register.add_known(system, address, found):
-        _refresh_scan_count()
         if scan.is_open():
             open_scan(scan.on_body_here())
+    _refresh_scan_count()
 
 
 def _fill_location(entry, system):
@@ -545,6 +551,26 @@ def _refresh_scan_count():
         return
     count = len(_register)
     _scan_count.config(text=f"{count} landable" if count else "")
+    _refresh_hint()
+
+
+def _refresh_hint():
+    """Nothing while bodies are listed. Before the honk: honk. After it, when
+    Spansh brought nothing: FSS, and why."""
+    if not _hint:
+        return
+    address = _register.system_address
+    if len(_register):
+        text = ""
+    elif address not in _spansh_asked:
+        text = "Honk to load the bodies"
+    elif address not in _spansh_answer:
+        text = "Asking Spansh..."
+    elif _spansh_answer[address] is None:
+        text = "Spansh unreachable - FSS the bodies"
+    else:
+        text = "Unknown to Spansh - FSS the bodies"
+    _hint.config(text=text)
 
 
 def _set_status(text):

@@ -2,7 +2,7 @@
 
 One row per landable body, grouped by what kind of body it is, with the
 materials that kind of body has been found to hold underneath. The body list
-comes from the journal, with gaps filled from Spansh on every jump; the
+comes from the journal, with gaps filled from Spansh on the honk; the
 percentages come from mining_sheet.json, which ships with the plugin.
 
 The window is deliberately read-only and disposable. Nothing is saved from it,
@@ -356,11 +356,11 @@ def _empty(parent, register, focus=None):
         why = ("Set the material back to All to see what this system does "
                "have, or try the next one.")
     elif register.system:
-        action = "FSS the system, or the planet you are heading for"
-        why = ("Spansh has no bodies for this system, or could not be reached. "
-               "The honk finds the bodies but does not describe them - only a "
-               "body the FSS has resolved carries the type this reads. "
-               "Flying in works too - the auto-scan sweeps the near ones.")
+        action = "Honk - then FSS the bodies if none show up"
+        why = ("The honk asks Spansh for the bodies others have scanned. When "
+               "Spansh does not know the system, the honk alone does not describe "
+               "them - resolve them in the FSS, or fly in and let the auto-scan "
+               "sweep the near ones.")
     else:
         action = "Waiting for the journal"
         why = ("Jump somewhere, or restart EDMC if it started while you were "
