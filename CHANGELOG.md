@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.4
+
+**Fixed**
+
+- The saved map picture showed gravity in m/s² labelled "g" - r Velorum 9 a read
+  3.60 g instead of 0.37 g.
+
 ## 4.3.3
 
 **Changed**

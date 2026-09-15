@@ -329,7 +329,8 @@ def picture_text(cover, system, when=None):
     if planet:
         facts.append(grounds.label(planet.get("ground")))
         if isinstance(planet.get("gravity"), (int, float)):
-            facts.append(f"{planet['gravity']:.2f} g")
+            # Stored as the journal's SurfaceGravity, m/s²; the picture says g.
+            facts.append(f"{planet['gravity'] / 9.80665:.2f} g")
         if isinstance(planet.get("distance"), (int, float)):
             facts.append(f"{planet['distance']:,.0f} Ls")
         if planet.get("locations") is not None:
