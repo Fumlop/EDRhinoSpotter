@@ -151,7 +151,7 @@ counted says `unprobed` rather than `0 loc` - none found and none looked for
 are not the same thing.
 
 Systems are remembered. Every scan, count and jump is written to
-`%LOCALAPPDATA%\RhinoSpotter\data\<System>.json` the moment it happens, so a
+`%LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db` the moment it happens, so a
 crash costs nothing. Jump back in later and the system arrives already filled;
 anything you scan after that is added to it. Nothing is asked of EDSM or
 anyone else's server - this is your own scan data going to disk and coming

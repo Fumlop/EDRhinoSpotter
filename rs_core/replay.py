@@ -29,7 +29,7 @@ import os
 import sys
 import time
 
-from rs_core import bodies, grounds, store
+from rs_core import bodies, grounds, migrate, store
 from rs_core.logging import logger
 
 JOURNAL_DIR = os.path.expandvars(
@@ -183,6 +183,8 @@ def main(argv=None):
     parser.add_argument("--rebuild", action="store_true",
                         help="write every system in the window to the cache")
     args = parser.parse_args(argv)
+    # The cache is the database now; the JSON of 4.1 goes in before it is merged into.
+    migrate.run()
 
     sheet = grounds.Sheet()
     paths = journal_files(args.root, args.days)

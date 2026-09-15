@@ -29,7 +29,7 @@ sys.path.insert(0, PLUGIN_DIR)
 
 from PIL import Image, ImageGrab                            # noqa: E402
 
-from rs_core import bodies, coverage, coverstore, spotmark  # noqa: E402
+from rs_core import bodies, coverage, coverstore, database, spotmark  # noqa: E402
 from rs_ui import main, minimap, overlay, scan              # noqa: E402
 
 DOCS = os.path.join(PLUGIN_DIR, "docs")
@@ -72,8 +72,8 @@ def bookmarks(body, card):
 # Maps on the bookmarked body, for "Mapped 3/22" and its page. Two sit on the
 # bookmarks - one saved with the location targeted, one tied only by the
 # bookmarks on it - and one lies away from all of them, so the page shows its
-# "location unknown" section too. Written into the scratch coverage folder and
-# removed again before the minimap pictures, which must not find them.
+# "location unknown" section too. Written into the scratch database and coverage
+# folder and removed again before the minimap pictures, which must not find them.
 RADIUS_4A = 1352744.5
 
 
@@ -217,6 +217,8 @@ def main_images():
     grab(window, "mapped.png", scale, top_margin=34)
     window.destroy()
     shutil.rmtree(coverstore.folder(body), ignore_errors=True)
+    with database.connect() as conn:
+        conn.execute("DELETE FROM maps WHERE body = ?", (body,))
     cards.by_body = was_by_body
 
     overlay_image(root, scale, marks[0])
@@ -372,6 +374,7 @@ if __name__ == "__main__":
     # the commander's folder.
     with tempfile.TemporaryDirectory(prefix="rhinospotter-docs-") as scratch:
         coverstore.ROOT = scratch
+        database.PATH = os.path.join(scratch, "rhinospotter.db")
         # The overlays hide while Elite is not the window in front, and while
         # this runs the terminal that started it is.
         overlay.game_focused = lambda: True

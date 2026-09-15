@@ -2,7 +2,7 @@
 
 import pytest
 
-from rs_core import names, spotcard, store
+from rs_core import names
 
 
 @pytest.mark.unit
@@ -18,9 +18,6 @@ class TestSafe:
     def test_spaces_stay_by_default(self):
         assert names.safe("Hyperion Reach") == "Hyperion Reach"
 
-    def test_spaces_go_when_asked(self):
-        assert names.safe("Hyperion Reach", spaces=False) == "Hyperion_Reach"
-
     def test_nothing_left_falls_back(self):
         assert names.safe("   ") == "unknown"
         assert names.safe(None) == "unknown"
@@ -31,19 +28,3 @@ class TestSafe:
         # directory name - Explorer silently drops it and the path stops
         # matching.
         assert names.safe("  Aramo  ") == "Aramo"
-
-
-@pytest.mark.unit
-class TestTheCallersAgree:
-    """The cache and the cards folder have to spell a system the same way, or
-    a card cannot be matched to the system it was marked in."""
-
-    def test_cache_file_and_cards_folder_use_the_same_name(self):
-        system = 'Col 285 "Sector" KM-V:d2-36'
-        assert store.safe_name(system) in spotcard.card_dir(system)
-
-    def test_a_bookmark_filename_has_no_spaces_in_it(self):
-        name = spotcard.filename({"planet_name": "Hyperion Reach 4 a",
-                                  "location_index": 7, "commodity": "Jadeite"})
-        assert " " not in name
-        assert name.endswith(".json")

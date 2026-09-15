@@ -13,8 +13,8 @@ Two buttons.
                 sheet shipped as mining_sheet.json. Neither asks the network
                 for anything.
 
-Nothing is written to a database. The card is the record, and the scan window
-is read-only.
+Bookmarks, scanned bodies and minimap maps go into one SQLite file,
+rhinospotter.db under %LOCALAPPDATA% - see rs_core/database.py.
 
 This file is the EDMC contract and nothing else: the lifecycle hooks, and where
 they go. The panel is rs_ui, the work is rs_core, the tests are rs_tests.

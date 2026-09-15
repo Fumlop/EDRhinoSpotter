@@ -1,98 +1,117 @@
-"""Reading back which bodies have been marked, from the sidecars."""
+"""Reading back which bodies have been marked, from the database."""
 
-import json
 import os
+import sqlite3
 
 import pytest
 
-from rs_core import cards, spotcard
+from rs_core import cards, database, spotcard
 
 
-def write_card(folder, body, material, index, marked_at, with_sidecar=True):
-    """A card the way spotcard writes one: a PNG and its JSON."""
+@pytest.fixture(autouse=True)
+def cards_root(tmp_path, monkeypatch):
+    """Where an old card's PNG is looked for - never the commander's folder."""
+    root = tmp_path / "cards"
+    monkeypatch.setattr(spotcard, "CARDS_ROOT", str(root))
+    return root
+
+
+def put(**fields):
+    """A bookmark the way the plugin writes one. Its id."""
+    record = {"system": "Andel", "planet_name": "Andel 1 a", "commodity": "Monazite",
+              "latitude": 10.0, "longitude": 20.0, "marked_at": "2026-09-13 18:40:00"}
+    record.update(fields)
+    return spotcard.save(record)
+
+
+def write_card(body, material, index, marked_at, with_png=True):
+    """A bookmark from the days of PNG cards: the record names its picture."""
     stem = f"{body.replace(' ', '_')}_loc{index}_{material.lower()}"
-    png = os.path.join(str(folder), stem + ".png")
-    with open(png, "wb") as handle:
-        handle.write(b"not really a png")
-    if with_sidecar:
-        with open(os.path.join(str(folder), stem + ".json"), "w", encoding="utf-8") as handle:
-            json.dump({"system": "Andel", "planet_name": body, "commodity": material,
-                       "location_index": index, "marked_at": marked_at,
-                       "card": stem + ".png"}, handle)
+    put(planet_name=body, commodity=material, location_index=index, marked_at=marked_at,
+        card=stem + ".png")
+    png = os.path.join(spotcard.card_dir("Andel"), stem + ".png")
+    if with_png:
+        os.makedirs(os.path.dirname(png), exist_ok=True)
+        with open(png, "wb") as handle:
+            handle.write(b"not really a png")
     return png
 
 
 class TestForSystem:
-    def test_reads_the_sidecars(self, tmp_path):
-        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "3311-05-14T18:40:00")
-        write_card(tmp_path, "Andel 4 c", "Monazite", 7, "3311-05-15T09:00:00")
-        found = cards.for_system("Andel", root=str(tmp_path))
+    def test_reads_the_bookmarks(self):
+        write_card("Andel 1 a", "Jadeite", 22, "3311-05-14T18:40:00")
+        write_card("Andel 4 c", "Monazite", 7, "3311-05-15T09:00:00")
+        found = cards.for_system("Andel")
         assert {record["planet_name"] for record in found} == {"Andel 1 a", "Andel 4 c"}
+        assert all(isinstance(record["id"], int) for record in found)
 
-    def test_a_png_without_a_sidecar_is_skipped(self, tmp_path):
-        """Written by a version that kept none. A link to the wrong body is
-        worse than no link, and the body name in a filename is a guess - the
-        spaces are gone and the material is lowercased."""
-        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "x", with_sidecar=False)
-        assert cards.for_system("Andel", root=str(tmp_path)) == []
-
-    def test_a_bookmark_without_a_png_is_kept(self, tmp_path):
-        """The JSON is the bookmark; the card image is gone from the plugin."""
-        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "x")
-        os.remove(os.path.join(str(tmp_path), "Andel_1_a_loc22_jadeite.png"))
-        [record] = cards.for_system("Andel", root=str(tmp_path))
+    def test_a_bookmark_without_a_png_is_kept(self):
+        """The bookmark is the row; the card image is gone from the plugin."""
+        write_card("Andel 1 a", "Jadeite", 22, "x", with_png=False)
+        [record] = cards.for_system("Andel")
         assert record["planet_name"] == "Andel 1 a" and record["path"] is None
 
-    def test_broken_json_is_skipped_not_raised(self, tmp_path):
-        (tmp_path / "Andel_1_a_loc1_jadeite.json").write_text("{not json", encoding="utf-8")
-        (tmp_path / "Andel_1_a_loc1_jadeite.png").write_bytes(b"x")
-        assert cards.for_system("Andel", root=str(tmp_path)) == []
+    def test_an_old_cards_path_points_at_its_png(self):
+        png = write_card("Andel 1 a", "Jadeite", 22, "x")
+        assert cards.for_system("Andel")[0]["path"] == png
 
-    def test_broken_json_says_which_file_in_the_log(self, tmp_path, caplog):
+    def test_another_systems_bookmarks_are_not_in_it(self):
+        put()
+        put(system="Loha", planet_name="Loha 2")
+        assert [record["planet_name"] for record in cards.for_system("Andel")] == ["Andel 1 a"]
+
+    def test_a_system_with_no_bookmarks(self):
+        assert cards.for_system("Nowhere") == []
+
+    def test_a_broken_row_says_which_in_the_log_once(self, db, caplog):
         """A bookmark cannot be rebuilt from the journal, so one that stops
         reading has to show up somewhere rather than just vanish from the list."""
-        broken = tmp_path / "Andel_1_a_loc1_jadeite.json"
-        broken.write_text("{not json", encoding="utf-8")
+        id = put()
+        put(commodity="Jadeite")
+        with sqlite3.connect(db) as conn:
+            conn.execute("UPDATE bookmarks SET data = '{not json' WHERE id = ?", (id,))
         with caplog.at_level("WARNING", logger="RhinoSpotter"):
-            cards.for_system("Andel", root=str(tmp_path))
-            cards.for_system("Andel", root=str(tmp_path))    # the minimap, 10 s later
+            assert [r["commodity"] for r in cards.for_system("Andel")] == ["Jadeite"]
+            cards.for_system("Andel")                     # the minimap, after a change
         assert [r.levelname for r in caplog.records] == ["WARNING"]
-        assert str(broken) in caplog.records[0].getMessage()
+        assert f"bookmark {id} " in caplog.records[0].getMessage()
 
-    def test_a_sidecar_with_no_body_is_skipped(self, tmp_path):
-        (tmp_path / "odd.json").write_text(json.dumps({"system": "Andel"}), encoding="utf-8")
-        (tmp_path / "odd.png").write_bytes(b"x")
-        assert cards.for_system("Andel", root=str(tmp_path)) == []
+    def test_a_row_with_no_body_is_skipped(self, db):
+        id = put()
+        with sqlite3.connect(db) as conn:
+            conn.execute("UPDATE bookmarks SET data = '{\"system\": \"Andel\"}' WHERE id = ?",
+                         (id,))
+        assert cards.for_system("Andel") == []
 
-    def test_a_system_with_no_folder(self, tmp_path):
-        assert cards.for_system("Nowhere", root=str(tmp_path / "nope")) == []
-
-    def test_an_old_cards_path_points_at_its_png(self, tmp_path):
-        png = write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "x")
-        assert cards.for_system("Andel", root=str(tmp_path))[0]["path"] == png
+    def test_a_database_that_cannot_be_opened_is_no_bookmarks(self, tmp_path, caplog):
+        folder = tmp_path / "a folder, not a file"
+        folder.mkdir()
+        with caplog.at_level("WARNING", logger="RhinoSpotter"):
+            assert cards.for_system("Andel", db=str(folder)) == []
+        assert caplog.records
 
 
 class TestByBody:
-    def test_groups_on_the_journal_name(self, tmp_path):
+    def test_groups_on_the_journal_name(self):
         """Keyed by the body exactly as the journal names it, which is what the
         window has in hand - no normalising on either side."""
-        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "a")
-        write_card(tmp_path, "Andel 1 a", "Monazite", 23, "b")
-        write_card(tmp_path, "Andel 4 c", "Olivine", 1, "c")
-        grouped = cards.by_body("Andel", root=str(tmp_path))
+        write_card("Andel 1 a", "Jadeite", 22, "a")
+        write_card("Andel 1 a", "Monazite", 23, "b")
+        write_card("Andel 4 c", "Olivine", 1, "c")
+        grouped = cards.by_body("Andel")
         assert len(grouped["Andel 1 a"]) == 2
         assert len(grouped["Andel 4 c"]) == 1
 
-    def test_an_unmarked_body_is_simply_absent(self, tmp_path):
-        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "a")
-        assert "Andel 9 z" not in cards.by_body("Andel", root=str(tmp_path))
+    def test_an_unmarked_body_is_simply_absent(self):
+        write_card("Andel 1 a", "Jadeite", 22, "a")
+        assert "Andel 9 z" not in cards.by_body("Andel")
 
 
 class TestNewest:
-    def test_picks_the_latest_mark(self, tmp_path):
-        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "3311-05-14T18:40:00")
-        write_card(tmp_path, "Andel 1 a", "Monazite", 23, "3311-05-16T08:00:00")
-        found = cards.by_body("Andel", root=str(tmp_path))["Andel 1 a"]
+    def test_picks_the_latest_mark(self):
+        write_card("Andel 1 a", "Jadeite", 22, "3311-05-14T18:40:00")
+        write_card("Andel 1 a", "Monazite", 23, "3311-05-16T08:00:00")
+        found = cards.by_body("Andel")["Andel 1 a"]
         assert cards.newest(found)["commodity"] == "Monazite"
 
     def test_nothing_to_pick(self):
@@ -100,70 +119,76 @@ class TestNewest:
 
 
 class TestDelete:
-    """Removing a bookmark: its JSON, and an old card's PNG with it."""
+    """Removing a bookmark: its row, and an old card's PNG with it."""
 
-    def test_both_files_go(self, tmp_path):
-        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "3311-05-14T18:40:00")
-        record = cards.for_system("Andel", root=str(tmp_path))[0]
+    def test_the_row_and_the_png_go(self):
+        png = write_card("Andel 1 a", "Jadeite", 22, "3311-05-14T18:40:00")
+        record = cards.for_system("Andel")[0]
         assert cards.delete(record) is True
-        assert os.listdir(tmp_path) == []
+        assert cards.for_system("Andel") == []
+        assert not os.path.exists(png)
 
-    def test_the_sidecar_is_not_guessed_from_the_png(self, tmp_path):
-        """The name has had its spaces replaced and its material lowercased,
-        so the path the reader found is the only one that is certain."""
-        write_card(tmp_path, "Andel 1 a", "Low Temp. Diamonds", 7, "x")
-        record = cards.for_system("Andel", root=str(tmp_path))[0]
-        assert os.path.isfile(record["sidecar"])
-        cards.delete(record)
-        assert os.listdir(tmp_path) == []
-
-    def test_a_file_already_gone_is_not_a_failure(self, tmp_path):
-        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "x")
-        record = cards.for_system("Andel", root=str(tmp_path))[0]
+    def test_a_png_already_gone_is_not_a_failure(self):
+        write_card("Andel 1 a", "Jadeite", 22, "x")
+        record = cards.for_system("Andel")[0]
         os.remove(record["path"])
         assert cards.delete(record) is True
-        assert os.listdir(tmp_path) == []
+        assert cards.for_system("Andel") == []
+
+    def test_deleting_twice(self):
+        put()
+        record = cards.for_system("Andel")[0]
+        assert cards.delete(record) is True
+        assert cards.delete(record) is False
 
     def test_nothing_to_delete(self):
         assert cards.delete({}) is False
 
-    def test_a_file_that_will_not_go_says_so(self, tmp_path, monkeypatch):
+    def test_a_png_that_will_not_go_says_so_and_keeps_the_bookmark(self, monkeypatch):
         """Open in a viewer, or a read-only folder. The list must not claim it
         deleted something it did not."""
-        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "x")
-        record = cards.for_system("Andel", root=str(tmp_path))[0]
+        write_card("Andel 1 a", "Jadeite", 22, "x")
+        record = cards.for_system("Andel")[0]
 
         def refuse(path):
             raise PermissionError(13, "in use")
 
         monkeypatch.setattr(cards.os, "remove", refuse)
         assert cards.delete(record) is False
+        assert len(cards.for_system("Andel")) == 1
+
+    def test_a_delete_moves_the_revision(self):
+        put()
+        before = database.revision()
+        cards.delete(cards.for_system("Andel")[0])
+        assert database.revision() != before
 
 
 class TestDepleted:
     """A bookmark marked mined out, and the mark taken off again."""
 
-    def test_marking_writes_when(self, tmp_path):
-        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "x")
-        record = cards.for_system("Andel", root=str(tmp_path))[0]
+    def test_marking_writes_when(self):
+        write_card("Andel 1 a", "Jadeite", 22, "x")
+        record = cards.for_system("Andel")[0]
         assert cards.set_depleted(record, True, when="3311-05-20T10:00:00+00:00") is True
-        again = cards.for_system("Andel", root=str(tmp_path))[0]
+        again = cards.for_system("Andel")[0]
         assert again["depleted_at"] == "3311-05-20T10:00:00+00:00"
         assert record["depleted_at"] == again["depleted_at"]
         # Everything else in the bookmark is left as it was.
         assert again["commodity"] == "Jadeite" and again["location_index"] == 22
 
-    def test_unmarking_removes_the_key(self, tmp_path):
-        write_card(tmp_path, "Andel 1 a", "Jadeite", 22, "x")
-        record = cards.for_system("Andel", root=str(tmp_path))[0]
+    def test_unmarking_removes_the_key(self):
+        write_card("Andel 1 a", "Jadeite", 22, "x")
+        record = cards.for_system("Andel")[0]
         cards.set_depleted(record, True)
         cards.set_depleted(record, False)
-        with open(record["sidecar"], encoding="utf-8") as handle:
-            assert "depleted_at" not in json.load(handle)
+        assert "depleted_at" not in cards.for_system("Andel")[0]
         assert "depleted_at" not in record
 
-    def test_a_bookmark_that_cannot_be_written_says_so(self, tmp_path):
-        record = {"sidecar": str(tmp_path / "gone.json")}
+    def test_a_bookmark_that_is_gone_says_so(self):
+        put()
+        record = cards.for_system("Andel")[0]
+        cards.delete(record)
         assert cards.set_depleted(record, True) is False
         assert cards.set_depleted({}, True) is False
 
@@ -191,30 +216,28 @@ class TestOrdered:
 
 
 class TestSave:
-    def test_save_writes_one(self, tmp_path):
+    def test_save_writes_one(self, cards_root):
         """The end this is all read from: a real bookmark, written by the real
-        writer, and no picture beside it."""
-        path = spotcard.save({
+        writer, and no file beside it."""
+        id = spotcard.save({
             "system": "Andel", "planet_name": "Andel 1 a", "location_index": 22,
             "commodity": "Jadeite", "rigs": 4, "heading": 214,
             "latitude": 1.5, "longitude": -2.5,
             "marked_at": "3311-05-14T18:40:00", "commander": "Example",
-        }, str(tmp_path / "Andel_1_a_loc22_jadeite.json"))
-        found = cards.for_system("Andel", root=str(tmp_path))
-        assert len(found) == 1
-        assert found[0]["planet_name"] == "Andel 1 a"
-        assert found[0]["commodity"] == "Jadeite"
-        assert found[0]["sidecar"] == path and found[0]["path"] is None
-        assert os.listdir(tmp_path) == ["Andel_1_a_loc22_jadeite.json"]
+        })
+        [found] = cards.for_system("Andel")
+        assert found["id"] == id
+        assert found["planet_name"] == "Andel 1 a" and found["commodity"] == "Jadeite"
+        assert found["rigs"] == 4 and found["latitude"] == 1.5 and found["path"] is None
+        assert not cards_root.exists()
 
-    def test_a_second_mark_of_the_same_spot_is_a_second_file(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(spotcard, "CARDS_ROOT", str(tmp_path))
+    def test_a_second_mark_of_the_same_spot_is_a_second_bookmark(self):
         spot = {"system": "Andel", "planet_name": "Andel 1 a", "location_index": 22,
                 "commodity": "Jadeite", "latitude": 1.0, "longitude": 2.0}
         first, second = spotcard.save(dict(spot)), spotcard.save(dict(spot))
-        assert first != second and second.endswith("_2.json")
+        assert first != second and len(cards.for_system("Andel")) == 2
 
-    def test_a_datetime_survives_as_text(self, tmp_path):
+    def test_a_datetime_survives_as_text(self):
         """marked_at is a datetime when the plugin writes it and has to come
         back as something json can hold."""
         from datetime import datetime, timezone
@@ -222,22 +245,44 @@ class TestSave:
             "system": "Andel", "planet_name": "Andel 1 a", "location_index": 1,
             "commodity": "Jadeite", "latitude": 1.0, "longitude": 2.0,
             "marked_at": datetime(3311, 5, 14, tzinfo=timezone.utc),
-        }, str(tmp_path / "spot.json"))
-        record = cards.for_system("Andel", root=str(tmp_path))[0]
-        assert "3311" in record["marked_at"]
+        })
+        assert "3311" in cards.for_system("Andel")[0]["marked_at"]
+
+    def test_with_an_id_it_replaces_that_bookmark(self):
+        id = put(amount="High")
+        old = cards.for_system("Andel")[0]
+        assert spotcard.save(cards.updated(old, {"amount": "Low"}), id=id) == id
+        [again] = cards.for_system("Andel")
+        assert again["amount"] == "Low" and again["id"] == id
+
+    def test_an_update_of_a_deleted_bookmark_writes_it_again(self):
+        """Deleted in the scan window while the worker was updating it - the
+        file it used to be came back the same way."""
+        id = put()
+        old = cards.for_system("Andel")[0]
+        cards.delete(old)
+        assert spotcard.save(cards.updated(old, {"amount": "Low"}), id=id) is not None
+        assert len(cards.for_system("Andel")) == 1
+
+    def test_a_write_that_fails_raises_and_keeps_the_old_bookmark(self, monkeypatch):
+        """The panel says why, and the bookmark is left as it was."""
+        id = put(amount="High")
+        old = cards.for_system("Andel")[0]
+
+        def half_written(conn, record, id=None, source=None):
+            conn.execute("UPDATE bookmarks SET data = '{}' WHERE id = ?", (id,))
+            raise sqlite3.OperationalError("disk I/O error")
+
+        monkeypatch.setattr(database, "write_bookmark", half_written)
+        with pytest.raises(sqlite3.OperationalError):
+            spotcard.save(cards.updated(old, {"amount": "Low"}), id=id)
+        assert cards.for_system("Andel")[0]["amount"] == "High"
 
 
 class TestNearby:
     """A new mark within SAME_SPOT_M of the same material on the same body updates it."""
 
     RADIUS = 1352744.5
-
-    def write(self, folder, name, **fields):
-        import json
-        record = {"system": "Andel", "planet_name": "Andel 1 a", "commodity": "Monazite",
-                  "latitude": 10.0, "longitude": 20.0, "marked_at": "2026-09-13 18:40:00"}
-        record.update(fields)
-        (folder / name).write_text(json.dumps(record), encoding="utf-8")
 
     def spot(self, **fields):
         spot = {"system": "Andel", "planet_name": "Andel 1 a", "commodity": "Monazite",
@@ -254,38 +299,37 @@ class TestNearby:
         assert cards.SAME_SPOT_M == 100.0
         assert 76.0 / (2 * math.sin(math.pi / 7)) * 1.1 <= cards.SAME_SPOT_M
 
-    def test_same_material_inside_the_radius_is_found(self, tmp_path):
-        self.write(tmp_path, "a.json")
-        old = cards.nearby(self.spot(latitude=self.metres_north(90)), root=str(tmp_path))
+    def test_same_material_inside_the_radius_is_found(self):
+        put()
+        old = cards.nearby(self.spot(latitude=self.metres_north(90)))
         assert old is not None and round(old["distance_m"]) == 90
 
-    def test_outside_the_radius_is_a_new_bookmark(self, tmp_path):
-        self.write(tmp_path, "a.json")
-        assert cards.nearby(self.spot(latitude=self.metres_north(105)), root=str(tmp_path)) is None
+    def test_outside_the_radius_is_a_new_bookmark(self):
+        put()
+        assert cards.nearby(self.spot(latitude=self.metres_north(105))) is None
 
-    def test_another_material_close_by_is_not_touched(self, tmp_path):
-        self.write(tmp_path, "a.json", commodity="Jadeite")
-        assert cards.nearby(self.spot(), root=str(tmp_path)) is None
+    def test_another_material_close_by_is_not_touched(self):
+        put(commodity="Jadeite")
+        assert cards.nearby(self.spot()) is None
 
-    def test_another_body_is_not_touched(self, tmp_path):
-        self.write(tmp_path, "a.json", planet_name="Andel 1 b")
-        assert cards.nearby(self.spot(), root=str(tmp_path)) is None
+    def test_another_body_is_not_touched(self):
+        put(planet_name="Andel 1 b")
+        assert cards.nearby(self.spot()) is None
 
-    def test_the_nearest_of_two_wins(self, tmp_path):
-        self.write(tmp_path, "far.json", latitude=self.metres_north(80))
-        self.write(tmp_path, "near.json", latitude=self.metres_north(40))
-        old = cards.nearby(self.spot(), root=str(tmp_path))
-        assert old["sidecar"].endswith("near.json")
+    def test_the_nearest_of_two_wins(self):
+        put(latitude=self.metres_north(80))
+        near = put(latitude=self.metres_north(40))
+        assert cards.nearby(self.spot())["id"] == near
 
-    def test_no_radius_no_update(self, tmp_path):
-        self.write(tmp_path, "a.json")
-        assert cards.nearby(self.spot(planet_radius=None), root=str(tmp_path)) is None
+    def test_no_radius_no_update(self):
+        put()
+        assert cards.nearby(self.spot(planet_radius=None)) is None
 
 
 class TestUpdated:
     OLD = {"marked_at": "2026-09-13 18:40:00", "latitude": 10.0, "longitude": 20.0,
            "heading": 77, "rigs": 4, "location_index": 13, "amount": "High",
-           "density": "Low", "sidecar": "x.json", "distance_m": 12.0}
+           "density": "Low", "id": 5, "path": None, "distance_m": 12.0}
 
     def test_only_amount_and_density_change(self):
         new = cards.updated(self.OLD, {"marked_at": "2026-09-13 20:30:00", "latitude": 10.001,
@@ -295,7 +339,7 @@ class TestUpdated:
         for key in ("marked_at", "latitude", "longitude", "heading", "rigs", "location_index"):
             assert new[key] == self.OLD[key]
         assert "updated_at" in new
-        assert "sidecar" not in new and "distance_m" not in new
+        assert "id" not in new and "path" not in new and "distance_m" not in new
 
     def test_an_unpicked_reading_keeps_the_old_one(self):
         new = cards.updated(self.OLD, {"amount": None, "density": None})
@@ -315,43 +359,37 @@ class TestLocationAt:
 
     RADIUS = 381784.9
 
-    def write(self, folder, name, **fields):
-        import json
-        record = {"system": "Andel", "planet_name": "Andel 8 b", "commodity": "Monazite",
-                  "latitude": 10.0, "longitude": 20.0, "location_index": 13}
-        record.update(fields)
-        (folder / name).write_text(json.dumps(record), encoding="utf-8")
+    def put(self, **fields):
+        put(**dict({"planet_name": "Andel 8 b", "location_index": 13}, **fields))
 
     def north(self, metres):
         import math
         return 10.0 + math.degrees(metres / self.RADIUS)
 
-    def test_a_drop_near_a_bookmark_takes_its_location(self, tmp_path):
-        self.write(tmp_path, "a.json")
+    def test_a_drop_near_a_bookmark_takes_its_location(self):
+        self.put()
         index, metres = cards.location_at("Andel", "Andel 8 b", self.north(900), 20.0,
-                                          self.RADIUS, root=str(tmp_path))
+                                          self.RADIUS)
         assert index == 13 and round(metres) == 900
 
-    def test_the_nearest_bookmark_wins(self, tmp_path):
-        self.write(tmp_path, "far.json", latitude=self.north(6500), location_index=2)
-        self.write(tmp_path, "near.json", latitude=self.north(3200), location_index=7)
-        assert cards.location_at("Andel", "Andel 8 b", 10.0, 20.0, self.RADIUS,
-                                 root=str(tmp_path))[0] == 7
+    def test_the_nearest_bookmark_wins(self):
+        self.put(latitude=self.north(6500), location_index=2)
+        self.put(latitude=self.north(3200), location_index=7)
+        assert cards.location_at("Andel", "Andel 8 b", 10.0, 20.0, self.RADIUS)[0] == 7
 
-    def test_beyond_ten_km_there_is_no_answer(self, tmp_path):
-        self.write(tmp_path, "a.json")
+    def test_beyond_ten_km_there_is_no_answer(self):
+        self.put()
         assert cards.location_at("Andel", "Andel 8 b", self.north(10100), 20.0,
-                                 self.RADIUS, root=str(tmp_path)) is None
+                                 self.RADIUS) is None
 
-    def test_a_bookmark_without_a_location_or_on_another_body_is_ignored(self, tmp_path):
-        self.write(tmp_path, "a.json", location_index=None)
-        self.write(tmp_path, "b.json", planet_name="Andel 8 c")
-        assert cards.location_at("Andel", "Andel 8 b", 10.0, 20.0, self.RADIUS,
-                                 root=str(tmp_path)) is None
+    def test_a_bookmark_without_a_location_or_on_another_body_is_ignored(self):
+        self.put(location_index=None)
+        self.put(planet_name="Andel 8 c")
+        assert cards.location_at("Andel", "Andel 8 b", 10.0, 20.0, self.RADIUS) is None
 
-    def test_no_radius_no_answer(self, tmp_path):
-        self.write(tmp_path, "a.json")
-        assert cards.location_at("Andel", "Andel 8 b", 10.0, 20.0, None, root=str(tmp_path)) is None
+    def test_no_radius_no_answer(self):
+        self.put()
+        assert cards.location_at("Andel", "Andel 8 b", 10.0, 20.0, None) is None
 
 
 class TestSameBody:
@@ -370,21 +408,21 @@ class TestSameBody:
         assert cards.same_body(record, "Andel 1 a", system_address=111, body_id=3)
         assert not cards.same_body(record, "Andel 1 b", system_address=111, body_id=3)
 
-    def test_nearby_skips_a_same_named_body_elsewhere(self, tmp_path):
+    def test_nearby_skips_a_same_named_body_elsewhere(self):
         record = {"system": "Andel", "planet_name": "Hyperion", "commodity": "Monazite",
                   "latitude": 10.0, "longitude": 20.0, "system_address": 111, "body_id": 3}
-        (tmp_path / "a.json").write_text(json.dumps(record), encoding="utf-8")
+        spotcard.save(record)
         spot = dict(record, system_address=222, planet_radius=1352744.5)
-        assert cards.nearby(spot, root=str(tmp_path)) is None
-        assert cards.nearby(dict(spot, system_address=111), root=str(tmp_path)) is not None
+        assert cards.nearby(spot) is None
+        assert cards.nearby(dict(spot, system_address=111)) is not None
 
-    def test_location_at_skips_a_same_named_body_elsewhere(self, tmp_path):
-        record = {"system": "Andel", "planet_name": "Hyperion", "latitude": 10.0,
-                  "longitude": 20.0, "location_index": 4, "system_address": 111, "body_id": 3}
-        (tmp_path / "a.json").write_text(json.dumps(record), encoding="utf-8")
+    def test_location_at_skips_a_same_named_body_elsewhere(self):
+        spotcard.save({"system": "Andel", "planet_name": "Hyperion", "latitude": 10.0,
+                       "longitude": 20.0, "location_index": 4, "system_address": 111,
+                       "body_id": 3})
         args = ("Andel", "Hyperion", 10.0, 20.0, 1352744.5)
-        assert cards.location_at(*args, root=str(tmp_path), system_address=222) is None
-        assert cards.location_at(*args, root=str(tmp_path), system_address=111)[0] == 4
+        assert cards.location_at(*args, system_address=222) is None
+        assert cards.location_at(*args, system_address=111)[0] == 4
 
     def test_an_update_gives_an_old_bookmark_the_ids(self):
         new = cards.updated({"planet_name": "Andel 1 a"},

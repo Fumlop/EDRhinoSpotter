@@ -112,8 +112,8 @@ class Coverage:
 
     def __init__(self, body, lat, lon, radius, system_address=None):
         self.body = body
-        # The game's IDs for the body, once known. The coverage folder is by
-        # body name only, and a name is only unique inside its system.
+        # The game's IDs for the body, once known. Maps are kept by body name,
+        # and a name is only unique inside its system.
         self.system_address = system_address
         self.body_id = None
         self.origin = (lat, lon)

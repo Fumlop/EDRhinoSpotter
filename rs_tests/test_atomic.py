@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from rs_core import atomic, spotcard
+from rs_core import atomic
 
 
 class TestWrite:
@@ -76,18 +76,3 @@ class TestWrite:
             atomic.write_bytes(path, "not bytes")
         assert os.listdir(str(tmp_path)) == ["a.gz"]
         assert (tmp_path / "a.gz").read_bytes() == b"old"
-
-    def test_a_bookmark_that_cannot_be_saved_keeps_the_old_one(self, tmp_path, monkeypatch):
-        """spotcard.save goes through it, and still raises so the panel says why."""
-        path = spotcard.save({"planet_name": "Andel 1 a", "rigs": 6},
-                             out_path=str(tmp_path / "Andel_1_a_loc1_monazite.json"))
-        before = (tmp_path / "Andel_1_a_loc1_monazite.json").read_text(encoding="utf-8")
-
-        def refuse(src, dst):
-            raise OSError("disk full")
-        monkeypatch.setattr(atomic.os, "replace", refuse)
-
-        with pytest.raises(OSError):
-            spotcard.save({"planet_name": "Andel 1 a", "rigs": 8}, out_path=path)
-        assert os.listdir(str(tmp_path)) == ["Andel_1_a_loc1_monazite.json"]
-        assert (tmp_path / "Andel_1_a_loc1_monazite.json").read_text(encoding="utf-8") == before

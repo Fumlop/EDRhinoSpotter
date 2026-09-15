@@ -1,8 +1,6 @@
 """Which bodies in a system you have already marked.
 
-Read from the JSON bookmarks spotcard writes, not from the file names. A name
-has had its spaces replaced and its material lowercased, so reading a body
-back out of one is a guess; the JSON holds what was actually marked.
+Read from the bookmarks spotcard writes into the database - rs_core/database.py.
 
 No tkinter and no PIL, so it can be checked without EDMC or a display. See
 rs_tests/test_cards.py.
@@ -10,9 +8,10 @@ rs_tests/test_cards.py.
 
 import json
 import os
+import sqlite3
 from datetime import datetime, timezone
 
-from rs_core import atomic, guide
+from rs_core import database, guide
 from rs_core.logging import logger
 from rs_core.spotcard import card_dir
 
@@ -24,93 +23,101 @@ from rs_core.spotcard import card_dir
 # on top that is 96 m, set to a round 100 m.
 SAME_SPOT_M = 100.0
 
-# Bookmarks already reported as unreadable. The minimap reads the folder every
-# 10 s, and one broken file is one line in the log, not six a minute.
+# Bookmarks already reported as unreadable. The minimap reads them again on
+# every change, and one broken row is one line in the log, not one a change.
 _warned = set()
 
 
-def for_system(system, root=None):
-    """Every bookmark marked in that system, newest last.
+def for_system(system, db=None):
+    """Every bookmark marked in that system, in the order they were made.
 
-    The JSON is the bookmark. Older versions wrote a PNG card beside it; that
-    card's path is kept in `path` when it is still there, so Delete takes it
-    too, and None otherwise. A PNG with no JSON is skipped rather than guessed
-    at - a link to the wrong body is worse than no link.
+    Each record carries its row as `id`. Older versions wrote a PNG card beside
+    the bookmark; that card's path is kept in `path` when it is still there,
+    so Delete takes it too, and None otherwise.
     """
-    folder = card_dir(system) if root is None else root
     try:
-        names = sorted(os.listdir(folder))
-    except OSError:
+        with database.connect(db) as conn:
+            rows = conn.execute("SELECT id, data FROM bookmarks WHERE system = ? ORDER BY id",
+                                (system,)).fetchall()
+    except (sqlite3.Error, OSError) as err:
+        logger.warning(f"could not read the bookmarks of {system}: {err}")
         return []
 
     found = []
-    for name in names:
-        if not name.endswith(".json"):
-            continue
-        path = os.path.join(folder, name)
+    for id, data in rows:
         try:
-            with open(path, encoding="utf-8") as handle:
-                record = json.load(handle)
-        except (OSError, ValueError) as err:
-            if path not in _warned:
-                _warned.add(path)
-                logger.warning(f"skipping unreadable bookmark {path}: {err}")
+            record = json.loads(data)
+        except ValueError as err:
+            if id not in _warned:
+                _warned.add(id)
+                logger.warning(f"skipping unreadable bookmark {id} in {system}: {err}")
             continue
         if not isinstance(record, dict) or not record.get("planet_name"):
             continue
-        card = os.path.join(folder, record.get("card") or os.path.splitext(name)[0] + ".png")
-        record["path"] = card if os.path.isfile(card) else None
-        record["sidecar"] = path
+        card = os.path.join(card_dir(system), record["card"]) if record.get("card") else None
+        record["path"] = card if card and os.path.isfile(card) else None
+        record["id"] = id
         found.append(record)
     return found
 
 
-def delete(record):
-    """Remove a bookmark: its JSON, and an old card's PNG if it has one.
+def delete(record, db=None):
+    """Remove a bookmark: its row, and an old card's PNG if it has one.
 
-    True when something was removed. A file that is already gone is the state
-    the caller asked for and not a failure; a file that will not go - open in
-    a viewer, on a read-only folder - is, and says so rather than leaving the
-    list claiming it is deleted.
+    True when something was removed. A PNG that is already gone is the state
+    the caller asked for and not a failure; one that will not go - open in a
+    viewer, on a read-only folder - is, says so, and leaves the bookmark in
+    place rather than the list claiming it is deleted.
     """
     removed = False
-    for key in ("path", "sidecar"):
-        target = record.get(key)
-        if not target:
-            continue
+    if record.get("path"):
         try:
-            os.remove(target)
+            os.remove(record["path"])
             removed = True
         except FileNotFoundError:
-            continue
+            pass
         except OSError as err:
-            logger.warning(f"could not delete {target}: {err}")
+            logger.warning(f"could not delete {record['path']}: {err}")
             return False
+    if record.get("id") is not None:
+        try:
+            with database.connect(db) as conn:
+                removed = conn.execute("DELETE FROM bookmarks WHERE id = ?",
+                                       (record["id"],)).rowcount > 0 or removed
+        except (sqlite3.Error, OSError) as err:
+            logger.warning(f"could not delete bookmark {record['id']}: {err}")
+            return False
+        database.changed()
     return removed
 
 
-def set_depleted(record, depleted, when=None):
+def set_depleted(record, depleted, when=None, db=None):
     """Mark a bookmark as mined out, or take the mark off. True when written.
 
-    Written into the bookmark's own JSON as `depleted_at` - when it was marked,
-    not a yes/no - so the day the community knows how long a patch takes to
-    come back, the time is already there to count from. No mark, no key.
+    Written into the bookmark as `depleted_at` - when it was marked, not a
+    yes/no - so the day the community knows how long a patch takes to come
+    back, the time is already there to count from. No mark, no key.
     The record in hand is updated to match.
     """
-    path = record.get("sidecar")
-    if not path:
+    if record.get("id") is None:
         return False
     try:
-        with open(path, encoding="utf-8") as handle:
-            data = json.load(handle)
-        if depleted:
-            data["depleted_at"] = when or datetime.now(timezone.utc).isoformat(timespec="seconds")
-        else:
-            data.pop("depleted_at", None)
-        atomic.write_text(path, json.dumps(data, indent=1))
-    except (OSError, ValueError) as err:
-        logger.warning(f"could not mark {path} depleted: {err}")
+        with database.connect(db) as conn:
+            row = conn.execute("SELECT data FROM bookmarks WHERE id = ?",
+                               (record["id"],)).fetchone()
+            if row is None:
+                logger.warning(f"could not mark bookmark {record['id']} depleted: it is gone")
+                return False
+            data = json.loads(row[0])
+            if depleted:
+                data["depleted_at"] = when or datetime.now(timezone.utc).isoformat(timespec="seconds")
+            else:
+                data.pop("depleted_at", None)
+            database.write_bookmark(conn, data, record["id"])
+    except (sqlite3.Error, OSError, ValueError) as err:
+        logger.warning(f"could not mark bookmark {record['id']} depleted: {err}")
         return False
+    database.changed()
     if depleted:
         record["depleted_at"] = data["depleted_at"]
     else:
@@ -131,7 +138,7 @@ def same_body(record, name, system_address=None, body_id=None):
     return record.get("planet_name") == name
 
 
-def nearby(spot, root=None, within=SAME_SPOT_M):
+def nearby(spot, db=None, within=SAME_SPOT_M):
     """The bookmark a new mark updates, or None: same body, same material,
     within `within` metres, the nearest one. None too when the mark carries no
     planet radius, since without it there is no distance to measure."""
@@ -141,7 +148,7 @@ def nearby(spot, root=None, within=SAME_SPOT_M):
     if not radius or lat is None or lon is None or not material:
         return None
     best = None
-    for record in for_system(spot.get("system"), root):
+    for record in for_system(spot.get("system"), db):
         if not same_body(record, spot.get("planet_name"), spot.get("system_address"),
                          spot.get("body_id")):
             continue
@@ -170,7 +177,7 @@ def nearby(spot, root=None, within=SAME_SPOT_M):
 SAME_LOCATION_M = 10000.0
 
 
-def location_at(system, body, lat, lon, radius, root=None, within=SAME_LOCATION_M,
+def location_at(system, body, lat, lon, radius, db=None, within=SAME_LOCATION_M,
                 system_address=None, body_id=None):
     """(location index, metres) of the nearest bookmark on `body` that knows its
     location and lies within `within` metres, or None. The IDs, when known,
@@ -178,7 +185,7 @@ def location_at(system, body, lat, lon, radius, root=None, within=SAME_LOCATION_
     if not radius or lat is None or lon is None:
         return None
     best = None
-    for record in for_system(system, root):
+    for record in for_system(system, db):
         index = record.get("location_index")
         if not same_body(record, body, system_address, body_id) or not isinstance(index, int):
             continue
@@ -204,7 +211,7 @@ def updated(old, spot):
     takes the Depleted mark off: the deposit reads live again.
     """
     record = {key: value for key, value in old.items()
-              if key not in ("path", "sidecar", "distance_m")}
+              if key not in ("path", "id", "distance_m")}
     for key in ("amount", "density"):
         if spot.get(key) is not None:
             record[key] = spot[key]
@@ -219,14 +226,14 @@ def updated(old, spot):
     return record
 
 
-def by_body(system, root=None):
+def by_body(system, db=None):
     """{body name: [card, ...]} for one system.
 
     Keyed by the body exactly as the journal names it, which is what the scan
     window has in hand - no normalising on either side, so a match is a match.
     """
     grouped = {}
-    for record in for_system(system, root):
+    for record in for_system(system, db):
         grouped.setdefault(record["planet_name"], []).append(record)
     return grouped
 

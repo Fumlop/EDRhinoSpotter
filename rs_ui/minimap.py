@@ -23,8 +23,10 @@ import os
 import threading
 import time
 import tkinter as tk
+from tkinter import messagebox
 
-from rs_core import arrow, cards, coverage, coverstore, grounds, guide, palette, spotcard, spotmark, store
+from rs_core import (arrow, cards, coverage, coverstore, database, grounds, guide, migrate,
+                     palette, spotmark, store)
 from rs_core.logging import logger
 from rs_ui import hotkey, overlay
 
@@ -74,7 +76,7 @@ _notice = None           # (text, until monotonic) on the hint line, e.g. "set c
 _writes = store.Debounced(write=coverstore.save)
 _in_srv = False
 _failed = False          # a draw that raised: stay down until the next launch
-_marks = None            # ((system, body, cards folder mtime), [(lat, lon, code, depleted), ...])
+_marks = None            # ((system, body, bookmark revision), [(lat, lon, code, depleted), ...])
 _why = None              # why the map is down, logged when it changes (debug only)
 _codes = None            # grounds.Sheet.codes, read once
 _fresh = []              # [(system, body, lat, lon, code, when)] bookmarked, maybe not on disk yet
@@ -223,27 +225,22 @@ def _remember():
 def _bookmarks(system, body):
     """[(lat, lon, code, depleted), ...] of the bookmarks on this body.
 
-    Read again when the cards folder changes - a bookmark written, updated or
-    deleted moves its modified time, since every write is a temp file moved
-    into place. Nothing else changes a bookmark, so nothing else re-reads.
+    Read again when a bookmark was written, updated or deleted -
+    database.revision() moves on every one. Nothing else changes a bookmark,
+    so nothing else re-reads.
     """
     global _marks
     if not system or not body:
         return []
-    try:
-        stamp = os.stat(spotcard.card_dir(system)).st_mtime_ns
-    except OSError:
-        stamp = None
-    key = (system, body, stamp)
+    key = (system, body, database.revision())
     if _marks is None or _marks[0] != key:
         points = []
-        if stamp is not None:
-            for record in cards.for_system(system):
-                lat, lon = record.get("latitude"), record.get("longitude")
-                if (record.get("planet_name") == body and isinstance(lat, (int, float))
-                        and isinstance(lon, (int, float))):
-                    points.append((lat, lon, _code(record.get("commodity")),
-                                   bool(record.get("depleted_at"))))
+        for record in cards.for_system(system):
+            lat, lon = record.get("latitude"), record.get("longitude")
+            if (record.get("planet_name") == body and isinstance(lat, (int, float))
+                    and isinstance(lon, (int, float))):
+                points.append((lat, lon, _code(record.get("commodity")),
+                               bool(record.get("depleted_at"))))
         _marks = (key, points)
     now = time.monotonic()
     _fresh[:] = [f for f in _fresh if now - f[5] < FRESH_S]
@@ -264,9 +261,9 @@ def _code(material):
 def bookmarked(spot):
     """A bookmark was just made: on the map now, not when its card is on disk.
 
-    The card renders on a worker thread, and until its sidecar is written and
+    The card renders on a worker thread, and until its bookmark is written and
     read back the dot would be missing. Kept beside what is read from disk for
-    FRESH_S, by which time the sidecar has been read or the card failed.
+    FRESH_S, by which time the bookmark has been read or the card failed.
     """
     global _drawn
     lat, lon = spot.get("latitude"), spot.get("longitude")
@@ -432,7 +429,42 @@ def prefs(parent):
         row=3, column=0, sticky="w", padx=10, pady=(2, 10))
     nb.Button(frame, text="Open folder", command=_open_folder).grid(
         row=3, column=1, sticky="w", padx=10, pady=(2, 10))
+    # The JSON files 4.1 wrote, once the database holds them.
+    result = nb.Label(frame, text="")
+    nb.Button(frame, text="Delete migrated JSON",
+              command=lambda: _delete_migrated(frame, result)).grid(
+        row=4, column=0, sticky="w", padx=10, pady=(2, 10))
+    result.grid(row=4, column=1, sticky="w", padx=10, pady=(2, 10))
     return frame
+
+
+def _delete_migrated(frame, result):
+    """Ask, then delete the old JSON files the database already holds.
+    Pictures, skipped files and the database itself stay."""
+    try:
+        files = migrate.leftovers()
+    except Exception as err:            # OSError, sqlite3.Error
+        logger.warning(f"minimap: could not look for migrated JSON: {err}")
+        result.config(text="could not check - see the log")
+        return
+    if not files:
+        result.config(text="nothing to delete")
+        return
+    if not messagebox.askyesno(
+            "Delete migrated JSON",
+            f"Delete {len(files)} old JSON files from {database.ROOT}?" + os.linesep * 2
+            + "They are in the database already. Map pictures, files the import "
+              "skipped and the database stay.",
+            default="no", parent=frame.winfo_toplevel()):
+        return
+    try:
+        deleted, failed = migrate.delete_leftovers()
+    except Exception as err:
+        logger.warning(f"minimap: could not delete migrated JSON: {err}")
+        result.config(text="could not check - see the log")
+        return
+    result.config(text=f"deleted {len(deleted)}" + (f", {len(failed)} failed - see the log"
+                                                    if failed else ""))
 
 
 def _open_folder():

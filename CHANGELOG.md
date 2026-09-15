@@ -1,19 +1,28 @@
 # Changelog
 
-## 4.1.14
-
-**Fixed**
-
-- A bookmark is written to a temporary file and moved into place, so a crash or
-  the minimap reading it mid-write can no longer leave a cut-off file that
-  drops out of the list. A bookmark that cannot be read is logged once, with
-  its path, instead of vanishing without a word.
+## 4.2.0
 
 **Changed**
 
+- Bookmarks, scanned bodies and minimap map points live in one SQLite file,
+  `%LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db`, instead of JSON files under
+  `data\`, `cards\` and `coverage\`. A write is one transaction, so a crash
+  can no longer leave a cut-off bookmark. Map pictures stay PNG files in
+  `coverage\<Body>\`.
+- The first start imports the old JSON files and writes `db\migrate.done`;
+  later starts see that file and skip the import. The old files are left where
+  they are. A file that cannot be read is logged and listed in
+  `migrate.done`.
+- EDMC closing copies the database to `db\backups\`; the newest two copies
+  are kept.
+- The "bookmarks" link in the panel is gone - bookmarks are read in RhinoScan.
+- Settings: "Delete migrated JSON" removes, after asking, the old JSON files
+  whose contents the database holds (checked row by row) and stray `.tmp`
+  files. Map pictures, files the import skipped and anything written after
+  the import stay.
 - Bookmarks, the body cache and minimap maps keep the game's SystemAddress and
   BodyID beside the names. A body of the same name in another system no
-  longer shares maps or bookmark matches. Files written before keep working
+  longer shares maps or bookmark matches. Records from before keep working
   and are matched by name; they get the IDs the next time they are written.
 
 ## 4.1.13

@@ -1,8 +1,8 @@
 """A file written whole or not at all.
 
 Written to a temporary file beside the target and moved onto it: EDMC can be
-closed at any moment, and the minimap reads bookmarks while the worker thread
-writes them. A reader sees the old file or the new one, never half of one.
+closed at any moment. A reader sees the old file or the new one, never half of
+one. Used for the map pictures and migrate.done; the rest is in the database.
 
 On failure the temporary file is removed and the error raised; the target is
 left as it was. The folder has to exist - the callers make it.
@@ -14,9 +14,8 @@ import os
 import tempfile
 import time
 
-# Windows refuses to replace a file another thread has open - the minimap
-# reading the bookmark being updated. A read takes well under a millisecond,
-# so a few short waits get past it.
+# Windows refuses to replace a file something else has open - a viewer
+# holding the map picture. A few short waits get past a brief hold.
 REPLACE_TRIES = 5
 REPLACE_WAIT_S = 0.05
 

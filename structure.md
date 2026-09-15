@@ -47,10 +47,22 @@ No tkinter anywhere in here.
   `location_index()`, `read_status()`, `mark()`, `on_surface()`, `MATERIALS`.
   `nearest_index()` reads the same location out of a `Touchdown` or `Liftoff`
   instead, which is where it survives the moment Status.json forgets it.
-- **[spotcard.py](rs_core/spotcard.py)** - one spot -> a JSON bookmark. Looks
-  nothing up. `save()`, `filename()`, `_free()` (a repeat mark is a second
-  bookmark, not a replacement), `CARDS_ROOT`, and `_font()` for the map
-  picture's text. It drew a PNG card until the map picture replaced it.
+- **[spotcard.py](rs_core/spotcard.py)** - one spot -> a bookmark row. Looks
+  nothing up. `save()` inserts (a repeat mark is a second bookmark, not a
+  replacement) or, with `id`, replaces one; `CARDS_ROOT` is where 4.1 kept
+  bookmarks and old card PNGs; `_font()` for the map picture's text.
+- **[database.py](rs_core/database.py)** - the one SQLite file,
+  `%LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db`. `connect()` is a
+  connection per piece of work, committed or rolled back and closed - three
+  threads write, none share one. Tables `bodies`, `bookmarks`, `maps`: the
+  columns a lookup needs plus the whole record as JSON (maps: gzipped).
+  `PRAGMA user_version` is the schema version. `revision()` moves on every
+  bookmark change. `backup()` at plugin_stop keeps the newest two copies.
+- **[migrate.py](rs_core/migrate.py)** - the JSON files of 4.1 into the
+  database, once. `db\migrate.done` is written after the import and makes
+  every later start return before listing a folder. Old files are never
+  touched; an unreadable one is logged and listed in migrate.done; a row
+  already in the database wins over its file.
 - **[grounds.py](rs_core/grounds.py)** - what a body is, and what that kind of
   body holds. `classify()` turns a journal Scan into one of ten grounds;
   `Sheet` reads `mining_sheet.json`. The classifier mirrors the CASE in
@@ -66,12 +78,11 @@ No tkinter anywhere in here.
   arriving asks
   `on_arrive` what is already known and starts from that, every change goes
   straight to `on_change`, and what came off disk is never written back.
-- **[store.py](rs_core/store.py)** - one JSON file per system under
-  `%LOCALAPPDATA%\RhinoSpotter\data\`, beside the cards and outside the
-  plugin folder for the same reason they are. EDMC replays the journal file it
-  is watching and nothing older, so a system honked last week is otherwise
-  gone. Written through a temp file and a rename: EDMC can be closed at any
-  moment, and a half-written cache that still parses is worse than none.
+- **[store.py](rs_core/store.py)** - a system's bodies in the database, a row
+  per body. EDMC replays the journal file it is watching and nothing older, so
+  a system honked last week is otherwise gone. A save replaces the system in
+  one transaction: EDMC can be closed at any moment, and half a system that
+  still reads is worse than none.
   `Debounced` is what the panel hands the register instead of `save`: a honk
   is one change per body and all of them rewrite the same file, so the first
   starts a two-second timer and the last one before it fires is what gets
@@ -79,11 +90,12 @@ No tkinter anywhere in here.
   than the delay is written as it goes rather than held until it ends - and
   `flush()` at plugin_stop means a normal shutdown loses nothing.
 - **[coverstore.py](rs_core/coverstore.py)** - the minimap's maps under
-  `%LOCALAPPDATA%\RhinoSpotter\coverage\<Body>\map N.json.gz`, a folder per
-  body and a file per map, so a save never merges. The points that painted new
-  ground, and the center once one is set, lat/lon to six decimals, gzipped: an hour's drive
-  is about 2.4 KB. Plain `.json` is read too. A file that will not parse is
-  skipped and logged. `map N.png` beside it is written, never read.
+  a row per map in the database, keyed by body and name, so a save never
+  merges. The points that painted new ground, and the center once one is set,
+  lat/lon to six decimals, gzipped: an hour's drive is about 2.4 KB. A row
+  that will not parse is skipped and logged. `coverage\<Body>\map N.png` is
+  written, never read; `next_name()` counts those too, so no picture is
+  overwritten.
 - **[replay.py](rs_core/replay.py)** - recent journals through the same
   Register the live plugin uses, and a score for what they found. Every
   landable body is worth the best rate its ground has ever shown and the
@@ -124,13 +136,11 @@ No tkinter anywhere in here.
   the card itself and the system cache all need a name Windows will take, and
   they used to have three copies of the loop that makes one.
 - **[cards.py](rs_core/cards.py)** - which bodies in a system have been
-  marked, read from the JSON bookmarks rather than the file names. A name has
-  had its spaces replaced and its material lowercased, so reading a body back
-  out of one is a guess; a PNG without JSON is skipped rather than guessed at.
+  marked, read from the bookmark rows; each record carries its row as `id`.
   An old card's PNG is kept on the record as `path` when it is still there.
   `ordered()` is the order a body's bookmarks are read in: most rigs first,
-  uncounted ones last; `delete()` removes one, JSON and any old PNG at once;
-  `set_depleted()` writes or removes `depleted_at` in the bookmark's JSON.
+  uncounted ones last; `delete()` removes one, row and any old PNG at once;
+  `set_depleted()` writes or removes `depleted_at` in the bookmark.
 - **[deposit.py](rs_core/deposit.py)** - rig positions and HUD Amount into a
   range of tons left, 275-300 t a position, with the measured deposit behind
   it in the docstring. The panel's Density and Amount pickers write into the
@@ -250,19 +260,25 @@ Everything in here imports tkinter.
   window-height clamp, north up, and the layer kept until new ground is
   painted. Saved maps: the points repaint the same mask, a launch within reach
   carries the last saved map on (nearest on a tie), one out of reach starts a new one.
-- **test_coverstore.py** - gzipped round trip, plain JSON read, a broken or
-  other-version file skipped, `map N` numbering, and the settings-tab count.
-- **test_names.py** - every character Windows refuses, spaces kept for a folder
-  and replaced for a file, and that the cache and the cards folder spell one
-  system the same way.
+- **test_coverstore.py** - gzipped round trip, a broken or other-version row
+  skipped, `map N` numbering past rows and pictures, and the settings-tab count.
+- **test_database.py** - the schema on a new file, a block that raises writes
+  nothing, bookmark columns, an import source taken once, and the backup: the
+  copy holds the data, two kept, a failed copy pushes none out.
+- **test_migrate.py** - everything readable comes in, the old files are left
+  byte for byte, migrate.done lists what came in and what was skipped, a
+  database that cannot be written leaves no marker, with the marker no folder
+  is listed, and a second run adds nothing and keeps newer rows.
+- **test_names.py** - every character Windows refuses, spaces kept, and the
+  fallback for a name with nothing left in it.
 - **test_palette.py** - that the window draws from the one palette, and
   that a colour which is not six hex digits raises rather than silently
   becoming black.
 - **test_replay.py** - which files count as recent, that a second visit does
   not lose the first, and that a ground the sheet never measured is worth
   nothing rather than guessed at.
-- **test_store.py** - round trip, system names Explorer refuses, an older
-  cache shape, that no temporary file survives a save, and the debounce: a
+- **test_store.py** - round trip, system names Explorer refuses, a database
+  or row that cannot be read, and the debounce: a
   burst is one write, the last change is the one written, flush takes the
   pending write with it, and a burst longer than the delay still reaches disk.
 - **test_update.py** - version comparison, that every network failure is the
@@ -276,7 +292,7 @@ Everything in here imports tkinter.
 |---|---|---|
 | Bodies in this system | journal `Scan` events, via EDMC | the game, live |
 | Mining locations on a body | journal `FSSBodySignals` / `SAASignalsFound` | the FSS, then a surface scan |
-| Systems visited before | `%LOCALAPPDATA%\RhinoSpotter\data\<System>.json` | written on every change |
+| Systems visited before | `%LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db` | written on every change |
 | What a ground holds | `mining_sheet.json` | shipped with the release |
 | What a location holds | nothing - it is in no feed | screenshot and read by eye |
 | Where you are, while guiding | `Status.json` | the game, twice a second |

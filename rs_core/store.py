@@ -4,19 +4,15 @@ EDMC replays the journal file it is watching and nothing older. Every game
 restart opens a new file, so a system honked last week is gone from the
 plugin's view even though the commander scanned it properly at the time.
 
-So each system is written out as one small JSON file and read back when you
-arrive there again. No network, no EDSM, no database: this is the commander's
-own scan data going to disk and coming back.
+So each system's bodies go into the database and are read back when you
+arrive there again. No network, no EDSM: this is the commander's own scan data
+going to disk and coming back. A row per body, the body itself as JSON.
 
-    %LOCALAPPDATA%\RhinoSpotter\data\<System>.json
+    %LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db    - rs_core/database.py
 
-Beside the cards, and outside the plugin folder for the same reason they are:
-a reinstall replaces the plugin, and nobody expects it to take their scans
-with it.
-
-One file per system rather than a folder per body. A body is a handful of
-fields; a folder holding four of them costs four directory reads to answer one
-question about the system.
+Outside the plugin folder: a reinstall replaces the plugin, and nobody expects
+it to take their scans with it. The JSON files older versions wrote under
+data\ are read in once by rs_core/migrate.py.
 
 Written on every change rather than when you leave. A system you never leave -
 because the game crashed, or EDMC was closed on the pad - is exactly the one
@@ -27,96 +23,67 @@ rs_tests/test_store.py.
 """
 
 import json
-import os
+import sqlite3
 import threading
 
-from rs_core import atomic, names
+from rs_core import database
 from rs_core.logging import logger
 
-# Beside the cards, and outside the plugin folder for the same reason: scans
-# outlive a plugin reinstall, and %LOCALAPPDATA% is somewhere Explorer opens
-# without hunting for it.
-STORE_ROOT = os.path.join(os.environ.get("LOCALAPPDATA")
-                          or os.path.expanduser("~"), "RhinoSpotter", "data")
-VERSION = 1
 
+def save(system, bodies, db=None):
+    """Write one system, replacing what was there. Returns the database path,
+    or None if it could not be written.
 
-def safe_name(system):
-    r"""A system name Windows will accept as a filename.
-
-    The same rule the cards folder uses - rs_core/names.py. It has to be the
-    same one: a system that is safe here and not there is a cache that cannot
-    be matched to the cards beside it.
-    """
-    return names.safe(system)
-
-
-def path_for(system, root=STORE_ROOT):
-    return os.path.join(root, safe_name(system) + ".json")
-
-
-def save(system, bodies, root=STORE_ROOT):
-    """Write one system. Returns the path, or None if it could not be written.
-
-    Written to a temporary file and moved into place: EDMC can be closed at any
-    moment, and a half-written cache file that still parses would be worse than
-    none - it would look like a system with three bodies in it.
+    One transaction: EDMC can be closed at any moment, and half a system that
+    still reads would be worse than none - it would look like a system with
+    three bodies in it.
     """
     if not system or not bodies:
         return None
+    rows = [(system, body["name"], body.get("system_address"), body.get("body_id"),
+             json.dumps(body)) for body in bodies]
     try:
-        os.makedirs(root, exist_ok=True)
-        target = path_for(system, root)
-        # The address belongs to the system, so it is written once under its
-        # name rather than on every body. A body that names another one - not
-        # something a journal does - keeps its own.
-        address = next((body["system_address"] for body in bodies
-                        if body.get("system_address") is not None), None)
-        payload = {"version": VERSION, "system": system}
-        if address is not None:
-            payload["system_address"] = address
-            bodies = [{key: value for key, value in body.items()
-                       if not (key == "system_address" and value in (None, address))}
-                      for body in bodies]
-        payload["bodies"] = bodies
-        atomic.write_text(target, json.dumps(payload, indent=1))
-        return target
-    except OSError as err:
-        logger.debug(f"could not cache {system}: {err}")
+        with database.connect(db) as conn:
+            conn.execute("DELETE FROM bodies WHERE system = ?", (system,))
+            conn.executemany("INSERT OR REPLACE INTO bodies "
+                             "(system, name, system_address, body_id, data) "
+                             "VALUES (?, ?, ?, ?, ?)", rows)
+        return db or database.PATH
+    except (sqlite3.Error, OSError) as err:
+        logger.warning(f"could not cache {system}: {err}")
         return None
 
 
-def load(system, root=STORE_ROOT):
+def load(system, db=None):
     """The bodies cached for that system, or [].
 
     Every failure is the same empty answer. A cache that cannot be read is a
     cache that is not there, and the panel says "honk the system" either way.
     """
     try:
-        with open(path_for(system, root), encoding="utf-8") as handle:
-            data = json.load(handle)
-    except (OSError, ValueError):
+        with database.connect(db) as conn:
+            rows = conn.execute("SELECT system_address, data FROM bodies WHERE system = ? "
+                                "ORDER BY rowid", (system,)).fetchall()
+        bodies = [json.loads(data) for _, data in rows]
+    except (sqlite3.Error, OSError, ValueError) as err:
+        logger.warning(f"could not read the cache of {system}: {err}")
         return []
-    if data.get("version") != VERSION:
-        # A shape from an older plugin. Dropping it costs one honk; guessing at
-        # it costs a wrong answer that looks right.
-        return []
-    bodies = data.get("bodies")
-    if not isinstance(bodies, list):
-        return []
-    # Handed back on each body, which is how the register takes it in.
-    address = data.get("system_address")
+    # The address belongs to the system: a body scanned before it was known
+    # takes it from the others, which is how the register takes it in.
+    address = next((row[0] for row in rows if row[0] is not None), None)
     if address is not None:
         bodies = [dict(body, system_address=body.get("system_address", address))
                   if isinstance(body, dict) else body for body in bodies]
     return bodies
 
 
-def systems(root=STORE_ROOT):
+def systems(db=None):
     """Every system name in the cache, for a count in the panel."""
     try:
-        return sorted(name[:-5] for name in os.listdir(root) if name.endswith(".json"))
-    except OSError:
+        with database.connect(db) as conn:
+            return [row[0] for row in conn.execute(
+                "SELECT DISTINCT system FROM bodies ORDER BY system")]
+    except (sqlite3.Error, OSError):
         return []
 
 
@@ -130,9 +97,9 @@ DEBOUNCE_S = 2.0
 class Debounced:
     """`save`, with a burst of them written once.
 
-    A honk is one change per body, and every one of them rewrote the whole
-    system file: 45 landable bodies in Col 285 Sector LM-V d2-73 meant 45
-    writes to end up with one 5 KB file. At 1.1 ms a write that is 50 ms, so
+    A honk is one change per body, and every one of them rewrites the whole
+    system: 45 landable bodies in Col 285 Sector LM-V d2-73 meant 45
+    writes to end up with one system. At 1.1 ms a write that is 50 ms, so
     this is not about the clock - it is about not rewriting a file forty-five
     times to say the same thing.
 

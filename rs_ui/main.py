@@ -9,12 +9,11 @@ come back through _on_ui. Tk is not thread-safe, and a widget written from a
 worker fails minutes later somewhere unrelated.
 """
 
-import os
-import subprocess
 import threading
 import tkinter as tk
 
-from rs_core import bodies, cards, deposit, grounds, palette, spotcard, spotmark, store, update
+from rs_core import (bodies, cards, database, deposit, grounds, migrate, palette, spotcard,
+                     spotmark, store, update)
 from rs_core.logging import logger
 from rs_ui import hotkey, minimap, scan
 
@@ -56,6 +55,8 @@ _rigs = None             # tk.StringVar - rigs on the patch
 _material = None         # tk.StringVar - the material this spot is mined for
 _density = None          # tk.StringVar - the deposit's HUD Density, or NOT_READ
 _amount = None           # tk.StringVar - the deposit's HUD Amount, or NOT_READ
+_search = None           # tk.StringVar - bookmark search text, not used yet
+SEARCH_SHOWN = False     # the Search row under Bookmark, off until search works
 # Density and Amount before anything is picked. Not required: a bookmark without
 # them is still a bookmark, it just cannot say how many tons are left.
 NOT_READ = "-"
@@ -63,6 +64,12 @@ NOT_READ = "-"
 
 def start(plugin_dir):
     global _sheet
+    # Before anything reads the database: the JSON files of 4.1 go in once.
+    try:
+        migrate.run()
+    except Exception:
+        logger.exception("importing the old JSON files into the database failed - "
+                         "the next start tries again")
     _sheet = grounds.Sheet()
     if not _sheet.loaded:
         logger.warning(f"no mining_sheet.json: {_sheet.error}")
@@ -71,15 +78,13 @@ def start(plugin_dir):
 
 def build(parent):
     global _frame, _status, _scan_count, _card_button, _landed_after
-    global _loc, _rigs, _material, _density, _amount
+    global _loc, _rigs, _material, _density, _amount, _search
 
     _frame = tk.Frame(parent)
     _frame.columnconfigure(1, weight=1)
 
     tk.Label(_frame, text=f"RhinoSpotter {update.RUNNING}", anchor="w").grid(
         row=0, column=0, sticky="w", padx=2, pady=(4, 2))
-    link = _folder_link(_frame)
-    link.grid(row=0, column=1, sticky="w", padx=2, pady=(4, 2))
 
     # Up here with the system-level things, not down beside the button. How
     # many bodies are in this system is true before anyone presses anything,
@@ -131,22 +136,26 @@ def build(parent):
     _card_button.pack(side="left")
     tk.Button(row, text="RhinoScan", width=13, command=open_scan).pack(side="left", padx=(8, 0))
 
+    # The place the bookmark search goes. Hidden until it does something.
+    if SEARCH_SHOWN:
+        _search = tk.StringVar(value="")
+        tk.Label(_frame, text="Search", anchor="w").grid(row=5, column=0, sticky="w", padx=2)
+        tk.Entry(_frame, textvariable=_search).grid(row=5, column=1, columnspan=3,
+                                                    sticky="we", padx=2, pady=(0, 2))
+
     # The one thing RhinoScan cannot do for you, and the thing everyone gets
     # wrong first: the honk finds the bodies, it does not describe them. Only
     # a resolved body carries PlanetClass and Volcanism, which is all this
     # reads. Said here, before you press the button and wonder.
     tk.Label(_frame, text="FSS unknown systems", anchor="w",
-             fg=palette.MUTED).grid(row=5, column=0, columnspan=4,
+             fg=palette.MUTED).grid(row=6, column=0, columnspan=4,
                                     sticky="w", padx=2, pady=(0, 2))
 
     _status = tk.Label(_frame, text="", anchor="w", wraplength=320, justify="left")
-    _status.grid(row=6, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
+    _status.grid(row=7, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
 
     if theme:
         theme.update(_frame)
-    # After the theme, which paints every label the same - the link has to stay
-    # visibly a link.
-    link.config(fg=palette.ACCENT)
 
     # Test mode fills the register before the panel exists, and EDMC may also
     # start mid-session with a system already tracked. Either way the count
@@ -204,27 +213,6 @@ def _on_ui(function, *args):
         _frame.after(0, function, *args)
     except (RuntimeError, tk.TclError):
         pass
-
-
-def _folder_link(parent):
-    """The bookmarks folder, one click away - a path you cannot open is a path
-    you stop looking at."""
-    label = tk.Label(parent, text="bookmarks ↗", anchor="w", cursor="hand2")
-    label.bind("<Button-1>", lambda event: open_cards())
-    return label
-
-
-def open_cards():
-    """Explorer on the bookmarks folder, made if this is the first time."""
-    try:
-        os.makedirs(spotcard.CARDS_ROOT, exist_ok=True)
-        # startfile is Windows-only and EDMC is too, but a failure here must not
-        # be the thing that eats a card.
-        os.startfile(spotcard.CARDS_ROOT)          # noqa: S606
-    except AttributeError:
-        subprocess.Popen(["explorer", spotcard.CARDS_ROOT])
-    except OSError as err:
-        _set_status(f"cannot open {spotcard.CARDS_ROOT}: {err}")
 
 
 def open_scan(at_body=True):
@@ -331,6 +319,8 @@ def stop():
     # Last, and not through the timer: EDMC is going, and a scan waiting on a
     # two-second thread would go with it.
     _writes.flush()
+    # After every write, so the copy has them.
+    database.backup()
 
 
 def prefs(parent):
@@ -439,7 +429,7 @@ def _render_card(spot, token):
             spotcard.save(spot)
             message = None
         else:
-            spotcard.save(cards.updated(old, spot), out_path=old["sidecar"])
+            spotcard.save(cards.updated(old, spot), id=old["id"])
             message = (f"updated Amount/Density of the {spot.get('commodity')} "
                        f"bookmark {old['distance_m']:.0f} m away")
     except Exception as err:

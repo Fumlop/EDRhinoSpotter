@@ -189,8 +189,8 @@ class Register:
     def _persist(self):
         """Every change goes to disk at once, so nothing is lost to a crash.
 
-        A honk is a burst of these - one write per body, each a few kilobytes
-        through a temp file and a rename. That is the price of never scanning a
+        A honk is a burst of these - one write per body, each a transaction
+        rewriting the system. That is the price of never scanning a
         system twice, and it is not a price worth optimising until somebody
         notices it.
         """

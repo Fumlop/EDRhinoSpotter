@@ -14,7 +14,15 @@ PLUGIN_DIR = Path(__file__).parent.parent
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from rs_core import grounds                        # noqa: E402  - needs the path first
+from rs_core import database, grounds              # noqa: E402  - needs the path first
+
+
+@pytest.fixture(autouse=True)
+def db(tmp_path, monkeypatch):
+    """Every test gets its own database, and none of them the commander's."""
+    path = str(tmp_path / "db" / "rhinospotter.db")
+    monkeypatch.setattr(database, "PATH", path)
+    return path
 
 
 def scan(name, planet_class, volcanism="", landable=True, distance=100.0, **extra):
