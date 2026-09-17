@@ -123,24 +123,25 @@ def build(parent):
     # Rigs, Amount and Density give the bookmark a range of tons left: Density
     # sets how much a rig holds, Amount how much of it is still there - see
     # rs_core/deposit.py.
-    # Amount first, Density second: the order the HUD lists them, top to
-    # bottom. The other way round, both got picked into each other's box.
+    # A row each, Amount over Density: the order the HUD lists them, top to
+    # bottom. Side by side they were picked into each other's box, and each
+    # label then sat against the far edge of the panel from its own menu.
     _density = tk.StringVar(value=NOT_READ)
     _amount = tk.StringVar(value=NOT_READ)
     tk.Label(_frame, text="Amount", anchor="w").grid(row=3, column=0, sticky="w", padx=2)
     amount_menu = tk.OptionMenu(_frame, _amount, NOT_READ, *deposit.AMOUNTS)
     _style_menu(amount_menu)
     amount_menu.grid(row=3, column=1, sticky="we", padx=2)
-    tk.Label(_frame, text="Density", anchor="w").grid(row=3, column=2, sticky="e", padx=2)
+    tk.Label(_frame, text="Density", anchor="w").grid(row=4, column=0, sticky="w", padx=2)
     density_menu = tk.OptionMenu(_frame, _density, NOT_READ, *deposit.DENSITIES)
     _style_menu(density_menu)
-    density_menu.grid(row=3, column=3, sticky="we", padx=2)
+    density_menu.grid(row=4, column=1, sticky="we", padx=2)
 
     # Own frame: column 1 stretches, and the buttons have to sit against each
     # other rather than spread to the far edge of the panel. Both are one
     # press with no confirmation, so they get a gap between them.
     row = tk.Frame(_frame)
-    row.grid(row=4, column=0, columnspan=4, sticky="w", padx=2, pady=(4, 2))
+    row.grid(row=5, column=0, columnspan=4, sticky="w", padx=2, pady=(4, 2))
     _card_button = tk.Button(row, text=CARD_TEXT, width=13, command=make_card)
     _card_button.pack(side="left")
     tk.Button(row, text="RhinoData", width=13, command=open_scan).pack(side="left", padx=(8, 0))
@@ -148,18 +149,18 @@ def build(parent):
     # The place the bookmark search goes. Hidden until it does something.
     if SEARCH_SHOWN:
         _search = tk.StringVar(value="")
-        tk.Label(_frame, text="Search", anchor="w").grid(row=5, column=0, sticky="w", padx=2)
-        tk.Entry(_frame, textvariable=_search).grid(row=5, column=1, columnspan=3,
+        tk.Label(_frame, text="Search", anchor="w").grid(row=6, column=0, sticky="w", padx=2)
+        tk.Entry(_frame, textvariable=_search).grid(row=6, column=1, columnspan=3,
                                                     sticky="we", padx=2, pady=(0, 2))
 
     # What to do when the list is empty, said before you press the button and
     # wonder. The honk asks Spansh; only when that brings nothing does the FSS
     # have to describe the bodies. See _refresh_hint.
     _hint = tk.Label(_frame, text="", anchor="w", fg=palette.MUTED)
-    _hint.grid(row=6, column=0, columnspan=4, sticky="w", padx=2, pady=(0, 2))
+    _hint.grid(row=7, column=0, columnspan=4, sticky="w", padx=2, pady=(0, 2))
 
     _status = tk.Label(_frame, text="", anchor="w", wraplength=320, justify="left")
-    _status.grid(row=7, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
+    _status.grid(row=8, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
 
     if theme:
         theme.update(_frame)
