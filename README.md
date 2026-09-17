@@ -110,7 +110,8 @@ On a body's bookmark list:
 
 EDMC Settings, RhinoSpotter tab:
 
-- Minimap on/off and corner.
+- Minimap on/off, whether it stays up when you alt-tab out of the game, and
+  its corner.
 - Saved maps count and size, **Open folder** for the map pictures.
 - **Delete migrated JSON** - after upgrading to 4.2, removes the old JSON files
   the database already holds.

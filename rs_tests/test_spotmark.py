@@ -32,6 +32,12 @@ class TestRefinedMaterial:
         for slug in seen.split():
             assert spotmark.refined_material({"Type": f"${slug}_name;"}) in spotmark.MATERIALS
 
+    def test_tritium_is_its_market_name(self):
+        """Not seen in a MiningRefined yet. Market.json names it
+        $tritium_name; / "Tritium", and the sheet has it on icy ground - it is
+        in the list for commanders who mine carrier fuel on the surface."""
+        assert spotmark.refined_material({"Type": "$tritium_name;"}) == "Tritium"
+
     def test_not_a_material(self):
         assert spotmark.refined_material({"Type": "$painite_name;"}) is None
         assert spotmark.refined_material({}) is None
