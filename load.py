@@ -7,7 +7,7 @@ Two buttons.
                 Status.json at the press, which is live-only, so the card has
                 to be made while you are still there.
 
-    RhinoScan   lists the landable bodies of the system you are in, grouped by
+    RhinoData   lists the landable bodies of the system you are in, grouped by
                 what kind of body they are, with what that kind has been found
                 to hold. Bodies come from the journal, gaps filled from Spansh
                 on the honk; rates from the mining sheet shipped as

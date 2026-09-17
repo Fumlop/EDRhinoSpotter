@@ -205,7 +205,7 @@ def main(argv=None):
         path = store.save(system, seen)
         print(f"\ntest mode: {system} (score {value}, {len(seen)} landable)")
         print(f"  -> {path}")
-        print("  start EDMC and jump nowhere - RhinoScan shows it")
+        print("  start EDMC and jump nowhere - RhinoData shows it")
 
     for system, seen, value in ordered[:args.top]:
         counted = sum(body.get("locations") or 0 for body in seen)

@@ -1,5 +1,38 @@
 # Changelog
 
+## 4.4.0
+
+**Added**
+
+- Ctrl+Alt+D opens the RhinoData window over the game. It was the one thing
+  here that could not be reached without leaving it. Escape closes it.
+- Distance to each bookmarked patch, from where the ship or SRV is standing,
+  in place of the heading column - which is on the dim line under the row now.
+  "-" wherever the guide arrow would have nothing to point at.
+- Column headings over every table: the body list, over each ground's rows,
+  and the bookmark and map tables.
+- What a material pays, beside the rate it pays it at, on the body list. It
+  was on the bookmark page only, which is a screen further on than the one the
+  body is picked from.
+- Every body row opens that body's page, bookmarked or not.
+- Something that runs across the window. Click the system name.
+
+**Changed**
+
+- The RhinoScan button is called RhinoData, and the window titles with it.
+- Picking a material redraws the open window where it stands. It used to
+  destroy the window and build a new one, which put whoever was two views deep
+  back on the body list with the scroll at the top.
+- One material filter for the whole plugin: the bookmark page carries the
+  panel's own picker, and the second per-body dropdown that could disagree
+  with it is gone.
+- The volcanism column says what kind - "major metallic magma" - rather than
+  only major or minor. On an icy or metal-rich body the heading above says the
+  body class, so the kind was nowhere.
+- Bookmarks and Mapped are buttons rather than coloured text. The accent
+  colour means "this can be pressed" and nothing else now; material rates are
+  plain text and the number does the work.
+
 ## 4.3.7
 
 **Changed**

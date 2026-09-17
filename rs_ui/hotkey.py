@@ -1,7 +1,8 @@
-"""Two hotkeys for the minimap while you drive.
+"""Three hotkeys for the map and the data, while the game has the focus.
 
     Ctrl+Alt+Z  make where the SRV stands the centre of the map
     Ctrl+Alt+B  make where the SRV stands the location's border
+    Ctrl+Alt+D  open the RhinoData window over the game
 
 Windows hotkeys, registered with RegisterHotKey on a thread of their own: the
 game has the focus while you drive, so a key bound in Tk would never hear it.
@@ -29,12 +30,15 @@ MOD_NOREPEAT = 0x4000
 WM_HOTKEY = 0x0312
 WM_QUIT = 0x0012
 
-# id -> (label, virtual key). Both are Ctrl+Alt.
+# id -> (label, virtual key). All three are Ctrl+Alt.
 CENTER = 0x5253             # 'RS'
 BORDER = 0x5254
-KEYS = {CENTER: ("Ctrl+Alt+Z", 0x5A), BORDER: ("Ctrl+Alt+B", 0x42)}
+SCAN = 0x5255
+KEYS = {CENTER: ("Ctrl+Alt+Z", 0x5A), BORDER: ("Ctrl+Alt+B", 0x42),
+        SCAN: ("Ctrl+Alt+D", 0x44)}
 CENTER_LABEL = KEYS[CENTER][0]
 BORDER_LABEL = KEYS[BORDER][0]
+SCAN_LABEL = KEYS[SCAN][0]
 
 _thread = None
 _thread_id = None

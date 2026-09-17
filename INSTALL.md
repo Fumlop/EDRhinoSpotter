@@ -47,7 +47,7 @@ load is listed there with its error.
 
 ## Using it
 
-### RhinoScan - which bodies here are worth landing on
+### RhinoData - which bodies here are worth landing on
 
 ![The scan window](docs/rhinoscan.png)
 
