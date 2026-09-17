@@ -191,11 +191,16 @@ Everything in here imports tkinter.
   widen the panel on the one day it matters, and a permanent one every day. The bookmark write and the update check run off the UI thread and come
   back through `_frame.after`, because Tk is not thread-safe and a widget
   written from a worker fails minutes later somewhere unrelated.
-- **[hotkey.py](rs_ui/hotkey.py)** - Ctrl+Alt+Z and Ctrl+Alt+B, registered
-  with RegisterHotKey on a thread with its own message loop, since the game
-  holds the focus while you drive. A press is bounced to Tk and sets the map's
-  center or border. A combination already held elsewhere is a logged warning;
-  the other still registers.
+- **[hotkey.py](rs_ui/hotkey.py)** - Ctrl+Alt+Z, Ctrl+Alt+B and Ctrl+Alt+D,
+  registered with RegisterHotKey on a thread with its own message loop, since
+  the game holds the focus while you drive. A press is bounced to Tk and sets
+  the map's center or border, or opens the RhinoData window. A combination
+  already held elsewhere is a logged warning; the others still register.
+- **[rhino.py](rs_ui/rhino.py)** - the easter egg. `docs/running.png` placed
+  over the window and moved across it, flattened onto the window's background
+  first because Tk composites a half-transparent edge against something else.
+  One at a time, every failure swallowed: this must not be able to break a
+  mining tool.
 - **[overlay.py](rs_ui/overlay.py)** - the arrow over the game. A borderless
   always-on-top window keyed to a colour it then makes a hole of, so only what
   is drawn shows, and click-through on top of that - a shape over the cockpit
@@ -212,7 +217,7 @@ Everything in here imports tkinter.
   rather than PIL's ImageTk, which is the one part of PIL that EDMC's build
   cannot be relied on to carry. A window it cannot build is logged and
   skipped - the bookmark list works without an arrow over the game.
-- **[scan.py](rs_ui/scan.py)** - the RhinoScan window, in three views: the
+- **[scan.py](rs_ui/scan.py)** - the RhinoData window, in three views: the
   body list, the bookmarks of one body, and the mapped locations of one body
   ("Mapped 3/20 ›" on its row, from `coverage.mapped_locations`), each with
   Back at the top left. One

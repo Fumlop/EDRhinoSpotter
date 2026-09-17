@@ -580,7 +580,7 @@ def _place(side, where, rect):
         user32 = _user32()
         user32.SetWindowPos(_handle, HWND_TOPMOST, x, y, width, height, SWP_NOACTIVATE)
         # Asked every tick, not trusted from _shown: after a hide through Win32
-        # the map stayed down once Guide and RhinoScan had been used, with
+        # the map stayed down once Guide and RhinoData had been used, with
         # _shown saying it was up. Showing a shown window again costs nothing.
         if not _shown or not user32.IsWindowVisible(_handle):
             user32.ShowWindow(_handle, SW_SHOWNOACTIVATE)

@@ -18,7 +18,7 @@ Unpack into `%LOCALAPPDATA%\EDMarketConnector\plugins\RhinoSpotter\` so that
 Updates: when a release is out, **Bookmark** reads **Update**. Press it, then
 restart EDMC. Your data is not in the plugin folder and is never touched.
 
-## RhinoScan - where to land
+## RhinoData - where to land
 
 <p align="center">
   <img src="docs/rhinoscan.png" width="620"
@@ -40,7 +40,7 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
   listed, with its rate first. Bookmark counts then count only that material.
 - `N bookmarks ›` and `Mapped N/M ›` on a body open its bookmarks or mapped
   locations.
-- On or over a body, RhinoScan opens straight on that body's bookmarks.
+- On or over a body, RhinoData opens straight on that body's bookmarks.
 - Rates, not contents: no journal says what a location holds.
 
 ## Bookmark - the patch you are on

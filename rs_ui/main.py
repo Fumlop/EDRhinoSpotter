@@ -142,7 +142,7 @@ def build(parent):
     row.grid(row=4, column=0, columnspan=4, sticky="w", padx=2, pady=(4, 2))
     _card_button = tk.Button(row, text=CARD_TEXT, width=13, command=make_card)
     _card_button.pack(side="left")
-    tk.Button(row, text="RhinoScan", width=13, command=open_scan).pack(side="left", padx=(8, 0))
+    tk.Button(row, text="RhinoData", width=13, command=open_scan).pack(side="left", padx=(8, 0))
 
     # The place the bookmark search goes. Hidden until it does something.
     if SEARCH_SHOWN:
@@ -165,7 +165,7 @@ def build(parent):
 
     # Test mode fills the register before the panel exists, and EDMC may also
     # start mid-session with a system already tracked. Either way the count
-    # beside RhinoScan has to say so without waiting for the next journal line.
+    # beside RhinoData has to say so without waiting for the next journal line.
     # One watcher for the whole session. The picker in the scan window writes
     # to this same variable, so this fires for either of them.
     _material.trace_add("write", _on_material_changed)
@@ -180,7 +180,11 @@ def build(parent):
     _refresh_scan_count()
     _check_updates()
     hotkey.start({hotkey.CENTER: lambda: _on_ui(minimap.center_here),
-                  hotkey.BORDER: lambda: _on_ui(minimap.border_here)})
+                  hotkey.BORDER: lambda: _on_ui(minimap.border_here),
+                  # The window is the only thing here that could not be
+                  # reached without leaving the game: alt-tab, find EDMC,
+                  # press the button. The key opens it where you are.
+                  hotkey.SCAN: lambda: _on_ui(open_scan)})
     return _frame
 
 
@@ -221,9 +225,11 @@ def _on_ui(function, *args):
         pass
 
 
-def open_scan(at_body=True):
-    """The RhinoScan window for the system the journal last named, opened on
-    the bookmarks of the body under the ship when there is one and `at_body`.
+def open_scan():
+    """The RhinoData window for the system the journal last named, opened on
+    the bookmarks of the body under the ship when there is one.
+
+    Only on the first open: a window already up is redrawn where it stands.
 
     The window gets the panel's own material variable, not a copy of its
     value: the picker it draws under the system name writes straight back
@@ -236,9 +242,9 @@ def open_scan(at_body=True):
         scan.show(_frame.winfo_toplevel(), _register, _sheet, _focus(),
                   variable=_material,
                   materials=(ALL_MATERIALS,) + tuple(spotmark.MATERIALS),
-                  here=spotmark.body_here(spotmark.read_status()) if at_body else None)
+                  here=spotmark.body_here(spotmark.read_status()))
     except Exception as err:                       # a broken window must not
-        logger.exception("RhinoScan failed")       # take the card flow with it
+        logger.exception("RhinoData failed")       # take the card flow with it
         _set_status(f"no scan window: {err}")
 
 
@@ -246,19 +252,18 @@ def _on_material_changed(*_):
     """Redraw the scan window for the material that was just picked.
 
     One watcher, added once when the panel is built. The filter changes which
-    groups exist and how tall the window is, so it is drawn again rather than
-    updated in place - it is a dozen labels.
+    groups exist and how tall the window is, so the view is drawn again rather
+    than updated in place - it is a dozen labels.
 
     Deferred by one idle tick: the write happens while the menu that caused it
-    is still on screen, and destroying that menu's parent from underneath it is
-    how Tk is told to close a window in the middle of closing itself.
+    is still on screen, and taking that menu's parent apart from underneath it
+    is how Tk is told to destroy a widget in the middle of using it.
     """
     open_now = bool(_frame) and scan.is_open()
     logger.debug(f"material changed to {_material.get()!r}, "
-                 f"scan open={open_now} - {'reopening' if open_now else 'nothing to do'}")
+                 f"scan open={open_now} - {'redrawing' if open_now else 'nothing to do'}")
     if open_now:
-        at_body = scan.on_body_here()
-        _frame.after_idle(lambda: open_scan(at_body))
+        _frame.after_idle(open_scan)
 
 
 # How often Status.json is read to see whether Bookmark has anything to mark.
@@ -362,7 +367,7 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     # made there is already filled. Only on the ground: asteroid mining refines
     # the same materials in space. Never over a material picked by hand - a
     # by-product must not rename the bookmark - and only on a change: every
-    # write reopens an open RhinoScan window, and a load is dozens of these.
+    # write reopens an open RhinoData window, and a load is dozens of these.
     if entry.get("event") == "MiningRefined" and _material is not None:
         _prefill_material(entry)
 
@@ -427,7 +432,7 @@ def _add_spansh(system, address, answer):
         _spansh_known[address] = known
         spansh.mark_answered(address)
         if _register.add_known(system, address, found) and scan.is_open():
-            open_scan(scan.on_body_here())
+            open_scan()
     _refresh_scan_count()
 
 
