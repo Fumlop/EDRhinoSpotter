@@ -97,7 +97,7 @@ def settle(window, ticks=40):
         time.sleep(0.03)
 
 
-def grab(window, name, scale, top_margin=0):
+def grab(window, name, scale, top_margin=0, bottom=6):
     """Save a window, in physical pixels.
 
     Tk reports logical units and ImageGrab works in physical ones. On a display
@@ -107,7 +107,7 @@ def grab(window, name, scale, top_margin=0):
     x, y = window.winfo_rootx(), window.winfo_rooty()
     w, h = window.winfo_width(), window.winfo_height()
     box = (int(x * scale), int((y - top_margin) * scale),
-           int((x + w) * scale), int((y + h + 6) * scale))
+           int((x + w) * scale), int((y + h + bottom) * scale))
     path = os.path.join(DOCS, name)
     ImageGrab.grab(bbox=box).save(path)
     print(f"{name:<18} {w}x{h}")
@@ -160,7 +160,9 @@ def main_images():
     main._amount.set("High")
     main._density.set("Low")
     settle(panel, 15)
-    grab(panel, "plugin.png", scale)
+    # No shadow margin under this one: the panel has no menu to cast one, and
+    # those few pixels are whatever else is on the desktop.
+    grab(panel, "plugin.png", scale, bottom=0)
     panel.destroy()
 
     found = register()
@@ -198,6 +200,13 @@ def main_images():
     scan.show(root, found, sheet, None,
               variable=main._material, materials=picker)
     window = scan._window
+    # Standing on the body among the three bookmarks, so the Distance column
+    # has something to say. The real Status.json would put every row at "-",
+    # or worse, be read at all.
+    was_status = spotmark.read_status
+    spotmark.read_status = lambda *args, **kwargs: {
+        "BodyName": body, "Latitude": 12.37, "Longitude": -98.74,
+        "PlanetRadius": RADIUS_4A, "Heading": 90}
     scan._bookmarks_view(window, SYSTEM, body, marks)
     window.attributes("-topmost", True)
     window.deiconify()
@@ -205,6 +214,7 @@ def main_images():
     settle(window)
     grab(window, "bookmarks.png", scale, top_margin=34)
     window.destroy()
+    spotmark.read_status = was_status
 
     scan.show(root, found, sheet, None,
               variable=main._material, materials=picker)

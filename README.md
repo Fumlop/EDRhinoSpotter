@@ -26,9 +26,11 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
 </p>
 
 - Lists the landable bodies of the current system, grouped by ground type, with
-  the share of that ground's mining locations that carried each material.
-- **Bodies:** honk, and Spansh is asked for the system's known bodies - marked
-  `spansh` in the list until your own FSS scan or fly-by replaces them. The line
+  the share of that ground's mining locations that carried each material and
+  the median price it sells for. Each group has its own column headings: body,
+  distance, locations, volcanism.
+- **Bodies:** honk, and Spansh is asked for the system's known bodies, until
+  your own FSS scan or fly-by replaces them. The line
   under the buttons says when to FSS instead: a new system, no Spansh bodies,
   Spansh unreachable, or Spansh knowing fewer bodies than the honk counted
   ("Spansh 31/40 bodies - FSS for the rest").
@@ -38,8 +40,9 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
   `unprobed` = nobody counted the locations yet.
 - **Material** dropdown: pick one and only grounds that ever carried it are
   listed, with its rate first. Bookmark counts then count only that material.
-- `N bookmarks ›` and `Mapped N/M ›` on a body open its bookmarks or mapped
-  locations.
+- **N bookmarks** and **Mapped N/M** buttons on a body open its bookmarks or
+  mapped locations; clicking the body row itself opens its bookmarks too. The
+  bookmark list shows how far each patch is from where you stand.
 - On or over a body, RhinoData opens straight on that body's bookmarks.
 - Rates, not contents: no journal says what a location holds.
 

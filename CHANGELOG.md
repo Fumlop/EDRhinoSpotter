@@ -1,5 +1,17 @@
 # Changelog
 
+## 4.4.3
+
+**Changed**
+
+- Density has a row of its own in the panel, under Amount and over the
+  buttons. Beside Amount its label sat at the far edge of the panel from its
+  own menu, and the two got picked into each other's box.
+- The pictures in the README are of 4.4.x: the RhinoData button, the column
+  headings over every group, prices beside the rates, the volcanism kind, the
+  bookmark buttons and the Distance column. The text beside them no longer
+  describes the `spansh` tag or the old `N bookmarks ›` links, both gone.
+
 ## 4.4.2
 
 **Added**
