@@ -1,5 +1,16 @@
 # Changelog
 
+## 4.4.1
+
+**Changed**
+
+- The tons-left range on a bookmark counts Density. A second deposit mined to
+  Depleted - Monazite, Medium Density, four rig positions, 1,537 t - held a
+  third more than the Low Density one the range was built on, and came in
+  337 t past the most the range allowed. Low is 275-300 t a rig position,
+  Medium 370-400 t. High, or a bookmark without Density, gets the span of both
+  until a High deposit has been mined out and measured.
+
 ## 4.4.0
 
 **Added**

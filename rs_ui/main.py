@@ -120,8 +120,9 @@ def build(parent):
     _menu.grid(row=2, column=1, columnspan=3, sticky="we", padx=2)
 
     # What the HUD says about the targeted deposit. Neither is in the journal.
-    # Amount and Rigs give the bookmark a range of tons left; Density is kept
-    # for when there is data to use it - see rs_core/deposit.py.
+    # Rigs, Amount and Density give the bookmark a range of tons left: Density
+    # sets how much a rig holds, Amount how much of it is still there - see
+    # rs_core/deposit.py.
     # Amount first, Density second: the order the HUD lists them, top to
     # bottom. The other way round, both got picked into each other's box.
     _density = tk.StringVar(value=NOT_READ)
