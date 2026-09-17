@@ -25,7 +25,7 @@ MATERIALS = (
     "Grandidierite", "Helium", "Helium-3", "Iridium", "Jadeite",
     "Low Temp Diamonds", "Magnesite", "Monazite", "Olivine", "Osmium",
     "Periclase Dunite", "Platinum", "Quartz Pyroxenite", "Rhodplumsite",
-    "Ruby", "Sapphire", "Serendibite", "Thortveitite",
+    "Ruby", "Sapphire", "Serendibite", "Thortveitite", "Tritium",
 )
 
 

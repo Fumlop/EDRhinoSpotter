@@ -38,6 +38,7 @@ except ImportError:      # running outside EDMC
 
 ENABLED_KEY = "rhinospotter_minimap_enabled"
 CORNER_KEY = "rhinospotter_minimap_corner"
+KEEP_KEY = "rhinospotter_minimap_keep"
 CORNERS = ("top left", "top right", "bottom left", "bottom right")
 
 KEY = overlay.KEY
@@ -82,10 +83,20 @@ _codes = None            # grounds.Sheet.codes, read once
 _fresh = []              # [(system, body, lat, lon, code, when)] bookmarked, maybe not on disk yet
 _enabled = None          # tk.BooleanVar on the settings tab
 _corner = None           # tk.StringVar on the settings tab
+_keep = None             # tk.BooleanVar on the settings tab
 
 
 def enabled():
     return config.get_bool(ENABLED_KEY, default=True) if config is not None else True
+
+
+def keep_up():
+    """Whether the map stays up with Elite not in front - alt-tabbed to a
+    browser, or reading something on a second screen while the SRV sits.
+
+    Off unless asked for: over the desktop the map is on top of whatever is in
+    that corner, and nobody should find that out by surprise."""
+    return config.get_bool(KEEP_KEY, default=False) if config is not None else False
 
 
 def corner():
@@ -150,11 +161,14 @@ def update(root, status, system=None, ids=None):
 def _show_map(root, status, system, lat, lon, heading, in_reach, body):
     global _drawn
     rect = overlay._game_rect()
-    if not overlay.game_focused() or (rect and rect[3] - rect[1] < MIN_GAME_HEIGHT):
+    minimised = bool(rect) and rect[3] - rect[1] < MIN_GAME_HEIGHT
+    if minimised or not (overlay.game_focused() or keep_up()):
         # Alt-tabbed out, or minimised: nothing over the desktop. Painting
-        # carries on; only the window goes.
-        _down(f"Elite not in front ({overlay.foreground_title()!r})"
-              if not overlay.game_focused() else f"game window {rect} is minimised")
+        # carries on; only the window goes. The setting keeps it up through an
+        # alt-tab, not through a minimise - a minimised game has no corner for
+        # the map to sit in.
+        _down(f"game window {rect} is minimised" if minimised
+              else f"Elite not in front ({overlay.foreground_title()!r})")
         return
     if not _build(root):
         _down("no window could be built")
@@ -420,32 +434,37 @@ def stop():
 # ---------------------------------------------------------------- settings
 
 def prefs(parent):
-    """The settings tab: the map on or off, and which corner it sits in."""
-    global _enabled, _corner
+    """The settings tab: the map on or off, whether it stays up through an
+    alt-tab, and which corner it sits in."""
+    global _enabled, _corner, _keep
     frame = nb.Frame(parent)
     _enabled = tk.BooleanVar(value=enabled())
     _corner = tk.StringVar(value=corner())
+    _keep = tk.BooleanVar(value=keep_up())
     nb.Checkbutton(frame, text="Show the minimap while in the SRV",
                    variable=_enabled).grid(row=0, column=0, columnspan=2,
                                            sticky="w", padx=10, pady=(10, 2))
-    nb.Label(frame, text="Corner").grid(row=1, column=0, sticky="w", padx=10, pady=2)
+    nb.Checkbutton(frame, text="Keep it up when you alt-tab out of the game",
+                   variable=_keep).grid(row=1, column=0, columnspan=2,
+                                        sticky="w", padx=10, pady=2)
+    nb.Label(frame, text="Corner").grid(row=2, column=0, sticky="w", padx=10, pady=2)
     nb.OptionMenu(frame, _corner, _corner.get(), *CORNERS).grid(
-        row=1, column=1, sticky="w", padx=10, pady=2)
+        row=2, column=1, sticky="w", padx=10, pady=2)
     nb.Label(frame, text="Painted means driven within "
                          f"{coverage.SCAN_RADIUS_M / 1000:.0f} km, not scanned.").grid(
-        row=2, column=0, columnspan=2, sticky="w", padx=10, pady=2)
+        row=3, column=0, columnspan=2, sticky="w", padx=10, pady=2)
     count, size = coverstore.usage()
     amount = f"{size / 1048576:.1f} MB" if size >= 1048576 else f"{size / 1024:.0f} KB"
     nb.Label(frame, text=f"Saved maps: {count} ({amount})").grid(
-        row=3, column=0, sticky="w", padx=10, pady=(2, 10))
+        row=4, column=0, sticky="w", padx=10, pady=(2, 10))
     nb.Button(frame, text="Open folder", command=_open_folder).grid(
-        row=3, column=1, sticky="w", padx=10, pady=(2, 10))
+        row=4, column=1, sticky="w", padx=10, pady=(2, 10))
     # The JSON files 4.1 wrote, once the database holds them.
     result = nb.Label(frame, text="")
     nb.Button(frame, text="Delete migrated JSON",
               command=lambda: _delete_migrated(frame, result)).grid(
-        row=4, column=0, sticky="w", padx=10, pady=(2, 10))
-    result.grid(row=4, column=1, sticky="w", padx=10, pady=(2, 10))
+        row=5, column=0, sticky="w", padx=10, pady=(2, 10))
+    result.grid(row=5, column=1, sticky="w", padx=10, pady=(2, 10))
     return frame
 
 
@@ -493,6 +512,8 @@ def prefs_changed():
             config.set(ENABLED_KEY, bool(_enabled.get()))
         if _corner is not None:
             config.set(CORNER_KEY, _corner.get())
+        if _keep is not None:
+            config.set(KEEP_KEY, bool(_keep.get()))
     # Moved or switched off: the next reading places and draws it again.
     _placed = _drawn = None
 

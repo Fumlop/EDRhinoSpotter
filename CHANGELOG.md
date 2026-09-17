@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.4.2
+
+**Added**
+
+- Tritium in the material list, for commanders mining carrier fuel. The mining
+  sheet has it on icy bodies at 32.8 %, so picking it lists those.
+- A setting to keep the minimap up when you alt-tab out of the game: EDMC
+  Settings, RhinoSpotter tab. Off unless ticked - over the desktop the map sits
+  on top of whatever is in that corner. A minimised game still takes it down.
+
 ## 4.4.1
 
 **Changed**

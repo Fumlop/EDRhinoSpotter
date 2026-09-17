@@ -232,9 +232,11 @@ Everything in here imports tkinter.
 - **[minimap.py](rs_ui/minimap.py)** - the minimap window and its settings
   tab. No timer of its own: `main._poll_landed` hands it the Status.json it
   already read, and nothing raises back into that poll. Shown while the InSRV
-  flag is set, hidden otherwise and while the game is minimised, sized from
-  the game window's height and parked in the corner picked under EDMC
-  Settings (`rhinospotter_minimap_enabled`, `rhinospotter_minimap_corner`).
+  flag is set, hidden otherwise and while the game is minimised - and while
+  it is not in front, unless the setting keeps it up through an alt-tab -
+  sized from the game window's height and parked in the corner picked under
+  EDMC Settings (`rhinospotter_minimap_enabled`, `rhinospotter_minimap_keep`,
+  `rhinospotter_minimap_corner`).
   Built once, hidden, and made click-through and no-activate before it is
   first shown; then shown, moved and hidden with Win32 calls that do not take
   the foreground, because it comes up mid-game on its own. A draw that raises
