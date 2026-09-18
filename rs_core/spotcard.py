@@ -12,6 +12,7 @@ where they are, and rs_core/migrate.py reads their JSON in once.
 The fonts helper stays here: the map picture draws its text with it.
 """
 
+import functools
 import os
 
 from PIL import ImageFont
@@ -36,7 +37,10 @@ def card_dir(system):
 FONTS = r"C:\Windows\Fonts"
 
 
+@functools.lru_cache(maxsize=64)
 def _font(name, size):
+    """Kept: the minimap asks for three faces a frame and truetype() re-reads
+    the file every time. A handful of (name, size) pairs are ever used."""
     try:
         return ImageFont.truetype(os.path.join(FONTS, name), size)
     except OSError:

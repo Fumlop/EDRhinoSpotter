@@ -192,11 +192,12 @@ Everything in here imports tkinter.
   widen the panel on the one day it matters, and a permanent one every day. The bookmark write and the update check run off the UI thread and come
   back through `_frame.after`, because Tk is not thread-safe and a widget
   written from a worker fails minutes later somewhere unrelated.
-- **[hotkey.py](rs_ui/hotkey.py)** - Ctrl+Alt+Z, Ctrl+Alt+B and Ctrl+Alt+D,
-  registered with RegisterHotKey on a thread with its own message loop, since
-  the game holds the focus while you drive. A press is bounced to Tk and sets
-  the map's center or border, or opens the RhinoData window. A combination
-  already held elsewhere is a logged warning; the others still register.
+- **[hotkey.py](rs_ui/hotkey.py)** - Ctrl+Alt+Z, Ctrl+Alt+B, Ctrl+Alt+M and
+  Ctrl+Alt+D, registered with RegisterHotKey on a thread with its own message
+  loop, since the game holds the focus while you drive. A press is bounced to
+  Tk and sets the map's center or border, steps its size, or opens the
+  RhinoData window. A combination already held elsewhere is a logged warning;
+  the others still register.
 - **[rhino.py](rs_ui/rhino.py)** - the easter egg. `docs/running.png` placed
   over the window and moved across it, flattened onto the window's background
   first because Tk composites a half-transparent edge against something else.

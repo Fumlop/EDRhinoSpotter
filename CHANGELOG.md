@@ -1,5 +1,39 @@
 # Changelog
 
+## 4.5.0
+
+**Added**
+
+- The center you set with Ctrl+Alt+Z is drawn: a blue dot inside a ring, where
+  it stands on the map. Until now only the rings and the border said where it
+  was, and neither says it on a map without a border.
+- Lines between the things on the map, each with its length on it: from the
+  center to every bookmark, and from every bookmark to the one nearest it. Two
+  bookmarks that pick each other share one line, and two bookmarked from the
+  same standing position are not joined to each other at all.
+- **Ctrl+Alt+M** steps the map through 1x, 1.4x and 1.8x and back to 1x. The
+  size is remembered across EDMC restarts. It stops at 640 px, which is a speed
+  limit rather than a room limit: the painted area is redrawn on EDMC's own
+  thread every 250 m driven, measured here at 41 ms at 428 px and 160 ms at
+  855, and 640 keeps the worst press near where a 4K window already sits.
+
+**Changed**
+
+- Only bookmarks on the map are joined up. Bookmarks are kept by body, not by
+  distance, so a body worked over several sessions carries some hundreds of
+  kilometres away; each of those used to get a line from the center straight
+  off the edge towards something not on screen. On one body here, 13 of 14
+  bookmarks were off the map and cost 3.1 ms a frame to draw as rays to
+  nowhere.
+- A number is left off a line when it would print over another number, over a
+  bookmark and its code, over the SRV, over the center or over the scale bar.
+  It is tried at the middle of its line first, then further out either way, and
+  last just past the far end - a short line has the SRV at one end and a dot at
+  the other and no clear span between them, and every center line under about
+  3 km used to lose its number to that.
+- Fonts are kept once they are loaded. The map asks for three faces a frame and
+  each one re-read its file from `C:\Windows\Fonts`.
+
 ## 4.4.3
 
 **Changed**

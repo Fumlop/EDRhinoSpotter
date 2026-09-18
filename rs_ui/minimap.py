@@ -39,6 +39,7 @@ except ImportError:      # running outside EDMC
 ENABLED_KEY = "rhinospotter_minimap_enabled"
 CORNER_KEY = "rhinospotter_minimap_corner"
 KEEP_KEY = "rhinospotter_minimap_keep"
+ZOOM_KEY = "rhinospotter_minimap_zoom"
 CORNERS = ("top left", "top right", "bottom left", "bottom right")
 
 KEY = overlay.KEY
@@ -102,6 +103,32 @@ def keep_up():
 def corner():
     value = config.get_str(CORNER_KEY, default=CORNERS[0]) if config is not None else CORNERS[0]
     return value if value in CORNERS else CORNERS[0]
+
+
+def _step():
+    """Which of coverage.MAP_ZOOMS the size hotkey was left on. The step and
+    not the factor: EDMC's config holds ints, and 1.4 is not one. A stored
+    value from anywhere else is taken the long way round rather than guarded."""
+    return config.get_int(ZOOM_KEY, default=0) % len(coverage.MAP_ZOOMS) if config else 0
+
+
+def zoom():
+    """How big the player has asked for the map to be."""
+    return coverage.MAP_ZOOMS[_step()]
+
+
+def bigger():
+    """The hotkey: the next size up, and round to the smallest after the
+    largest. Works outside the SRV too - the map is not up to see it change,
+    but nothing about the size needs a fix."""
+    global _placed, _drawn
+    if config is None:
+        return                        # outside EDMC there is nowhere to keep it
+    step = (_step() + 1) % len(coverage.MAP_ZOOMS)
+    config.set(ZOOM_KEY, step)
+    # The window is a different size now, so it is placed and drawn again.
+    _placed = _drawn = None
+    logger.debug(f"minimap: size hotkey, now {coverage.MAP_ZOOMS[step]:g}x")
 
 
 def update(root, status, system=None, ids=None):
@@ -174,7 +201,7 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
         _down("no window could be built")
         return
     _up()
-    side = coverage.map_side(rect[3] - rect[1] if rect else None)
+    side = coverage.map_side(rect[3] - rect[1] if rect else None, zoom())
     where = corner()
     x, y = _coverage.xy(lat, lon)
     header = _header(status, body, system)
@@ -185,7 +212,7 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
     per_px = 2 * coverage.VIEW_M / side
     state = (int(x // per_px), int(y // per_px),
              None if heading is None else arrow.bucket(heading),
-             side, where, in_reach, header, _coverage.version,
+             side, zoom(), where, in_reach, header, _coverage.version,
              tuple(round(v) for v in _coverage.anchor()), _coverage.centered,
              _coverage.border_m, _hint(), marks)
     if state != _drawn:
@@ -570,10 +597,13 @@ def _hint():
 
 
 def _layout(side):
+    """(unit, padding, text band, window width, window height) for a map this
+    wide. Five bands: the header over the map, and three hotkey rows plus the
+    distance row under it."""
     unit = side / 240.0
     pad = max(6, round(8 * unit))
     band = max(18, round(22 * unit))
-    return unit, pad, band, side + 2 * pad, side + 4 * band + 2 * pad
+    return unit, pad, band, side + 2 * pad, side + 5 * band + 2 * pad
 
 
 def _place(side, where, rect):
@@ -664,6 +694,10 @@ def _draw(side, x, y, heading, in_reach, header, marks=()):
         _canvas.create_text(pad, foot + band, text=f"{hotkey.CENTER_LABEL}  set center",
                             fill=palette.MUTED, font=small, anchor="w")
     _canvas.create_text(pad, foot + 2 * band, text=f"{hotkey.BORDER_LABEL}  set border",
+                        fill=palette.MUTED, font=small, anchor="w")
+    # The size says what it is now as well as which key changes it: the map
+    # comes up at whatever the last press left, a game later.
+    _canvas.create_text(pad, foot + 3 * band, text=f"{hotkey.SIZE_LABEL}  size {zoom():g}x",
                         fill=palette.MUTED, font=small, anchor="w")
     if in_reach:
         _canvas.create_text(width - pad, foot, text=f"{_coverage.painted_km2():.0f} km²",

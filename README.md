@@ -96,10 +96,17 @@ On a body's bookmark list:
 
 - Shows while in the SRV. Paints a 2 km disc (scanner range) wherever you drive.
   12 km across, north up, 1 km grid.
-- **Ctrl+Alt+Z** - set the location's center where you stand.
+- **Ctrl+Alt+Z** - set the location's center where you stand. A set center is
+  a blue dot in a ring on the map.
 - **Ctrl+Alt+B** - set the border where you stand (needs a center). Rings then
   show the drive circles; ground outside the border is dropped.
+- **Ctrl+Alt+M** - step the map through its sizes: 1x, 1.4x, 1.8x and back,
+  stopping at 640 px. The size sticks across EDMC restarts.
 - Bookmarks are dots with material codes: green active, red depleted.
+- Lines say how far apart things are: from the center to every bookmark on the
+  map, and from every bookmark to the one nearest it. A number sits on each
+  line, and the ones that would print over something are left off - press
+  Ctrl+Alt+M for a bigger map to read more of them.
 - Saved per body; a launch within 10 km carries on the same map, EDMC restarts
   included. Each dock saves a picture with a legend of the bookmarks on it.
 - Hidden while Elite is not the front window.

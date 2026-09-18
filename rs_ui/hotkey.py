@@ -1,7 +1,8 @@
-"""Three hotkeys for the map and the data, while the game has the focus.
+"""Four hotkeys for the map and the data, while the game has the focus.
 
     Ctrl+Alt+Z  make where the SRV stands the centre of the map
     Ctrl+Alt+B  make where the SRV stands the location's border
+    Ctrl+Alt+M  step the map through its sizes
     Ctrl+Alt+D  open the RhinoData window over the game
 
 Windows hotkeys, registered with RegisterHotKey on a thread of their own: the
@@ -14,7 +15,9 @@ Ctrl+Alt+B: Ctrl+Alt+C, Ctrl+Shift+C and Ctrl+Shift+B were already held by
 other programs on the machine this was written on (RegisterHotKey error 1409),
 and the Ctrl keeps them clear of the NVIDIA overlay's Alt+Z. A combination
 something else already holds is logged as a warning rather than silently
-leaving a key that does nothing; the other one still works.
+leaving a key that does nothing; the other one still works. Ctrl+Alt+M was
+free here and is far less contested than those; a commander who has bound it
+in the game loses it to EDMC while EDMC runs, with nothing to say so.
 
 Callbacks run on this thread. The caller hands in something that bounces them
 to Tk, the way every other worker in the plugin does.
@@ -30,23 +33,25 @@ MOD_NOREPEAT = 0x4000
 WM_HOTKEY = 0x0312
 WM_QUIT = 0x0012
 
-# id -> (label, virtual key). All three are Ctrl+Alt.
+# id -> (label, virtual key). All four are Ctrl+Alt.
 CENTER = 0x5253             # 'RS'
 BORDER = 0x5254
 SCAN = 0x5255
+SIZE = 0x5256
 KEYS = {CENTER: ("Ctrl+Alt+Z", 0x5A), BORDER: ("Ctrl+Alt+B", 0x42),
-        SCAN: ("Ctrl+Alt+D", 0x44)}
+        SCAN: ("Ctrl+Alt+D", 0x44), SIZE: ("Ctrl+Alt+M", 0x4D)}
 CENTER_LABEL = KEYS[CENTER][0]
 BORDER_LABEL = KEYS[BORDER][0]
 SCAN_LABEL = KEYS[SCAN][0]
+SIZE_LABEL = KEYS[SIZE][0]
 
 _thread = None
 _thread_id = None
 
 
 def start(callbacks):
-    """Register the hotkeys and listen. `callbacks` is {CENTER: fn, BORDER: fn}.
-    Safe to call twice; the second is ignored."""
+    """Register the hotkeys and listen. `callbacks` is {CENTER: fn, ...} over
+    the ids in KEYS. Safe to call twice; the second is ignored."""
     global _thread
     if _thread is not None and _thread.is_alive():
         return

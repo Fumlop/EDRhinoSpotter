@@ -183,6 +183,7 @@ def build(parent):
     _check_updates()
     hotkey.start({hotkey.CENTER: lambda: _on_ui(minimap.center_here),
                   hotkey.BORDER: lambda: _on_ui(minimap.border_here),
+                  hotkey.SIZE: lambda: _on_ui(minimap.bigger),
                   # The window is the only thing here that could not be
                   # reached without leaving the game: alt-tab, find EDMC,
                   # press the button. The key opens it where you are.
