@@ -217,10 +217,7 @@ class Sheet:
         is the median price, best across grounds; a refreshed sheet that
         re-ranks prices can move a code.
         """
-        price = {}
-        for rows in self.grounds.values():
-            for row in rows:
-                price[row['material']] = max(price.get(row['material'], 0), row.get('median') or 0)
+        price = {name: value for name, value in self.values().items()}
         taken, codes = set(), {}
         for name in sorted(price, key=lambda n: (-price[n], n)):
             first = name[0].upper()
@@ -234,6 +231,21 @@ class Sheet:
             taken.add(code)
             codes[name.lower()] = code
         return codes
+
+    def values(self):
+        """{material, lowercased: what it is worth} - the median price, best
+        across grounds, 0 for one the sheet carries unpriced.
+
+        The one ranking of materials by value in the plugin: codes() hands out
+        its letters by it, and the minimap joins a bookmark to the next
+        material down by it. Two callers, one definition of "worth more".
+        """
+        price = {}
+        for rows in self.grounds.values():
+            for row in rows:
+                name = row['material'].lower()
+                price[name] = max(price.get(name, 0), row.get('median') or 0)
+        return price
 
     def materials(self, ground, limit=None, minimum=0.0):
         """What that ground has been found to hold, likeliest first.

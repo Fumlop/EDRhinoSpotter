@@ -1,5 +1,49 @@
 # Changelog
 
+## 4.5.0
+
+**Added**
+
+- The center you set with Ctrl+Alt+Z is drawn: a blue dot where it stands on
+  the map, smaller than a bookmark so the two are never taken for each other.
+  Until now only the rings and the border said where it was, and neither says
+  it on a map without a border. It is a mark and not a hub - nothing is joined
+  to it and it carries no distance of its own.
+- Lines between the bookmarks on the map, each with its length on it: solid to
+  the nearest bookmark of the same material, dotted to the nearest bookmark of
+  the next material down the sheet's price ranking. Two bookmarks of one
+  material that pick each other share their solid line; a dotted line only runs
+  downhill, so it is never drawn twice. Two bookmarks made from the same
+  standing position are not joined at all.
+- **Ctrl+Alt+M** doubles the size and puts it back. The size is remembered
+  across EDMC restarts and stops at 640 px, which is a speed limit rather than
+  a room limit: the painted area is redrawn on EDMC's own thread every 250 m
+  driven, measured here at 41 ms at 428 px and 160 ms at 855.
+- The material ranking behind the codes on the dots is now `Sheet.values()`,
+  one definition of what a material is worth, used by the codes and by the
+  dotted lines alike.
+
+**The smallest map draws no lines and no distances.** 12 km of ground in 250 px
+has no room for a number, and the lines cover the painted area they cross.
+Press Ctrl+Alt+M for them.
+
+**Changed**
+
+- Only bookmarks on the map are joined up. Bookmarks are kept by body, not by
+  distance, so a body worked over several sessions carries some hundreds of
+  kilometres away; each of those used to get a line from the center straight
+  off the edge towards something not on screen. On one body here, 13 of 14
+  bookmarks were off the map and cost 3.1 ms a frame to draw as rays to
+  nowhere.
+- A number sits beside the middle of its own line, square to it, and steps
+  along it or further out when that place is taken - by another number, a
+  bookmark and its code, the SRV, the center or the scale bar. Never past an
+  end: out there it sits beside whatever other line runs through and is read as
+  that line's length, which on a map with six lines on it looks like the
+  numbers are made up.
+- Fonts are kept once they are loaded. The map asks for three faces a frame and
+  each one re-read its file from `C:\Windows\Fonts`.
+
 ## 4.4.3
 
 **Changed**

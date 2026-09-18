@@ -40,9 +40,25 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
   `unprobed` = nobody counted the locations yet.
 - **Material** dropdown: pick one and only grounds that ever carried it are
   listed, with its rate first. Bookmark counts then count only that material.
+
+<p align="center">
+  <img src="docs/rhinoscan-filtered.png" width="620"
+       alt="The same system filtered to one material, only the grounds that carry it listed">
+</p>
+<p align="center"><em>The same system with Material set: the grounds that never
+carried it are gone.</em></p>
+
 - **N bookmarks** and **Mapped N/M** buttons on a body open its bookmarks or
   mapped locations; clicking the body row itself opens its bookmarks too. The
   bookmark list shows how far each patch is from where you stand.
+
+<p align="center">
+  <img src="docs/mapped.png" width="440"
+       alt="The mapped locations of one body, with the maps saved for each">
+</p>
+<p align="center"><em>Mapped N/M: the locations this body has a saved map for,
+and the maps that no location could be tied to.</em></p>
+
 - On or over a body, RhinoData opens straight on that body's bookmarks.
 - Rates, not contents: no journal says what a location holds.
 
@@ -96,14 +112,36 @@ On a body's bookmark list:
 
 - Shows while in the SRV. Paints a 2 km disc (scanner range) wherever you drive.
   12 km across, north up, 1 km grid.
-- **Ctrl+Alt+Z** - set the location's center where you stand.
+- **Ctrl+Alt+Z** - set the location's center where you stand. A set center is
+  a blue dot on the map, smaller than a bookmark.
 - **Ctrl+Alt+B** - set the border where you stand (needs a center). Rings then
   show the drive circles; ground outside the border is dropped.
+- **Ctrl+Alt+M** - twice the size, and back. Capped at 640 px. The size sticks
+  across EDMC restarts.
 - Bookmarks are dots with material codes: green active, red depleted.
+- At 2x the bookmarks are joined up, each line carrying its length:
+  - **solid** to the nearest bookmark of the **same material** - where to go to
+    keep mining what you are mining;
+  - **dotted** to the nearest bookmark of the **next material down** in price -
+    where to go to settle for less.
+
+  Each number sits beside the middle of its own line, never past an end - out
+  there it would be next to somebody else's line and read as that one's. The
+  center is not joined to anything; it is just the blue dot. The smallest map
+  draws none of it: 12 km of ground in 250 px has no room for a number and the
+  lines cover the painted area they cross. A number with nowhere free to sit is
+  left off; press Ctrl+Alt+M to read the rest.
 - Saved per body; a launch within 10 km carries on the same map, EDMC restarts
   included. Each dock saves a picture with a legend of the bookmarks on it.
 - Hidden while Elite is not the front window.
 - "Painted" means driven within 2 km, not proven scanned - the game logs no scan.
+
+<p align="center">
+  <img src="docs/minimap-big.png" width="300"
+       alt="The minimap at 1.8x, every distance carrying its number">
+</p>
+<p align="center"><em>Ctrl+Alt+M: 2x, the size that draws the distances.
+Solid joins a material to itself, dotted steps down to the next.</em></p>
 
 <p align="center">
   <img src="docs/mapshare.png" width="440" alt="A saved map picture with bookmarks and legend">

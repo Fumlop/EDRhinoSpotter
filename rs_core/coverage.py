@@ -22,7 +22,7 @@ import math
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
-from rs_core import arrow, measure, palette, spotcard
+from rs_core import arrow, guide, measure, palette, spotcard
 
 # Status.json Flags bit for "in the SRV", as EDMC's edmc_data names it.
 IN_SRV = 0x4000000
@@ -77,6 +77,15 @@ MAP_SHARE = 0.22
 MAP_MIN_PX = 180
 MAP_MAX_PX = 480
 
+# What the size hotkey steps through, and how big the player may ask for.
+# MAP_MAX_PX is what a map picks for itself; this is the ceiling on top of it,
+# and it is a speed limit rather than a room limit: _draw_layer is redone on
+# the Tk thread every STAMP_M driven, measured here at 41 ms at 428 px, 90 ms
+# at 640 and 160 ms at 855. 640 keeps the worst press in the same range as a
+# 4K window already sits in without touching the hotkey at all.
+MAP_ZOOMS = (1.0, 2.0)
+MAP_ZOOM_MAX_PX = 640
+
 # The layer is drawn twice the size and reduced, for edges that are not
 # staircases.
 SS = 2
@@ -96,11 +105,18 @@ def srv_fix(status):
     return body, lat, lon, radius, status.get("Heading")
 
 
-def map_side(window_height):
-    """The map's side in pixels, for a game window this tall."""
+def map_side(window_height, zoom=1.0):
+    """The map's side in pixels, for a game window this tall.
+
+    `zoom` is the size hotkey's factor. It multiplies the side past MAP_MAX_PX
+    - that cap is what a map picks by itself, not what the player may ask for -
+    and stops at MAP_ZOOM_MAX_PX.
+    """
     if not window_height:
-        return MAP_MIN_PX + (MAP_MAX_PX - MAP_MIN_PX) // 4
-    return max(MAP_MIN_PX, min(MAP_MAX_PX, int(round(window_height * MAP_SHARE))))
+        side = MAP_MIN_PX + (MAP_MAX_PX - MAP_MIN_PX) // 4
+    else:
+        side = max(MAP_MIN_PX, min(MAP_MAX_PX, int(round(window_height * MAP_SHARE))))
+    return min(int(round(side * zoom)), MAP_ZOOM_MAX_PX)
 
 
 class Coverage:
@@ -474,27 +490,225 @@ BORDER = palette.rgb(palette.FG_SOFT)      # not WARN: that is the mask edge
 MARK = palette.rgb(palette.GOOD)
 MARK_DEPLETED = palette.rgb(palette.ALERT)
 
+# The centre the player set. Blue is the accent and nothing else on the map
+# wears it, so the eye finds the centre first. It is a mark and not a hub: the
+# lines run between the bookmarks, never out to it.
+CENTRE = palette.rgb(palette.ACCENT)
+# Bookmark to bookmark. Solid to the nearest of the same material, dotted to
+# the next material down: the line you would drive to keep mining what you are
+# mining, and the line you would drive to settle for less.
+LINE_SPOT = _mix(palette.BG, palette.FG_SOFT, 0.5)
+LINE_LOWER = _mix(palette.BG, palette.FG_SOFT, 0.35)
+
+# Where a number may sit: how far along its line, and which side of it. Never
+# past an end - a number beyond a dot is next to whatever line runs there, and
+# reads as that one's. Beside the line rather than on it, so the dots at the
+# ends do not push it away from the line it belongs to.
+LABEL_ALONG = (0.5, 0.62, 0.38)
+# How far square to the line, in multiples of the text height. The second step
+# clears the SRV marker, which sits in the middle of the map and so on top of
+# any line you happen to be driving along.
+LABEL_SIDES = (1, -1)
+LABEL_GAPS = (0.9, 2.0)
+
+
+def _mark_radius(side):
+    """A bookmark dot's radius: 1.8% of the map side, and still a dot at 180 px."""
+    return max(3.0, side * 0.018)
+
+
+def _mark_font(side):
+    """A bookmark code's face: 5% of the map side, never under 9 px."""
+    return spotcard._font("consolab.ttf", max(9, int(round(side * 0.05))))
+
+
+def _code_at(cx, cy, side):
+    """Where a bookmark's code is written: just right of its dot. _distances
+    keeps its numbers out of this box, so the two have to agree on it."""
+    return cx + _mark_radius(side) + 1, cy
+
+
+def _on_map(image, cx, cy, r):
+    """Whether a dot of radius r at (cx, cy) is on the map at all."""
+    return -r <= cx <= image.width + r and -r <= cy <= image.height + r
+
 
 def _bookmarks(image, points, side):
-    """A dot per bookmark at these pixel positions, its material's code beside
-    it. Radius 1.8% of the map side: small, and still a dot at 180 px.
+    """A dot per bookmark at these pixel positions, its material's code beside it.
 
     `points` are (x, y), (x, y, code) or (x, y, code, depleted) - grounds.Sheet.codes
     gives the code. A depleted bookmark is red, any other green.
     """
-    r = max(3.0, side * 0.018)
+    r = _mark_radius(side)
     draw = ImageDraw.Draw(image)
-    font = spotcard._font("consolab.ttf", max(9, int(round(side * 0.05))))
+    font = _mark_font(side)
     for cx, cy, *rest in points:
-        if -r <= cx <= image.width + r and -r <= cy <= image.height + r:
+        if _on_map(image, cx, cy, r):
             colour = MARK_DEPLETED if len(rest) > 1 and rest[1] else MARK
             draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=colour,
                          outline=palette.rgb(palette.BG))
             if rest and rest[0]:
                 # Outlined in the background colour: readable over the painted
                 # area, the grid and the rings alike.
-                draw.text((cx + r + 1, cy), rest[0], fill=colour, font=font, anchor="lm",
-                          stroke_width=2, stroke_fill=palette.rgb(palette.BG))
+                draw.text(_code_at(cx, cy, side), rest[0], fill=colour, font=font,
+                          anchor="lm", stroke_width=2, stroke_fill=palette.rgb(palette.BG))
+
+
+def _dotted(draw, a, b, fill, width):
+    """A dotted line from a to b. ImageDraw has no dash pattern, so the line is
+    walked and the dots are put down one at a time."""
+    (ax, ay), (bx, by) = a, b
+    length = math.hypot(bx - ax, by - ay)
+    if not length:
+        return
+    on, off = max(2.0, width * 2.0), max(3.0, width * 3.0)
+    step = (bx - ax) / length, (by - ay) / length
+    at = 0.0
+    while at < length:
+        end = min(at + on, length)
+        draw.line([(ax + step[0] * at, ay + step[1] * at),
+                   (ax + step[0] * end, ay + step[1] * end)], fill=fill, width=width)
+        at = end + off
+
+
+def _centre_radius(side):
+    """The dot on the centre. _distances keeps its numbers off it: the dot is
+    drawn last and would otherwise sit on top of one."""
+    return max(3.0, side * 0.016)
+
+
+def _centre_mark(image, cx, cy, side):
+    """The centre the player set with the hotkey: a blue dot, smaller than a
+    bookmark so the two are never taken for each other. Outlined in the
+    background colour like the bookmarks, so it reads over painted ground, the
+    grid and the rings alike."""
+    r = _centre_radius(side)
+    ImageDraw.Draw(image).ellipse([cx - r, cy - r, cx + r, cy + r], fill=CENTRE,
+                                  outline=palette.rgb(palette.BG))
+
+
+def _distances(image, points, side, centre, per_px):
+    """How far apart the bookmarks are: two lines out of every spot, each with
+    its length on it.
+
+    `points` are the spots in pixels, `centre` the map's centre in pixels or
+    None while the player has not set one. `per_px` is metres a pixel.
+
+    Only spots on the map are joined up. A bookmark on the far side of the
+    body is in `points` - nothing filters them by distance - and a line to one
+    would be a ray off the edge towards something the player cannot see, at the
+    cost of drawing it: fourteen bookmarks on one body, thirteen of them off
+    the map, measured 3.1 ms a frame against 0.2 ms for the one that is on it.
+
+    Each spot is joined twice: a solid line to the nearest spot holding the
+    same material, and a dotted one to the nearest spot holding the next
+    material down the sheet's price ranking. Two spots of one material that
+    pick each other share their solid line; a dotted line only ever runs
+    downhill, so it can never be drawn twice.
+
+    `centre` is not joined to anything - it is only kept clear, since the dot
+    marking it is drawn after these lines and would sit on top of a number.
+
+    A number is left off when it would not fit on the map or would land on
+    something already drawn - another number, a dot with its code, the SRV, the
+    centre, or the scale bar the window writes over the bottom left corner.
+    """
+    draw = ImageDraw.Draw(image)
+    size = max(8, int(round(side * 0.042)))
+    font = spotcard._font("consola.ttf", size)
+    width = max(1, int(round(side / 300)))
+    r = _mark_radius(side)
+    spots, code_of, value_of = [], {}, {}
+    for point in points:
+        if not _on_map(image, point[0], point[1], r):
+            continue
+        spot = (float(point[0]), float(point[1]))
+        spots.append(spot)
+        code_of[spot] = point[2] if len(point) > 2 else None
+        value_of[spot] = point[4] if len(point) > 4 else 0
+
+    # What goes on over these lines, so the numbers keep out of its way rather
+    # than being painted over: the SRV in the middle, the centre ring, the dots
+    # with their codes, and the scale bar the window draws into the corner.
+    half = _marker_size(side) / 2.0
+    written = [(side / 2 - half, side / 2 - half, side / 2 + half, side / 2 + half),
+               (0, side - side / 12.0, side / 3.0, side)]
+    if centre is not None:
+        dot = _centre_radius(side)
+        written.append((centre[0] - dot, centre[1] - dot, centre[0] + dot, centre[1] + dot))
+    mark_font = _mark_font(side)
+    for point in points:
+        cx, cy = float(point[0]), float(point[1])
+        if not _on_map(image, cx, cy, r):
+            continue
+        written.append((cx - r, cy - r, cx + r, cy + r))
+        code = point[2] if len(point) > 2 else None
+        if code:
+            written.append(draw.textbbox(_code_at(cx, cy, side), code,
+                                         font=mark_font, anchor="lm"))
+
+    def label(a, b, colour):
+        """The line's length, written beside it, at the first free place.
+
+        Beside and not on: a dot sits at each end with its code, and a number
+        placed on a short line is pushed off it by them. Offset square to the
+        line and it stays next to the middle of its own line, which is the
+        whole point of the number - one put past an end lands beside some other
+        line and is read as that line's length.
+        """
+        (ax, ay), (bx, by) = a, b
+        length = math.hypot(bx - ax, by - ay)
+        if length < r:
+            return                    # two bookmarks from one standing position
+        text = guide.metres(length * per_px)
+        # Square to the line, far enough out to clear it and its own stroke.
+        nx, ny = -(by - ay) / length, (bx - ax) / length
+        places = ((a, s * g) for g in LABEL_GAPS for a in LABEL_ALONG for s in LABEL_SIDES)
+        for along, sway in places:
+            tx = ax + (bx - ax) * along + nx * size * sway
+            ty = ay + (by - ay) * along + ny * size * sway
+            left, top, right, bottom = draw.textbbox((tx, ty), text, font=font, anchor="mm")
+            # The stroke widens the text by two pixels a side, and a gap of one
+            # more keeps two numbers from touching.
+            box = (left - 3, top - 3, right + 3, bottom + 3)
+            if box[0] < 0 or box[1] < 0 or box[2] > side or box[3] > side:
+                continue
+            if any(box[0] < other[2] and other[0] < box[2]
+                   and box[1] < other[3] and other[1] < box[3] for other in written):
+                continue
+            written.append(box)
+            draw.text((tx, ty), text, fill=colour, font=font, anchor="mm",
+                      stroke_width=2, stroke_fill=palette.rgb(palette.BG))
+            return
+
+    def away(spot):
+        return lambda other: math.hypot(other[0] - spot[0], other[1] - spot[1])
+
+    same, lower = set(), []
+    for spot in spots:
+        kin = [o for o in spots if o != spot and code_of[o] == code_of[spot]]
+        if kin:
+            same.add(tuple(sorted((spot, min(kin, key=away(spot))))))
+        # The next material down, not any material down: the best of what is
+        # worth less, and the nearest of those when several share it.
+        under = [o for o in spots if value_of[o] < value_of[spot]]
+        if under:
+            step = max(value_of[o] for o in under)
+            lower.append((spot, min((o for o in under if value_of[o] == step), key=away(spot))))
+    same = sorted(same)
+
+    # Every line first, then every number: a line drawn after a number would
+    # run through it.
+    for a, b in same:
+        draw.line([a, b], fill=LINE_SPOT, width=width)
+    for a, b in lower:
+        _dotted(draw, a, b, LINE_LOWER, width)
+    # The same material first: it is the number worth the room when a solid and
+    # a dotted line want the same piece of map.
+    for a, b in same:
+        label(a, b, palette.rgb(palette.FG_SOFT))
+    for a, b in lower:
+        label(a, b, LINE_LOWER)
 
 
 def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True):
@@ -552,6 +766,11 @@ def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True):
 _markers = {}            # (frame or None, pixels) -> RGBA
 
 
+def _marker_size(side):
+    """The SRV marker's side in pixels, on a map this wide."""
+    return max(12, int(round(side * 0.09)))
+
+
 def _marker(heading, size):
     """The SRV: a chevron turned to the heading, or a dot without one.
     Drawn at four times the size, once per arrow.STEP degrees, and kept."""
@@ -576,12 +795,16 @@ def _marker(heading, size):
     return sprite
 
 
-def render(coverage, x, y, heading, side, marks=()):
+def render(coverage, x, y, heading, side, marks=(), distances=False):
     """The map, side x side, the SRV at (x, y) in the middle, north up.
 
     A crop of the kept layer with the bookmarks and the marker on top - the
     painting itself is only redone when coverage.version moves. `marks` are
     bookmarks in metres from the map's centre.
+
+    `distances` draws the lines between them. Off at the smallest size the map
+    comes in: 12 km of ground in 180 px has no room for a number, and the lines
+    themselves cover the painted area they are drawn over.
     """
     layer = coverage.layer(side)
     scale = side / (2 * VIEW_M)
@@ -589,9 +812,16 @@ def render(coverage, x, y, heading, side, marks=()):
     top = int(round(layer.height / 2 - y * scale - side / 2))
     image = Image.new("RGB", (side, side), palette.rgb(palette.BG))
     image.paste(layer, (-left, -top))
-    _bookmarks(image, [(side / 2 + (mx - x) * scale, side / 2 - (my - y) * scale, *rest)
-                       for mx, my, *rest in marks], side)
-    size = max(12, int(round(side * 0.09)))
+    spots = [(side / 2 + (mx - x) * scale, side / 2 - (my - y) * scale, *rest)
+             for mx, my, *rest in marks]
+    # The centre is the map's origin, so it is where (0, 0) metres lands.
+    centre = (side / 2 - x * scale, side / 2 + y * scale) if coverage.centered else None
+    if distances:
+        _distances(image, spots, side, centre, 1.0 / scale)
+    _bookmarks(image, spots, side)
+    if centre is not None:
+        _centre_mark(image, centre[0], centre[1], side)
+    size = _marker_size(side)
     marker = _marker(heading, size)
     image.paste(marker, ((side - size) // 2, (side - size) // 2), marker)
     return image

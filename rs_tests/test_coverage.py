@@ -389,6 +389,24 @@ class TestScale:
     def test_no_game_window_still_gets_a_map(self):
         assert coverage.MAP_MIN_PX <= coverage.map_side(None) <= coverage.MAP_MAX_PX
 
+    def test_the_size_hotkey_grows_the_map(self):
+        for height in (720, 1080, 1440):
+            sides = [coverage.map_side(height, step) for step in coverage.MAP_ZOOMS]
+            assert sides == sorted(sides) and sides[0] < sides[-1]
+
+    def test_asking_for_bigger_goes_past_the_map_of_its_own_accord(self):
+        assert coverage.map_side(4320, 1.8) > coverage.MAP_MAX_PX
+
+    def test_the_biggest_the_hotkey_can_ask_for_is_bounded(self):
+        # _draw_layer is redone on the Tk thread while driving, and it grows
+        # with the square of the side.
+        for height in (400, 720, 1080, 1440, 2160, 4320):
+            for step in coverage.MAP_ZOOMS:
+                assert coverage.map_side(height, step) <= coverage.MAP_ZOOM_MAX_PX
+
+    def test_the_size_hotkey_works_without_a_game_window(self):
+        assert coverage.map_side(None, 1.8) > coverage.map_side(None)
+
 
 @pytest.mark.unit
 class TestRender:
@@ -497,6 +515,148 @@ class TestRender:
         assert cover.layer(240) is first
         cover.add(*at(0, 5000))
         assert cover.layer(240) is not first
+
+    def centred(self):
+        cover = fresh()
+        cover.recenter(LAT, LON)
+        return cover
+
+    def count(self, image, colour, box=None):
+        left, top, right, bottom = box or (0, 0, image.width, image.height)
+        return sum(1 for i in range(left, right) for j in range(top, bottom)
+                   if image.getpixel((i, j)) == colour)
+
+    def around(self, side, cx, cy, reach=14):
+        return (max(0, int(cx) - reach), max(0, int(cy) - reach),
+                min(side, int(cx) + reach), min(side, int(cy) + reach))
+
+    def test_the_srv_standing_on_the_centre_covers_its_dot(self):
+        side = 240
+        # Not a defect worth guarding against on the map - you are standing on
+        # it - but it is why the other centre tests drive the SRV away first.
+        on_it = coverage.render(self.centred(), 0, 0, None, side)
+        beside_it = coverage.render(self.centred(), 0, 3000, None, side)
+        assert self.count(on_it, coverage.CENTRE) == 0
+        assert self.count(beside_it, coverage.CENTRE) > 0
+
+    def test_a_set_centre_is_marked_where_it_is(self):
+        side = 240
+        per_m = side / (2 * coverage.VIEW_M)
+        # The SRV 3 km east of the centre, so the centre is not under its marker.
+        image = coverage.render(self.centred(), 3000, 0, None, side)
+        box = self.around(side, side / 2 - 3000 * per_m, side / 2)
+        assert self.count(image, coverage.CENTRE, box) > 0
+
+    def test_a_centre_nobody_set_is_not_marked(self):
+        side = 240
+        per_m = side / (2 * coverage.VIEW_M)
+        image = coverage.render(fresh(), 3000, 0, None, side)
+        box = self.around(side, side / 2 - 3000 * per_m, side / 2)
+        assert self.count(image, coverage.CENTRE, box) == 0
+
+    def test_nothing_is_joined_to_the_centre(self):
+        side = 240
+        # A lone spot: with nothing of its own material and nothing worth less,
+        # it is joined to nothing at all, the centre included. The SRV is put
+        # 3 km north so its marker is not sitting on the centre dot.
+        image = coverage.render(self.centred(), 0, 3000, None, side,
+                                marks=[(2500, 0, "T", False, 100)], distances=True)
+        assert self.count(image, coverage.LINE_SPOT) == 0
+        assert self.count(image, coverage.LINE_LOWER) == 0
+        assert self.count(image, coverage.CENTRE) > 0
+
+    def test_the_smallest_map_draws_no_lines_at_all(self):
+        side = 240
+        marks = [(2000, 0, "T", False, 100), (2600, 0, "T", False, 100),
+                 (-2000, 1000, "TH", False, 50)]
+        # SRV 3 km north, so its marker is clear of the centre dot.
+        image = coverage.render(self.centred(), 0, 3000, None, side, marks)
+        for colour in (coverage.LINE_SPOT, coverage.LINE_LOWER):
+            assert self.count(image, colour) == 0
+        # The dots and the centre are still drawn - it is the lines that go.
+        assert self.count(image, coverage.MARK) > 0
+        assert self.count(image, coverage.CENTRE) > 0
+
+    def test_a_solid_line_joins_the_nearest_spot_of_the_same_material(self):
+        side = 240
+        per_m = side / (2 * coverage.VIEW_M)
+        # Two pairs of one material each, one pair per corner: each spot's own
+        # kind is beside it, so nothing crosses the middle.
+        marks = [(-3400, -2000, "T", False, 100), (-1400, -2000, "T", False, 100),
+                 (3400, 2000, "T", False, 100), (1400, 2000, "T", False, 100)]
+        image = coverage.render(fresh(), 0, 0, None, side, marks, distances=True)
+        assert self.count(image, coverage.LINE_SPOT) > 0
+        assert self.count(image, coverage.LINE_SPOT,
+                          self.around(side, side / 2, side / 2, 30)) == 0
+
+    def test_a_material_on_its_own_gets_no_solid_line(self):
+        side = 240
+        marks = [(2000, 0, "T", False, 100), (-2000, 0, "TH", False, 50)]
+        image = coverage.render(fresh(), 0, 0, None, side, marks, distances=True)
+        assert self.count(image, coverage.LINE_SPOT) == 0
+        assert self.count(image, coverage.LINE_LOWER) > 0        # but the step down is drawn
+
+    def test_the_dotted_line_goes_one_step_down_not_all_the_way(self):
+        side = 240
+        per_m = side / (2 * coverage.VIEW_M)
+        # Worth 100 at the top, 50 a short way off, 10 the other side. The
+        # dotted line leaves the top one for the 50, never for the 10.
+        marks = [(0, 2500, "T", False, 100), (2500, 0, "TH", False, 50),
+                 (-2500, 0, "TI", False, 10)]
+        image = coverage.render(fresh(), 0, 0, None, side, marks, distances=True)
+        down = (side / 2 + 1250 * per_m, side / 2 - 1250 * per_m)       # top -> 50
+        skip = (side / 2 - 1250 * per_m, side / 2 - 1250 * per_m)       # top -> 10
+        assert self.count(image, coverage.LINE_LOWER, self.around(side, *down, 8)) > 0
+        assert self.count(image, coverage.LINE_LOWER, self.around(side, *skip, 8)) == 0
+
+    def test_two_bookmarks_from_one_standing_position_are_not_joined(self):
+        side = 240
+        marks = [(2000, 0, "T", False, 100), (2000, 0, "T", False, 100)]
+        image = coverage.render(fresh(), 0, 0, None, side, marks, distances=True)
+        assert self.count(image, coverage.LINE_SPOT) == 0
+
+    def test_a_bookmark_off_the_map_gets_no_line(self):
+        side = 240
+        # One on the map and one 400 km away: on the body, nowhere near the
+        # 12 km the map shows. Same material, so they would be joined if the
+        # far one counted.
+        marks = [(2000, 0, "T", False, 100), (400000, 0, "T", False, 100)]
+        image = coverage.render(self.centred(), 0, 0, None, side, marks, distances=True)
+        assert self.count(image, coverage.LINE_SPOT) == 0
+
+    def test_a_line_carries_its_length(self):
+        # Two bookmarks of one material 2 km apart - the short line whose
+        # number used to be squeezed off the map altogether. Drawn at 480
+        # because at 240 an 8 px glyph is nearly all antialiasing and an
+        # exact-colour count cannot see it.
+        side = 480
+        ink = palette.rgb(palette.FG_SOFT)          # only a solid line's number
+        one = coverage.render(fresh(), 0, 0, None, side,
+                              marks=[(1000, 0, "T", False, 100)], distances=True)
+        two = coverage.render(fresh(), 0, 0, None, side,
+                              marks=[(1000, 0, "T", False, 100),
+                                     (-1000, 0, "T", False, 100)], distances=True)
+        assert self.count(two, ink) > self.count(one, ink) + 20
+
+    def test_the_numbers_thin_out_rather_than_print_over_each_other(self):
+        side = 480                    # at 240 the glyphs are mostly antialiasing
+        # Two dozen bookmarks of one material 1.5 km out - someone who marks
+        # every patch on the location. Each is joined to its nearest, so there
+        # are a dozen solid lines wanting a number in the same few pixels.
+        crowd = [(1500 * math.cos(math.radians(a)), 1500 * math.sin(math.radians(a)),
+                  "T", False, 100) for a in range(0, 360, 15)]
+        ink = palette.rgb(palette.FG_SOFT)
+
+        def numbers(marks):
+            return self.count(coverage.render(fresh(), 0, 0, None, side, marks,
+                                              distances=True), ink)
+        # The unit is one line on its own, taken across the ring so it is not
+        # one of the crowd's own short hops. Every number is about as much ink
+        # as every other - they are all "N m" or "N.N km".
+        one = numbers([crowd[0], crowd[12]])
+        many = numbers(crowd)
+        assert one > 0                          # a line on its own does get its number
+        assert 0 < many < len(crowd) // 2 * one
 
     def test_nothing_drawn_lands_on_the_overlay_key(self):
         cover = fresh()
