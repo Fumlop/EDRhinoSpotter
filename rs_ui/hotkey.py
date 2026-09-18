@@ -2,8 +2,12 @@
 
     Ctrl+Alt+Z  make where the SRV stands the centre of the map
     Ctrl+Alt+B  make where the SRV stands the location's border
-    Ctrl+Alt+M  step the map through its sizes
+    Ctrl+Alt+M  zoom the map
     Ctrl+Alt+D  open the RhinoData window over the game
+
+Those are the defaults. Each can be changed in EDMC Settings, RhinoSpotter
+tab; label() says what a key is bound to now, and everything that names a key
+asks it rather than keeping a copy.
 
 Windows hotkeys, registered with RegisterHotKey on a thread of their own: the
 game has the focus while you drive, so a key bound in Tk would never hear it.
@@ -23,36 +27,82 @@ Callbacks run on this thread. The caller hands in something that bounces them
 to Tk, the way every other worker in the plugin does.
 """
 
+import string
 import threading
 
 from rs_core.logging import logger
 
+try:
+    from config import config
+except ImportError:      # running outside EDMC
+    config = None
+
 MOD_ALT = 0x0001
 MOD_CONTROL = 0x0002
+MOD_SHIFT = 0x0004
 MOD_NOREPEAT = 0x4000
 WM_HOTKEY = 0x0312
 WM_QUIT = 0x0012
 
-# id -> (label, virtual key). All four are Ctrl+Alt.
 CENTER = 0x5253             # 'RS'
 BORDER = 0x5254
 SCAN = 0x5255
 SIZE = 0x5256
-KEYS = {CENTER: ("Ctrl+Alt+Z", 0x5A), BORDER: ("Ctrl+Alt+B", 0x42),
-        SCAN: ("Ctrl+Alt+D", 0x44), SIZE: ("Ctrl+Alt+M", 0x4D)}
-CENTER_LABEL = KEYS[CENTER][0]
-BORDER_LABEL = KEYS[BORDER][0]
-SCAN_LABEL = KEYS[SCAN][0]
-SIZE_LABEL = KEYS[SIZE][0]
+
+# What each key does, its default, and where a change is kept in EDMC's
+# config. In the order Settings lists them.
+ACTIONS = ((CENTER, "Set center", "Ctrl+Alt+Z", "rhinospotter_hotkey_center"),
+           (BORDER, "Set border", "Ctrl+Alt+B", "rhinospotter_hotkey_border"),
+           (SIZE, "Zoom", "Ctrl+Alt+M", "rhinospotter_hotkey_zoom"),
+           (SCAN, "Open RhinoData", "Ctrl+Alt+D", "rhinospotter_hotkey_data"))
+
+# What Settings offers: a modifier set and a key. Every set has two modifiers
+# at least - one alone would steal ordinary typing.
+MODIFIER_SETS = ("Ctrl+Alt", "Ctrl+Shift", "Alt+Shift", "Ctrl+Alt+Shift")
+KEY_NAMES = (tuple(string.ascii_uppercase) + tuple(string.digits)
+             + tuple(f"F{n}" for n in range(1, 13)))
+MODIFIERS = {"Ctrl": MOD_CONTROL, "Alt": MOD_ALT, "Shift": MOD_SHIFT}
 
 _thread = None
 _thread_id = None
+_callbacks = {}
+
+
+def parse(combo):
+    """'Ctrl+Alt+Z' -> (modifier flags, virtual key), or None for anything
+    Settings could not have offered."""
+    parts = (combo or "").split("+")
+    mods, key = parts[:-1], parts[-1].upper()
+    if "+".join(mods) not in MODIFIER_SETS or key not in KEY_NAMES:
+        return None
+    flags = 0
+    for mod in mods:
+        flags |= MODIFIERS[mod]
+    vk = 0x70 + int(key[1:]) - 1 if len(key) > 1 else ord(key)
+    return flags, vk
+
+
+def label(key_id):
+    """What a key is bound to now: the one set in Settings, or its default."""
+    for kid, _, default, config_key in ACTIONS:
+        if kid == key_id:
+            combo = config.get_str(config_key, default=default) if config is not None else default
+            return combo if parse(combo) else default
+    raise KeyError(key_id)
+
+
+def restart():
+    """Settings changed a key: drop the old combinations, take the new ones."""
+    stop()
+    if _callbacks:
+        start(_callbacks)
 
 
 def start(callbacks):
     """Register the hotkeys and listen. `callbacks` is {CENTER: fn, ...} over
-    the ids in KEYS. Safe to call twice; the second is ignored."""
-    global _thread
+    the ids in ACTIONS. Safe to call twice; the second is ignored."""
+    global _thread, _callbacks
+    _callbacks = dict(callbacks)
     if _thread is not None and _thread.is_alive():
         return
     try:
@@ -91,11 +141,13 @@ def _listen(callbacks, ready):
     _thread_id = kernel32.GetCurrentThreadId()
     registered = []
     for key_id in callbacks:
-        label, vk = KEYS[key_id]
-        if user32.RegisterHotKey(None, key_id, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, vk):
+        combo = label(key_id)
+        flags, vk = parse(combo)
+        if user32.RegisterHotKey(None, key_id, flags | MOD_NOREPEAT, vk):
             registered.append(key_id)
         else:
-            logger.warning(f"hotkey: {label} is taken by another program, it does nothing here")
+            logger.warning(f"hotkey: {combo} is taken by another program or another "
+                           f"RhinoSpotter key, it does nothing here")
     ready.set()
     if not registered:
         _thread_id = None

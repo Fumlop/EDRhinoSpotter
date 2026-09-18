@@ -85,6 +85,7 @@ _fresh = []              # [(system, body, lat, lon, code, when)] bookmarked, ma
 _enabled = None          # tk.BooleanVar on the settings tab
 _corner = None           # tk.StringVar on the settings tab
 _keep = None             # tk.BooleanVar on the settings tab
+_hotkeys = {}            # hotkey id -> (modifier StringVar, key StringVar) on the settings tab
 
 
 def enabled():
@@ -524,6 +525,20 @@ def prefs(parent):
               command=lambda: _delete_migrated(frame, result)).grid(
         row=5, column=0, sticky="w", padx=10, pady=(2, 10))
     result.grid(row=5, column=1, sticky="w", padx=10, pady=(2, 10))
+
+    # The hotkeys: a modifier set and a key each. Taken on OK and registered
+    # again at once; the rows under the map name them from the next frame.
+    nb.Label(frame, text="Hotkeys").grid(row=6, column=0, sticky="w", padx=10, pady=(6, 2))
+    _hotkeys.clear()
+    for row, (key_id, name, _, _) in enumerate(hotkey.ACTIONS, start=7):
+        mods, key = hotkey.label(key_id).rsplit("+", 1)
+        mod_var, key_var = tk.StringVar(value=mods), tk.StringVar(value=key)
+        _hotkeys[key_id] = (mod_var, key_var)
+        nb.Label(frame, text=name).grid(row=row, column=0, sticky="w", padx=10, pady=2)
+        keys = nb.Frame(frame)
+        nb.OptionMenu(keys, mod_var, mods, *hotkey.MODIFIER_SETS).pack(side="left")
+        nb.OptionMenu(keys, key_var, key, *hotkey.KEY_NAMES).pack(side="left", padx=(4, 0))
+        keys.grid(row=row, column=1, sticky="w", padx=10, pady=2)
     return frame
 
 
@@ -573,6 +588,17 @@ def prefs_changed():
             config.set(CORNER_KEY, _corner.get())
         if _keep is not None:
             config.set(KEEP_KEY, bool(_keep.get()))
+        changed = False
+        for key_id, _, _, config_key in hotkey.ACTIONS:
+            if key_id not in _hotkeys:
+                continue
+            mod_var, key_var = _hotkeys[key_id]
+            combo = f"{mod_var.get()}+{key_var.get()}"
+            if hotkey.parse(combo) and combo != hotkey.label(key_id):
+                config.set(config_key, combo)
+                changed = True
+        if changed:
+            hotkey.restart()
     # Moved or switched off: the next reading places and draws it again.
     _placed = _drawn = None
 
@@ -730,11 +756,11 @@ def _draw(side, x, y, heading, in_reach, header, marks=(), distances=False, base
     if notice:
         _canvas.create_text(pad, foot + band, text=notice, fill=palette.WARN, font=small, anchor="w")
     else:
-        _canvas.create_text(pad, foot + band, text=f"{hotkey.CENTER_LABEL}  set center",
+        _canvas.create_text(pad, foot + band, text=f"{hotkey.label(hotkey.CENTER)}  set center",
                             fill=palette.MUTED, font=small, anchor="w")
-    _canvas.create_text(pad, foot + 2 * band, text=f"{hotkey.BORDER_LABEL}  set border",
+    _canvas.create_text(pad, foot + 2 * band, text=f"{hotkey.label(hotkey.BORDER)}  set border",
                         fill=palette.MUTED, font=small, anchor="w")
-    _canvas.create_text(pad, foot + 3 * band, text=f"{hotkey.SIZE_LABEL}  zoom",
+    _canvas.create_text(pad, foot + 3 * band, text=f"{hotkey.label(hotkey.SIZE)}  zoom",
                         fill=palette.MUTED, font=small, anchor="w")
     if in_reach:
         _canvas.create_text(width - pad, foot, text=f"{_coverage.painted_km2():.0f} km²",
