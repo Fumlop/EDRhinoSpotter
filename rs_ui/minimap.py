@@ -220,7 +220,8 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
                   for mlat, mlon, code, depleted, value in _bookmarks(system, body))
     # What a picture is of, at the precision it is drawn at: a map pixel of
     # movement and a frame of the marker. Anything finer redraws for nothing.
-    per_px = 2 * coverage.VIEW_M / side
+    view = coverage.view_m(zoom())
+    per_px = 2 * view / side
     state = (int(x // per_px), int(y // per_px),
              None if heading is None else arrow.bucket(heading),
              side, zoom(), where, in_reach, header, _coverage.version,
@@ -228,7 +229,7 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
              tuple(round(v) for v in _coverage.anchor()), _coverage.centered,
              _coverage.border_m, _hint(), marks)
     if state != _drawn:
-        _draw(side, x, y, heading, in_reach, header, marks, _distances_shown(), base)
+        _draw(side, x, y, heading, in_reach, header, marks, _distances_shown(), base, view)
         _drawn = state
     _place(side, where, rect, base)
 
@@ -683,10 +684,11 @@ def _header(status, body, system):
     return f"loc {index}  {short}" if index is not None else short
 
 
-def _draw(side, x, y, heading, in_reach, header, marks=(), distances=False, base=None):
+def _draw(side, x, y, heading, in_reach, header, marks=(), distances=False, base=None,
+          view=coverage.VIEW_M):
     global _photo
     unit, pad, band, width, height = _layout(side, base)
-    image = coverage.render(_coverage, x, y, heading, side, marks, distances)
+    image = coverage.render(_coverage, x, y, heading, side, marks, distances, view)
     data = io.BytesIO()
     image.save(data, "PNG", compress_level=1)
     _photo = tk.PhotoImage(data=base64.b64encode(data.getvalue()))
@@ -705,7 +707,7 @@ def _draw(side, x, y, heading, in_reach, header, marks=(), distances=False, base
     _canvas.create_rectangle(pad - 1, top - 1, pad + side, top + side, outline=palette.RULE)
 
     # Scale bar: one grid square.
-    bar = side * coverage.GRID_M / (2 * coverage.VIEW_M)
+    bar = side * coverage.GRID_M / (2 * view)
     bx, by = pad + 8 * unit, top + side - 10 * unit
     _canvas.create_line(bx, by, bx + bar, by, fill=palette.FG, width=max(2, round(2 * unit)))
     _canvas.create_text(bx + bar + 4 * unit, by, text=guide.metres(coverage.GRID_M),
