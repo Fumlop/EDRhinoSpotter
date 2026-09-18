@@ -545,68 +545,105 @@ class TestRender:
         box = self.around(side, side / 2 - 3000 * per_m, side / 2)
         assert self.count(image, coverage.CENTRE, box) == 0
 
-    def test_a_line_runs_from_the_centre_to_every_spot(self):
+    def test_nothing_is_joined_to_the_centre(self):
         side = 240
-        marks = [(2000, 0), (-2000, 1000), (0, -2500)]
-        image = coverage.render(self.centred(), 0, 0, None, side, marks=marks)
-        assert self.count(image, coverage.LINE_CENTRE) > 0
-        assert self.count(coverage.render(fresh(), 0, 0, None, side, marks=marks),
-                          coverage.LINE_CENTRE) == 0
+        # A lone spot due east of the centre: with nothing of its own material
+        # and nothing worth less, it is joined to nothing at all, centre
+        # included. Only its dot and the ring are drawn.
+        image = coverage.render(self.centred(), 0, 0, None, side,
+                                marks=[(2500, 0, "T", False, 100)], distances=True)
+        band = (side // 2, side // 2 - 3, side, side // 2 + 3)
+        assert self.count(image, coverage.LINE_SPOT, band) == 0
+        assert self.count(image, coverage.LINE_LOWER, band) == 0
+        assert self.count(image, coverage.CENTRE) > 0
 
-    def test_a_line_runs_from_a_spot_to_the_spot_nearest_it(self):
+    def test_the_smallest_map_draws_no_lines_at_all(self):
         side = 240
-        # Two pairs, one in each corner: each spot's nearest is its partner, so
-        # the two short lines are drawn and nothing crosses the middle. A spot
-        # joined to every other spot would put a line straight through it.
-        marks = [(-3000, -2000), (-2400, -2000), (3000, 2000), (2400, 2000)]
-        image = coverage.render(fresh(), 0, 0, None, side, marks=marks)
+        marks = [(2000, 0, "T", False, 100), (2600, 0, "T", False, 100),
+                 (-2000, 1000, "TH", False, 50)]
+        image = coverage.render(self.centred(), 0, 0, None, side, marks)
+        for colour in (coverage.LINE_SPOT, coverage.LINE_LOWER):
+            assert self.count(image, colour) == 0
+        # The dots and the centre are still drawn - it is the lines that go.
+        assert self.count(image, coverage.MARK) > 0
+        assert self.count(image, coverage.CENTRE) > 0
+
+    def test_a_solid_line_joins_the_nearest_spot_of_the_same_material(self):
+        side = 240
+        per_m = side / (2 * coverage.VIEW_M)
+        # Two pairs of one material each, one pair per corner: each spot's own
+        # kind is beside it, so nothing crosses the middle.
+        marks = [(-3400, -2000, "T", False, 100), (-1400, -2000, "T", False, 100),
+                 (3400, 2000, "T", False, 100), (1400, 2000, "T", False, 100)]
+        image = coverage.render(fresh(), 0, 0, None, side, marks, distances=True)
         assert self.count(image, coverage.LINE_SPOT) > 0
         assert self.count(image, coverage.LINE_SPOT,
                           self.around(side, side / 2, side / 2, 30)) == 0
 
+    def test_a_material_on_its_own_gets_no_solid_line(self):
+        side = 240
+        marks = [(2000, 0, "T", False, 100), (-2000, 0, "TH", False, 50)]
+        image = coverage.render(fresh(), 0, 0, None, side, marks, distances=True)
+        assert self.count(image, coverage.LINE_SPOT) == 0
+        assert self.count(image, coverage.LINE_LOWER) > 0        # but the step down is drawn
+
+    def test_the_dotted_line_goes_one_step_down_not_all_the_way(self):
+        side = 240
+        per_m = side / (2 * coverage.VIEW_M)
+        # Worth 100 at the top, 50 a short way off, 10 the other side. The
+        # dotted line leaves the top one for the 50, never for the 10.
+        marks = [(0, 2500, "T", False, 100), (2500, 0, "TH", False, 50),
+                 (-2500, 0, "TI", False, 10)]
+        image = coverage.render(fresh(), 0, 0, None, side, marks, distances=True)
+        down = (side / 2 + 1250 * per_m, side / 2 - 1250 * per_m)       # top -> 50
+        skip = (side / 2 - 1250 * per_m, side / 2 - 1250 * per_m)       # top -> 10
+        assert self.count(image, coverage.LINE_LOWER, self.around(side, *down, 8)) > 0
+        assert self.count(image, coverage.LINE_LOWER, self.around(side, *skip, 8)) == 0
+
     def test_two_bookmarks_from_one_standing_position_are_not_joined(self):
         side = 240
-        image = coverage.render(fresh(), 0, 0, None, side, marks=[(2000, 0), (2000, 0)])
+        marks = [(2000, 0, "T", False, 100), (2000, 0, "T", False, 100)]
+        image = coverage.render(fresh(), 0, 0, None, side, marks, distances=True)
         assert self.count(image, coverage.LINE_SPOT) == 0
 
     def test_a_bookmark_off_the_map_gets_no_line(self):
         side = 240
-        # 400 km away: on the body, nowhere near the 12 km the map shows.
-        image = coverage.render(self.centred(), 0, 0, None, side, marks=[(400000, 0)])
-        assert self.count(image, coverage.LINE_CENTRE) == 0
+        # One on the map and one 400 km away: on the body, nowhere near the
+        # 12 km the map shows. Same material, so they would be joined if the
+        # far one counted.
+        marks = [(2000, 0, "T", False, 100), (400000, 0, "T", False, 100)]
+        image = coverage.render(self.centred(), 0, 0, None, side, marks, distances=True)
+        assert self.count(image, coverage.LINE_SPOT) == 0
 
     def test_a_line_carries_its_length(self):
-        # The SRV sitting on the centre with one bookmark 2 km out: the short
-        # line whose number used to be squeezed off the map altogether. Drawn
-        # at 480 because at 240 an 8 px glyph is nearly all antialiasing and an
+        # Two bookmarks of one material 2 km apart - the short line whose
+        # number used to be squeezed off the map altogether. Drawn at 480
+        # because at 240 an 8 px glyph is nearly all antialiasing and an
         # exact-colour count cannot see it.
         side = 480
-        bare = coverage.render(self.centred(), 0, 0, None, side)
-        marked = coverage.render(self.centred(), 0, 0, None, side, marks=[(2000, 0)])
-        assert self.count(marked, coverage.CENTRE) > self.count(bare, coverage.CENTRE) + 20
-
-    def test_one_spot_on_its_own_has_nothing_to_join(self):
-        side = 240
-        image = coverage.render(fresh(), 0, 0, None, side, marks=[(2000, 0)])
-        assert self.count(image, coverage.LINE_SPOT) == 0
+        ink = palette.rgb(palette.FG_SOFT)          # only a solid line's number
+        one = coverage.render(fresh(), 0, 0, None, side,
+                              marks=[(1000, 0, "T", False, 100)], distances=True)
+        two = coverage.render(fresh(), 0, 0, None, side,
+                              marks=[(1000, 0, "T", False, 100),
+                                     (-1000, 0, "T", False, 100)], distances=True)
+        assert self.count(two, ink) > self.count(one, ink) + 20
 
     def test_the_numbers_thin_out_rather_than_print_over_each_other(self):
         side = 480                    # at 240 the glyphs are mostly antialiasing
-        # Two dozen bookmarks 1.5 km out - someone who maps every material on
-        # the location rather than the ones worth driving to.
-        crowd = [(1500 * math.cos(math.radians(a)), 1500 * math.sin(math.radians(a)))
-                 for a in range(0, 360, 15)]
+        # Two dozen bookmarks of one material 1.5 km out - someone who marks
+        # every patch on the location. Each is joined to its nearest, so there
+        # are a dozen solid lines wanting a number in the same few pixels.
+        crowd = [(1500 * math.cos(math.radians(a)), 1500 * math.sin(math.radians(a)),
+                  "T", False, 100) for a in range(0, 360, 15)]
+        ink = palette.rgb(palette.FG_SOFT)
 
-        def ink(marks):
-            # The accent is the centre ring and the centre lines' numbers, so
-            # the ring is subtracted to leave the numbers.
-            return (self.count(coverage.render(self.centred(), 0, 0, None, side, marks=marks),
-                               coverage.CENTRE)
-                    - self.count(coverage.render(self.centred(), 0, 0, None, side),
-                                 coverage.CENTRE))
-        one, many = ink(crowd[:1]), ink(crowd)
-        assert one > 0                          # a lone spot does get its number
-        assert 0 < many < len(crowd) * one      # not two dozen numbers' worth of ink
+        def numbers(marks):
+            return self.count(coverage.render(fresh(), 0, 0, None, side, marks,
+                                              distances=True), ink)
+        pair, many = numbers(crowd[:2]), numbers(crowd)
+        assert pair > 0                         # one line does get its number
+        assert 0 < many < len(crowd) // 2 * pair
 
     def test_nothing_drawn_lands_on_the_overlay_key(self):
         cover = fresh()

@@ -100,17 +100,31 @@ On a body's bookmark list:
   a blue dot in a ring on the map.
 - **Ctrl+Alt+B** - set the border where you stand (needs a center). Rings then
   show the drive circles; ground outside the border is dropped.
-- **Ctrl+Alt+M** - step the map through its sizes: 1x, 1.4x, 1.8x and back,
-  stopping at 640 px. The size sticks across EDMC restarts.
+- **Ctrl+Alt+M** - twice the size, and back. Capped at 640 px. The size sticks
+  across EDMC restarts.
 - Bookmarks are dots with material codes: green active, red depleted.
-- Lines say how far apart things are: from the center to every bookmark on the
-  map, and from every bookmark to the one nearest it. A number sits on each
-  line, and the ones that would print over something are left off - press
-  Ctrl+Alt+M for a bigger map to read more of them.
+- At 2x the bookmarks are joined up, each line carrying its length:
+  - **solid** to the nearest bookmark of the **same material** - where to go to
+    keep mining what you are mining;
+  - **dotted** to the nearest bookmark of the **next material down** in price -
+    where to go to settle for less.
+
+  The center is not joined to anything; it is just the blue dot. The smallest
+  map draws none of it: 12 km of ground in 250 px has no room for
+  a number and the lines cover the painted area they cross. A number that would
+  print over another number, a dot, the SRV, the center or the scale bar is
+  left off; press Ctrl+Alt+M to read the rest.
 - Saved per body; a launch within 10 km carries on the same map, EDMC restarts
   included. Each dock saves a picture with a legend of the bookmarks on it.
 - Hidden while Elite is not the front window.
 - "Painted" means driven within 2 km, not proven scanned - the game logs no scan.
+
+<p align="center">
+  <img src="docs/minimap-big.png" width="300"
+       alt="The minimap at 1.8x, every distance carrying its number">
+</p>
+<p align="center"><em>Ctrl+Alt+M: 2x, the size that draws the distances.
+Solid joins a material to itself, dotted steps down to the next.</em></p>
 
 <p align="center">
   <img src="docs/mapshare.png" width="440" alt="A saved map picture with bookmarks and legend">

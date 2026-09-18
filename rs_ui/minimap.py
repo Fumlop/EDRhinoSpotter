@@ -80,7 +80,7 @@ _in_srv = False
 _failed = False          # a draw that raised: stay down until the next launch
 _marks = None            # ((system, body, bookmark revision), [(lat, lon, code, depleted), ...])
 _why = None              # why the map is down, logged when it changes (debug only)
-_codes = None            # grounds.Sheet.codes, read once
+_codes = None            # (grounds.Sheet.codes, grounds.Sheet.values), read once
 _fresh = []              # [(system, body, lat, lon, code, when)] bookmarked, maybe not on disk yet
 _enabled = None          # tk.BooleanVar on the settings tab
 _corner = None           # tk.StringVar on the settings tab
@@ -115,6 +115,14 @@ def _step():
 def zoom():
     """How big the player has asked for the map to be."""
     return coverage.MAP_ZOOMS[_step()]
+
+
+def _distances_shown():
+    """Whether the lines between the bookmarks are drawn: anything but the
+    smallest map. At 1x the map is 12 km of ground in a couple of hundred
+    pixels, where a line covers the painted area it crosses and a number has
+    nowhere to sit."""
+    return _step() > 0
 
 
 def bigger():
@@ -205,18 +213,19 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
     where = corner()
     x, y = _coverage.xy(lat, lon)
     header = _header(status, body, system)
-    marks = tuple((*_coverage.xy(mlat, mlon), code, depleted)
-                  for mlat, mlon, code, depleted in _bookmarks(system, body))
+    marks = tuple((*_coverage.xy(mlat, mlon), code, depleted, value)
+                  for mlat, mlon, code, depleted, value in _bookmarks(system, body))
     # What a picture is of, at the precision it is drawn at: a map pixel of
     # movement and a frame of the marker. Anything finer redraws for nothing.
     per_px = 2 * coverage.VIEW_M / side
     state = (int(x // per_px), int(y // per_px),
              None if heading is None else arrow.bucket(heading),
              side, zoom(), where, in_reach, header, _coverage.version,
+             _distances_shown(),
              tuple(round(v) for v in _coverage.anchor()), _coverage.centered,
              _coverage.border_m, _hint(), marks)
     if state != _drawn:
-        _draw(side, x, y, heading, in_reach, header, marks)
+        _draw(side, x, y, heading, in_reach, header, marks, _distances_shown())
         _drawn = state
     _place(side, where, rect)
 
@@ -289,24 +298,39 @@ def _bookmarks(system, body):
                 if (record.get("planet_name") == body and isinstance(lat, (int, float))
                         and isinstance(lon, (int, float))):
                     points.append((lat, lon, _code(record.get("commodity")),
-                                   bool(record.get("depleted_at"))))
+                                   bool(record.get("depleted_at")),
+                                   _value(record.get("commodity"))))
             _marks = (key, points)
     # While a read fails: the last good read of this body, nothing for another.
     known = _marks[1] if _marks is not None and _marks[0][:2] == (system, body) else []
     now = time.monotonic()
     _fresh[:] = [f for f in _fresh if now - f[5] < FRESH_S]
-    on_disk = {(lat, lon) for lat, lon, _, _ in known}
-    fresh = [(lat, lon, code, False) for s, b, lat, lon, code, _ in _fresh
+    on_disk = {(lat, lon) for lat, lon, *_ in known}
+    fresh = [(lat, lon, code, False, value) for s, b, lat, lon, code, value, _ in _fresh
              if s == system and b == body and (lat, lon) not in on_disk]
     return known + fresh if fresh else known
 
 
-def _code(material):
-    """The short code for a material, or None for one the sheet does not know."""
+def _sheet():
+    """(codes, values) from the mining sheet, read once. One Sheet for both:
+    the codes and the prices have to come from the same reading, or a dot could
+    carry a letter the ranking beside it disagrees with."""
     global _codes
     if _codes is None:
-        _codes = grounds.Sheet().codes()
-    return _codes.get((material or "").lower())
+        sheet = grounds.Sheet()
+        _codes = (sheet.codes(), sheet.values())
+    return _codes
+
+
+def _code(material):
+    """The short code for a material, or None for one the sheet does not know."""
+    return _sheet()[0].get((material or "").lower())
+
+
+def _value(material):
+    """What a material is worth, for the line to the next one down. 0 for one
+    the sheet does not price - those sit at the bottom together."""
+    return _sheet()[1].get((material or "").lower(), 0)
 
 
 def bookmarked(spot):
@@ -321,7 +345,8 @@ def bookmarked(spot):
     if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
         return
     _fresh.append((spot.get("system"), spot.get("planet_name"), lat, lon,
-                   _code(spot.get("commodity")), time.monotonic()))
+                   _code(spot.get("commodity")), _value(spot.get("commodity")),
+                   time.monotonic()))
     _drawn = None
 
 
@@ -333,8 +358,8 @@ def _docked(system):
         return
     body, name = _coverage.body, _coverage.name
     mask = _coverage.mask.copy()
-    marks = [(*_coverage.xy(lat, lon), code, depleted)
-             for lat, lon, code, depleted in _bookmarks(system, body)]
+    marks = [(*_coverage.xy(lat, lon), code, depleted, value)
+             for lat, lon, code, depleted, value in _bookmarks(system, body)]
     title, legend = picture_text(_coverage, system)
     border_m = _coverage.border_m
 
@@ -649,10 +674,10 @@ def _header(status, body, system):
     return f"loc {index}  {short}" if index is not None else short
 
 
-def _draw(side, x, y, heading, in_reach, header, marks=()):
+def _draw(side, x, y, heading, in_reach, header, marks=(), distances=False):
     global _photo
     unit, pad, band, width, height = _layout(side)
-    image = coverage.render(_coverage, x, y, heading, side, marks)
+    image = coverage.render(_coverage, x, y, heading, side, marks, distances)
     data = io.BytesIO()
     image.save(data, "PNG", compress_level=1)
     _photo = tk.PhotoImage(data=base64.b64encode(data.getvalue()))

@@ -76,6 +76,21 @@ def bookmarks(body, card):
 # folder and removed again before the minimap pictures, which must not find them.
 RADIUS_4A = 1352744.5
 
+# The bookmarks on the map pictures: metres east and north of the drive's
+# origin, the code the sheet gives the material, whether it is mined out, what
+# it is worth, and what the saved map's legend says about it.
+#
+# Two pairs of one material and three prices, so both kinds of line have
+# something to draw: solid between the two Thortveitite and the two Monazite,
+# dotted from each of them down to the next material worth less.
+SPOTS = [
+    (2400, 400, "T", False, 940000, "Thortveitite", 2),
+    (600, -300, "T", False, 940000, "Thortveitite", 4),
+    (1900, -6100, "MZ", False, 460000, "Monazite", 3),
+    (-1500, -5600, "MZ", False, 460000, "Monazite", 2),
+    (-900, -6300, "PL", True, 180000, "Platinum", 3),
+]
+
 
 def plant_maps(body):
     from PIL import Image
@@ -310,11 +325,13 @@ def minimap_image(root, scale):
             "Destination": {"Name": "$SAA_Unknown_Signal:#index=22;"},
         }
 
-    # Two bookmarks on the body, where the drive went past them.
+    # Five bookmarks on the body, where the drive went past them - about what a
+    # location holds once its worthwhile materials are marked. Two would draw
+    # the distance lines without showing what they look like in the way.
     was_marks = minimap._bookmarks
     minimap._bookmarks = lambda system, body: [
-        (reading(x, y, 0, 0)["Latitude"], reading(x, y, 0, 0)["Longitude"], code, depleted)
-        for x, y, code, depleted in ((2400, 400, "T", False), (-900, -6300, "PL", True))]
+        (reading(x, y, 0, 0)["Latitude"], reading(x, y, 0, 0)["Longitude"], code, depleted, value)
+        for x, y, code, depleted, value, _, _ in SPOTS]
 
     for track in launches:
         for (x1, y1), (x2, y2) in zip(track, track[1:]):
@@ -353,13 +370,22 @@ def minimap_image(root, scale):
     press(2500, -8500, minimap.border_here)
     shoot("minimap-border.png")
 
+    # The second press: twice the size, and the step that draws the lines
+    # between the bookmarks at all. Patched rather than pressed - zoom() and
+    # _distances_shown() read EDMC's config, which is not here.
+    was_zoom, was_shown = minimap.zoom, minimap._distances_shown
+    minimap.zoom, minimap._distances_shown = lambda: coverage.MAP_ZOOMS[-1], lambda: True
+    minimap._placed = minimap._drawn = None
+    shoot("minimap-big.png")
+    minimap.zoom, minimap._distances_shown = was_zoom, was_shown
+    minimap._placed = minimap._drawn = None
+
     # The same drive as a shared map picture, with the title and legend the
     # plugin writes. Spelled out rather than read from cards and the system
     # cache, which hold the commander's own flights.
     cover = minimap._coverage
-    spots = [(2400, 400, "T", "Thortveitite", 2, False), (-900, -6300, "PL", "Platinum", 3, True)]
     marks, legend = [], []
-    for x, y, code, material, rigs, depleted in spots:
+    for x, y, code, depleted, _, material, rigs in SPOTS:
         at = reading(x, y, 0, 0)
         marks.append((*cover.xy(at["Latitude"], at["Longitude"]), code, depleted))
         legend.append((code, f"{material}  ·  {at['Latitude']:.6f} / {at['Longitude']:.6f}"

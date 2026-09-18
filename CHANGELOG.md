@@ -6,16 +6,25 @@
 
 - The center you set with Ctrl+Alt+Z is drawn: a blue dot inside a ring, where
   it stands on the map. Until now only the rings and the border said where it
-  was, and neither says it on a map without a border.
-- Lines between the things on the map, each with its length on it: from the
-  center to every bookmark, and from every bookmark to the one nearest it. Two
-  bookmarks that pick each other share one line, and two bookmarked from the
-  same standing position are not joined to each other at all.
-- **Ctrl+Alt+M** steps the map through 1x, 1.4x and 1.8x and back to 1x. The
-  size is remembered across EDMC restarts. It stops at 640 px, which is a speed
-  limit rather than a room limit: the painted area is redrawn on EDMC's own
-  thread every 250 m driven, measured here at 41 ms at 428 px and 160 ms at
-  855, and 640 keeps the worst press near where a 4K window already sits.
+  was, and neither says it on a map without a border. It is a mark and not a
+  hub - nothing is joined to it and it carries no distance of its own.
+- Lines between the bookmarks on the map, each with its length on it: solid to
+  the nearest bookmark of the same material, dotted to the nearest bookmark of
+  the next material down the sheet's price ranking. Two bookmarks of one
+  material that pick each other share their solid line; a dotted line only runs
+  downhill, so it is never drawn twice. Two bookmarks made from the same
+  standing position are not joined at all.
+- **Ctrl+Alt+M** doubles the size and puts it back. The size is remembered
+  across EDMC restarts and stops at 640 px, which is a speed limit rather than
+  a room limit: the painted area is redrawn on EDMC's own thread every 250 m
+  driven, measured here at 41 ms at 428 px and 160 ms at 855.
+- The material ranking behind the codes on the dots is now `Sheet.values()`,
+  one definition of what a material is worth, used by the codes and by the
+  dotted lines alike.
+
+**The smallest map draws no lines and no distances.** 12 km of ground in 250 px
+has no room for a number, and the lines cover the painted area they cross.
+Press Ctrl+Alt+M for them.
 
 **Changed**
 
