@@ -40,6 +40,9 @@ ENABLED_KEY = "rhinospotter_minimap_enabled"
 CORNER_KEY = "rhinospotter_minimap_corner"
 KEEP_KEY = "rhinospotter_minimap_keep"
 ZOOM_KEY = "rhinospotter_minimap_zoom"
+SRV_KEY = "rhinospotter_srv_type"
+# Only the Rhino has the mining scanner the painted area stands for.
+RHINO = "mev_rhino"
 CORNERS = ("top left", "top right", "bottom left", "bottom right")
 
 KEY = overlay.KEY
@@ -77,6 +80,7 @@ _here = None             # (lat, lon) of the last SRV fix, for the hotkeys
 _notice = None           # (text, until monotonic) on the hint line, e.g. "set center first"
 _writes = store.Debounced(write=coverstore.save)     # one pending save per (body, name)
 _in_srv = False
+_srv_type = None         # SRVType of the last LaunchSRV; None: not seen, read from config
 _failed = False          # a draw that raised: stay down until the next launch
 _marks = None            # ((system, body, bookmark revision), [(lat, lon, code, depleted), ...])
 _why = None              # why the map is down, logged when it changes (debug only)
@@ -140,6 +144,26 @@ def bigger():
     logger.debug(f"minimap: size hotkey, now {coverage.MAP_ZOOMS[step]:g}x")
 
 
+def srv_event(entry):
+    """A journal line. LaunchSRV names the SRV; kept in config as well, since a
+    login inside the SRV writes no LaunchSRV to learn it from."""
+    global _srv_type
+    if entry.get("event") != "LaunchSRV" or not entry.get("SRVType"):
+        return
+    _srv_type = entry["SRVType"].lower()
+    if config is not None:
+        config.set(SRV_KEY, _srv_type)
+
+
+def in_rhino():
+    """Whether the SRV is the Rhino. Not knowing counts as yes: a map missing a
+    Rhino drive is worse than one painted by another SRV."""
+    kind = _srv_type
+    if kind is None and config is not None:
+        kind = config.get_str(SRV_KEY, default="") or None
+    return kind is None or kind == RHINO
+
+
 def update(root, status, system=None, ids=None, ground=None):
     """One Status.json reading. Paints, and shows or hides the map.
 
@@ -163,6 +187,11 @@ def update(root, status, system=None, ids=None, ground=None):
             _in_srv = _failed = False
             _down("not in the SRV" if not int(status.get("Flags") or 0) & coverage.IN_SRV
                   else "in the SRV, but Status.json has no body or coordinates")
+            return
+        if not in_rhino():
+            # Not painted either: another SRV has no scanner to paint with.
+            _in_srv = False
+            _down(f"in the SRV, but not the Rhino ({_srv_type})")
             return
         previous = _coverage
         address, body_id = ids(system, fix[0]) if ids else (None, None)

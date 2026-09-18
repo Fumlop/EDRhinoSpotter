@@ -360,6 +360,8 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     if cmdr:
         _cmdr = cmdr
 
+    minimap.srv_event(entry)
+
     # Landing or dropping the SRV fills Loc in. The nearest bookmark within 10 km
     # on this body says which location this is, and it was checked when it was made;
     # only without one does Touchdown's nearest-location guess stand in, which
