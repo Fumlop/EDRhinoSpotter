@@ -27,7 +27,7 @@ try:
 except ImportError:         # a bare interpreter without it
     requests = None
 
-VERSION = "4.6.1"
+VERSION = "4.6.2"
 
 # For testing the update path without publishing a throwaway release: set
 # RHINOSPOTTER_VERSION to something older and the running plugin will see the
