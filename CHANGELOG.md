@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.7.1
+
+**Fixed**
+
+- Settings tab missing since 4.6.0: the hotkey rows mixed pack and grid inside EDMC's frame, Tk refused, and EDMC dropped the whole tab.
+
 ## 4.7.0
 
 **Added**

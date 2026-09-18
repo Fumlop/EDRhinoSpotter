@@ -538,9 +538,11 @@ def prefs(parent):
         mod_var, key_var = tk.StringVar(value=mods), tk.StringVar(value=key)
         _hotkeys[key_id] = (mod_var, key_var)
         nb.Label(frame, text=name).grid(row=row, column=0, sticky="w", padx=10, pady=2)
+        # Grid, not pack: EDMC's nb.Frame already grids a child of its own, and
+        # Tk refuses both managers in one frame - the whole tab went with it.
         keys = nb.Frame(frame)
-        nb.OptionMenu(keys, mod_var, mods, *hotkey.MODIFIER_SETS).pack(side="left")
-        nb.OptionMenu(keys, key_var, key, *hotkey.KEY_NAMES).pack(side="left", padx=(4, 0))
+        nb.OptionMenu(keys, mod_var, mods, *hotkey.MODIFIER_SETS).grid(row=0, column=0)
+        nb.OptionMenu(keys, key_var, key, *hotkey.KEY_NAMES).grid(row=0, column=1, padx=(4, 0))
         keys.grid(row=row, column=1, sticky="w", padx=10, pady=2)
     return frame
 
