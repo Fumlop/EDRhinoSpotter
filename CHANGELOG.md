@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.7.2
+
+**Changed**
+
+- Only the Rhino paints and shows the minimap; the Scarab and Scorpion paint nothing. The SRV type comes from LaunchSRV and is kept in EDMC's config for a login inside the SRV; with none known the SRV counts as the Rhino.
+- Minimap switched off in Settings: not shown and nothing recorded. Switching it on is a new launch: a map within reach carries on, otherwise a new one starts.
+
 ## 4.7.1
 
 **Fixed**

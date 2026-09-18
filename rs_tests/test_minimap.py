@@ -16,7 +16,8 @@ def fresh(monkeypatch):
     monkeypatch.setattr(minimap, "config", None)
     monkeypatch.setattr(minimap, "_down", lambda reason: None)
     monkeypatch.setattr(minimap, "_remember", lambda: None)
-    monkeypatch.setattr(minimap, "enabled", lambda: False)
+    monkeypatch.setattr(minimap, "enabled", lambda: True)
+    monkeypatch.setattr(minimap, "_show_map", lambda *args: None)
 
 
 def launch(kind):
@@ -44,6 +45,12 @@ class TestRhino:
         launch("mev_rhino")
         minimap.update(None, IN_SRV)
         assert minimap._coverage is not None and minimap._coverage.version > 0
+
+    def test_switched_off_paints_nothing(self, monkeypatch):
+        monkeypatch.setattr(minimap, "enabled", lambda: False)
+        launch("mev_rhino")
+        minimap.update(None, IN_SRV)
+        assert minimap._coverage is None
 
     def test_another_srv_paints_nothing(self):
         launch("testbuggy")

@@ -179,6 +179,12 @@ def update(root, status, system=None, ids=None, ground=None):
         # A read that landed mid-write. Not a reason to take the map down and
         # count the next fix as a fresh launch.
         return
+    if not enabled():
+        # Switched off is off: nothing painted, saved or drawn - a map the
+        # commander does not want is not kept behind their back either.
+        _in_srv = False
+        _down("switched off in Settings")
+        return
     try:
         fix = coverage.srv_fix(status)
         if fix is None:
@@ -216,8 +222,8 @@ def update(root, status, system=None, ids=None, ground=None):
         if index is not None:
             _coverage.location = index
         _remember()
-        if _failed or not enabled():
-            _down("a draw failed earlier" if _failed else "switched off in Settings")
+        if _failed:
+            _down("a draw failed earlier")
             return
         _show_map(root, status, system, lat, lon, heading, in_reach, body)
     except Exception:
@@ -533,7 +539,7 @@ def prefs(parent):
     _enabled = tk.BooleanVar(value=enabled())
     _corner = tk.StringVar(value=corner())
     _keep = tk.BooleanVar(value=keep_up())
-    nb.Checkbutton(frame, text="Show the minimap while in the SRV",
+    nb.Checkbutton(frame, text="Minimap in the Rhino - off: not shown, nothing recorded",
                    variable=_enabled).grid(row=0, column=0, columnspan=2,
                                            sticky="w", padx=10, pady=(10, 2))
     nb.Checkbutton(frame, text="Keep it up when you alt-tab out of the game",
