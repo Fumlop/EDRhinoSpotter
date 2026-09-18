@@ -4,10 +4,11 @@
 
 **Added**
 
-- The center you set with Ctrl+Alt+Z is drawn: a blue dot inside a ring, where
-  it stands on the map. Until now only the rings and the border said where it
-  was, and neither says it on a map without a border. It is a mark and not a
-  hub - nothing is joined to it and it carries no distance of its own.
+- The center you set with Ctrl+Alt+Z is drawn: a blue dot where it stands on
+  the map, smaller than a bookmark so the two are never taken for each other.
+  Until now only the rings and the border said where it was, and neither says
+  it on a map without a border. It is a mark and not a hub - nothing is joined
+  to it and it carries no distance of its own.
 - Lines between the bookmarks on the map, each with its length on it: solid to
   the nearest bookmark of the same material, dotted to the nearest bookmark of
   the next material down the sheet's price ranking. Two bookmarks of one
@@ -34,12 +35,12 @@ Press Ctrl+Alt+M for them.
   off the edge towards something not on screen. On one body here, 13 of 14
   bookmarks were off the map and cost 3.1 ms a frame to draw as rays to
   nowhere.
-- A number is left off a line when it would print over another number, over a
-  bookmark and its code, over the SRV, over the center or over the scale bar.
-  It is tried at the middle of its line first, then further out either way, and
-  last just past the far end - a short line has the SRV at one end and a dot at
-  the other and no clear span between them, and every center line under about
-  3 km used to lose its number to that.
+- A number sits beside the middle of its own line, square to it, and steps
+  along it or further out when that place is taken - by another number, a
+  bookmark and its code, the SRV, the center or the scale bar. Never past an
+  end: out there it sits beside whatever other line runs through and is read as
+  that line's length, which on a map with six lines on it looks like the
+  numbers are made up.
 - Fonts are kept once they are loaded. The map asks for three faces a frame and
   each one re-read its file from `C:\Windows\Fonts`.
 

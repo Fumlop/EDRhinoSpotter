@@ -113,7 +113,7 @@ On a body's bookmark list:
 - Shows while in the SRV. Paints a 2 km disc (scanner range) wherever you drive.
   12 km across, north up, 1 km grid.
 - **Ctrl+Alt+Z** - set the location's center where you stand. A set center is
-  a blue dot in a ring on the map.
+  a blue dot on the map, smaller than a bookmark.
 - **Ctrl+Alt+B** - set the border where you stand (needs a center). Rings then
   show the drive circles; ground outside the border is dropped.
 - **Ctrl+Alt+M** - twice the size, and back. Capped at 640 px. The size sticks
@@ -125,10 +125,11 @@ On a body's bookmark list:
   - **dotted** to the nearest bookmark of the **next material down** in price -
     where to go to settle for less.
 
-  The center is not joined to anything; it is just the blue dot. The smallest
-  map draws none of it: 12 km of ground in 250 px has no room for
-  a number and the lines cover the painted area they cross. A number that would
-  print over another number, a dot, the SRV, the center or the scale bar is
+  Each number sits beside the middle of its own line, never past an end - out
+  there it would be next to somebody else's line and read as that one's. The
+  center is not joined to anything; it is just the blue dot. The smallest map
+  draws none of it: 12 km of ground in 250 px has no room for a number and the
+  lines cover the painted area they cross. A number with nowhere free to sit is
   left off; press Ctrl+Alt+M to read the rest.
 - Saved per body; a launch within 10 km carries on the same map, EDMC restarts
   included. Each dock saves a picture with a legend of the bookmarks on it.
