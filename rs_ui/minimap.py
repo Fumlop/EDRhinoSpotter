@@ -729,9 +729,7 @@ def _draw(side, x, y, heading, in_reach, header, marks=(), distances=False, base
                             fill=palette.MUTED, font=small, anchor="w")
     _canvas.create_text(pad, foot + 2 * band, text=f"{hotkey.BORDER_LABEL}  set border",
                         fill=palette.MUTED, font=small, anchor="w")
-    # The size says what it is now as well as which key changes it: the map
-    # comes up at whatever the last press left, a game later.
-    _canvas.create_text(pad, foot + 3 * band, text=f"{hotkey.SIZE_LABEL}  size {zoom():g}x",
+    _canvas.create_text(pad, foot + 3 * band, text=f"{hotkey.SIZE_LABEL}  zoom",
                         fill=palette.MUTED, font=small, anchor="w")
     if in_reach:
         _canvas.create_text(width - pad, foot, text=f"{_coverage.painted_km2():.0f} km²",
