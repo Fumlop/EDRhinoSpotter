@@ -500,9 +500,16 @@ CENTRE = palette.rgb(palette.ACCENT)
 LINE_SPOT = _mix(palette.BG, palette.FG_SOFT, 0.5)
 LINE_LOWER = _mix(palette.BG, palette.FG_SOFT, 0.35)
 
-# Where along a line its number may sit, tried in this order. _distances adds
-# one more past the far end, for lines with no clear span on them at all.
-LABEL_ALONG = (0.5, 0.62, 0.38, 0.74, 0.26)
+# Where a number may sit: how far along its line, and which side of it. Never
+# past an end - a number beyond a dot is next to whatever line runs there, and
+# reads as that one's. Beside the line rather than on it, so the dots at the
+# ends do not push it away from the line it belongs to.
+LABEL_ALONG = (0.5, 0.62, 0.38)
+# How far square to the line, in multiples of the text height. The second step
+# clears the SRV marker, which sits in the middle of the map and so on top of
+# any line you happen to be driving along.
+LABEL_SIDES = (1, -1)
+LABEL_GAPS = (0.9, 2.0)
 
 
 def _mark_radius(side):
@@ -565,28 +572,24 @@ def _dotted(draw, a, b, fill, width):
 
 
 def _centre_radius(side):
-    """The ring round the centre. _distances keeps its numbers outside it: the
-    ring is drawn last and would otherwise cut straight through one."""
-    return max(5.0, side * 0.026)
+    """The dot on the centre. _distances keeps its numbers off it: the dot is
+    drawn last and would otherwise sit on top of one."""
+    return max(3.0, side * 0.016)
 
 
 def _centre_mark(image, cx, cy, side):
-    """The centre the player set with the hotkey: a small dot inside a ring.
-
-    A ring rather than a filled disc - the centre is a place on the ground,
-    and a disc that size would read as a bookmark of its own.
-    """
-    draw = ImageDraw.Draw(image)
+    """The centre the player set with the hotkey: a blue dot, smaller than a
+    bookmark so the two are never taken for each other. Outlined in the
+    background colour like the bookmarks, so it reads over painted ground, the
+    grid and the rings alike."""
     r = _centre_radius(side)
-    draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=CENTRE,
-                 width=max(1, int(round(side / 200))))
-    dot = max(1.5, r * 0.34)
-    draw.ellipse([cx - dot, cy - dot, cx + dot, cy + dot], fill=CENTRE)
+    ImageDraw.Draw(image).ellipse([cx - r, cy - r, cx + r, cy + r], fill=CENTRE,
+                                  outline=palette.rgb(palette.BG))
 
 
 def _distances(image, points, side, centre, per_px):
-    """How far apart things are: a line from the centre to every spot, and one
-    from every spot to the spot nearest it, each with its length on it.
+    """How far apart the bookmarks are: two lines out of every spot, each with
+    its length on it.
 
     `points` are the spots in pixels, `centre` the map's centre in pixels or
     None while the player has not set one. `per_px` is metres a pixel.
@@ -603,8 +606,8 @@ def _distances(image, points, side, centre, per_px):
     pick each other share their solid line; a dotted line only ever runs
     downhill, so it can never be drawn twice.
 
-    `centre` is not joined to anything - it is only kept clear, since the ring
-    marking it is drawn after these lines and would cut through a number.
+    `centre` is not joined to anything - it is only kept clear, since the dot
+    marking it is drawn after these lines and would sit on top of a number.
 
     A number is left off when it would not fit on the map or would land on
     something already drawn - another number, a dot with its code, the SRV, the
@@ -631,43 +634,39 @@ def _distances(image, points, side, centre, per_px):
     written = [(side / 2 - half, side / 2 - half, side / 2 + half, side / 2 + half),
                (0, side - side / 12.0, side / 3.0, side)]
     if centre is not None:
-        ring = _centre_radius(side)
-        written.append((centre[0] - ring, centre[1] - ring, centre[0] + ring, centre[1] + ring))
+        dot = _centre_radius(side)
+        written.append((centre[0] - dot, centre[1] - dot, centre[0] + dot, centre[1] + dot))
     mark_font = _mark_font(side)
-    # How far past a spot a number has to start to clear the dot and the code
-    # written beside it. Without the code in the sum, a short line's last
-    # candidate lands on its own bookmark's letters and the number is lost.
-    behind = {}
     for point in points:
         cx, cy = float(point[0]), float(point[1])
         if not _on_map(image, cx, cy, r):
             continue
         written.append((cx - r, cy - r, cx + r, cy + r))
         code = point[2] if len(point) > 2 else None
-        clear = r
         if code:
-            box = draw.textbbox(_code_at(cx, cy, side), code, font=mark_font, anchor="lm")
-            written.append(box)
-            clear = box[2] - cx
-        behind[(cx, cy)] = clear + size
+            written.append(draw.textbbox(_code_at(cx, cy, side), code,
+                                         font=mark_font, anchor="lm"))
 
     def label(a, b, colour):
-        """The line's length on it, at the first place along it that is free.
+        """The line's length, written beside it, at the first free place.
 
-        The middle first, then out either way, and last of all just past the
-        far end: the lines all leave the centre, so a short one has the SRV at
-        one end and a dot with its code at the other and no clear span in
-        between - measured, every centre line under about 3 km lost its number
-        before the last place was tried.
+        Beside and not on: a dot sits at each end with its code, and a number
+        placed on a short line is pushed off it by them. Offset square to the
+        line and it stays next to the middle of its own line, which is the
+        whole point of the number - one put past an end lands beside some other
+        line and is read as that line's length.
         """
         (ax, ay), (bx, by) = a, b
         length = math.hypot(bx - ax, by - ay)
         if length < r:
             return                    # two bookmarks from one standing position
         text = guide.metres(length * per_px)
-        past = (length + behind.get(b, r + size) + draw.textlength(text, font=font) / 2) / length
-        for along in LABEL_ALONG + (past,):
-            tx, ty = ax + (bx - ax) * along, ay + (by - ay) * along
+        # Square to the line, far enough out to clear it and its own stroke.
+        nx, ny = -(by - ay) / length, (bx - ax) / length
+        places = ((a, s * g) for g in LABEL_GAPS for a in LABEL_ALONG for s in LABEL_SIDES)
+        for along, sway in places:
+            tx = ax + (bx - ax) * along + nx * size * sway
+            ty = ay + (by - ay) * along + ny * size * sway
             left, top, right, bottom = draw.textbbox((tx, ty), text, font=font, anchor="mm")
             # The stroke widens the text by two pixels a side, and a gap of one
             # more keeps two numbers from touching.

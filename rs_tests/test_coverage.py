@@ -530,6 +530,15 @@ class TestRender:
         return (max(0, int(cx) - reach), max(0, int(cy) - reach),
                 min(side, int(cx) + reach), min(side, int(cy) + reach))
 
+    def test_the_srv_standing_on_the_centre_covers_its_dot(self):
+        side = 240
+        # Not a defect worth guarding against on the map - you are standing on
+        # it - but it is why the other centre tests drive the SRV away first.
+        on_it = coverage.render(self.centred(), 0, 0, None, side)
+        beside_it = coverage.render(self.centred(), 0, 3000, None, side)
+        assert self.count(on_it, coverage.CENTRE) == 0
+        assert self.count(beside_it, coverage.CENTRE) > 0
+
     def test_a_set_centre_is_marked_where_it_is(self):
         side = 240
         per_m = side / (2 * coverage.VIEW_M)
@@ -547,21 +556,21 @@ class TestRender:
 
     def test_nothing_is_joined_to_the_centre(self):
         side = 240
-        # A lone spot due east of the centre: with nothing of its own material
-        # and nothing worth less, it is joined to nothing at all, centre
-        # included. Only its dot and the ring are drawn.
-        image = coverage.render(self.centred(), 0, 0, None, side,
+        # A lone spot: with nothing of its own material and nothing worth less,
+        # it is joined to nothing at all, the centre included. The SRV is put
+        # 3 km north so its marker is not sitting on the centre dot.
+        image = coverage.render(self.centred(), 0, 3000, None, side,
                                 marks=[(2500, 0, "T", False, 100)], distances=True)
-        band = (side // 2, side // 2 - 3, side, side // 2 + 3)
-        assert self.count(image, coverage.LINE_SPOT, band) == 0
-        assert self.count(image, coverage.LINE_LOWER, band) == 0
+        assert self.count(image, coverage.LINE_SPOT) == 0
+        assert self.count(image, coverage.LINE_LOWER) == 0
         assert self.count(image, coverage.CENTRE) > 0
 
     def test_the_smallest_map_draws_no_lines_at_all(self):
         side = 240
         marks = [(2000, 0, "T", False, 100), (2600, 0, "T", False, 100),
                  (-2000, 1000, "TH", False, 50)]
-        image = coverage.render(self.centred(), 0, 0, None, side, marks)
+        # SRV 3 km north, so its marker is clear of the centre dot.
+        image = coverage.render(self.centred(), 0, 3000, None, side, marks)
         for colour in (coverage.LINE_SPOT, coverage.LINE_LOWER):
             assert self.count(image, colour) == 0
         # The dots and the centre are still drawn - it is the lines that go.
@@ -641,9 +650,13 @@ class TestRender:
         def numbers(marks):
             return self.count(coverage.render(fresh(), 0, 0, None, side, marks,
                                               distances=True), ink)
-        pair, many = numbers(crowd[:2]), numbers(crowd)
-        assert pair > 0                         # one line does get its number
-        assert 0 < many < len(crowd) // 2 * pair
+        # The unit is one line on its own, taken across the ring so it is not
+        # one of the crowd's own short hops. Every number is about as much ink
+        # as every other - they are all "N m" or "N.N km".
+        one = numbers([crowd[0], crowd[12]])
+        many = numbers(crowd)
+        assert one > 0                          # a line on its own does get its number
+        assert 0 < many < len(crowd) // 2 * one
 
     def test_nothing_drawn_lands_on_the_overlay_key(self):
         cover = fresh()
