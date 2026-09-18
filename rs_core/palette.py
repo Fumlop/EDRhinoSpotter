@@ -36,6 +36,9 @@ GOOD = "#69db7c"
 WARN = "#ffd43b"
 ALERT = "#ff8080"
 
+# A group of bookmarks worth a whole stop of the Rhino - see coverage.golden_groups.
+GOLD = "#f5c542"
+
 
 def rgb(colour):
     """'#87ceeb' -> (135, 206, 235), for PIL.

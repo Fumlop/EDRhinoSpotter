@@ -216,8 +216,8 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
     where = corner()
     x, y = _coverage.xy(lat, lon)
     header = _header(status, body, system)
-    marks = tuple((*_coverage.xy(mlat, mlon), code, depleted, value)
-                  for mlat, mlon, code, depleted, value in _bookmarks(system, body))
+    marks = tuple((*_coverage.xy(mlat, mlon), code, depleted, value, rigs)
+                  for mlat, mlon, code, depleted, value, rigs in _bookmarks(system, body))
     # What a picture is of, at the precision it is drawn at: a map pixel of
     # movement and a frame of the marker. Anything finer redraws for nothing.
     view = coverage.view_m(zoom())
@@ -277,7 +277,7 @@ def _remember():
 
 
 def _bookmarks(system, body):
-    """[(lat, lon, code, depleted), ...] of the bookmarks on this body.
+    """[(lat, lon, code, depleted, value, rigs), ...] of the bookmarks on this body.
 
     Read again when a bookmark was written, updated or deleted -
     database.revision() moves on every one. Nothing else changes a bookmark,
@@ -303,14 +303,14 @@ def _bookmarks(system, body):
                         and isinstance(lon, (int, float))):
                     points.append((lat, lon, _code(record.get("commodity")),
                                    bool(record.get("depleted_at")),
-                                   _value(record.get("commodity"))))
+                                   _value(record.get("commodity")), record.get("rigs")))
             _marks = (key, points)
     # While a read fails: the last good read of this body, nothing for another.
     known = _marks[1] if _marks is not None and _marks[0][:2] == (system, body) else []
     now = time.monotonic()
-    _fresh[:] = [f for f in _fresh if now - f[5] < FRESH_S]
+    _fresh[:] = [f for f in _fresh if now - f[-1] < FRESH_S]
     on_disk = {(lat, lon) for lat, lon, *_ in known}
-    fresh = [(lat, lon, code, False, value) for s, b, lat, lon, code, value, _ in _fresh
+    fresh = [(lat, lon, code, False, value, rigs) for s, b, lat, lon, code, value, rigs, _ in _fresh
              if s == system and b == body and (lat, lon) not in on_disk]
     return known + fresh if fresh else known
 
@@ -350,7 +350,7 @@ def bookmarked(spot):
         return
     _fresh.append((spot.get("system"), spot.get("planet_name"), lat, lon,
                    _code(spot.get("commodity")), _value(spot.get("commodity")),
-                   time.monotonic()))
+                   spot.get("rigs"), time.monotonic()))
     _drawn = None
 
 
@@ -362,14 +362,17 @@ def _docked(system):
         return
     body, name = _coverage.body, _coverage.name
     mask = _coverage.mask.copy()
-    marks = [(*_coverage.xy(lat, lon), code, depleted, value)
-             for lat, lon, code, depleted, value in _bookmarks(system, body)]
+    marks = [(*_coverage.xy(lat, lon), code, depleted, value, rigs)
+             for lat, lon, code, depleted, value, rigs in _bookmarks(system, body)]
+    golden = coverage.golden_groups([(x, y, rigs) for x, y, _, depleted, _, rigs in marks
+                                     if not depleted])
     title, legend = picture_text(_coverage, system)
     border_m = _coverage.border_m
 
     def draw():
         try:
-            coverstore.save_png(body, name, coverage.picture(mask, marks, title, legend, border_m))
+            coverstore.save_png(body, name, coverage.picture(mask, marks, title, legend, border_m,
+                                                             golden))
         except Exception:
             logger.exception(f"minimap: could not draw the picture of {name} on {body}")
 

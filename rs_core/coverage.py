@@ -435,7 +435,7 @@ def mapped_locations(found, body, records=()):
 PICTURE_SIDE = int(round(MASK_PX * VIEW_M / REACH_M))
 
 
-def picture(mask, marks=(), title=(), legend=(), border_m=None):
+def picture(mask, marks=(), title=(), legend=(), border_m=None, golden=()):
     """The whole map as a PIL image, north up, bookmarks on it.
 
     Takes a copy of the mask and the bookmarks (metres) rather than the
@@ -443,11 +443,12 @@ def picture(mask, marks=(), title=(), legend=(), border_m=None):
 
     `title` is lines of text above the map, the first one larger; `legend` is
     (code, text) or (code, text, depleted) rows below it, one per bookmark. Both optional - without them
-    the picture is the bare map.
+    the picture is the bare map. `golden` is golden_groups() output, circled in gold.
     """
     # No rings: the ground and the bookmarks are what the picture is kept for.
     image = _draw_layer(mask, PICTURE_SIDE, border_m=border_m, drive=False)
     scale = image.width / (2 * REACH_M)
+    _golden(image, golden, scale, PICTURE_SIDE)
     _bookmarks(image, [(image.width / 2 + mx * scale, image.height / 2 - my * scale, *rest)
                        for mx, my, *rest in marks], PICTURE_SIDE)
     if not title and not legend:
@@ -476,6 +477,52 @@ def picture(mask, marks=(), title=(), legend=(), border_m=None):
         draw.text((pad + 36, y), text, font=small, fill=palette.rgb(palette.FG))
         y += line
     return sheet
+
+
+# A group of bookmarks the Rhino can work from one stop: at least GOLDEN_RIGS
+# rig positions, none depleted, all within GOLDEN_RADIUS_M of one point. The
+# Rhino carries six rigs; 2/2/1/1, 2/2/2, 2/3/1, 3/3, 1x6 and 2/1/1/1 all count.
+GOLDEN_RADIUS_M = 2500.0
+GOLDEN_RIGS = 5
+GOLD = palette.rgb(palette.GOLD)
+
+
+def golden_groups(spots):
+    """[(cx, cy, radius, members), ...] - metres - for the golden groups among
+    `spots`, (x, y, rigs) in metres with depleted ones already left out.
+
+    Candidate centres are every spot and every midpoint between two; the spots
+    within GOLDEN_RADIUS_M of one are a group when their rigs add up to
+    GOLDEN_RIGS. A group inside a bigger one is dropped. The circle drawn round a
+    group sits on its members' centroid and reaches the furthest of them.
+    """
+    points = [(float(x), float(y), int(r)) for x, y, r in spots if r]
+    centres = [(x, y) for x, y, _ in points]
+    centres += [((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+                for i, a in enumerate(points) for b in points[i + 1:]]
+    found = set()
+    for cx, cy in centres:
+        members = frozenset(i for i, (x, y, _) in enumerate(points)
+                            if math.hypot(x - cx, y - cy) <= GOLDEN_RADIUS_M)
+        if sum(points[i][2] for i in members) >= GOLDEN_RIGS:
+            found.add(members)
+    groups = []
+    for members in sorted((g for g in found if not any(g < h for h in found)), key=sorted):
+        mx = sum(points[i][0] for i in members) / len(members)
+        my = sum(points[i][1] for i in members) / len(members)
+        radius = max(math.hypot(points[i][0] - mx, points[i][1] - my) for i in members)
+        groups.append((mx, my, radius, sorted(members)))
+    return groups
+
+
+def _golden(image, groups, scale, side):
+    """A gold circle round each golden group, under the dots."""
+    draw = ImageDraw.Draw(image)
+    pad = _mark_radius(side) + 5
+    for mx, my, radius, _ in groups:
+        cx, cy = image.width / 2 + mx * scale, image.height / 2 - my * scale
+        r = radius * scale + pad
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=GOLD, width=2)
 
 
 def bearing(x, y, to_x, to_y):
