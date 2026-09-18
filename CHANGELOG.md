@@ -1,5 +1,20 @@
 # Changelog
 
+## 4.5.1
+
+**Fixed**
+
+- Ctrl+Alt+M scaled the whole window, not the map. The padding, the text bands
+  and the type in them were all measured from the map's side, so at 2x the
+  header, the hotkey rows and the frame doubled along with the ground and the
+  map took a third of the screen for no more information. They are measured
+  from the size the map has at 1x now. On a 1080p window 2x is 492x602 instead
+  of 508x728, and 1x is unchanged everywhere.
+- `mining_sheet.json` is the one regenerated from 928 mining locations. 4.5.0
+  shipped the sheet of 2026-09-14, four days and 61 locations behind, and since
+  4.5.0 that file sets the price ranking the dotted lines step down as well as
+  the codes on the dots.
+
 ## 4.5.0
 
 **Added**
