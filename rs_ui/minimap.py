@@ -140,11 +140,12 @@ def bigger():
     logger.debug(f"minimap: size hotkey, now {coverage.MAP_ZOOMS[step]:g}x")
 
 
-def update(root, status, system=None, ids=None):
+def update(root, status, system=None, ids=None, ground=None):
     """One Status.json reading. Paints, and shows or hides the map.
 
     `ids(system, body)` gives the body's (system_address, body_id) - the
     register's - so a map is kept apart from a body of the same name elsewhere.
+    `ground(system, body)` gives its ground key, which picks the map's texture.
 
     Nothing raises out of here: the caller is the panel's poll, and a raise
     would stop it rescheduling - Bookmark would stop greying out with it.
@@ -172,6 +173,8 @@ def update(root, status, system=None, ids=None):
             _coverage.system_address = address
         if _coverage.body_id is None:
             _coverage.body_id = body_id
+        if ground:
+            _coverage.ground = ground(system, fix[0])
         if previous is not None and _coverage is not previous:
             # Written now rather than up to two seconds later: the old map is
             # done with. Off the Tk thread - see Debounced.flush_later.

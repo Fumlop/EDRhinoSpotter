@@ -19,10 +19,12 @@ rs_tests/test_coverage.py.
 """
 
 import math
+from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 from rs_core import arrow, guide, measure, palette, spotcard
+from rs_core.logging import logger
 
 # Status.json Flags bit for "in the SRV", as EDMC's edmc_data names it.
 IN_SRV = 0x4000000
@@ -167,6 +169,9 @@ class Coverage:
         self._last = None
         self._clip = None       # the border as a mask, while one is set
         self._layer = None      # ((version, side, ring centre, border), image)
+        # The body's ground key (rs_core.grounds), which picks the texture the
+        # unpainted ground is drawn in. None: the plain background.
+        self.ground = None
 
     def to_dict(self):
         """The map as coverstore writes it. New lists, so a writer on another
@@ -314,9 +319,10 @@ class Coverage:
         """The whole mask drawn at the scale of a map this big showing `view`
         metres either side, kept until something new is painted."""
         ring_at = tuple(round(v) for v in self.anchor())
-        key = (self.version, side, view, ring_at, self.border_m)
+        key = (self.version, side, view, ring_at, self.border_m, self.ground)
         if self._layer is None or self._layer[0] != key:
-            self._layer = (key, _draw_layer(self.mask, side, ring_at, self.border_m, view=view))
+            self._layer = (key, _draw_layer(self.mask, side, ring_at, self.border_m, view=view,
+                                            ground=self.ground))
         return self._layer[1]
 
 
@@ -768,7 +774,45 @@ def _distances(image, points, side, centre, per_px, marker=None):
         label(a, b, LINE_LOWER)
 
 
-def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True, view=VIEW_M):
+# The ground the SRV drives on, under the painted area: one picture a ground
+# family, made in EDIntel's lab/radar_backgrounds and shipped as PNGs.
+TEXTURE_DIR = Path(__file__).resolve().parent.parent / "texture"
+TEXTURE_OF = {
+    'metal-rich': 'metallic',
+    'high-metal-content': 'rocky-metal',
+    'rocky-ice': 'rocky-ice',
+    'icy': 'icy',
+}
+_textures = {}           # (name, pixels) -> RGB image, or None when it would not load
+
+
+def texture_name(ground):
+    """The texture file for a ground key, without .png, or None for none."""
+    if not ground:
+        return None
+    if ground.startswith('rock 80%+'):
+        return 'rocky'
+    return TEXTURE_OF.get(ground)
+
+
+def _texture(ground, size):
+    """The ground's texture at size x size, or None: loaded and scaled once,
+    then kept - the layer is redrawn every STAMP_M driven."""
+    name = texture_name(ground)
+    if name is None:
+        return None
+    key = (name, size)
+    if key not in _textures:
+        try:
+            with Image.open(TEXTURE_DIR / f"{name}.png") as picture:
+                _textures[key] = picture.convert("RGB").resize((size, size), Image.BICUBIC)
+        except OSError as err:
+            logger.warning(f"minimap: no {name} texture, plain ground instead: {err}")
+            _textures[key] = None
+    return _textures[key]
+
+
+def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True, view=VIEW_M, ground=None):
     """Painted area, grid, the edge of the mask, the rings around `ring_at`
     (metres, or None for no rings) and the location's border around the centre
     (metres, or None), over all of REACH_M, at `side` pixels to 2 * view."""
@@ -779,7 +823,8 @@ def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True, view=VIEW_M
     def at(mx, my):
         return big / 2 + mx * scale, big / 2 - my * scale
 
-    image = Image.new("RGB", (big, big), palette.rgb(palette.BG))
+    texture = _texture(ground, big)
+    image = texture.copy() if texture else Image.new("RGB", (big, big), palette.rgb(palette.BG))
     painted = mask.resize((big, big), Image.BILINEAR)
     image.paste(FILL, mask=painted)
     edge = painted.point(lambda v: 255 if v > 127 else 0).filter(ImageFilter.FIND_EDGES)
