@@ -241,6 +241,16 @@ def _place():
     if geometry != _placed:
         _window.geometry(geometry)
         _placed = geometry
+    # Through Win32 as well, as the minimap does: hidden by _show before it was
+    # first placed - Guide pressed with Elite behind - Tk counts the window as
+    # unmapped and keeps the geometry to itself, and the arrow comes up top left.
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+        handle = user32.GetParent(_window.winfo_id()) or _window.winfo_id()
+        user32.SetWindowPos(handle, -1, x, y, WIDTH, HEIGHT, 0x10)   # HWND_TOPMOST, SWP_NOACTIVATE
+    except (ImportError, AttributeError, OSError):
+        pass
     # Said again every tick. Topmost is a request, not a promise - a game
     # going fullscreen takes the top of the Z-order with it, and the arrow
     # that was over it is then behind it with nothing to say so.

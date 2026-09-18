@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.6.1
+
+**Fixed**
+
+- Guide arrow came up top left instead of top middle of Elite when Guide was pressed with the game behind; placed through Win32 now, as the minimap is.
+- RhinoData button or hotkey on an open window brings it to the front, restoring it when minimised; before, it only redrew in place.
+
 ## 4.6.0
 
 **Added**
