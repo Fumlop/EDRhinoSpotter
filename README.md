@@ -116,8 +116,10 @@ On a body's bookmark list:
   a blue dot on the map, smaller than a bookmark.
 - **Ctrl+Alt+B** - set the border where you stand (needs a center). Rings then
   show the drive circles; ground outside the border is dropped.
-- **Ctrl+Alt+M** - twice the size, and back. Capped at 640 px. The size sticks
-  across EDMC restarts.
+- **Ctrl+Alt+M** - twice the size, and back. It scales the map only: the frame,
+  the header and the rows under it stay the size they were, so the window grows
+  by the ground you gained and nothing else. Capped at 640 px of map. The size
+  sticks across EDMC restarts.
 - Bookmarks are dots with material codes: green active, red depleted.
 - At 2x the bookmarks are joined up, each line carrying its length:
   - **solid** to the nearest bookmark of the **same material** - where to go to

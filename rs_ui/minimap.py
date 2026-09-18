@@ -209,7 +209,10 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
         _down("no window could be built")
         return
     _up()
-    side = coverage.map_side(rect[3] - rect[1] if rect else None, zoom())
+    height = rect[3] - rect[1] if rect else None
+    # The map grows with the hotkey; the frame and the rows under it do not.
+    base = coverage.map_side(height)
+    side = coverage.map_side(height, zoom())
     where = corner()
     x, y = _coverage.xy(lat, lon)
     header = _header(status, body, system)
@@ -225,9 +228,9 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
              tuple(round(v) for v in _coverage.anchor()), _coverage.centered,
              _coverage.border_m, _hint(), marks)
     if state != _drawn:
-        _draw(side, x, y, heading, in_reach, header, marks, _distances_shown())
+        _draw(side, x, y, heading, in_reach, header, marks, _distances_shown(), base)
         _drawn = state
-    _place(side, where, rect)
+    _place(side, where, rect, base)
 
 
 def center_here():
@@ -621,21 +624,27 @@ def _hint():
     return None
 
 
-def _layout(side):
+def _layout(side, base=None):
     """(unit, padding, text band, window width, window height) for a map this
     wide. Five bands: the header over the map, and three hotkey rows plus the
-    distance row under it."""
-    unit = side / 240.0
+    distance row under it.
+
+    `base` is the side the map would have at 1x. Everything round the map - the
+    padding, the text bands and the type in them - is measured from that, so
+    the size hotkey grows the ground you are looking at and leaves the frame
+    and the rows under it exactly where they were.
+    """
+    unit = (base or side) / 240.0
     pad = max(6, round(8 * unit))
     band = max(18, round(22 * unit))
     return unit, pad, band, side + 2 * pad, side + 5 * band + 2 * pad
 
 
-def _place(side, where, rect):
+def _place(side, where, rect, base=None):
     """Into the corner, shown, and on top - every tick, since the game gets
     moved and a game going fullscreen takes the top of the Z-order with it."""
     global _placed, _shown
-    _, _, _, width, height = _layout(side)
+    _, _, _, width, height = _layout(side, base)
     if rect:
         left, top, right, bottom = rect
     else:
@@ -674,9 +683,9 @@ def _header(status, body, system):
     return f"loc {index}  {short}" if index is not None else short
 
 
-def _draw(side, x, y, heading, in_reach, header, marks=(), distances=False):
+def _draw(side, x, y, heading, in_reach, header, marks=(), distances=False, base=None):
     global _photo
-    unit, pad, band, width, height = _layout(side)
+    unit, pad, band, width, height = _layout(side, base)
     image = coverage.render(_coverage, x, y, heading, side, marks, distances)
     data = io.BytesIO()
     image.save(data, "PNG", compress_level=1)
