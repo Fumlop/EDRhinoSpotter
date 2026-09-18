@@ -708,3 +708,47 @@ class TestIds:
         fix = coverage.srv_fix(status())
         cover = coverage.follow(None, fix, was_in_srv=False, system_address=111)
         assert coverage.follow(cover, fix, was_in_srv=True, system_address=111) is cover
+
+
+@pytest.mark.unit
+class TestGolden:
+
+    def ring(self, rigs, radius=1000.0):
+        """Spots spread evenly on a circle of this radius, one per rig count."""
+        n = len(rigs)
+        return [(radius * math.cos(2 * math.pi * i / n), radius * math.sin(2 * math.pi * i / n), r)
+                for i, r in enumerate(rigs)]
+
+    def test_every_listed_pattern_is_golden(self):
+        for rigs in ((2, 2, 1, 1), (2, 2, 2), (2, 3, 1), (3, 3), (1,) * 6, (2, 1, 1, 1)):
+            groups = coverage.golden_groups(self.ring(rigs))
+            assert len(groups) == 1 and len(groups[0][3]) == len(rigs), rigs
+
+    def test_four_rigs_are_not(self):
+        assert coverage.golden_groups(self.ring((2, 1, 1))) == []
+
+    def test_spots_too_far_apart_are_not(self):
+        # 3/3 with 6 km between them: no point is within 2.5 km of both.
+        assert coverage.golden_groups([(0, 0, 3), (6000, 0, 3)]) == []
+
+    def test_spots_without_rigs_count_nothing(self):
+        assert coverage.golden_groups(self.ring((None, 2, 2))) == []
+
+    def test_a_group_inside_a_bigger_one_is_drawn_once(self):
+        groups = coverage.golden_groups(self.ring((2, 2, 2, 1), radius=500))
+        assert len(groups) == 1 and len(groups[0][3]) == 4
+
+    def test_the_circle_sits_on_the_centroid_and_reaches_every_spot(self):
+        (cx, cy, radius, _), = coverage.golden_groups([(0, 0, 3), (2000, 0, 3)])
+        assert (round(cx), round(cy), round(radius)) == (1000, 0, 1000)
+
+    def test_the_picture_circles_a_golden_group_in_gold(self):
+        spots = [(0, 0, 3), (1500, 0, 3)]
+        marks = [(x, y, "T", False) for x, y, _ in spots]
+        gold = coverage.GOLD
+        count = lambda img: sum(1 for i in range(img.width) for j in range(img.height)
+                                if img.getpixel((i, j)) == gold)
+        cover = fresh()
+        plain = coverage.picture(cover.mask.copy(), marks)
+        ringed = coverage.picture(cover.mask.copy(), marks, golden=coverage.golden_groups(spots))
+        assert count(plain) == 0 and count(ringed) > 20

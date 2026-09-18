@@ -330,8 +330,8 @@ def minimap_image(root, scale):
     # the distance lines without showing what they look like in the way.
     was_marks = minimap._bookmarks
     minimap._bookmarks = lambda system, body: [
-        (reading(x, y, 0, 0)["Latitude"], reading(x, y, 0, 0)["Longitude"], code, depleted, value)
-        for x, y, code, depleted, value, _, _ in SPOTS]
+        (reading(x, y, 0, 0)["Latitude"], reading(x, y, 0, 0)["Longitude"], code, depleted, value, rigs)
+        for x, y, code, depleted, value, _, rigs in SPOTS]
 
     for track in launches:
         for (x1, y1), (x2, y2) in zip(track, track[1:]):
