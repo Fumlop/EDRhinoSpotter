@@ -175,11 +175,11 @@ def nearby(spot, db=None, within=SAME_SPOT_M):
 
 
 # A drop this close to a bookmark is taken to be at that bookmark's mining
-# location: a location is up to about 5 km in radius, so two points in it are
-# up to 10 km apart. The nearest bookmark wins. Bookmarks of two different
-# locations have sat 2.7 km apart, so at a location not bookmarked yet a
-# neighbour's number can come up - the panel says which bookmark it used.
-SAME_LOCATION_M = 10000.0
+# location. The nearest bookmark wins. 10 km pulled in neighbouring locations:
+# on Eme A 1 b a loc 9 bookmark set Location at loc 3. Bookmarks of two
+# different locations have sat 2.7 km apart, so a neighbour can still come up -
+# the panel says which bookmark it used.
+SAME_LOCATION_M = 3000.0
 
 
 def location_at(system, body, lat, lon, radius, db=None, within=SAME_LOCATION_M,

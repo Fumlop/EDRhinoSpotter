@@ -141,6 +141,17 @@ class TestNearestIndex:
     def test_a_landing_next_to_nothing(self):
         assert spotmark.nearest_index({"event": "Touchdown"}) is None
 
+    def test_taking_off_yourself_leaves_the_location(self):
+        assert spotmark.leaves_location({"event": "Liftoff", "PlayerControlled": True})
+        assert spotmark.leaves_location({"event": "Liftoff"})
+
+    def test_sending_the_ship_away_from_the_srv_does_not(self):
+        assert not spotmark.leaves_location({"event": "Liftoff", "PlayerControlled": False})
+
+    def test_other_events_do_not(self):
+        for event in ("Touchdown", "LaunchSRV", "DockSRV", "Embark"):
+            assert not spotmark.leaves_location({"event": event})
+
 
 class TestOnGround:
     """What Bookmark asks once a second: is there anything under us to mark."""

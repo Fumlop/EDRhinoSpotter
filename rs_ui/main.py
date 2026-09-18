@@ -365,6 +365,8 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     # names the wrong one when two locations are close.
     if entry.get("event") in ("Touchdown", "LaunchSRV") and _loc is not None:
         _fill_location(entry, system)
+    elif spotmark.leaves_location(entry) and _loc is not None:
+        _loc.set("")
 
     # Mining a material on the ground picks it in the dropdown, so the Bookmark
     # made there is already filled. Only on the ground: asteroid mining refines

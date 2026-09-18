@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.5.2
+
+**Fixed**
+
+- Location prefilled only from a bookmark within 3 km (was 10 km); neighbouring locations no longer pull.
+- Location cleared on takeoff; kept when the ship is sent away from the SRV.
+
 ## 4.5.1
 
 **Fixed**
