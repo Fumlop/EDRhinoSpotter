@@ -175,10 +175,9 @@ def nearby(spot, db=None, within=SAME_SPOT_M):
 
 
 # A drop this close to a bookmark is taken to be at that bookmark's mining
-# location. The nearest bookmark wins. 10 km pulled in neighbouring locations:
-# on Eme A 1 b a loc 9 bookmark set Location at loc 3. Bookmarks of two
-# different locations have sat 2.7 km apart, so a neighbour can still come up -
-# the panel says which bookmark it used.
+# location. The nearest bookmark wins. Bookmarks of different locations on one
+# body sit 14 km apart at the closest (measured 2026-09-18), so 3 km never
+# reaches a neighbour. The panel says which bookmark it used.
 SAME_LOCATION_M = 3000.0
 
 
