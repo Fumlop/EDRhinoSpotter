@@ -374,7 +374,7 @@ def minimap_image(root, scale):
     # between the bookmarks at all. Patched rather than pressed - zoom() and
     # _distances_shown() read EDMC's config, which is not here.
     was_zoom, was_shown = minimap.zoom, minimap._distances_shown
-    minimap.zoom, minimap._distances_shown = lambda: coverage.MAP_ZOOMS[-1], lambda: True
+    minimap.zoom, minimap._distances_shown = lambda: coverage.MAP_ZOOMS[1], lambda: True
     minimap._placed = minimap._drawn = None
     shoot("minimap-big.png")
     minimap.zoom, minimap._distances_shown = was_zoom, was_shown

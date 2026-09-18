@@ -83,8 +83,18 @@ MAP_MAX_PX = 480
 # the Tk thread every STAMP_M driven, measured here at 41 ms at 428 px, 90 ms
 # at 640 and 160 ms at 855. 640 keeps the worst press in the same range as a
 # 4K window already sits in without touching the hotkey at all.
-MAP_ZOOMS = (1.0, 2.0)
+MAP_ZOOMS = (1.0, 2.0, 4.0)
 MAP_ZOOM_MAX_PX = 640
+
+# The window grows with the zoom up to this; past it the window keeps its size
+# and the map shows less ground instead - 4x is the 2x window with 6 km across
+# in it rather than 12.
+WINDOW_ZOOM = 2.0
+
+
+def view_m(zoom=1.0):
+    """Half the ground the map shows across, in metres, at this zoom."""
+    return VIEW_M * min(zoom, WINDOW_ZOOM) / zoom
 
 # The layer is drawn twice the size and reduced, for edges that are not
 # staircases.
@@ -116,7 +126,7 @@ def map_side(window_height, zoom=1.0):
         side = MAP_MIN_PX + (MAP_MAX_PX - MAP_MIN_PX) // 4
     else:
         side = max(MAP_MIN_PX, min(MAP_MAX_PX, int(round(window_height * MAP_SHARE))))
-    return min(int(round(side * zoom)), MAP_ZOOM_MAX_PX)
+    return min(int(round(side * min(zoom, WINDOW_ZOOM))), MAP_ZOOM_MAX_PX)
 
 
 class Coverage:
@@ -300,13 +310,13 @@ class Coverage:
     def painted_km2(self):
         return sum(self.mask.histogram()[1:]) * (MASK_M_PER_PX / 1000.0) ** 2
 
-    def layer(self, side):
-        """The whole mask drawn at the scale of a map this big, kept until
-        something new is painted."""
+    def layer(self, side, view=VIEW_M):
+        """The whole mask drawn at the scale of a map this big showing `view`
+        metres either side, kept until something new is painted."""
         ring_at = tuple(round(v) for v in self.anchor())
-        key = (self.version, side, ring_at, self.border_m)
+        key = (self.version, side, view, ring_at, self.border_m)
         if self._layer is None or self._layer[0] != key:
-            self._layer = (key, _draw_layer(self.mask, side, ring_at, self.border_m))
+            self._layer = (key, _draw_layer(self.mask, side, ring_at, self.border_m, view=view))
         return self._layer[1]
 
 
@@ -711,11 +721,11 @@ def _distances(image, points, side, centre, per_px):
         label(a, b, LINE_LOWER)
 
 
-def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True):
+def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True, view=VIEW_M):
     """Painted area, grid, the edge of the mask, the rings around `ring_at`
     (metres, or None for no rings) and the location's border around the centre
-    (metres, or None), over all of REACH_M, at `side` pixels to 2 * VIEW_M."""
-    size = int(round(side * REACH_M / VIEW_M))
+    (metres, or None), over all of REACH_M, at `side` pixels to 2 * view."""
+    size = int(round(side * REACH_M / view))
     big = size * SS
     scale = big / (2 * REACH_M)                   # pixels a metre
 
@@ -795,7 +805,7 @@ def _marker(heading, size):
     return sprite
 
 
-def render(coverage, x, y, heading, side, marks=(), distances=False):
+def render(coverage, x, y, heading, side, marks=(), distances=False, view=VIEW_M):
     """The map, side x side, the SRV at (x, y) in the middle, north up.
 
     A crop of the kept layer with the bookmarks and the marker on top - the
@@ -806,12 +816,20 @@ def render(coverage, x, y, heading, side, marks=(), distances=False):
     comes in: 12 km of ground in 180 px has no room for a number, and the lines
     themselves cover the painted area they are drawn over.
     """
-    layer = coverage.layer(side)
-    scale = side / (2 * VIEW_M)
-    left = int(round(layer.width / 2 + x * scale - side / 2))
-    top = int(round(layer.height / 2 - y * scale - side / 2))
-    image = Image.new("RGB", (side, side), palette.rgb(palette.BG))
+    # The painted ground is never drawn finer than the full view needs: zoomed
+    # in, a smaller crop of it is scaled up. Drawn at the zoomed scale, the
+    # layer took 205-369 ms at 4x, redone every STAMP_M driven on the Tk thread.
+    # Dots, lines and numbers go on afterwards at the full size and stay sharp.
+    lside = max(1, int(round(side * view / VIEW_M)))
+    layer = coverage.layer(lside, view)
+    lscale = lside / (2 * view)
+    left = int(round(layer.width / 2 + x * lscale - lside / 2))
+    top = int(round(layer.height / 2 - y * lscale - lside / 2))
+    image = Image.new("RGB", (lside, lside), palette.rgb(palette.BG))
     image.paste(layer, (-left, -top))
+    if lside != side:
+        image = image.resize((side, side), Image.BILINEAR)
+    scale = side / (2 * view)
     spots = [(side / 2 + (mx - x) * scale, side / 2 - (my - y) * scale, *rest)
              for mx, my, *rest in marks]
     # The centre is the map's origin, so it is where (0, 0) metres lands.

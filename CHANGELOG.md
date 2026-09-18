@@ -1,5 +1,16 @@
 # Changelog
 
+## 4.6.0
+
+**Added**
+
+- Ctrl+Alt+M 4x step: the 2x window showing 6 km across instead of 12.
+
+**Changed**
+
+- Hotkey row reads "Ctrl+Alt+M  zoom".
+- Zoomed in, painted ground is drawn at 2x detail and scaled up; layer rebuild 56-105 ms instead of 205-369 ms.
+
 ## 4.5.2
 
 **Fixed**

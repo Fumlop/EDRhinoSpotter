@@ -392,7 +392,7 @@ class TestScale:
     def test_the_size_hotkey_grows_the_map(self):
         for height in (720, 1080, 1440):
             sides = [coverage.map_side(height, step) for step in coverage.MAP_ZOOMS]
-            assert sides == sorted(sides) and sides[0] < sides[-1]
+            assert sides == sorted(sides) and sides[0] < sides[1]
 
     def test_asking_for_bigger_goes_past_the_map_of_its_own_accord(self):
         assert coverage.map_side(4320, 1.8) > coverage.MAP_MAX_PX
@@ -403,6 +403,14 @@ class TestScale:
         for height in (400, 720, 1080, 1440, 2160, 4320):
             for step in coverage.MAP_ZOOMS:
                 assert coverage.map_side(height, step) <= coverage.MAP_ZOOM_MAX_PX
+
+    def test_four_times_keeps_the_two_times_window(self):
+        for height in (720, 1080, 1440, 2160):
+            assert coverage.map_side(height, 4.0) == coverage.map_side(height, 2.0)
+
+    def test_four_times_shows_half_the_ground(self):
+        assert coverage.view_m(1.0) == coverage.view_m(2.0) == coverage.VIEW_M
+        assert coverage.view_m(4.0) == coverage.VIEW_M / 2
 
     def test_the_size_hotkey_works_without_a_game_window(self):
         assert coverage.map_side(None, 1.8) > coverage.map_side(None)
@@ -435,6 +443,13 @@ class TestRender:
         image = coverage.render(fresh(), 0, 0, None, side, marks=[(3000, -2000)])
         assert self.pixel(image, side / 2 + 3000 * per_m, side / 2 + 2000 * per_m) == coverage.MARK
         assert self.pixel(image, side / 2 - 3000 * per_m, side / 2 + 2000 * per_m) != coverage.MARK
+
+    def test_zoomed_in_a_bookmark_sits_twice_as_far_out(self):
+        side = 240
+        half = coverage.VIEW_M / 2                      # the 4x view
+        image = coverage.render(fresh(), 0, 0, None, side, marks=[(1500, 0)], view=half)
+        assert self.pixel(image, side / 2 + 1500 * side / (2 * half), side / 2) == coverage.MARK
+        assert self.pixel(image, side / 2 + 1500 * side / (2 * coverage.VIEW_M), side / 2) != coverage.MARK
 
     def test_a_bookmark_is_smaller_than_the_droppoint(self):
         side = 240
