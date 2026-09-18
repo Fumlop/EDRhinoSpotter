@@ -724,6 +724,7 @@ def _draw(side, x, y, heading, in_reach, header, marks=(), distances=False, base
 
     small = ("Consolas", max(8, round(9 * unit)))
     bold = ("Segoe UI", max(9, round(10 * unit)), "bold")
+    keys = ("Consolas", max(7, round(8 * unit)))     # the hotkey rows, a step under the rest
     top = pad + band
 
     _canvas.delete("all")
@@ -757,11 +758,11 @@ def _draw(side, x, y, heading, in_reach, header, marks=(), distances=False, base
         _canvas.create_text(pad, foot + band, text=notice, fill=palette.WARN, font=small, anchor="w")
     else:
         _canvas.create_text(pad, foot + band, text=f"{hotkey.label(hotkey.CENTER)}  set center",
-                            fill=palette.MUTED, font=small, anchor="w")
+                            fill=palette.MUTED, font=keys, anchor="w")
     _canvas.create_text(pad, foot + 2 * band, text=f"{hotkey.label(hotkey.BORDER)}  set border",
-                        fill=palette.MUTED, font=small, anchor="w")
+                        fill=palette.MUTED, font=keys, anchor="w")
     _canvas.create_text(pad, foot + 3 * band, text=f"{hotkey.label(hotkey.SIZE)}  zoom",
-                        fill=palette.MUTED, font=small, anchor="w")
+                        fill=palette.MUTED, font=keys, anchor="w")
     if in_reach:
         _canvas.create_text(width - pad, foot, text=f"{_coverage.painted_km2():.0f} km²",
                             fill=palette.ACCENT, font=bold, anchor="e")
