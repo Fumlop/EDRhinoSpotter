@@ -79,6 +79,17 @@ def nearest_index(entry):
     return _index(entry.get("NearestDestination"))
 
 
+def leaves_location(entry):
+    """True when the ship takes off from the surface with you in it.
+
+    Location is cleared then, so the next landing starts empty instead of
+    carrying this location's number to the next one. A Liftoff with
+    PlayerControlled false is the ship sent away while you stay in the SRV -
+    still at the location, so it keeps its number.
+    """
+    return entry.get("event") == "Liftoff" and entry.get("PlayerControlled", True)
+
+
 def read_status(path=STATUS_PATH):
     """Status.json, or an empty dict - the game rewrites it constantly and a
     read that lands mid-write must not cost you the mark."""

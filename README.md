@@ -66,7 +66,8 @@ and the maps that no location could be tied to.</em></p>
 
 1. Land, put the rigs down.
 2. Pick **Material**, set **Rigs**. **Location** fills itself on landing (nearest
-   bookmark within 10 km, else the journal's guess) - type over it if wrong.
+   bookmark within 3 km, else the journal's guess) - type over it if wrong.
+   Taking off clears it.
    **Amount** / **Density** from the HUD are optional.
 3. Press **Bookmark** - the button says `completed`.
 

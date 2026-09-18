@@ -362,7 +362,7 @@ class TestUpdated:
 
 
 class TestLocationAt:
-    """A drop within 10 km of a bookmark takes that bookmark's location."""
+    """A drop within 3 km of a bookmark takes that bookmark's location."""
 
     RADIUS = 381784.9
 
@@ -380,14 +380,19 @@ class TestLocationAt:
         assert index == 13 and round(metres) == 900
 
     def test_the_nearest_bookmark_wins(self):
-        self.put(latitude=self.north(6500), location_index=2)
-        self.put(latitude=self.north(3200), location_index=7)
+        self.put(latitude=self.north(2500), location_index=2)
+        self.put(latitude=self.north(1200), location_index=7)
         assert cards.location_at("Andel", "Andel 8 b", 10.0, 20.0, self.RADIUS)[0] == 7
 
-    def test_beyond_ten_km_there_is_no_answer(self):
+    def test_beyond_three_km_there_is_no_answer(self):
         self.put()
-        assert cards.location_at("Andel", "Andel 8 b", self.north(10100), 20.0,
+        assert cards.location_at("Andel", "Andel 8 b", self.north(3100), 20.0,
                                  self.RADIUS) is None
+
+    def test_a_neighbouring_location_five_km_off_does_not_pull(self):
+        # Eme A 1 b: a loc 9 bookmark set Location at loc 3 under the old 10 km.
+        self.put(latitude=self.north(5000), location_index=9)
+        assert cards.location_at("Andel", "Andel 8 b", 10.0, 20.0, self.RADIUS) is None
 
     def test_a_bookmark_without_a_location_or_on_another_body_is_ignored(self):
         self.put(location_index=None)
