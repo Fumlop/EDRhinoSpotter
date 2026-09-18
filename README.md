@@ -40,9 +40,25 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
   `unprobed` = nobody counted the locations yet.
 - **Material** dropdown: pick one and only grounds that ever carried it are
   listed, with its rate first. Bookmark counts then count only that material.
+
+<p align="center">
+  <img src="docs/rhinoscan-filtered.png" width="620"
+       alt="The same system filtered to one material, only the grounds that carry it listed">
+</p>
+<p align="center"><em>The same system with Material set: the grounds that never
+carried it are gone.</em></p>
+
 - **N bookmarks** and **Mapped N/M** buttons on a body open its bookmarks or
   mapped locations; clicking the body row itself opens its bookmarks too. The
   bookmark list shows how far each patch is from where you stand.
+
+<p align="center">
+  <img src="docs/mapped.png" width="440"
+       alt="The mapped locations of one body, with the maps saved for each">
+</p>
+<p align="center"><em>Mapped N/M: the locations this body has a saved map for,
+and the maps that no location could be tied to.</em></p>
+
 - On or over a body, RhinoData opens straight on that body's bookmarks.
 - Rates, not contents: no journal says what a location holds.
 
