@@ -5,6 +5,7 @@
 **Added**
 
 - Ctrl+Alt+M 4x step: the 2x window showing 6 km across instead of 12.
+- Hotkeys configurable in Settings: modifier set plus key for each of the four; the minimap rows show the keys in use.
 - Saved map picture circles golden groups in gold: 5+ rigs, none depleted, all within 2.5 km (2/2/1/1, 2/2/2, 2/3/1, 3/3, 2/1/1/1, 1x6).
 
 **Fixed**

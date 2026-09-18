@@ -160,6 +160,9 @@ EDMC Settings, RhinoSpotter tab:
 - Saved maps count and size, **Open folder** for the map pictures.
 - **Delete migrated JSON** - after upgrading to 4.2, removes the old JSON files
   the database already holds.
+- **Hotkeys** - a modifier set (Ctrl+Alt, Ctrl+Shift, Alt+Shift, Ctrl+Alt+Shift)
+  and a key (A-Z, 0-9, F1-F12) for each of the four. The keys named in this
+  README are the defaults; the rows under the minimap show the ones in use.
 
 ## Data
 
