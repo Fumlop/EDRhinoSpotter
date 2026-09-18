@@ -316,6 +316,12 @@ def minimap_image(root, scale):
         [(1500, -6000), (-600, -7400), (-1800, -5200), (400, -4300)],
     ]
 
+    # 4 a's ground, so the map is drawn on its texture as it is in the game.
+    ground = dict((f"{SYSTEM} {name}", kind) for name, kind, *_ in BODIES)
+
+    def of(system, body):
+        return ground.get(body)
+
     def reading(x, y, heading, flags):
         return {
             "Flags": flags, "BodyName": f"{SYSTEM} 4 a",
@@ -340,10 +346,11 @@ def minimap_image(root, scale):
             for i in range(steps + 1):
                 minimap.update(root, reading(x1 + (x2 - x1) * i / steps,
                                              y1 + (y2 - y1) * i / steps,
-                                             heading, minimap.coverage.IN_SRV), SYSTEM)
+                                             heading, minimap.coverage.IN_SRV), SYSTEM,
+                               ground=of)
         if track is not launches[-1]:
             # Back in the ship for the hop: nothing painted until the next launch.
-            minimap.update(root, reading(*track[-1], 0, 0x1000000), SYSTEM)
+            minimap.update(root, reading(*track[-1], 0, 0x1000000), SYSTEM, ground=of)
 
     # Three pictures of the same drive: as it is, after the centre hotkey in
     # the middle of it, and after the border hotkey at its southern edge. One
@@ -351,7 +358,7 @@ def minimap_image(root, scale):
     last = launches[-1][-1]
 
     def shoot(name):
-        minimap.update(root, reading(*last, 0, minimap.coverage.IN_SRV), SYSTEM)
+        minimap.update(root, reading(*last, 0, minimap.coverage.IN_SRV), SYSTEM, ground=of)
         window = minimap._window
         settle(window, 20)
         path = grab(window, name, scale)
