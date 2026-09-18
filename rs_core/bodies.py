@@ -158,6 +158,13 @@ class Register:
             return None, None
         return self.system_address, self._ids.get(name)
 
+    def ground(self, system, name):
+        """The ground key of a body in this system, or None when it is not
+        known or `system` is not the one held."""
+        if not system or system != self.system:
+            return None
+        return (self._bodies.get(name) or {}).get('ground')
+
     def track(self, entry, system=None):
         """Feed one journal event. Returns True if the body list changed.
 

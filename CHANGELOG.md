@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.7.0
+
+**Added**
+
+- Minimap ground textures by body type: icy, rocky ice (half ice, half rock), rocky (rock 80%+), high metal content (35% metal on rock), metal-rich. Bodies with no known ground keep the plain background.
+- Textures ship as PNGs in `texture/`; loaded once per body and zoom (75-89 ms), redraws stay at 14-15 ms.
+
 ## 4.6.2
 
 **Changed**

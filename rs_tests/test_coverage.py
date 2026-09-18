@@ -480,6 +480,24 @@ class TestRender:
         assert at_1x == zoomed
         assert grown > zoomed
 
+    def test_each_ground_family_has_its_texture(self):
+        assert coverage.texture_name('icy') == 'icy'
+        assert coverage.texture_name('rocky-ice') == 'rocky-ice'
+        assert coverage.texture_name('rock 80%+ [silicate magma]') == 'rocky'
+        assert coverage.texture_name('high-metal-content') == 'rocky-metal'
+        assert coverage.texture_name('metal-rich') == 'metallic'
+        assert coverage.texture_name(None) is None
+        for name in ('icy', 'rocky-ice', 'rocky', 'rocky-metal', 'metallic'):
+            assert (coverage.TEXTURE_DIR / f"{name}.png").is_file()
+
+    def test_a_known_ground_draws_its_texture_and_an_unknown_one_plain(self):
+        bg = palette.rgb(palette.BG)
+        plain, textured = fresh(), fresh()
+        textured.ground = 'icy'
+        corner = (3, 3)                    # unpainted, off the grid lines
+        assert coverage.render(plain, 0, 0, None, 240).getpixel(corner) == bg
+        assert coverage.render(textured, 0, 0, None, 240).getpixel(corner) != bg
+
     def test_scan_range_rings_around_the_latest_droppoint(self):
         side = 240
         per_m = side / (2 * coverage.VIEW_M)

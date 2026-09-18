@@ -294,7 +294,8 @@ def _poll_landed():
             ready = spotmark.on_ground(status)
             _card_button.config(state="normal" if ready else "disabled")
         # The same reading, so the minimap costs no second parse.
-        minimap.update(_frame.winfo_toplevel(), status, _system, ids=_register.ids)
+        minimap.update(_frame.winfo_toplevel(), status, _system, ids=_register.ids,
+                       ground=_register.ground)
         _poll_error = None
     except Exception as err:
         # Once per kind of failure, not once a second.
