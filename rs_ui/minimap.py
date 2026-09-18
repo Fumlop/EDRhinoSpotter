@@ -717,7 +717,7 @@ def _draw(side, x, y, heading, in_reach, header, marks=(), distances=False, base
           view=coverage.VIEW_M):
     global _photo
     unit, pad, band, width, height = _layout(side, base)
-    image = coverage.render(_coverage, x, y, heading, side, marks, distances, view)
+    image = coverage.render(_coverage, x, y, heading, side, marks, distances, view, base)
     data = io.BytesIO()
     image.save(data, "PNG", compress_level=1)
     _photo = tk.PhotoImage(data=base64.b64encode(data.getvalue()))

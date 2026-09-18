@@ -644,7 +644,7 @@ def _centre_mark(image, cx, cy, side):
                                   outline=palette.rgb(palette.BG))
 
 
-def _distances(image, points, side, centre, per_px):
+def _distances(image, points, side, centre, per_px, marker=None):
     """How far apart the bookmarks are: two lines out of every spot, each with
     its length on it.
 
@@ -687,7 +687,7 @@ def _distances(image, points, side, centre, per_px):
     # What goes on over these lines, so the numbers keep out of its way rather
     # than being painted over: the SRV in the middle, the centre ring, the dots
     # with their codes, and the scale bar the window draws into the corner.
-    half = _marker_size(side) / 2.0
+    half = (marker or _marker_size(side)) / 2.0
     written = [(side / 2 - half, side / 2 - half, side / 2 + half, side / 2 + half),
                (0, side - side / 12.0, side / 3.0, side)]
     if centre is not None:
@@ -852,7 +852,7 @@ def _marker(heading, size):
     return sprite
 
 
-def render(coverage, x, y, heading, side, marks=(), distances=False, view=VIEW_M):
+def render(coverage, x, y, heading, side, marks=(), distances=False, view=VIEW_M, base=None):
     """The map, side x side, the SRV at (x, y) in the middle, north up.
 
     A crop of the kept layer with the bookmarks and the marker on top - the
@@ -862,6 +862,9 @@ def render(coverage, x, y, heading, side, marks=(), distances=False, view=VIEW_M
     `distances` draws the lines between them. Off at the smallest size the map
     comes in: 12 km of ground in 180 px has no room for a number, and the lines
     themselves cover the painted area they are drawn over.
+
+    `base` is the side at 1x: the SRV marker is sized from it, so zooming grows
+    the ground and not the marker.
     """
     # The painted ground is never drawn finer than the full view needs: zoomed
     # in, a smaller crop of it is scaled up. Drawn at the zoomed scale, the
@@ -881,12 +884,12 @@ def render(coverage, x, y, heading, side, marks=(), distances=False, view=VIEW_M
              for mx, my, *rest in marks]
     # The centre is the map's origin, so it is where (0, 0) metres lands.
     centre = (side / 2 - x * scale, side / 2 + y * scale) if coverage.centered else None
+    size = _marker_size(base or side)
     if distances:
-        _distances(image, spots, side, centre, 1.0 / scale)
+        _distances(image, spots, side, centre, 1.0 / scale, size)
     _bookmarks(image, spots, side)
     if centre is not None:
         _centre_mark(image, centre[0], centre[1], side)
-    size = _marker_size(side)
     marker = _marker(heading, size)
     image.paste(marker, ((side - size) // 2, (side - size) // 2), marker)
     return image

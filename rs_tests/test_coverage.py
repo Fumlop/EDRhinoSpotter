@@ -468,6 +468,18 @@ class TestRender:
                        if image.getpixel((i, j)) == coverage.MARK)
         assert red([(1500, 0, "T")]) > red([(1500, 0)]) + 10
 
+    def test_the_srv_marker_keeps_its_1x_size_when_zoomed(self):
+        def marker_px(image):
+            fg = palette.rgb(palette.FG)
+            c = image.width // 2
+            return sum(image.getpixel((x, y)) == fg
+                       for x in range(c - 30, c + 30) for y in range(c - 30, c + 30))
+        at_1x = marker_px(coverage.render(fresh(), 0, 0, 0, 240))
+        zoomed = marker_px(coverage.render(fresh(), 0, 0, 0, 480, base=240))
+        grown = marker_px(coverage.render(fresh(), 0, 0, 0, 480))
+        assert at_1x == zoomed
+        assert grown > zoomed
+
     def test_scan_range_rings_around_the_latest_droppoint(self):
         side = 240
         per_m = side / (2 * coverage.VIEW_M)

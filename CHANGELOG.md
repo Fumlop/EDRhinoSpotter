@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.6.2
+
+**Changed**
+
+- Minimap: the SRV marker keeps its 1x size at every zoom; zooming grows the ground, not the marker.
+- Minimap: the hotkey rows (set center, set border, zoom) a step smaller than the rest of the text.
+
 ## 4.6.1
 
 **Fixed**
