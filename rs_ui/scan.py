@@ -93,7 +93,14 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
         # again, wherever it was moved to and whatever it was.
         logger.debug(f"scan: redraw, system={register.system!r} focus={focus!r}")
         (_view or (lambda: _scan_view(_window)))()
+        # lift() alone leaves a window behind another program, or minimised,
+        # where it was: the same way up as a first open, topmost until left.
+        if _window.state() == "iconic":
+            _window.deiconify()
+        _window.attributes("-topmost", True)
+        _window.bind("<FocusOut>", _drop_topmost, add="+")
         _window.lift()
+        _window.focus_force()
         return _window
 
     logger.debug(f"scan: open, system={register.system!r} focus={focus!r}")
