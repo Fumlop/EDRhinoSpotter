@@ -250,10 +250,71 @@ def main_images():
         conn.execute("DELETE FROM maps WHERE body = ?", (body,))
     cards.by_body = was_by_body
 
+    settings_image(root, scale)
     overlay_image(root, scale, marks[0])
     minimap_image(root, scale)
     backdrop.destroy()
     root.destroy()
+
+
+class Notebook:
+    """EDMC's myNotebook, as much of it as the settings tab asks for.
+
+    The tab is built out of nb.Frame, nb.Label, nb.Button, nb.Checkbutton and
+    nb.OptionMenu, and outside EDMC there is no myNotebook to import. These are
+    the plain Tk widgets under EDMC's dark theme colours, so the picture shows
+    the layout the commander gets rather than a grey system-themed one.
+    """
+
+    BG, FG, ACTIVE = "#0a0a0a", "#d8d8d8", "#1c1c1c"
+
+    @classmethod
+    def Frame(cls, parent, **kw):
+        return tk.Frame(parent, bg=cls.BG, **kw)
+
+    @classmethod
+    def Label(cls, parent, **kw):
+        return tk.Label(parent, bg=cls.BG, fg=cls.FG, anchor="w", **kw)
+
+    @classmethod
+    def Button(cls, parent, **kw):
+        return tk.Button(parent, bg=cls.ACTIVE, fg=cls.FG, activebackground=cls.ACTIVE,
+                         activeforeground="#ffffff", relief="solid", borderwidth=1,
+                         highlightthickness=0, padx=8, **kw)
+
+    @classmethod
+    def Checkbutton(cls, parent, **kw):
+        return tk.Checkbutton(parent, bg=cls.BG, fg=cls.FG, selectcolor=cls.BG,
+                              activebackground=cls.BG, activeforeground="#ffffff",
+                              anchor="w", highlightthickness=0, **kw)
+
+    @classmethod
+    def OptionMenu(cls, parent, variable, default, *values):
+        widget = tk.OptionMenu(parent, variable, default, *values)
+        widget.config(bg=cls.ACTIVE, fg=cls.FG, activebackground=cls.ACTIVE,
+                      activeforeground="#ffffff", relief="solid", borderwidth=1,
+                      highlightthickness=0, anchor="w", padx=6, pady=0)
+        widget["menu"].config(bg=cls.ACTIVE, fg=cls.FG, borderwidth=1, tearoff=False)
+        return widget
+
+
+def settings_image(root, scale):
+    """The Settings tab, as EDMC lays it out: the map switches, Free move and
+    the hotkeys."""
+    was_nb = minimap.nb
+    minimap.nb = Notebook
+    window = tk.Toplevel(root)
+    window.configure(bg=Notebook.BG)
+    window.attributes("-topmost", True)
+    try:
+        minimap.prefs(window).pack(fill="both", expand=True, padx=8, pady=8)
+        window.deiconify()
+        window.lift()
+        settle(window, 20)
+        grab(window, "settings.png", scale, top_margin=0, bottom=0)
+    finally:
+        window.destroy()
+        minimap.nb = was_nb
 
 
 def overlay_image(root, scale, mark):

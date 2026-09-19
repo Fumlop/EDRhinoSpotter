@@ -160,8 +160,17 @@ Solid joins a material to itself, dotted steps down to the next.</em></p>
 
 EDMC Settings, RhinoSpotter tab:
 
+<p align="center">
+  <img src="docs/settings.png?v=5.1.0" width="480"
+       alt="The RhinoSpotter settings tab: minimap switches, corner, Free move, saved maps and the hotkey rows">
+</p>
+
 - Minimap on/off, whether it stays up when you alt-tab out of the game, and
   its corner.
+- **Free move** - the map sits where you dragged it instead of in a corner.
+  **Place the map** takes the mouse for a moment: drag it, then double-click
+  or press Esc. The position is kept as an offset from the game window, so
+  moving or resizing Elite takes the map with it.
 - Saved maps count and size, **Open folder** for the map pictures.
 - **Delete migrated JSON** - after upgrading to 4.2, removes the old JSON files
   the database already holds.
