@@ -50,7 +50,9 @@ def bookmarks(system=None, body=None, path=None):
 
     A bookmark is a place a commander stood with the rigs down: where it is,
     what it was mining, how big the deposit read, and whether it has since been
-    worked out. `depleted` is the flag to draw on; `depleted_at` is when it was
+    worked out. `planet_radius` is there so a reader can work out the distance
+    between two marks the way this plugin does - metres over a sphere, not
+    degrees. It is `None` on bookmarks made before the plugin recorded it. `depleted` is the flag to draw on; `depleted_at` is when it was
     marked, which is what any research into deposits reforming needs.
 
     Unreadable rows are skipped rather than raised on: one broken row is not a
@@ -124,6 +126,7 @@ def _bookmark(id, record):
         "latitude": record.get("latitude"),
         "longitude": record.get("longitude"),
         "heading": record.get("heading"),
+        "planet_radius": record.get("planet_radius"),
         "amount": record.get("amount"),
         "density": record.get("density"),
         "depleted": bool(record.get("depleted_at")),

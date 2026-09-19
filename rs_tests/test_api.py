@@ -16,7 +16,7 @@ MARK = {"system": "Aramo", "planet_name": "Aramo A 1", "location_index": 7,
         "commodity": "Monazite", "rigs": 4, "latitude": 12.345678,
         "longitude": -98.765432, "heading": 214, "amount": "High",
         "density": "Low", "marked_at": "3311-05-14T18:40:00",
-        "commander": "Grumlop"}
+        "planet_radius": 1352744.5, "commander": "Grumlop"}
 
 
 @pytest.fixture
@@ -45,6 +45,7 @@ class TestBookmarks:
         assert mark["location"] == 7
         assert mark["rigs"] == 4
         assert mark["latitude"] == 12.345678
+        assert mark["planet_radius"] == 1352744.5   # metres, for a distance
 
     def test_one_system(self, marks):
         assert len(rs_api.bookmarks(system="Aramo", path=marks)) == 2
@@ -63,8 +64,8 @@ class TestBookmarks:
         """Only the documented keys. What is stored beside them has changed
         twice already and is nobody else's to build on."""
         documented = {"system", "body", "location", "material", "rigs", "latitude",
-                      "longitude", "heading", "amount", "density", "depleted",
-                      "depleted_at", "marked_at", "commander", "id"}
+                      "longitude", "heading", "planet_radius", "amount", "density",
+                      "depleted", "depleted_at", "marked_at", "commander", "id"}
         assert set(rs_api.bookmarks(path=marks)[0]) == documented
 
     def test_a_broken_row_is_skipped_not_raised_on(self, marks):

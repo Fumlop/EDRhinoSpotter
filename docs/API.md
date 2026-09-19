@@ -54,12 +54,20 @@ body. A list of dicts, and these keys only:
 | `rigs` | how many rig positions the deposit held, or `None` |
 | `latitude`, `longitude` | where the commander stood, six decimals |
 | `heading` | degrees, or `None` |
+| `planet_radius` | metres, from Status.json when the mark was made, or `None` |
 | `amount`, `density` | the HUD reading when the bookmark was made, or `None` |
 | `depleted` | `True` once it was marked worked out |
 | `depleted_at` | when it was marked, ISO 8601, or `None` |
 | `marked_at` | when the bookmark was made, ISO 8601 |
 | `commander` | who made it |
 | `id` | the row, stable for as long as the bookmark exists |
+
+`planet_radius` is there so two marks can be compared the way the plugin does
+it: a great-circle distance in metres over that sphere, rather than a
+difference in degrees that means different things at different latitudes.
+**It is `None` on bookmarks made before it was recorded** - the plugin started
+keeping it in September 2026, and nothing can fill it in afterwards, so treat
+a missing radius as "cannot compare across bodies" rather than as zero.
 
 `depleted_at` is the field worth having. It is a timestamped "this deposit was
 empty at this moment", which is what any work on deposits reforming needs, and

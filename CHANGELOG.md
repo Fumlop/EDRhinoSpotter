@@ -1,5 +1,15 @@
 # Changelog
 
+## 5.1.1
+
+**Added**
+
+- `rs_api.bookmarks()` carries `planet_radius`, asked for by ED Hotspots Finder: with it a reader can measure the distance between two marks the way this plugin does, in metres over the sphere, instead of in degrees. `None` on bookmarks made before the plugin recorded it - about a third of an older commander's marks.
+
+**Changed**
+
+- The Rigs box stops at 10. It went to 12, which is not a number anyone can enter in the game; 6 is the standard deposit and 7 is rare.
+
 ## 5.1.0
 
 **Added**
