@@ -29,11 +29,10 @@ import os
 import sys
 import time
 
-from rs_core import bodies, grounds, migrate, store
+from rs_core import bodies, grounds, migrate, paths, store
 from rs_core.logging import logger
 
-JOURNAL_DIR = os.path.expandvars(
-    r"%USERPROFILE%\Saved Games\Frontier Developments\Elite Dangerous")
+JOURNAL_DIR = paths.journal_dir()
 JOURNAL_GLOB = "Journal."
 DAYS = 3
 

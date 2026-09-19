@@ -11,11 +11,13 @@ at the press, and keeps the answer.
 import json
 import os
 import re
+
+from rs_core import paths
 from datetime import datetime, timezone
 
-STATUS_PATH = os.path.expandvars(
-    r"%USERPROFILE%\Saved Games\Frontier Developments\Elite Dangerous\Status.json"
-)
+# Beside the journals, wherever those are - a moved folder or a second
+# install is EDMC's answer, not a guess here. See rs_core/paths.
+STATUS_PATH = os.path.join(paths.journal_dir(), "Status.json")
 
 # The sheet's 22 materials plus bromellite, which is minable on ice and simply
 # has no rows yet. Hardcoded rather than read off the sheet, so the dropdown
