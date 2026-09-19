@@ -109,7 +109,9 @@ def build(parent):
     tk.Label(_frame, text="Location", anchor="w").grid(row=1, column=0, sticky="w", padx=2)
     tk.Entry(_frame, textvariable=_loc, width=4).grid(row=1, column=1, sticky="w", padx=2)
     tk.Label(_frame, text="Rigs", anchor="w").grid(row=1, column=2, sticky="e", padx=2)
-    tk.Spinbox(_frame, from_=0, to=12, textvariable=_rigs, width=4).grid(
+    # Ten is what a deposit can hold; the box used to go to twelve, which was
+    # a number nobody can enter in the game.
+    tk.Spinbox(_frame, from_=0, to=MAX_RIGS, textvariable=_rigs, width=4).grid(
         row=1, column=3, sticky="w", padx=2)
 
     _material = tk.StringVar(value=NO_MATERIAL)
@@ -271,6 +273,9 @@ def _on_material_changed(*_):
 
 # How often Status.json is read to see whether Bookmark has anything to mark.
 # One small file, and the answer changes at walking pace.
+# Rig positions a mining location can hold.
+MAX_RIGS = 10
+
 LANDED_POLL_MS = 1000
 
 
