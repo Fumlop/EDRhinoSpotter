@@ -128,3 +128,33 @@ class TestPlaceMode:
     def test_locking_when_nothing_is_being_placed_is_a_no_op(self, monkeypatch):
         monkeypatch.setattr(minimap, "_placing", False)
         assert minimap._lock() is False
+
+
+class TestPrefsSaving:
+    """What the OK button writes. The hotkey loop sits after the map settings
+    and a block inserted between them once took it into its branch, so hotkeys
+    stopped saving - this keeps them apart."""
+
+    def test_hotkeys_are_saved(self, monkeypatch):
+        import tkinter as tk
+        try:
+            root = tk.Tk()
+        except tk.TclError:
+            pytest.skip("no display")
+        root.withdraw()
+        written = {}
+        monkeypatch.setattr(minimap, "config", FakeConfig())
+        monkeypatch.setattr(minimap.config, "set",
+                            lambda key, value: written.__setitem__(key, value))
+        for name in ("_enabled", "_corner", "_keep", "_free"):
+            monkeypatch.setattr(minimap, name, None)
+        from rs_ui import hotkey
+        key_id, _, default, config_key = hotkey.ACTIONS[0]
+        mods, _key = default.rsplit("+", 1)
+        monkeypatch.setattr(minimap, "_hotkeys",
+                            {key_id: (tk.StringVar(master=root, value=mods),
+                                      tk.StringVar(master=root, value="Q"))})
+        monkeypatch.setattr(hotkey, "restart", lambda: None)
+        minimap.prefs_changed()
+        root.destroy()
+        assert written.get(config_key) == f"{mods}+Q"
