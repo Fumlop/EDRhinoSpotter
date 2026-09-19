@@ -320,7 +320,7 @@ def _game_rect():
     return rect.left, rect.top, rect.right, rect.bottom
 
 
-def _click_through(window):
+def _click_through(window, on=True):
     """Let the mouse through the whole window, arrow included.
 
     The transparent colour already passes clicks where nothing is drawn. This
@@ -332,10 +332,15 @@ def _click_through(window):
         user32 = ctypes.windll.user32
         handle = user32.GetParent(window.winfo_id()) or window.winfo_id()
         style = user32.GetWindowLongW(handle, -20)           # GWL_EXSTYLE
-        user32.SetWindowLongW(handle, -20, style
-                              | 0x80000                      # WS_EX_LAYERED
-                              | 0x20                         # WS_EX_TRANSPARENT
-                              | 0x8000000)                   # WS_EX_NOACTIVATE
+        if on:
+            style |= (0x80000                                # WS_EX_LAYERED
+                      | 0x20                                 # WS_EX_TRANSPARENT
+                      | 0x8000000)                           # WS_EX_NOACTIVATE
+        else:
+            # Layered stays: the transparent colour and the alpha hang off it.
+            style &= ~0x20
+            style &= ~0x8000000
+        user32.SetWindowLongW(handle, -20, style)
     except (ImportError, AttributeError, OSError) as err:
         logger.warning(f"overlay: not click-through here: {err}")
 
