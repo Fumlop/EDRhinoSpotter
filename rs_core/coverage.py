@@ -146,7 +146,8 @@ class Coverage:
         self.body_id = None
         self.origin = (lat, lon)
         self.radius = radius
-        self.mask = Image.new("L", (MASK_PX, MASK_PX), 0)
+        # Built on first use - see the mask property.
+        self._mask = None
         # Goes up only when a disc paints ground that was not painted before.
         # Driving around inside what is already painted leaves it alone, and
         # so leaves the drawn layer alone.
@@ -208,6 +209,23 @@ class Coverage:
         cover.system_address = data.get("system_address")
         cover.body_id = data.get("body_id")
         return cover
+
+    @property
+    def mask(self):
+        """The painted ground: 400 x 400 pixels at 50 m each.
+
+        Made on first use rather than in __init__, because map_at() builds one
+        Coverage per saved map only to ask whether a point lies inside it, and
+        never touches the mask. At 156 KiB each that was 31 MB of allocation on
+        a body with ten maps and twenty bookmarks - every time the window drew.
+        """
+        if self._mask is None:
+            self._mask = Image.new("L", (MASK_PX, MASK_PX), 0)
+        return self._mask
+
+    @mask.setter
+    def mask(self, image):
+        self._mask = image
 
     def _repaint(self, points):
         """Paint these (lat, lon) points onto a clear mask, keeping each one
