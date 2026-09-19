@@ -4,7 +4,7 @@
 
 It exists because two projects were reading the plugin's storage directly and
 found out the hard way that it moved - JSON files per bookmark up to 4.4.x, one
-sqlite database from 4.2/5.0. This module is the part that does not move.
+sqlite database from 5.0. This module is the part that does not move.
 
 ---
 
@@ -19,8 +19,8 @@ for mark in rs_api.bookmarks():
     print(mark["body"], mark["location"], mark["material"], mark["depleted"])
 ```
 
-Outside EDMC, from a separate application - the same module, the folder added
-to the path:
+Outside EDMC, from a separate application - the same module, the folder added to
+the path:
 
 ```python
 import os, sys
@@ -33,8 +33,8 @@ On Linux the plugin folder is `~/.local/share/EDMarketConnector/plugins/RhinoSpo
 
 Nothing in `rs_api` imports EDMC, tkinter or Pillow, so it works in a plain
 interpreter. The database is opened `mode=ro`: a reader cannot lock the plugin
-out, cannot change anything, and cannot create an empty database beside the
-real one by reading too early.
+out, cannot change anything, and cannot create an empty database beside the real
+one by reading too early.
 
 ---
 
@@ -43,7 +43,7 @@ real one by reading too early.
 ### `bookmarks(system=None, body=None)`
 
 Every bookmark the commander made, oldest first, or those of one system or one
-body. A list of dicts:
+body. A list of dicts, and these keys only:
 
 | Key | What |
 |---|---|
@@ -60,7 +60,6 @@ body. A list of dicts:
 | `marked_at` | when the bookmark was made, ISO 8601 |
 | `commander` | who made it |
 | `id` | the row, stable for as long as the bookmark exists |
-| `raw` | the whole record as the plugin stored it |
 
 `depleted_at` is the field worth having. It is a timestamped "this deposit was
 empty at this moment", which is what any work on deposits reforming needs, and
@@ -68,30 +67,21 @@ nothing else in the game records it.
 
 ### `bodies(system=None)`
 
-The bodies that carry bookmarks: `system`, `body`, `bookmarks`, `depleted`.
-The cheap question - is there anything of mine on this body - without reading
-every bookmark on it.
+The bodies that carry bookmarks: `system`, `body`, `bookmarks`, `depleted`. The
+cheap question - is there anything of mine on this body - without reading every
+bookmark on it.
 
-### `explored(body)`
+### `revision()`
 
-What the plugin knows that a radar does not: how much ground the SRV has
-actually driven over.
+A number that changes when the bookmarks do. Poll it, and read again when it
+moves; it is one small query. It is computed from the rows themselves rather
+than from a counter in memory, because a counter belongs to the process that
+did the writing - a separate application polling one would see the same value
+for ever.
 
-| Key | What |
-|---|---|
-| `body` | the body asked for |
-| `maps` | the saved maps on it, `["map 1", "map 2"]` |
-| `km2` | square kilometres inside scanner range of the track, `None` without Pillow |
-| `locations` | the mining locations those maps were driven on |
+### `version()`
 
-`None` when no map was ever saved there. The pictures themselves are PNGs in
-`<data folder>/coverage/<body>/<map name>.png` - see `data_dir()`.
-
-### `version()`, `database_path()`, `data_dir()`
-
-Which plugin version wrote the data, where the database is (watch it for
-changes if you want to react), and the folder holding the database, the map
-pictures and the backups.
+Which plugin version wrote the data.
 
 ---
 
@@ -103,20 +93,22 @@ While it reads 1: keys are added, never removed, never repurposed. A key that
 has to change meaning gets a new name and the old one keeps answering. If that
 becomes impossible, `SCHEMA` becomes 2 and this page says what moved.
 
-What is deliberately **not** promised: the database schema, the table names,
-the JSON inside `raw`, and the file layout. Read them if you like - they are
-the commander's own files - but they have moved before and they will move
-again. `rs_api` is what gets kept.
+What is deliberately **not** promised: the database schema, the table names, the
+file layout, and anything the plugin stores beside the keys above. Read them if
+you like - they are the commander's own files - but they have moved before and
+they will move again. `rs_api` is what gets kept.
 
 ---
 
 ## What is not here
 
-The map itself. The painted ground is a mask built from the SRV's track and it
-is drawn, not described - `explored()` gives you the number and the pictures,
-not a geometry. If you want to render it yourself, the points are in the
-database and `rs_core.coverage` will rebuild the mask from them, but that is
-the plugin's internals and it is not covered by the promise above.
+**The map.** The painted ground is a mask built from the SRV's track and it is
+drawn, not described. If the exploration layer is useful to you, ask - it can be
+added to this page rather than reverse-engineered out of the database.
 
-Bookmarks are the part that travels: a point, a material, a rig count and a
-flag. Any radar can draw those.
+**Permissions.** There is no flag in here granting or refusing anything. The
+database sits in the commander's own folder and anything that can import this
+can read it, so a permission in this module would be a lie in code. Bookmarks
+are somebody's flight log: showing a commander their own marks is one thing, and
+sending them anywhere else is a decision that belongs to that commander, made in
+your application, in words they can read, before you upload anything.

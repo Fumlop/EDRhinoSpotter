@@ -1,12 +1,10 @@
 """The read-only interface other programs are invited to use.
 
 Written against a scratch database rather than the commander's: the point of
-these tests is that somebody else's code keeps working, so they check the
-shape that was promised, not the plugin's own internals.
+these tests is that somebody else's code keeps working, so they check the shape
+that was promised, not the plugin's own internals.
 """
 
-import gzip
-import json
 import sqlite3
 
 import pytest
@@ -22,14 +20,16 @@ MARK = {"system": "Aramo", "planet_name": "Aramo A 1", "location_index": 7,
 
 
 @pytest.fixture
-def db(tmp_path):
-    """A database with three bookmarks: two on one body, one worked out."""
+def marks(tmp_path):
+    """Three bookmarks: two on one body in one system, one worked out in
+    another - so a filter that does nothing cannot pass."""
     path = str(tmp_path / "rhinospotter.db")
     with database.connect(path) as conn:
         for record in (MARK,
                        dict(MARK, location_index=9, commodity="Jadeite", rigs=2),
-                       dict(MARK, planet_name="Aramo A 2", location_index=3,
-                            commodity="Olivine", depleted_at="3311-05-17T06:16:36")):
+                       dict(MARK, system="Eme", planet_name="Eme A 1 a",
+                            location_index=3, commodity="Olivine",
+                            depleted_at="3311-05-17T06:16:36")):
             database.write_bookmark(conn, record)
         conn.commit()
     return path
@@ -37,45 +37,42 @@ def db(tmp_path):
 
 class TestBookmarks:
 
-    def test_every_bookmark_comes_back_with_the_promised_keys(self, db):
-        found = rs_api.bookmarks(path=db)
-        assert len(found) == 3
-        for mark in found:
-            assert set(rs_api.FIELDS) <= set(mark)
-
-    def test_the_names_are_the_ones_a_stranger_would_guess(self, db):
-        """`planet_name` and `commodity` are our column names, not an API."""
-        mark = rs_api.bookmarks(path=db)[0]
+    def test_the_names_are_the_ones_a_stranger_would_guess(self, marks):
+        """`planet_name` and `commodity` are column names, not an interface."""
+        mark = rs_api.bookmarks(path=marks)[0]
         assert mark["body"] == "Aramo A 1"
         assert mark["material"] == "Monazite"
         assert mark["location"] == 7
+        assert mark["rigs"] == 4
+        assert mark["latitude"] == 12.345678
 
-    def test_one_system(self, db):
-        assert len(rs_api.bookmarks(system="Aramo", path=db)) == 3
-        assert rs_api.bookmarks(system="Somewhere else", path=db) == []
+    def test_one_system(self, marks):
+        assert len(rs_api.bookmarks(system="Aramo", path=marks)) == 2
+        assert len(rs_api.bookmarks(system="Eme", path=marks)) == 1
+        assert rs_api.bookmarks(system="Somewhere else", path=marks) == []
 
-    def test_one_body(self, db):
-        assert len(rs_api.bookmarks(body="Aramo A 1", path=db)) == 2
+    def test_one_body(self, marks):
+        assert len(rs_api.bookmarks(body="Aramo A 1", path=marks)) == 2
 
-    def test_depleted_is_a_flag_and_a_time(self, db):
-        worked_out = [m for m in rs_api.bookmarks(path=db) if m["depleted"]]
+    def test_depleted_is_a_flag_and_a_time(self, marks):
+        worked_out = [m for m in rs_api.bookmarks(path=marks) if m["depleted"]]
         assert len(worked_out) == 1
         assert worked_out[0]["depleted_at"] == "3311-05-17T06:16:36"
-        assert worked_out[0]["material"] == "Olivine"
 
-    def test_everything_recorded_is_still_in_raw(self, db):
-        """Whatever the game gave that day, for a reader that wants more than
-        the documented fields."""
-        mark = rs_api.bookmarks(path=db)[0]
-        assert mark["raw"]["planet_name"] == "Aramo A 1"
-        assert mark["raw"]["commander"] == "Grumlop"
+    def test_the_plugins_own_storage_does_not_leak_through(self, marks):
+        """Only the documented keys. What is stored beside them has changed
+        twice already and is nobody else's to build on."""
+        documented = {"system", "body", "location", "material", "rigs", "latitude",
+                      "longitude", "heading", "amount", "density", "depleted",
+                      "depleted_at", "marked_at", "commander", "id"}
+        assert set(rs_api.bookmarks(path=marks)[0]) == documented
 
-    def test_a_broken_row_is_skipped_not_raised_on(self, db):
-        with sqlite3.connect(db) as conn:
+    def test_a_broken_row_is_skipped_not_raised_on(self, marks):
+        with sqlite3.connect(marks) as conn:
             conn.execute("INSERT INTO bookmarks (planet_name, data) VALUES (?, ?)",
                          ("Aramo A 3", "{not json"))
             conn.commit()
-        assert len(rs_api.bookmarks(path=db)) == 3
+        assert len(rs_api.bookmarks(path=marks)) == 3
 
     def test_no_database_is_no_bookmarks(self, tmp_path):
         assert rs_api.bookmarks(path=str(tmp_path / "nothing.db")) == []
@@ -83,50 +80,80 @@ class TestBookmarks:
 
 class TestBodies:
 
-    def test_counts_per_body(self, db):
-        found = {row["body"]: row for row in rs_api.bodies(path=db)}
+    def test_counts_per_body(self, marks):
+        found = {row["body"]: row for row in rs_api.bodies(path=marks)}
         assert found["Aramo A 1"]["bookmarks"] == 2
         assert found["Aramo A 1"]["depleted"] == 0
-        assert found["Aramo A 2"]["depleted"] == 1
+        assert found["Eme A 1 a"]["depleted"] == 1
+
+    def test_one_system(self, marks):
+        assert [row["body"] for row in rs_api.bodies(system="Eme", path=marks)]             == ["Eme A 1 a"]
 
 
-class TestExplored:
+class TestRevision:
+    """The only way a separate program knows to read again."""
 
-    def test_a_body_nobody_drove_has_nothing_to_say(self, db):
-        assert rs_api.explored("Aramo A 1", path=db) is None
-
-    def test_a_saved_map_answers_with_its_ground(self, db):
-        coverage = pytest.importorskip("rs_core.coverage")
-        cover = coverage.Coverage("Aramo A 1", 10.0, 20.0, 1_500_000)
-        for step in range(20):
-            cover.add(10.0 + step * 0.002, 20.0)
-        cover.location = 7
-        blob = gzip.compress(json.dumps(cover.to_dict()).encode("utf-8"))
-        with sqlite3.connect(db) as conn:
-            conn.execute("INSERT INTO maps (body, name, data) VALUES (?, ?, ?)",
-                         ("Aramo A 1", "map 1", blob))
+    def test_it_moves_when_a_bookmark_is_added(self, marks):
+        before = rs_api.revision(path=marks)
+        with database.connect(marks) as conn:
+            database.write_bookmark(conn, dict(MARK, location_index=22,
+                                               commodity="Jadeite"))
             conn.commit()
-        found = rs_api.explored("Aramo A 1", path=db)
-        assert found["maps"] == ["map 1"]
-        assert found["km2"] > 0
-        assert found["locations"] == [7]
+        assert rs_api.revision(path=marks) != before
+
+    def test_it_moves_when_one_is_marked_depleted(self, marks):
+        before = rs_api.revision(path=marks)
+        with database.connect(marks) as conn:
+            conn.execute("UPDATE bookmarks SET depleted_at = ? WHERE id = 1",
+                         ("3311-05-18T09:00:00",))
+            conn.commit()
+        assert rs_api.revision(path=marks) != before
+
+    def test_it_moves_when_one_is_deleted(self, marks):
+        before = rs_api.revision(path=marks)
+        with database.connect(marks) as conn:
+            conn.execute("DELETE FROM bookmarks WHERE id = 1")
+            conn.commit()
+        assert rs_api.revision(path=marks) != before
+
+    def test_it_stands_still_while_nothing_changes(self, marks):
+        assert rs_api.revision(path=marks) == rs_api.revision(path=marks)
+
+    def test_it_does_not_come_from_this_process(self, marks):
+        """The counter in rs_core.database belongs to whoever did the writing.
+        A separate application polling that one read 0 for ever."""
+        before = rs_api.revision(path=marks)
+        database.changed()                         # the in-process counter moves
+        assert rs_api.revision(path=marks) == before
+
+    def test_no_database_is_zero(self, tmp_path):
+        assert rs_api.revision(path=str(tmp_path / "nothing.db")) == 0
 
 
 class TestTheContract:
 
-    def test_the_schema_number_is_what_was_promised(self):
-        assert rs_api.SCHEMA == 1
+    def test_the_surface_is_the_four_calls_and_the_schema(self):
+        """Every public name has to keep working while SCHEMA is 1, so there are
+        no more of them than were asked for."""
+        public = {name for name in vars(rs_api)
+                  if not name.startswith("_")
+                  and name not in ("json", "os", "sqlite3", "zlib", "database",
+                                   "VERSION")}
+        assert public == {"SCHEMA", "version", "bookmarks", "bodies", "revision"}
 
-    def test_it_says_which_plugin_wrote_the_data(self):
-        assert rs_api.version()
-
-    def test_nothing_edmc_is_needed_to_read(self):
-        """A separate application imports this too - see the module docstring."""
+    def test_reading_needs_neither_edmc_nor_pillow(self):
+        """A separate application imports this in a plain interpreter."""
+        import pathlib
+        import subprocess
         import sys
-        source = open(rs_api.__file__, encoding="utf-8").read()
-        for forbidden in ("import tkinter", "from config import", "import myNotebook"):
-            assert forbidden not in source
-        assert "config" not in sys.modules or True   # nothing here put it there
+        import tempfile
+        source = ("import sys; sys.path.insert(0, %r); import rs_api;"
+                  "print('tkinter' in sys.modules, 'PIL' in sys.modules)"
+                  % str(pathlib.Path(rs_api.__file__).parent))
+        out = subprocess.run([sys.executable, "-c", source], capture_output=True,
+                             text=True, cwd=tempfile.gettempdir())
+        assert out.returncode == 0, out.stderr
+        assert out.stdout.strip() == "False False"
 
     def test_reading_never_creates_a_database(self, tmp_path):
         """A reader that runs before the commander has flown must not leave an
@@ -134,5 +161,5 @@ class TestTheContract:
         missing = str(tmp_path / "not-yet.db")
         rs_api.bookmarks(path=missing)
         rs_api.bodies(path=missing)
-        assert rs_api.explored("Aramo A 1", path=missing) is None
+        rs_api.revision(path=missing)
         assert not (tmp_path / "not-yet.db").exists()

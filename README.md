@@ -180,10 +180,10 @@ EDMC Settings, RhinoSpotter tab:
 
 ## For other plugins and tools
 
-`rs_api.py` reads the bookmarks and the driven ground back out, read-only,
-from inside EDMC or from a separate program. Keys are added, never removed,
-while `rs_api.SCHEMA` reads 1 - the storage itself has moved before and is not
-a promise. See **[docs/API.md](docs/API.md)**.
+`rs_api.py` reads the bookmarks back out, read-only, from inside EDMC or from
+a separate program: `bookmarks()`, `bodies()`, `revision()`, `version()`. Keys
+are added, never removed, while `rs_api.SCHEMA` reads 1 - the storage itself
+has moved before and is not a promise. See **[docs/API.md](docs/API.md)**.
 
 ```python
 import rs_api

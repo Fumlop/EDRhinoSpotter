@@ -1,60 +1,48 @@
-"""What another program may read out of RhinoSpotter, and the promise about it.
+r"""What another program may read out of RhinoSpotter, and the promise about it.
 
 Two people asked in the same week: one writing an EDMC plugin, one writing a
 separate application. Both were reading the plugin's own storage, which is how
-they found out the hard way that it moved from JSON files to a database between
-4.4.3 and 5.0. This module is the thing that does not move.
+they found out the hard way that it moved from JSON files to a database. This
+module is the thing that does not move.
 
-    import sys; sys.path.append(r"%LOCALAPPDATA%\\EDMarketConnector\\plugins\\RhinoSpotter")
+    import sys
+    sys.path.append(r"%LOCALAPPDATA%\EDMarketConnector\plugins\RhinoSpotter")
     import rs_api
 
     rs_api.bookmarks()                    # every bookmark the commander made
     rs_api.bookmarks(system="Aramo")      # one system
     rs_api.bodies()                       # the bodies that carry any
-    rs_api.explored("Aramo A 1")          # how much of that body has been driven
+    rs_api.revision()                     # changes when the bookmarks do
 
-Inside EDMC or outside it, same call: nothing here imports EDMC, tkinter or
-PIL, and the database is opened **read-only**, so a reader can neither lock the
-plugin out nor change what it reads.
+Inside EDMC or outside it, same call. Nothing here imports EDMC, tkinter or
+Pillow, and every call is read-only: a reader cannot lock the plugin out, change
+anything, or create a database by reading before the commander has flown.
 
-The promise: keys are added, never removed or repurposed, for as long as
-`SCHEMA` reads 1. A key that has to change meaning gets a new name and the old
-one keeps answering. If that ever becomes impossible, SCHEMA goes to 2 and this
-docstring says what moved.
+Four calls, because that is what was asked for. There is no permission system in
+here: the file sits in the commander's own folder and anything that can run this
+can read it, so a flag saying otherwise would be a lie in code. What a tool does
+with somebody's mining coordinates is the tool's to declare and the commander's
+to judge.
 
-See docs/API.md for the fields, and rs_tests/test_api.py for what is checked.
+See docs/API.md for the fields.
 """
 
 import json
 import os
 import sqlite3
+import zlib
 
-from rs_core import database, paths
+from rs_core import database
 from rs_core.update import VERSION
 
-# The shape of what comes back. Additive changes leave it alone.
+# The shape of what comes back. While this reads 1, keys are added, never
+# removed and never repurposed.
 SCHEMA = 1
-
-# The keys a bookmark answers with. Everything the plugin recorded is in
-# `raw` beside them - the readings the game gave that day, whatever they were.
-FIELDS = ("system", "body", "location", "material", "rigs", "latitude", "longitude",
-          "heading", "amount", "density", "depleted", "depleted_at", "marked_at",
-          "commander", "id")
 
 
 def version():
     """The plugin's version, so a reader can say what it read."""
     return VERSION
-
-
-def database_path():
-    """Where the storage is, in case a reader wants to watch it for changes."""
-    return database.PATH
-
-
-def data_dir():
-    """The plugin's folder: the database, the map pictures, the backups."""
-    return paths.data_root()
 
 
 def bookmarks(system=None, body=None, path=None):
@@ -65,8 +53,8 @@ def bookmarks(system=None, body=None, path=None):
     worked out. `depleted` is the flag to draw on; `depleted_at` is when it was
     marked, which is what any research into deposits reforming needs.
 
-    Returns a list of dicts. Unreadable rows are skipped rather than raised on:
-    one broken row is not a reason to hand back nothing.
+    Unreadable rows are skipped rather than raised on: one broken row is not a
+    reason to hand back nothing.
     """
     where, values = [], []
     if system:
@@ -81,16 +69,15 @@ def bookmarks(system=None, body=None, path=None):
     found = []
     for id, data in _rows(query + " ORDER BY id", values, path):
         record = _record(data)
-        if record is None:
-            continue
-        found.append(_bookmark(id, record))
+        if record is not None:
+            found.append(_bookmark(id, record))
     return found
 
 
 def bodies(system=None, path=None):
     """The bodies that carry bookmarks: name, system, how many, and how many of
-    those are worked out. The cheap question - "is there anything of mine on
-    this body" - without reading every bookmark on it."""
+    those are worked out. The cheap question - is there anything of mine on this
+    body - without reading every bookmark on it."""
     query = ("SELECT system, planet_name, count(*), "
              "       sum(CASE WHEN depleted_at IS NOT NULL THEN 1 ELSE 0 END) "
              "FROM bookmarks")
@@ -104,46 +91,30 @@ def bodies(system=None, path=None):
             for row in _rows(query, values, path)]
 
 
-def explored(body, path=None):
-    """How much of one body has been driven, or None when no map was saved.
+def revision(path=None):
+    """A number that changes when the bookmarks do. Poll it to know when to read
+    again.
 
-    This is the part of the plugin that no radar has: the ground inside scanner
-    range of the SRV's track, as square kilometres, per saved map. A reader that
-    wants the picture itself can take `maps` and open the PNGs beside the
-    database - see docs/API.md.
-
-    Needs Pillow, because the painted area is a mask. Without it, the counts
-    come back and `km2` is None rather than the call failing.
+    Read from the database, not from a counter in memory: a counter belongs to
+    the process that did the writing, so a separate application polling one gets
+    the same value for ever and never refreshes. This counts the rows and takes
+    the highest id and the latest stored record, so an insert, a delete, a
+    depleted flip and an edit each move it.
     """
-    maps = [name for name, _ in _maps(body, path)]
-    if not maps:
-        return None
-    summary = {"body": body, "maps": maps, "km2": None, "locations": None}
-    try:
-        from rs_core import coverage                # Pillow lives down here
-    except ImportError:
-        return summary
-    painted, locations = 0.0, set()
-    for name, data in _maps(body, path):
-        try:
-            cover = coverage.Coverage.from_dict(body, data, name=name)
-        except (TypeError, ValueError, KeyError):
-            continue
-        if cover is None:
-            continue
-        painted += cover.painted_km2()
-        if cover.location is not None:
-            locations.add(cover.location)
-    summary["km2"] = round(painted, 1)
-    summary["locations"] = sorted(locations)
-    return summary
+    rows = _rows("SELECT count(*), coalesce(max(id), 0), "
+                 "       coalesce(max(coalesce(depleted_at, '')), ''), "
+                 "       coalesce(max(data), '') FROM bookmarks", [], path)
+    if not rows:
+        return 0
+    return zlib.crc32("|".join(str(value) for value in rows[0]).encode("utf-8"))
 
 
 # ------------------------------------------------------------------ the parts
 
 
 def _bookmark(id, record):
-    """One row, as the documented fields plus everything it actually holds."""
+    """One row, as the documented fields. Whatever the plugin stores beside them
+    is its own business, and it has changed twice already."""
     return {
         "system": record.get("system"),
         "body": record.get("planet_name"),
@@ -160,7 +131,6 @@ def _bookmark(id, record):
         "marked_at": record.get("marked_at"),
         "commander": record.get("commander"),
         "id": id,
-        "raw": record,
     }
 
 
@@ -172,25 +142,13 @@ def _record(data):
     return record if isinstance(record, dict) and record.get("planet_name") else None
 
 
-def _maps(body, path=None):
-    """(name, dict) of every saved map on that body, newest name last."""
-    import gzip
-    found = []
-    for name, blob in _rows("SELECT name, data FROM maps WHERE body = ? ORDER BY name",
-                            [body], path):
-        try:
-            found.append((name, json.loads(gzip.decompress(blob).decode("utf-8"))))
-        except (OSError, ValueError, TypeError):
-            continue
-    return found
-
-
 def _rows(query, values, path=None):
     """Read-only, and quiet about a database that is not there yet.
 
-    mode=ro rather than a plain connect: a reader must not be able to create an
-    empty database beside the real one, lock the plugin out of its own writes,
-    or upgrade a schema it does not own.
+    mode=ro rather than a plain connect: rs_core.database.connect makes the
+    folder, the file and the schema, which is right for the plugin and wrong for
+    a reader - a tool that looks before the commander has ever flown would leave
+    an empty database behind for the plugin to find.
     """
     file = path or database.PATH
     if not os.path.isfile(file):
