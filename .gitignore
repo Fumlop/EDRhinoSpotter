@@ -7,6 +7,7 @@ htmlcov/
 # Cards and screenshots are the commander's own records, not the plugin.
 cards/
 data/
+lab/
 
 # Vendored at some point for a database path that no longer exists. Kept out
 # of the repo until something imports it again.
