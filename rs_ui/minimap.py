@@ -26,7 +26,7 @@ import tkinter as tk
 from tkinter import messagebox
 
 from rs_core import (arrow, cards, coverage, coverstore, database, grounds, guide, migrate,
-                     palette, spansh, spotmark, store)
+                     palette, paths, spansh, spotmark, store)
 from rs_core.logging import logger
 from rs_ui import hotkey, overlay
 
@@ -763,9 +763,10 @@ def _notice_now(text):
 def _open_folder():
     try:
         os.makedirs(coverstore.ROOT, exist_ok=True)
-        os.startfile(coverstore.ROOT)
-    except (OSError, AttributeError) as err:       # AttributeError: not Windows
-        logger.warning(f"minimap: could not open {coverstore.ROOT}: {err}")
+    except OSError as err:
+        logger.warning(f"minimap: could not make {coverstore.ROOT}: {err}")
+        return
+    paths.open_path(coverstore.ROOT)
 
 
 def prefs_changed():

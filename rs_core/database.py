@@ -22,10 +22,10 @@ import os
 import sqlite3
 from datetime import datetime, timezone
 
+from rs_core import paths
 from rs_core.logging import logger
 
-ROOT = os.path.join(os.environ.get("LOCALAPPDATA")
-                    or os.path.expanduser("~"), "RhinoSpotter")
+ROOT = paths.data_root()
 DIR = os.path.join(ROOT, "db")
 PATH = os.path.join(DIR, "rhinospotter.db")
 

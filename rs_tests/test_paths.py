@@ -90,3 +90,72 @@ def test_nothing_spells_the_saved_games_path_itself(module, attribute):
                 if attribute == "STATUS_PATH" else paths.journal_dir())
     assert "%" not in value
     assert value == expected
+
+
+class TestDataRoot:
+
+    def test_windows_uses_localappdata(self, monkeypatch):
+        monkeypatch.setenv("LOCALAPPDATA", r"C:\Users\cmdr\AppData\Local")
+        assert paths.data_root().endswith("RhinoSpotter")
+        assert paths.data_root().startswith(r"C:\Users\cmdr\AppData\Local")
+
+    def test_linux_uses_xdg_data_home(self, monkeypatch):
+        monkeypatch.delenv("LOCALAPPDATA", raising=False)
+        monkeypatch.setenv("XDG_DATA_HOME", "/home/cmdr/.local/share")
+        assert paths.data_root() == os.path.join("/home/cmdr/.local/share", "RhinoSpotter")
+
+    def test_linux_without_xdg_falls_back_to_the_default_share(self, monkeypatch):
+        monkeypatch.delenv("LOCALAPPDATA", raising=False)
+        monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+        monkeypatch.setattr(os.path, "expanduser", lambda path: "/home/cmdr")
+        assert paths.data_root() == os.path.join("/home/cmdr", ".local", "share",
+                                                 "RhinoSpotter")
+
+    def test_never_inside_the_plugin_folder(self, monkeypatch):
+        """A reinstall replaces the plugin folder. The bookmarks are not in it."""
+        monkeypatch.delenv("LOCALAPPDATA", raising=False)
+        monkeypatch.setenv("XDG_DATA_HOME", "/home/cmdr/.local/share")
+        assert "plugins" not in paths.data_root()
+
+
+class TestOpenPath:
+
+    def test_windows_goes_through_startfile(self, monkeypatch, tmp_path):
+        opened = []
+        monkeypatch.setattr(os, "startfile", opened.append, raising=False)
+        assert paths.open_path(tmp_path) is True
+        assert opened == [tmp_path]
+
+    def test_linux_goes_through_xdg_open(self, monkeypatch, tmp_path):
+        monkeypatch.delattr(os, "startfile", raising=False)
+        monkeypatch.setattr(paths.sys, "platform", "linux")
+        called = []
+        monkeypatch.setattr(paths.subprocess, "Popen", lambda args: called.append(args))
+        assert paths.open_path(tmp_path) is True
+        assert called == [["xdg-open", str(tmp_path)]]
+
+    def test_macos_goes_through_open(self, monkeypatch, tmp_path):
+        monkeypatch.delattr(os, "startfile", raising=False)
+        monkeypatch.setattr(paths.sys, "platform", "darwin")
+        called = []
+        monkeypatch.setattr(paths.subprocess, "Popen", lambda args: called.append(args))
+        assert paths.open_path(tmp_path) is True
+        assert called == [["open", str(tmp_path)]]
+
+    def test_no_viewer_falls_back_to_the_browser(self, monkeypatch, tmp_path):
+        """Never a raise: it is a convenience button on a window with work to do."""
+        monkeypatch.delattr(os, "startfile", raising=False)
+        monkeypatch.setattr(paths.sys, "platform", "linux")
+        monkeypatch.setattr(paths.subprocess, "Popen",
+                            lambda args: (_ for _ in ()).throw(FileNotFoundError("xdg-open")))
+        tried = []
+        monkeypatch.setattr(paths.webbrowser, "open", lambda url: bool(tried.append(url)) or True)
+        assert paths.open_path(tmp_path) is True
+        assert tried and tried[0].startswith("file:")
+
+
+class TestOnWindows:
+
+    def test_matches_whether_windll_is_there(self):
+        import ctypes
+        assert paths.on_windows() is hasattr(ctypes, "windll")

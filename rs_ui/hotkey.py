@@ -30,6 +30,7 @@ to Tk, the way every other worker in the plugin does.
 import string
 import threading
 
+from rs_core import paths
 from rs_core.logging import logger
 
 try:
@@ -105,11 +106,10 @@ def start(callbacks):
     _callbacks = dict(callbacks)
     if _thread is not None and _thread.is_alive():
         return
-    try:
-        import ctypes
-        ctypes.windll.user32
-    except (ImportError, AttributeError, OSError):
-        logger.debug("hotkey: not Windows, no hotkeys")
+    if not paths.on_windows():
+        # RegisterHotKey is Win32. Elsewhere the panel buttons and the
+        # settings tab still do everything the keys do.
+        logger.info("hotkey: not Windows, no global hotkeys")
         return
     ready = threading.Event()
     _thread = threading.Thread(target=_listen, args=(dict(callbacks), ready),

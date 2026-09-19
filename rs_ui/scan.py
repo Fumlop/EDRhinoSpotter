@@ -16,13 +16,11 @@ the list itself, so opening it twice costs nothing.
 """
 
 import os
-import pathlib
 import tkinter as tk
-import webbrowser
 from tkinter import messagebox
 
 from rs_core import (cards, coverage, coverstore, deposit, grounds, guide, palette,
-                     spotmark)
+                     paths, spotmark)
 from rs_core.logging import logger
 from rs_ui import overlay, rhino
 
@@ -1264,14 +1262,10 @@ def _open_card(path):
 
     Opened rather than drawn into this window: it is a picture made to be sent
     to somebody, and the viewer that opens it is the thing that can save it,
-    zoom it and copy it.
+    zoom it and copy it. Which viewer that is depends on the desktop - see
+    rs_core/paths.open_path.
     """
-    try:
-        os.startfile(path)                       # Windows, which is where EDMC runs
-    except AttributeError:
-        webbrowser.open(pathlib.Path(path).as_uri())
-    except OSError as err:
-        logger.warning(f"could not open {path}: {err}")
+    paths.open_path(path)
 
 
 # ------------------------------------------------------------------ the parts

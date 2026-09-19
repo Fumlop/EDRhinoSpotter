@@ -28,12 +28,11 @@ import os
 import sqlite3
 import time
 
-from rs_core import atomic, database, names
+from rs_core import atomic, database, names, paths
 from rs_core.logging import logger
 
 # The pictures. The points are in the database.
-ROOT = os.path.join(os.environ.get("LOCALAPPDATA")
-                    or os.path.expanduser("~"), "RhinoSpotter", "coverage")
+ROOT = os.path.join(paths.data_root(), "coverage")
 VERSION = 1
 
 
