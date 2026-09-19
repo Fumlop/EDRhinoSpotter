@@ -247,8 +247,9 @@ Everything in here imports tkinter.
   goes to a two-second `store.Debounced`, flushed when the map changes, when
   the SRV docks and at plugin_stop; docking also draws `coverage.picture` on a
   thread. The settings tab counts the saved maps and opens their folder.
-  Bookmarks on the body are drawn as dots, read from the card sidecars again
-  when the cards folder's modified time moves, and every ten seconds.
+  Bookmarks on the body are drawn as dots, read again when `database.revision()`
+  moves - it is bumped on every committed bookmark write, and nothing else
+  changes one, so nothing else re-reads.
 
 ## Tests (`rs_tests/`)
 

@@ -107,9 +107,11 @@ weeks later opens already filled.
    mining location is your selected destination; otherwise type the number.
 3. Press **Bookmark**.
 
-`completed` appears on the button once the bookmark is on disk, in
-`%LOCALAPPDATA%\RhinoSpotter\cards\<System>\`. The **cards folder** link in
-the panel header opens it.
+`completed` appears on the button once the bookmark is written, as a row in
+`%LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db` - the whole reading kept as
+JSON in that row, so a bookmark carries whatever the game gave that day. Older
+versions wrote a file per bookmark under `cards\<System>\`; those are read in
+once on upgrade and the folder is not written to again.
 
 Everything in it is read from `Status.json` at the press. It is live-only:
 position and selected location are gone the moment you fly off, so bookmark
