@@ -178,6 +178,20 @@ EDMC Settings, RhinoSpotter tab:
   and a key (A-Z, 0-9, F1-F12) for each of the four. The keys named in this
   README are the defaults; the rows under the minimap show the ones in use.
 
+## For other plugins and tools
+
+`rs_api.py` reads the bookmarks and the driven ground back out, read-only,
+from inside EDMC or from a separate program. Keys are added, never removed,
+while `rs_api.SCHEMA` reads 1 - the storage itself has moved before and is not
+a promise. See **[docs/API.md](docs/API.md)**.
+
+```python
+import rs_api
+
+for mark in rs_api.bookmarks(system="Aramo"):
+    print(mark["body"], mark["location"], mark["material"], mark["depleted"])
+```
+
 ## Data
 
 Stored locally. Network: Spansh when you honk (`spansh.co.uk/api/dump/<SystemAddress>`,
