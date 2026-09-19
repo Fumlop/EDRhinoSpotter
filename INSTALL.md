@@ -70,17 +70,18 @@ In a system Spansh does not know, or offline, the honk is not enough:
 
 A system where none of that happened shows nothing, and the window says so.
 
-**Bookmarks you already made.** A body you have marked before shows
-"2 bookmarks" behind it. Clicking lists them in the same window: one row per
-bookmark with the location, material, rigs, heading, coordinates and when it
-was marked, grouped by location, most rigs first. **Back** returns to the body
-list, and **Share map** beside a location opens the picture of the map its
-bookmarks are on. Bodies with none say nothing.
+**Bookmarks you already made.** A body you have marked before shows how many in
+the rail. Clicking it fills the middle of the window with them, folded into
+their mining locations, most rigs first; the card on the right carries the
+coordinates, the heading, what the deposit read and when it was marked. Nothing
+navigates away, so there is no Back: the rail, the list and the card are all on
+screen at once. **Share map** beside a location opens the picture of the map its
+bookmarks are on.
 
 **Guide.** An arrow over the game, top middle, pointing at that patch with the
 distance under it. Elite must run borderless or windowed - nothing draws over
-an exclusive fullscreen. **Stop** on the same row takes it down, and so does
-six seconds of having nothing to point at.
+an exclusive fullscreen. **Stop the arrow**, on the card or beside the body name,
+takes it down, and so does six seconds of having nothing to point at.
 
 **Active / Depleted.** Marks the patch mined out (red) or not (green); the
 bookmark keeps when it was marked.

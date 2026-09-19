@@ -48,16 +48,16 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
 <p align="center"><em>The same system with Material set: the grounds that never
 carried it are gone.</em></p>
 
-- **N bookmarks** and **Mapped N/M** buttons on a body open its bookmarks or
-  mapped locations; clicking the body row itself opens its bookmarks too. The
-  bookmark list shows how far each patch is from where you stand.
+- Clicking a body in the rail fills the middle with its bookmarks, folded into
+  their mining locations, and the card on the right with the one that is
+  picked. **Bookmarks** and **Mapped N/M** are tabs on the body, not pages.
 
 <p align="center">
   <img src="docs/mapped.png" width="440"
        alt="The mapped locations of one body, with the maps saved for each">
 </p>
-<p align="center"><em>Mapped N/M: the locations this body has a saved map for,
-and the maps that no location could be tied to.</em></p>
+<p align="center"><em>The Mapped tab: the locations this body has a saved map
+for, and the maps that no location could be tied to.</em></p>
 
 - On or over a body, RhinoData opens straight on that body's bookmarks.
 - Rates, not contents: no journal says what a location holds.
@@ -80,13 +80,16 @@ and the maps that no location could be tied to.</em></p>
        alt="The bookmarks of one body, grouped by location, each with Share map; rows with Guide and Delete">
 </p>
 
-On a body's bookmark list:
+A location line says how many deposits it holds, which materials, how many are
+worked out, how far the nearest one is, and carries **Share map** - the saved
+map picture for that location. Clicking it folds the location away. On the card
+of the picked bookmark:
 
 - **Guide** - arrow over the game (top middle) with direction and distance,
   from orbital cruise down to the SRV. Borderless or windowed.
-- **Active / Depleted** - mark a patch mined out.
+- **Mark depleted / Set active** - mark a patch mined out.
+- **Copy coords** - the coordinates onto the clipboard.
 - **Delete** - asks first.
-- **Share map** - the saved map picture for that location.
 - With Rigs and Amount set, an estimated tons-left range is shown (experimental).
 
 <p align="center">

@@ -219,13 +219,15 @@ Everything in here imports tkinter.
   rather than PIL's ImageTk, which is the one part of PIL that EDMC's build
   cannot be relied on to carry. A window it cannot build is logged and
   skipped - the bookmark list works without an arrow over the game.
-- **[scan.py](rs_ui/scan.py)** - the RhinoData window, in three views: the
-  body list, the bookmarks of one body, and the mapped locations of one body
-  ("Mapped 3/20 ›" on its row, from `coverage.mapped_locations`), each with
-  Back at the top left. One
-  window, rebuilt rather than stacked - the bookmarks are a step into the row
-  you clicked, not a second thing on the screen. Read-only and disposable:
-  nothing is saved from it, so pressing the button twice costs
+- **[scan.py](rs_ui/scan.py)** - the RhinoData window: three panes side by
+  side, at 60% of the screen. The rail lists every landable body with its
+  distance, locations and bookmark count; the middle holds the picked body's
+  bookmarks folded into their mining locations, or its maps
+  (`coverage.mapped_locations`) under the Mapped tab; the card on the right is
+  the picked bookmark and every button that acts on it. Nothing navigates away,
+  so there is no Back. One window, redrawn whole on every pick - the scroll
+  positions are carried across by name. Read-only apart from the card's
+  buttons: nothing is saved from the list, so pressing the button twice costs
   nothing. Given a material it lists only the ground that has ever carried it,
   and that material leads every group whatever its rate - the question has
   changed from "what is here" to "where is the jadeite", and a ground that
