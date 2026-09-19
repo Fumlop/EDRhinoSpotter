@@ -1,5 +1,15 @@
 # Changelog
 
+## 5.0.1
+
+**Fixed**
+
+- The minimap went behind the game on the way back from an alt-tab and stayed there. The map and a borderless game are both topmost, the last window raised wins that group, and asking for HWND_TOPMOST while already topmost does not reorder inside it. The map now checks every tick whether Elite sits above it and drops out of topmost and back in when it does.
+
+**Changed**
+
+- The plugin logs at info rather than warning. The nine info lines are once-per-event - the map going down and coming back with the reason, a guide starting and closing, a migration - and "the map vanished and I do not know why" used to need RHINOSPOTTER_DEBUG=1 and a restart to answer, by which time the state that hid it was gone.
+
 ## 5.0.0
 
 **Changed**
