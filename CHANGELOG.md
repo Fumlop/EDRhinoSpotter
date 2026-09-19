@@ -1,5 +1,24 @@
 # Changelog
 
+## 5.1.0-beta.1
+
+Linux, untested. A beta for one reason: nobody has run it on Linux yet. On Windows it
+behaves exactly like 5.0.1 plus Free move - the paths it now asks for resolve
+to the same folders they were hardcoded to.
+
+**Changed**
+
+- The plugin's own folder follows the system: `%LOCALAPPDATA%\RhinoSpotter` on Windows, `$XDG_DATA_HOME/RhinoSpotter` - normally `~/.local/share/RhinoSpotter` - anywhere else. Bookmarks, maps and backups live there, outside the plugin folder, so a reinstall cannot take them.
+- Pictures and folders open with the desktop's own viewer: `os.startfile` on Windows, `open` on macOS, `xdg-open` elsewhere, and a browser if none of them answers.
+- No global hotkeys off Windows - RegisterHotKey is Win32. The panel buttons and the settings tab do everything the keys do, and the plugin says so in the log once instead of raising.
+
+**Known, and why it is a beta**
+
+- The in-plugin update button will not move you off a beta: it compares the
+  three numbers and 5.1.0-beta.1 reads as 5.1.0. Install the final by hand
+  when it is out.
+- The minimap and the guide arrow are still Windows windows: they want click-through, a foreground test and a Z-order fight that are all Win32. On Linux the rest of the plugin works - panel, bookmarks, database, RhinoData window - and those two do not draw. See issue #2 for where that goes next.
+
 ## 5.0.1
 
 **Fixed**

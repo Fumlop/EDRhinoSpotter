@@ -4,6 +4,7 @@ an installer that either lands whole or does not touch anything."""
 import io
 import json
 import os
+import re
 import zipfile
 
 import pytest
@@ -51,9 +52,17 @@ class TestVersion:
         assert load.VERSION == update.VERSION
         assert load.__version__ == update.VERSION
 
-    def test_the_version_is_three_numbers(self):
+    def test_the_version_is_three_numbers_and_maybe_a_beta(self):
+        """"5.1.0", or "5.1.0-beta.1" on a branch that is not for everyone.
+
+        parse() reads the first three numbers either way, so a beta compares
+        as its own release and never announces itself to a stable install.
+        """
         assert update.parse(update.VERSION) != (0, 0, 0)
-        assert len(update.VERSION.split(".")) == 3
+        numbers, _, pre = update.VERSION.partition("-")
+        assert len(numbers.split(".")) == 3
+        assert all(part.isdigit() for part in numbers.split("."))
+        assert pre == "" or re.fullmatch(r"(alpha|beta|rc)\.\d+", pre)
 
 
 class TestIsNewer:
