@@ -39,6 +39,11 @@ except ImportError:      # running outside EDMC
 ENABLED_KEY = "rhinospotter_minimap_enabled"
 CORNER_KEY = "rhinospotter_minimap_corner"
 KEEP_KEY = "rhinospotter_minimap_keep"
+FREE_KEY = "rhinospotter_minimap_free"
+# Where the commander dragged it, as "dx,dy" from the game window's top
+# left - the game gets moved and resized, and a corner-free map has to
+# follow it rather than sit at a screen coordinate.
+POS_KEY = "rhinospotter_minimap_pos"
 ZOOM_KEY = "rhinospotter_minimap_zoom"
 SRV_KEY = "rhinospotter_srv_type"
 # Only the Rhino has the mining scanner the painted area stands for.
@@ -98,6 +103,9 @@ _enabled = None          # tk.BooleanVar on the settings tab
 _corner = None           # tk.StringVar on the settings tab
 _keep = None             # tk.BooleanVar on the settings tab
 _hotkeys = {}            # hotkey id -> (modifier StringVar, key StringVar) on the settings tab
+_free = None             # tk.BooleanVar on the settings tab
+_placing = False         # in place-the-map mode: click-through off, drag to move
+_grab = None             # (pointer x, pointer y, window x, window y) while dragging
 
 
 def enabled():
@@ -116,6 +124,39 @@ def keep_up():
 def corner():
     value = config.get_str(CORNER_KEY, default=CORNERS[0]) if config is not None else CORNERS[0]
     return value if value in CORNERS else CORNERS[0]
+
+
+def free_move():
+    """Whether the map sits where it was dragged instead of in a corner."""
+    return config.get_bool(FREE_KEY, default=False) if config is not None else False
+
+
+def offset():
+    """(dx, dy) from the game window's top left, or None.
+
+    Stored as text because EDMC's config holds strings and ints, and a pair
+    of them is neither. Anything unreadable is no offset at all, which puts
+    the map back in its corner rather than at 0,0."""
+    if config is None:
+        return None
+    try:
+        dx, dy = config.get_str(POS_KEY, default="").split(",")
+        return int(dx), int(dy)
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def free_xy(rect, width, height, where):
+    """Where a dragged map goes, kept inside the game window.
+
+    Clamped rather than trusted: the game gets resized, a second monitor
+    gets unplugged, and an offset measured against yesterday's window would
+    put the map off the screen with no way to drag it back."""
+    left, top, right, bottom = rect
+    dx, dy = where
+    x = min(max(left, left + dx), max(left, right - width))
+    y = min(max(top, top + dy), max(top, bottom - height))
+    return x, y
 
 
 def _step():
@@ -244,7 +285,7 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
     global _drawn
     rect = overlay._game_rect()
     minimised = bool(rect) and rect[3] - rect[1] < MIN_GAME_HEIGHT
-    if minimised or not (overlay.game_focused() or keep_up()):
+    if minimised or not (overlay.game_focused() or keep_up() or _placing):
         # Alt-tabbed out, or minimised: nothing over the desktop. Painting
         # carries on; only the window goes. The setting keeps it up through an
         # alt-tab, not through a minimise - a minimised game has no corner for
@@ -547,11 +588,12 @@ def stop():
 def prefs(parent):
     """The settings tab: the map on or off, whether it stays up through an
     alt-tab, and which corner it sits in."""
-    global _enabled, _corner, _keep
+    global _enabled, _corner, _keep, _free
     frame = nb.Frame(parent)
     _enabled = tk.BooleanVar(value=enabled())
     _corner = tk.StringVar(value=corner())
     _keep = tk.BooleanVar(value=keep_up())
+    _free = tk.BooleanVar(value=free_move())
     nb.Checkbutton(frame, text="Minimap in the Rhino - off: not shown, nothing recorded",
                    variable=_enabled).grid(row=0, column=0, columnspan=2,
                                            sticky="w", padx=10, pady=(10, 2))
@@ -561,27 +603,34 @@ def prefs(parent):
     nb.Label(frame, text="Corner").grid(row=2, column=0, sticky="w", padx=10, pady=2)
     nb.OptionMenu(frame, _corner, _corner.get(), *CORNERS).grid(
         row=2, column=1, sticky="w", padx=10, pady=2)
+    nb.Checkbutton(frame, text="Free move - put it where you dragged it, not in a corner",
+                   variable=_free).grid(row=3, column=0, columnspan=2,
+                                        sticky="w", padx=10, pady=2)
+    nb.Button(frame, text="Place the map", command=place).grid(
+        row=4, column=0, sticky="w", padx=10, pady=2)
+    nb.Label(frame, text="In the SRV: drag it, then double-click or Esc.").grid(
+        row=4, column=1, sticky="w", padx=10, pady=2)
     nb.Label(frame, text="Painted means driven within "
                          f"{coverage.SCAN_RADIUS_M / 1000:.0f} km, not scanned.").grid(
-        row=3, column=0, columnspan=2, sticky="w", padx=10, pady=2)
+        row=5, column=0, columnspan=2, sticky="w", padx=10, pady=2)
     count, size = coverstore.usage()
     amount = f"{size / 1048576:.1f} MB" if size >= 1048576 else f"{size / 1024:.0f} KB"
     nb.Label(frame, text=f"Saved maps: {count} ({amount})").grid(
-        row=4, column=0, sticky="w", padx=10, pady=(2, 10))
+        row=6, column=0, sticky="w", padx=10, pady=(2, 10))
     nb.Button(frame, text="Open folder", command=_open_folder).grid(
-        row=4, column=1, sticky="w", padx=10, pady=(2, 10))
+        row=6, column=1, sticky="w", padx=10, pady=(2, 10))
     # The JSON files 4.1 wrote, once the database holds them.
     result = nb.Label(frame, text="")
     nb.Button(frame, text="Delete migrated JSON",
               command=lambda: _delete_migrated(frame, result)).grid(
-        row=5, column=0, sticky="w", padx=10, pady=(2, 10))
-    result.grid(row=5, column=1, sticky="w", padx=10, pady=(2, 10))
+        row=7, column=0, sticky="w", padx=10, pady=(2, 10))
+    result.grid(row=7, column=1, sticky="w", padx=10, pady=(2, 10))
 
     # The hotkeys: a modifier set and a key each. Taken on OK and registered
     # again at once; the rows under the map name them from the next frame.
-    nb.Label(frame, text="Hotkeys").grid(row=6, column=0, sticky="w", padx=10, pady=(6, 2))
+    nb.Label(frame, text="Hotkeys").grid(row=8, column=0, sticky="w", padx=10, pady=(6, 2))
     _hotkeys.clear()
-    for row, (key_id, name, _, _) in enumerate(hotkey.ACTIONS, start=7):
+    for row, (key_id, name, _, _) in enumerate(hotkey.ACTIONS, start=9):
         mods, key = hotkey.label(key_id).rsplit("+", 1)
         mod_var, key_var = tk.StringVar(value=mods), tk.StringVar(value=key)
         _hotkeys[key_id] = (mod_var, key_var)
@@ -624,6 +673,93 @@ def _delete_migrated(frame, result):
                                                     if failed else ""))
 
 
+def place(root=None):
+    """Place the map: click-through off, drag it, Esc or a click to lock.
+
+    A drag and not a hover, because the window cannot feel a hover. It is
+    WS_EX_TRANSPARENT so the mouse goes through it to the game - that is
+    what keeps it from eating a click in a fight - and a window the mouse
+    goes through gets no Enter, no Motion and no three seconds of anything.
+    So the mode is entered from the settings tab, and while it is on the
+    window takes the mouse like an ordinary one.
+    """
+    global _placing
+    if _window is None or not _window.winfo_exists():
+        _notice_now("start the SRV first - there is no map to place yet")
+        return False
+    if _placing:
+        return _lock()
+    _placing = True
+    overlay._click_through(_window, on=False)
+    try:
+        _window.attributes("-alpha", 1.0)
+    except tk.TclError:
+        pass
+    _canvas.bind("<Button-1>", _take)
+    _canvas.bind("<B1-Motion>", _drag)
+    _canvas.bind("<ButtonRelease-1>", _drop)
+    _canvas.bind("<Double-Button-1>", lambda event: _lock())
+    _window.bind("<Escape>", lambda event: _lock())
+    _window.focus_force()
+    _notice_now("drag the map, double-click or Esc to lock it")
+    logger.info("minimap: placing")
+    return True
+
+
+def _take(event):
+    global _grab
+    _grab = (event.x_root, event.y_root, _window.winfo_x(), _window.winfo_y())
+
+
+def _drag(event):
+    if _grab is None:
+        return
+    px, py, wx, wy = _grab
+    _window.geometry(f"+{wx + event.x_root - px}+{wy + event.y_root - py}")
+
+
+def _drop(event):
+    """Remember where it was dropped, as an offset from the game window."""
+    global _grab, _placed
+    _grab = None
+    rect = overlay._game_rect()
+    left, top = (rect[0], rect[1]) if rect else (0, 0)
+    if config is not None:
+        config.set(POS_KEY, f"{_window.winfo_x() - left},{_window.winfo_y() - top}")
+        config.set(FREE_KEY, True)
+    if _free is not None:
+        _free.set(True)
+    _placed = None                           # the next tick reads the new offset
+
+
+def _lock():
+    """Out of place mode: the mouse goes through it again."""
+    global _placing, _grab
+    if not _placing:
+        return False
+    _drop(None) if _grab else None
+    _placing = False
+    _grab = None
+    for sequence in ("<Button-1>", "<B1-Motion>", "<ButtonRelease-1>", "<Double-Button-1>"):
+        _canvas.unbind(sequence)
+    _window.unbind("<Escape>")
+    overlay._click_through(_window, on=True)
+    try:
+        _window.attributes("-alpha", MAP_ALPHA)
+    except tk.TclError:
+        pass
+    _notice_now("placed")
+    logger.info("minimap: placed")
+    return True
+
+
+def _notice_now(text):
+    """The hint line under the map, for a few seconds."""
+    global _notice, _drawn
+    _notice = (text, time.monotonic() + NOTICE_S)
+    _drawn = None
+
+
 def _open_folder():
     try:
         os.makedirs(coverstore.ROOT, exist_ok=True)
@@ -641,6 +777,8 @@ def prefs_changed():
             config.set(CORNER_KEY, _corner.get())
         if _keep is not None:
             config.set(KEEP_KEY, bool(_keep.get()))
+        if _free is not None:
+            config.set(FREE_KEY, bool(_free.get()))
         changed = False
         for key_id, _, _, config_key in hotkey.ACTIONS:
             if key_id not in _hotkeys:
@@ -733,9 +871,17 @@ def _place(side, where, rect, base=None):
     else:
         left, top = 0, 0
         right, bottom = _window.winfo_screenwidth(), _window.winfo_screenheight()
-    inset = max(16, int((bottom - top) * 0.03))
-    x = left + inset if "left" in where else right - inset - width
-    y = top + inset if "top" in where else bottom - inset - height
+    dragged = offset() if free_move() else None
+    if dragged is not None:
+        x, y = free_xy((left, top, right, bottom), width, height, dragged)
+    else:
+        inset = max(16, int((bottom - top) * 0.03))
+        x = left + inset if "left" in where else right - inset - width
+        y = top + inset if "top" in where else bottom - inset - height
+    if _placing:
+        # Being dragged: the window is where the pointer put it, and moving
+        # it from here would fight the drag.
+        x, y = _window.winfo_x(), _window.winfo_y()
     geometry = f"{width}x{height}+{x}+{y}"
     if geometry != _placed:
         _canvas.config(width=width, height=height)
