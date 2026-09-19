@@ -22,13 +22,15 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
 
 <p align="center">
   <img src="docs/rhinoscan.png" width="620"
-       alt="The scan window over an example system, four grounds and ten landable bodies">
+       alt="The RhinoData window: bodies of the system on the left, one body's bookmarks folded by location in the middle, the picked bookmark on a card to the right">
 </p>
 
-- Lists the landable bodies of the current system, grouped by ground type, with
-  the share of that ground's mining locations that carried each material and
-  the median price it sells for. Each group has its own column headings: body,
-  distance, locations, volcanism.
+- The rail lists the landable bodies of the current system, grouped by ground
+  type, each with its distance, how many mining locations it has and how many
+  bookmarks you carry on it. Picking one fills the middle and the card.
+- Over the body: the share of that ground's mining locations that carried each
+  material and the median price it sells for. Green is a material this body
+  already has a bookmark for.
 - **Bodies:** honk, and Spansh is asked for the system's known bodies, until
   your own FSS scan or fly-by replaces them. The line
   under the buttons says when to FSS instead: a new system, no Spansh bodies,
@@ -43,7 +45,7 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
 
 <p align="center">
   <img src="docs/rhinoscan-filtered.png" width="620"
-       alt="The same system filtered to one material, only the grounds that carry it listed">
+       alt="The same window filtered to one material: only the grounds that carry it are listed, and the counts follow">
 </p>
 <p align="center"><em>The same system with Material set: the grounds that never
 carried it are gone.</em></p>
@@ -54,7 +56,7 @@ carried it are gone.</em></p>
 
 <p align="center">
   <img src="docs/mapped.png" width="440"
-       alt="The mapped locations of one body, with the maps saved for each">
+       alt="The Mapped tab of one body, with the maps saved for each location and the card of the picked map">
 </p>
 <p align="center"><em>The Mapped tab: the locations this body has a saved map
 for, and the maps that no location could be tied to.</em></p>
@@ -77,7 +79,7 @@ for, and the maps that no location could be tied to.</em></p>
 
 <p align="center">
   <img src="docs/bookmarks.png" width="620"
-       alt="The bookmarks of one body, grouped by location, each with Share map; rows with Guide and Delete">
+       alt="One body's bookmarks folded into their locations, and the card carrying coordinates, deposit and the buttons">
 </p>
 
 A location line says how many deposits it holds, which materials, how many are
