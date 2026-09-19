@@ -482,11 +482,16 @@ def picture_text(cover, system, when=None):
 
 
 def _down(reason):
-    """Hide, and say why when the reason changes - one debug line per change,
-    not one a second."""
+    """Hide, and say why when the reason changes.
+
+    At info rather than debug, and one line per change rather than one a
+    second: "the map is gone and I do not know why" is the one question this
+    window gets asked, and answering it used to cost a RHINOSPOTTER_DEBUG=1
+    and an EDMC restart - by which time whatever hid it was over.
+    """
     global _why
     if reason != _why:
-        logger.debug(f"minimap: down, {reason}")
+        logger.info(f"minimap: down, {reason}")
         _why = reason
     hide()
 
@@ -494,7 +499,7 @@ def _down(reason):
 def _up():
     global _why
     if _why is not None:
-        logger.debug(f"minimap: up, was down: {_why}")
+        logger.info(f"minimap: up, was down: {_why}")
         _why = None
 
 
