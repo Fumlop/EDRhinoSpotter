@@ -215,14 +215,16 @@ def main_images():
     scan.show(root, found, sheet, None,
               variable=main._material, materials=picker)
     window = scan._window
-    # Standing on the body among the three bookmarks, so the Distance column
-    # has something to say. The real Status.json would put every row at "-",
-    # or worse, be read at all.
+    # Standing on the body among the bookmarks, so the location lines and the
+    # card have a distance to say. The real Status.json would put every one of
+    # them at "-", or worse, be read at all.
     was_status = spotmark.read_status
     spotmark.read_status = lambda *args, **kwargs: {
         "BodyName": body, "Latitude": 12.37, "Longitude": -98.74,
         "PlanetRadius": RADIUS_4A, "Heading": 90}
-    scan._bookmarks_view(window, SYSTEM, body, marks)
+    scan._state["body"] = body
+    scan._state["view"] = "bookmarks"
+    scan._draw()
     window.attributes("-topmost", True)
     window.deiconify()
     window.lift()
@@ -234,7 +236,9 @@ def main_images():
     scan.show(root, found, sheet, None,
               variable=main._material, materials=picker)
     window = scan._window
-    scan._mapped_view(window, body, 22, marks)
+    scan._state["body"] = body
+    scan._state["view"] = "mapped"
+    scan._draw()
     window.attributes("-topmost", True)
     window.deiconify()
     window.lift()

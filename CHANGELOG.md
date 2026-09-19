@@ -1,5 +1,28 @@
 # Changelog
 
+## 5.0.0
+
+**Changed**
+
+- RhinoData is one window with three panes instead of three pages with a Back button: the bodies of the system on the left, the bookmarks of the picked body in the middle, the picked bookmark on a card to the right. Nothing navigates away, so there is no Back anywhere.
+- The window opens at 60% of the screen and keeps that size; it no longer measures its content and resizes on every step.
+- Bookmarks fold into their mining locations. A location line says how many deposits it holds, which materials, how many are worked out, how far the nearest one is, and carries its Share map. Fold all / Open all sits over the table.
+- The card holds what the row used to: coordinates, heading, distance, the HUD reading, the tons-left estimate, what the material is worth on that ground, and the buttons - Guide, Share map, Mark depleted, Copy coords, Delete. Copy coords is new.
+- The card follows what is open: the picked bookmark while its location is unfolded, otherwise the first deposit of the first open location, otherwise nothing.
+- Bookmarks and Mapped are tabs on the body, not separate pages. Every map row is selectable on its own, including maps tied to no location.
+- The rail carries each body's distance in Ls, its location count and its bookmark count; the material filter drives all three.
+- The materials line under a body is green for a material that body already has a bookmark for. A picked material leads the line whatever its rate.
+- Long material names are shortened where a column or a sentence cannot hold them: Low Temperature Diamonds to LTD, Periclase Dunite to P. Dunite.
+- The bookmark rows lost their Distance column - the location line carries the nearest, and Guide answers the rest.
+
+**Fixed**
+
+- The wheel scrolls whichever list the pointer is over, and puts back whatever EDMC had bound to it.
+- A click no longer sends either list back to the top.
+- The material filter no longer changes what counts as mapped: a map is driven ground, not a material.
+- Stop the arrow is reachable from the body heading whenever an arrow is up, whatever the card is showing.
+- The window gives up being topmost as soon as the game is clicked back into. It used to stay in front until it was closed: the FocusOut that was meant to release it lands on whatever button inside the window had the focus, not on the window.
+
 ## 4.7.2
 
 **Changed**
