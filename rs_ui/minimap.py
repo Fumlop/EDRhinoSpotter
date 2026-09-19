@@ -65,7 +65,15 @@ NOTICE_S = 4
 SW_HIDE = 0
 SW_SHOWNOACTIVATE = 4
 HWND_TOPMOST = -1
+HWND_NOTOPMOST = -2
 SWP_NOACTIVATE = 0x10
+SWP_NOSIZE = 0x01
+SWP_NOMOVE = 0x02
+GW_HWNDPREV = 3
+# How many windows above ours to walk before giving up on the question "is the
+# game on top of us". A desktop has a handful of visible ones; the cap is there
+# so a broken Z-order chain cannot spin the poll.
+Z_ORDER_LOOKUP = 40
 
 _window = None
 _canvas = None
@@ -744,9 +752,41 @@ def _place(side, where, rect, base=None):
         # _shown saying it was up. Showing a shown window again costs nothing.
         if not _shown or not user32.IsWindowVisible(_handle):
             user32.ShowWindow(_handle, SW_SHOWNOACTIVATE)
+        if _under_game(user32):
+            # Elite came back to the front and took the top of the Z-order with
+            # it. The call above does not fix that: asking for HWND_TOPMOST
+            # while already topmost leaves the order inside the topmost group
+            # alone. Dropping out and back in moves it.
+            for after in (HWND_NOTOPMOST, HWND_TOPMOST):
+                user32.SetWindowPos(_handle, after, 0, 0, 0, 0,
+                                    SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE)
+            logger.info("minimap: the game was over the map, lifted back")
     elif not _shown:
         _window.deiconify()
     _shown = True
+
+
+def _under_game(user32):
+    """Whether Elite's window sits above the map in the Z-order.
+
+    Walked rather than assumed: the map is topmost and so is a game in
+    borderless, and which of two topmost windows is in front is decided by
+    whichever was raised last - alt-tabbing back into the game raises it over
+    a map that has not moved since.
+    """
+    if not _handle:
+        return False
+    game = user32.FindWindowW(None, overlay.GAME_TITLE)
+    if not game:
+        return False
+    above = user32.GetWindow(_handle, GW_HWNDPREV)
+    for _ in range(Z_ORDER_LOOKUP):
+        if not above:
+            return False
+        if above == game:
+            return True
+        above = user32.GetWindow(above, GW_HWNDPREV)
+    return False
 
 
 def _header(status, body, system):
