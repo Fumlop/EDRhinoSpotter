@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.1.0
+
+**Added**
+
+- **Free move** for the minimap: Settings -> Place the map takes the mouse for a moment, you drag it where you want it, then double-click or press Esc. The position is kept as an offset from the game window, so moving or resizing Elite takes the map with it, and it is pulled back inside if the window shrinks. The corner setting still rules when Free move is off. A hover handle was the obvious design and cannot work: the window is click-through, so the mouse passes through it to the game and it never feels a hover.
+- `rs_api.py`, a read-only interface for other tools: `bookmarks()`, `bodies()`, `revision()`, `version()`. Works inside EDMC and from a separate program, imports neither EDMC nor Pillow, and opens the database `mode=ro` so a reader cannot lock the plugin out, change anything or create a database by reading too early. `rs_api.SCHEMA` is 1: keys are added, never removed. See docs/API.md. Two projects were reading the plugin's storage directly and broke when it moved from JSON files to a database; this is the part that does not move.
+- The settings tab has a picture in the README.
+
+**Fixed**
+
+- The journal folder is EDMC's answer, not a path spelled out here. `monitor.currentdir` first, then the `journaldir` setting, then the Windows default. A moved journal folder, a second install or a synced profile used to read as "not flying".
+
 ## 5.0.1
 
 **Fixed**
