@@ -81,7 +81,14 @@ SHORT_NAMES = {
 HINT = ("A location folds. The arrow the card starts draws over the game, top "
         "middle - borderless or windowed only.")
 
+# How often the window asks Windows whether it is still the one in front, while
+# it is shadowing everything else. Four times a second: it is one call, and the
+# answer is only interesting for as long as it takes to click away.
+TOPMOST_POLL_MS = 250
+GW_OWNER = 4
+
 _window = None           # only ever one, so the button cannot bury the panel
+_watch_id = None         # the pending topmost poll, so two opens do not stack
 _scan = None             # (register, sheet, focus, variable, materials)
 _canvases = {}           # the scrolling canvases of the draw on screen
 _scroll = {}             # how far each of them had been scrolled, by name
@@ -134,7 +141,7 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
         if _window.state() == "iconic":
             _window.deiconify()
         _window.attributes("-topmost", True)
-        _window.bind("<FocusOut>", _drop_topmost, add="+")
+        _watch_from_now()
         _window.lift()
         _window.focus_force()
         return _window
@@ -150,7 +157,7 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
     # game in front, and a window behind it is not an answer. Given up the
     # moment something else is clicked.
     _window.attributes("-topmost", True)
-    _window.bind("<FocusOut>", _drop_topmost, add="+")
+    _watch_from_now()
     _window.bind("<Escape>", lambda event: _window.destroy())
     _window.focus_force()
     _size(_window)
@@ -182,32 +189,62 @@ def _size(window):
     window.minsize(MIN_WIDTH, MIN_HEIGHT)
 
 
-def _drop_topmost(event):
-    """Stop shadowing the rest of the desktop the moment something else is clicked.
+def _watch_topmost():
+    """Give up topmost the moment the window in front belongs to somebody else.
 
-    The test used to be "the FocusOut came from the window itself", which is a
-    thing Windows almost never does: clicking away from a window whose focus
-    sits on one of its buttons - and after a draw it always does - delivers the
-    FocusOut to that button, so the window stayed over the game until it was
-    closed.
+    Tk's FocusOut was the wrong instrument. Clicking away from a window whose
+    focus sits on one of its buttons - which after a draw it always does -
+    delivers the FocusOut to the button, not to the window, so the window kept
+    shadowing the game; and asking Tk afterwards where the focus went answers
+    about this application, which says nothing about what Windows has in front.
 
-    Tk can answer the real question instead: focus_displayof() is the widget of
-    this application that now has the focus, and None when the focus has left
-    the application altogether. Asked on the next idle, because at FocusOut time
-    it is still whatever is being left.
+    So ask Windows, four times a second, and only while still topmost. The poll
+    stops the moment it drops, which is once per open.
     """
-    if _window is not None and _window.winfo_exists():
-        _window.after_idle(_check_left)
-
-
-def _check_left():
+    global _watch_id
+    _watch_id = None
     if _window is None or not _window.winfo_exists():
         return
-    if _window.focus_displayof() is not None:    # still inside this window
+    try:
+        if not _window.attributes("-topmost"):
+            return
+    except tk.TclError:                          # being destroyed under us
         return
-    logger.debug("scan: focus left the application, dropping topmost")
-    _window.attributes("-topmost", False)
-    _window.unbind("<FocusOut>")
+    if not _in_front():
+        logger.debug("scan: something else is in front, dropping topmost")
+        _window.attributes("-topmost", False)
+        # And down with it. Windows raised the app that was clicked underneath
+        # this window while it was still topmost, so dropping the flag alone
+        # left it sitting over that one app until a second one was clicked.
+        _window.lower()
+        return
+    _watch_id = _window.after(TOPMOST_POLL_MS, _watch_topmost)
+
+
+def _watch_from_now():
+    """Start the watch, or leave the one that is running to it."""
+    global _watch_id
+    if _watch_id is None and _window is not None:
+        _watch_id = _window.after(TOPMOST_POLL_MS, _watch_topmost)
+
+
+def _in_front():
+    """Whether the window Windows has in front is this one, or a menu of it.
+
+    The material picker's dropdown is a window of its own, owned by this one -
+    without the owner test, opening it would read as leaving.
+
+    True where there is nothing to ask: off Windows the window stays topmost
+    until it is closed, which is what it did there before.
+    """
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+    except (ImportError, AttributeError, OSError):
+        return True
+    handle = user32.GetParent(_window.winfo_id()) or _window.winfo_id()
+    front = user32.GetForegroundWindow()
+    return front == handle or user32.GetWindow(front, GW_OWNER) == handle
 
 
 def _log_destroy(event):
