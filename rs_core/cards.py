@@ -18,9 +18,10 @@ from rs_core.spotcard import card_dir
 # A new bookmark this close to one for the same material on the same body is
 # the same deposit read again - on leaving, say, with Amount gone from High to
 # Low - and updates it instead of adding a second. The distance is the largest
-# patch assumed on flat ground: eight rigs, seven round one in the middle at
-# the 76 m rig spacing, is a circle of 76 / (2 sin(pi/7)) = 87.6 m; with 10 %
-# on top that is 96 m, set to a round 100 m.
+# patch assumed on flat ground: deposit.MAX_RIGS positions, six round one in
+# the middle at the 76 m rig spacing, is a circle of 76 / (2 sin(pi/6)) = 76.0 m;
+# with 10 % on top that is 83.6 m. Kept at a round 100 m: it was derived for
+# eight positions and the slack costs nothing.
 SAME_SPOT_M = 100.0
 
 # Bookmarks already reported as unreadable. The minimap reads them again on

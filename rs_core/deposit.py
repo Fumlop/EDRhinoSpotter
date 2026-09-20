@@ -26,8 +26,11 @@ SHARE_LEFT, from the label transitions in the same traces: High -> Medium after
 No tkinter. Tests in rs_tests/test_deposit.py.
 """
 
-# Rig positions a deposit can hold. The game accepts no more.
-MAX_RIGS = 10
+# Rig positions a deposit can hold. Six can be worked at once (register
+# GA-020); a seventh position is physically confirmed (GA-021) and is a buffer -
+# it can be placed, it cannot be run. The twelve rig units the Rhino carries
+# (GA-023) are stock, not positions on one deposit.
+MAX_RIGS = 7
 
 DENSITIES = ("Low", "Medium", "High")
 AMOUNTS = ("High", "Medium", "Low", "Depleted")
