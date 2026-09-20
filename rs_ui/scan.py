@@ -1508,12 +1508,12 @@ def _share_map(body, group):
     saved map of the body, and doing that for every location of every draw cost
     more than the whole rest of the window.
 
-    A map with no picture yet is drawn here and saved. minimap writes the PNG
-    when the SRV goes back in the ship; a drive that ended any other way left
-    the points in the database and nothing to open.
+    Drawn again on every press, then saved: a picture holds the bookmarks, the
+    prices and the golden groups as they were when it was written, and all
+    three move. The PNG already on disk is the fallback when the redraw fails.
     """
     maps = coverstore.maps(body, system_address=_system_address())
-    picture = _picture(body, group, maps) or _drawn_now(body, group, maps)
+    picture = _drawn_now(body, group, maps) or _picture(body, group, maps)
     if picture:
         _open_card(picture)
         return

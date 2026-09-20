@@ -191,9 +191,6 @@ EDMC Settings, RhinoSpotter tab:
   **Place the map** takes the mouse for a moment: drag it, then double-click
   or press Esc. The position is kept as an offset from the game window, so
   moving or resizing Elite takes the map with it.
-- **Ground** - which texture set the unpainted ground is drawn from. `lit`
-  (default) is shaded relief: craters, fracture networks, snow on ice, ore
-  veins. `flat` is the set that shipped before 5.5.0.
 - Saved maps count and size, **Open folder** for the map pictures.
 - **Delete migrated JSON** - after upgrading to 4.2, removes the old JSON files
   the database already holds.

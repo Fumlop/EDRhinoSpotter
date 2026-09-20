@@ -488,27 +488,31 @@ class TestRender:
         assert coverage.texture_name('metal-rich') == 'metallic'
         assert coverage.texture_name(None) is None
         for name in ('icy', 'rocky-ice', 'rocky', 'rocky-metal', 'metallic'):
-            assert (coverage.TEXTURE_DIR / f"{name}.png").is_file()
+            assert (coverage.TEXTURE_DIR / f"{name}{coverage.TEXTURE_EXT}").is_file()
 
-    def test_every_set_has_a_file_for_every_family(self):
-        for name in ('icy', 'rocky-ice', 'rocky', 'rocky-metal', 'metallic'):
-            for folder in coverage.TEXTURE_FOLDER.values():
-                assert (folder / f"{name}.png").is_file()
+    def test_the_old_png_set_is_swept_only_where_the_jpeg_is_there(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(coverage, "TEXTURE_DIR", tmp_path)
+        (tmp_path / "icy.png").write_bytes(b"old")
+        (tmp_path / "icy.jpg").write_bytes(b"new")
+        (tmp_path / "rocky.png").write_bytes(b"old")        # no rocky.jpg beside it
+        (tmp_path / "mine.png").write_bytes(b"mine")        # not a texture name
+        lit = tmp_path / "lit"
+        lit.mkdir()
+        (lit / "icy.png").write_bytes(b"old")
+        coverage.clear_old_textures()
+        assert not (tmp_path / "icy.png").exists()
+        assert (tmp_path / "rocky.png").exists()
+        assert (tmp_path / "mine.png").exists()
+        assert not lit.exists()
 
-    def test_the_set_switch_redraws_the_ground_in_the_other_one(self):
-        corner = (3, 3)                    # unpainted, off the grid lines
-        try:
-            textured = fresh()
-            textured.ground = 'icy'
-            coverage.texture_set('lit')
-            lit = coverage.render(textured, 0, 0, None, 240).getpixel(corner)
-            coverage.texture_set('flat')
-            assert coverage.texture_set() == 'flat'
-            assert coverage.render(textured, 0, 0, None, 240).getpixel(corner) != lit
-            coverage.texture_set('nonsense')
-            assert coverage.texture_set() == coverage.TEXTURE_SETS[0]
-        finally:
-            coverage.texture_set(coverage.TEXTURE_SETS[0])
+    def test_a_lit_folder_holding_anything_else_is_left_alone(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(coverage, "TEXTURE_DIR", tmp_path)
+        lit = tmp_path / "lit"
+        lit.mkdir()
+        (lit / "icy.png").write_bytes(b"old")
+        (lit / "notes.txt").write_bytes(b"mine")
+        coverage.clear_old_textures()
+        assert (lit / "icy.png").exists() and (lit / "notes.txt").exists()
 
     def test_a_known_ground_draws_its_texture_and_an_unknown_one_plain(self):
         bg = palette.rgb(palette.BG)

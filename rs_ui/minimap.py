@@ -20,6 +20,7 @@ goes back into the ship. A launch within reach of a saved map carries it on.
 import base64
 import io
 import os
+import itertools
 import threading
 import time
 import tkinter as tk
@@ -49,8 +50,6 @@ SRV_KEY = "rhinospotter_srv_type"
 # Whether the material lists carry the cheap half. Not a minimap setting - it
 # lives here because this is the file that draws the settings tab.
 LOW_VALUE_KEY = "rhinospotter_low_value"
-# Which coverage.TEXTURE_SETS the unpainted ground is drawn from.
-GROUND_KEY = "rhinospotter_ground_set"
 # Only the Rhino has the mining scanner the painted area stands for.
 RHINO = "mev_rhino"
 CORNERS = ("top left", "top right", "bottom left", "bottom right")
@@ -109,7 +108,6 @@ _keep = None             # tk.BooleanVar on the settings tab
 _hotkeys = {}            # hotkey id -> (modifier StringVar, key StringVar) on the settings tab
 _free = None             # tk.BooleanVar on the settings tab
 _low_value = None        # tk.BooleanVar on the settings tab
-_ground = None           # tk.StringVar on the settings tab
 _lifted = False          # the game is over the map, so it is being lifted every tick
 _placing = False         # in place-the-map mode: click-through off, drag to move
 _grab = None             # (pointer x, pointer y, window x, window y) while dragging
@@ -145,14 +143,6 @@ def low_value_shown():
     across grounds.
     """
     return config.get_bool(LOW_VALUE_KEY, default=False) if config is not None else False
-
-
-def ground_set():
-    """Which of coverage.TEXTURE_SETS the ground under the painted area is
-    drawn from. Anything else stored counts as the first."""
-    default = coverage.TEXTURE_SETS[0]
-    value = config.get_str(GROUND_KEY, default=default) if config is not None else default
-    return value if value in coverage.TEXTURE_SETS else default
 
 
 def offset():
@@ -248,7 +238,6 @@ def update(root, status, system=None, ids=None, ground=None):
     would stop it rescheduling - Bookmark would stop greying out with it.
     """
     global _coverage, _in_srv, _failed, _here
-    coverage.texture_set(ground_set())
     if not status:
         # A read that landed mid-write. Not a reason to take the map down and
         # count the next fix as a fresh launch.
@@ -615,76 +604,87 @@ def stop():
 
 def prefs(parent):
     """The settings tab: the map on or off, whether it stays up through an
-    alt-tab, and which corner it sits in."""
-    global _enabled, _corner, _keep, _free, _low_value, _ground
+    alt-tab, which corner it sits in, the saved maps, the materials switch and
+    the hotkeys.
+
+    Rows come from `place_at`, not from numbers written here: hand-numbered
+    rows put two widgets in row 9 the last time one was inserted.
+    """
+    global _enabled, _corner, _keep, _free, _low_value
     frame = nb.Frame(parent)
     _enabled = tk.BooleanVar(value=enabled())
     _corner = tk.StringVar(value=corner())
     _keep = tk.BooleanVar(value=keep_up())
     _free = tk.BooleanVar(value=free_move())
     _low_value = tk.BooleanVar(value=low_value_shown())
-    _ground = tk.StringVar(value=ground_set())
-    nb.Checkbutton(frame, text="Minimap in the Rhino - off: not shown, nothing recorded",
-                   variable=_enabled).grid(row=0, column=0, columnspan=2,
-                                           sticky="w", padx=10, pady=(10, 2))
-    nb.Checkbutton(frame, text="Keep it up when you alt-tab out of the game",
-                   variable=_keep).grid(row=1, column=0, columnspan=2,
-                                        sticky="w", padx=10, pady=2)
-    nb.Label(frame, text="Corner").grid(row=2, column=0, sticky="w", padx=10, pady=2)
-    nb.OptionMenu(frame, _corner, _corner.get(), *CORNERS).grid(
-        row=2, column=1, sticky="w", padx=10, pady=2)
-    nb.Checkbutton(frame, text="Free move - put it where you dragged it, not in a corner",
-                   variable=_free).grid(row=3, column=0, columnspan=2,
-                                        sticky="w", padx=10, pady=2)
-    nb.Button(frame, text="Place the map", command=place).grid(
-        row=4, column=0, sticky="w", padx=10, pady=2)
-    nb.Label(frame, text="In the SRV: drag it, then double-click or Esc.").grid(
-        row=4, column=1, sticky="w", padx=10, pady=2)
-    nb.Label(frame, text="Painted means driven within "
-                         f"{coverage.SCAN_RADIUS_M / 1000:.0f} km, not scanned.").grid(
-        row=5, column=0, columnspan=2, sticky="w", padx=10, pady=2)
-    nb.Label(frame, text="Ground - lit: shaded relief, snow on the ice").grid(
-        row=6, column=0, sticky="w", padx=10, pady=2)
-    nb.OptionMenu(frame, _ground, _ground.get(), *coverage.TEXTURE_SETS).grid(
-        row=6, column=1, sticky="w", padx=10, pady=2)
+
+    rows = itertools.count()
+
+    def place_at(row, widget, column=0, span=1, pady=2):
+        widget.grid(row=row, column=column, columnspan=span, sticky="w", padx=10, pady=pady)
+        return widget
+
+    def line(left, right=None, pady=2):
+        """One row: `left` across both columns, or left and right side by side.
+        Each takes the frame and returns the widget."""
+        row = next(rows)
+        place_at(row, left(frame), span=1 if right else 2, pady=pady)
+        if right:
+            place_at(row, right(frame), column=1, pady=pady)
+        return row
+
+    line(lambda f: nb.Checkbutton(
+        f, text="Minimap in the Rhino - off: not shown, nothing recorded",
+        variable=_enabled), pady=(10, 2))
+    line(lambda f: nb.Checkbutton(
+        f, text="Keep it up when you alt-tab out of the game", variable=_keep))
+    line(lambda f: nb.Label(f, text="Corner"),
+         lambda f: nb.OptionMenu(f, _corner, _corner.get(), *CORNERS))
+    line(lambda f: nb.Checkbutton(
+        f, text="Free move - put it where you dragged it, not in a corner", variable=_free))
+    line(lambda f: nb.Button(f, text="Place the map", command=place),
+         lambda f: nb.Label(f, text="In the SRV: drag it, then double-click or Esc."))
+    line(lambda f: nb.Label(f, text="Painted means driven within "
+                                    f"{coverage.SCAN_RADIUS_M / 1000:.0f} km, not scanned."))
+
     count, size = coverstore.usage()
     amount = f"{size / 1048576:.1f} MB" if size >= 1048576 else f"{size / 1024:.0f} KB"
-    nb.Label(frame, text=f"Saved maps: {count} ({amount})").grid(
-        row=7, column=0, sticky="w", padx=10, pady=(2, 10))
-    nb.Button(frame, text="Open folder", command=_open_folder).grid(
-        row=7, column=1, sticky="w", padx=10, pady=(2, 10))
+    line(lambda f: nb.Label(f, text=f"Saved maps: {count} ({amount})"),
+         lambda f: nb.Button(f, text="Open folder", command=_open_folder), pady=(2, 10))
     # The JSON files 4.1 wrote, once the database holds them.
     result = nb.Label(frame, text="")
-    nb.Button(frame, text="Delete migrated JSON",
-              command=lambda: _delete_migrated(frame, result)).grid(
-        row=8, column=0, sticky="w", padx=10, pady=(2, 10))
-    result.grid(row=8, column=1, sticky="w", padx=10, pady=(2, 10))
+    line(lambda f: nb.Button(f, text="Delete migrated JSON",
+                             command=lambda: _delete_migrated(frame, result)),
+         lambda f: result, pady=(2, 10))
 
     # What the Material dropdown and the picker in RhinoData offer. Off, the
     # cheap half is left out of both and out of the rates line under a body -
     # never out of a bookmark that already names one, nor out of a material
     # being mined right now. See rs_ui/main._materials.
-    nb.Label(frame, text="Materials").grid(row=9, column=0, sticky="w", padx=10, pady=(6, 2))
-    nb.Checkbutton(frame, text="Show materials under "
-                               f"{grounds.HIGH_VALUE_MIN:,} Cr/t",
-                   variable=_low_value).grid(row=10, column=0, columnspan=2,
-                                             sticky="w", padx=10, pady=(2, 10))
+    line(lambda f: nb.Label(f, text="Materials"), pady=(6, 2))
+    line(lambda f: nb.Checkbutton(f, text="Show materials under "
+                                          f"{grounds.HIGH_VALUE_MIN:,} Cr/t",
+                                  variable=_low_value), pady=(2, 10))
 
     # The hotkeys: a modifier set and a key each. Taken on OK and registered
     # again at once; the rows under the map name them from the next frame.
-    nb.Label(frame, text="Hotkeys").grid(row=11, column=0, sticky="w", padx=10, pady=(6, 2))
+    line(lambda f: nb.Label(f, text="Hotkeys"), pady=(6, 2))
     _hotkeys.clear()
-    for row, (key_id, name, _, _) in enumerate(hotkey.ACTIONS, start=12):
+    for key_id, name, _, _ in hotkey.ACTIONS:
         mods, key = hotkey.label(key_id).rsplit("+", 1)
         mod_var, key_var = tk.StringVar(value=mods), tk.StringVar(value=key)
         _hotkeys[key_id] = (mod_var, key_var)
-        nb.Label(frame, text=name).grid(row=row, column=0, sticky="w", padx=10, pady=2)
-        # Grid, not pack: EDMC's nb.Frame already grids a child of its own, and
-        # Tk refuses both managers in one frame - the whole tab went with it.
-        keys = nb.Frame(frame)
-        nb.OptionMenu(keys, mod_var, mods, *hotkey.MODIFIER_SETS).grid(row=0, column=0)
-        nb.OptionMenu(keys, key_var, key, *hotkey.KEY_NAMES).grid(row=0, column=1, padx=(4, 0))
-        keys.grid(row=row, column=1, sticky="w", padx=10, pady=2)
+
+        def keys(f, mod_var=mod_var, key_var=key_var, mods=mods, key=key):
+            # Grid, not pack: EDMC's nb.Frame already grids a child of its own,
+            # and Tk refuses both managers in one frame - the whole tab went
+            # with it.
+            box = nb.Frame(f)
+            nb.OptionMenu(box, mod_var, mods, *hotkey.MODIFIER_SETS).grid(row=0, column=0)
+            nb.OptionMenu(box, key_var, key, *hotkey.KEY_NAMES).grid(row=0, column=1, padx=(4, 0))
+            return box
+
+        line(lambda f, name=name: nb.Label(f, text=name), keys)
     return frame
 
 
@@ -825,9 +825,6 @@ def prefs_changed():
             config.set(FREE_KEY, bool(_free.get()))
         if _low_value is not None:
             config.set(LOW_VALUE_KEY, bool(_low_value.get()))
-        if _ground is not None:
-            config.set(GROUND_KEY, _ground.get())
-            coverage.texture_set(ground_set())
         changed = False
         for key_id, _, _, config_key in hotkey.ACTIONS:
             if key_id not in _hotkeys:

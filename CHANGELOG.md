@@ -4,9 +4,15 @@
 
 **Added**
 
-- **A second ground texture set, `lit`.** Settings > Ground picks it: `flat` is the set that shipped, `lit` is a heightfield per ground family lit by one sun at 315 degrees, 34 degrees up - craters with rims and ejecta, fracture networks, snow lying on the flat and in the hollows with blue ice in the wind scours, ore veins on the metal grounds. Made in EDIntel's `lab/radar_backgrounds/hifi.py` with numpy and scipy; what ships is PNG, so the plugin still loads it with PIL alone. `texture/lit/` is 15.1 MB on top of the 6.4 MB of `texture/`.
-- **The map picture carries the three best golden groups, priced.** Every group of bookmarks within 2.5 km whose rigs add up to five was circled; now the best three by credits an hour are, each labelled with what a trip takes out - 11 t a rig position at that spot's median price. The hour is 300 s a spot (12 pieces, one every 25 s, the rigs at a spot running together) plus the drive round its members at 25 km/h.
-- **The saved map picture is drawn on the body's ground**, the same texture the live map uses; it was a plain dark field before. A picture goes from 10 KB to 159-213 KB. Existing pictures are redrawn the next time you dock at that location or press **Share map**.
+- **The ground under the map is lit.** One heightfield a ground family, shaded by a sun at 315 degrees, 34 degrees up: craters with rims and ejecta apron, fracture networks, snow lying on the flat and in the hollows with blue ice in the wind scours, ore veins on the metal grounds. Made in EDIntel's `lab/radar_backgrounds/hifi.py` with numpy and scipy; what ships is a picture, so the plugin still loads it with PIL alone.
+- **The saved map picture is drawn on that ground too**, where it was a plain dark field before.
+- **The picture carries the three best golden groups, priced.** Every group of bookmarks within 2.5 km whose rigs add up to five was circled; now the best three by credits an hour are, each labelled with what a trip takes out - 11 t a rig position at that spot's median price. The hour is 300 s a spot (12 pieces, one every 25 s, the rigs at a spot running together) plus the drive round its members at 25 km/h.
+
+**Changed**
+
+- **Share map** draws the picture again on every press. It opened the saved PNG before, so a location marked or worked out since kept the picture it was saved with.
+- Textures ship as JPEG at quality 90, no chroma subsampling: 2.3 MB against 15.1 as PNG, within 3 of 255 a pixel at the size the map draws them, and 19 ms to decode against 80. The PNG set from before is deleted at startup once the JPEG is in place - the in-plugin update replaces the whole folder anyway, this is for an install unzipped by hand.
+- The settings tab lays its rows out by counter. Two widgets went into the same row when one was inserted by hand.
 
 ## 5.4.0
 

@@ -337,7 +337,7 @@ class Coverage:
         """The whole mask drawn at the scale of a map this big showing `view`
         metres either side, kept until something new is painted."""
         ring_at = tuple(round(v) for v in self.anchor())
-        key = (self.version, side, view, ring_at, self.border_m, self.ground, _set)
+        key = (self.version, side, view, ring_at, self.border_m, self.ground)
         if self._layer is None or self._layer[0] != key:
             self._layer = (key, _draw_layer(self.mask, side, ring_at, self.border_m, view=view,
                                             ground=self.ground))
@@ -870,37 +870,47 @@ def _distances(image, points, side, centre, per_px, marker=None):
 # The ground the SRV drives on, under the painted area: one picture a ground
 # family, made in EDIntel's lab/radar_backgrounds and shipped as PNGs.
 TEXTURE_DIR = Path(__file__).resolve().parent.parent / "texture"
-# The sets to draw them from, the first one the default: "lit" is texture/lit/,
-# heightfields shaded by one sun; "flat" is texture/, the set that shipped
-# before it.
-TEXTURE_SETS = ("lit", "flat")
 TEXTURE_OF = {
     'metal-rich': 'metallic',
     'high-metal-content': 'rocky-metal',
     'rocky-ice': 'rocky-ice',
     'icy': 'icy',
 }
-TEXTURE_FOLDER = {"flat": TEXTURE_DIR, "lit": TEXTURE_DIR / "lit"}
-_textures = {}           # (set, name, pixels) -> RGB image, or None when it would not load
-_set = TEXTURE_SETS[0]
+# JPEG, not PNG: the same five textures are 15.1 MB as PNG and 2.3 MB at
+# quality 90 without chroma subsampling, within 3 of 255 a pixel once the
+# 1920 px file is drawn at the 330 px the map uses, and they decode in 19 ms
+# against 80.
+TEXTURE_EXT = ".jpg"
+_textures = {}           # (name, pixels) -> RGB image, or None when it would not load
 
 
-def texture_set(name=None):
-    """The set in use, after setting it to `name` when one is given. A name
-    outside TEXTURE_SETS counts as the first. A switch drops the loaded
-    textures; Coverage.layer carries the set in its key, so the map is redrawn
-    on the next reading."""
-    global _set
-    if name is not None:
-        want = name if name in TEXTURE_SETS else TEXTURE_SETS[0]
-        if want != _set:
-            _set = want
-            _textures.clear()
-    return _set
+def clear_old_textures():
+    """Delete the PNG set 5.5.0 and older shipped, once the JPEG is in place.
+
+    The in-plugin update replaces the whole texture folder; this is for an
+    install unzipped over the last one by hand. Only texture/<family>.png and
+    a texture/lit/ holding nothing but those five PNGs are touched, and only
+    where the .jpg is there. Nothing here raises.
+    """
+    names = set(TEXTURE_OF.values()) | {'rocky'}
+    try:
+        for name in sorted(names):
+            old = TEXTURE_DIR / f"{name}.png"
+            if old.is_file() and (TEXTURE_DIR / f"{name}{TEXTURE_EXT}").is_file():
+                old.unlink()
+                logger.info(f"minimap: removed the old {old.name}")
+        lit = TEXTURE_DIR / "lit"
+        if lit.is_dir() and all(p.stem in names and p.suffix == ".png" for p in lit.iterdir()):
+            for picture in lit.iterdir():
+                picture.unlink()
+            lit.rmdir()
+            logger.info("minimap: removed the old texture/lit folder")
+    except OSError as err:
+        logger.warning(f"minimap: could not remove the old textures: {err}")
 
 
 def texture_name(ground):
-    """The texture file for a ground key, without .png, or None for none."""
+    """The texture file for a ground key, without the extension, or None."""
     if not ground:
         return None
     if ground.startswith('rock 80%+'):
@@ -914,14 +924,13 @@ def _texture(ground, size):
     name = texture_name(ground)
     if name is None:
         return None
-    key = (_set, name, size)
+    key = (name, size)
     if key not in _textures:
-        folder = TEXTURE_FOLDER[_set]
         try:
-            with Image.open(folder / f"{name}.png") as picture:
+            with Image.open(TEXTURE_DIR / f"{name}{TEXTURE_EXT}") as picture:
                 _textures[key] = picture.convert("RGB").resize((size, size), Image.BICUBIC)
         except OSError as err:
-            logger.warning(f"minimap: no {_set} {name} texture, plain ground instead: {err}")
+            logger.warning(f"minimap: no {name} texture, plain ground instead: {err}")
             _textures[key] = None
     return _textures[key]
 

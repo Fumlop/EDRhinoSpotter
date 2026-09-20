@@ -12,8 +12,8 @@ worker fails minutes later somewhere unrelated.
 import threading
 import tkinter as tk
 
-from rs_core import (bodies, cards, database, deposit, grounds, migrate, palette, spansh,
-                     spotcard, spotmark, store, update)
+from rs_core import (bodies, cards, coverage, database, deposit, grounds, migrate, palette,
+                     spansh, spotcard, spotmark, store, update)
 from rs_core.logging import logger
 from rs_ui import hotkey, minimap, scan
 
@@ -82,6 +82,9 @@ def start(plugin_dir):
     except Exception:
         logger.exception("importing the old JSON files into the database failed - "
                          "the next start tries again")
+    # The PNG texture set of 5.5.0 and older, where an install was unzipped
+    # over the last one by hand.
+    coverage.clear_old_textures()
     _sheet = grounds.Sheet()
     if not _sheet.loaded:
         logger.warning(f"no mining_sheet.json: {_sheet.error}")
