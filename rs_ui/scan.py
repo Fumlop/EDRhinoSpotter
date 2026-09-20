@@ -17,11 +17,14 @@ the list itself, so opening it twice costs nothing.
 
 import os
 import pathlib
+import io
 import tkinter as tk
 import webbrowser
 from tkinter import messagebox
 
-from rs_core import (cards, coverage, coverstore, deposit, grounds, guide, palette,
+from PIL import Image
+
+from rs_core import (cards, coverage, coverstore, database, deposit, grounds, guide, palette,
                      spotmark)
 from rs_core.logging import logger
 from rs_ui import overlay, rhino
@@ -70,11 +73,17 @@ MIN_WIDTH = 900
 MIN_HEIGHT = 520
 RAIL_WIDTH = 280
 CARD_WIDTH = 310
+# The map over the bookmark card, in pixels. Square, and short enough that the
+# card under it keeps its buttons on screen: at the card's full width the
+# picture pushed Share map and Mark depleted off the bottom of the window.
+MAP_PX = 240
 
 # Material names that do not fit a 22-character column or a one-line sentence.
 SHORT_NAMES = {
     "low temperature diamonds": "LTD",
     "low temp. diamonds": "LTD",
+    "low temp diamonds": "LTD",
+    "methanol monohydrate crystals": "Monohydrate",
     "periclase dunite": "P. Dunite",
 }
 
@@ -262,7 +271,7 @@ def _draw():
 
     middle = tk.Frame(outer, bg=BG)
     middle.pack(side="left", fill="both", expand=True)
-    picked = _middle(middle, register, sheet, focus, body, records, groups, maps)
+    picked = _middle(middle, register, sheet, focus, body, records, groups, maps, materials)
 
     _card(card, register, sheet, body, picked, maps)
 
@@ -470,7 +479,7 @@ def _picker(parent, variable, materials, focus):
 # ----------------------------------------------------------------- the middle
 
 
-def _middle(parent, register, sheet, focus, body, records, groups, maps):
+def _middle(parent, register, sheet, focus, body, records, groups, maps, materials=()):
     """The body's heading, its two tabs, and whatever the open tab holds.
 
     Returns what the card is to show - a bookmark, a map row, or None. It is the
@@ -508,7 +517,7 @@ def _middle(parent, register, sheet, focus, body, records, groups, maps):
 
     tk.Label(head, text=_about(body), bg=BG, fg=DIM, anchor="w",
              font=("Segoe UI", 9)).pack(fill="x", pady=(4, 0))
-    _rates(head, sheet, body, focus)
+    _rates(head, sheet, body, focus, materials)
 
     if _state["view"] == "mapped":
         picked = _mapped_list(parent, body, mapped, unknown)
@@ -774,7 +783,13 @@ def _card(parent, register, sheet, body, picked, maps):
     A card rather than buttons on the row: there are five things to do to a
     bookmark and four numbers worth reading about it, and neither fits beside a
     row that also has to line its columns up with the row under it.
+
+    The ground the bookmark sits on goes above the card, packed first. Picking
+    a bookmark in the middle asks "where is this" before it asks "what is it",
+    and the answer was two clicks away on the other tab.
     """
+    if picked is not None and body is not None and _state["view"] == "bookmarks":
+        _location_map(parent, sheet, body, picked, maps)
     box = tk.Frame(parent, bg=PANEL, highlightthickness=1,
                    highlightbackground=RULE, highlightcolor=RULE)
     box.pack(fill="x", padx=(0, 14), pady=(14, 0))
@@ -924,6 +939,82 @@ def _map_card(box, body, row):
     button.pack(fill="x", padx=13, pady=(12, 13))
 
 
+# One render, kept: (what it is of, the PhotoImage). Picking a bookmark redraws
+# the whole window, and repainting a map from its points and drawing it is
+# 70-160 ms measured - too long to spend again on a picture that has not
+# changed. Tk also drops an image nothing holds a reference to.
+_map_picture = None
+
+
+def _location_map(parent, sheet, body, record, maps):
+    """The saved map the picked bookmark lies on, above its card.
+
+    Of the maps that reach the bookmark, the one whose centre is nearest -
+    coverage.map_at, the same tie the Mapped tab counts with.
+
+    Bare: no title, no legend. The card directly under it already says the
+    body, the location and the material, and a legend of five bookmarks would
+    be taller than the picture at this width.
+
+    Nothing at all when the bookmark lies on no saved map, rather than an empty
+    frame where a picture sometimes is - that reads as a failed load.
+    """
+    global _map_picture
+    lat, lon = record.get("latitude"), record.get("longitude")
+    if not maps or lat is None or lon is None:
+        return
+    try:
+        name = coverage.map_at(maps, body["name"], float(lat), float(lon))
+    except (TypeError, ValueError):
+        return
+    if not name:
+        return
+    key = (body["name"], name, database.revision())
+    if _map_picture is None or _map_picture[0] != key:
+        photo = _draw_location_map(parent, sheet, body, name, dict(maps)[name])
+        if photo is None:
+            return
+        _map_picture = (key, photo)
+    label = tk.Label(parent, image=_map_picture[1], bg=BG,
+                     borderwidth=0, highlightthickness=0)
+    label.image = _map_picture[1]
+    label.pack(padx=(0, 14), pady=(14, 0))
+
+
+def _draw_location_map(parent, sheet, body, name, data):
+    """That map repainted from its points, every bookmark on the body on it.
+
+    Every bookmark, not only the ones this map reaches: the ones outside it
+    fall off the edge of the picture on their own, and deciding which reach
+    would be the same sum coverage.picture already does.
+
+    A failure is logged and None - the card is the thing that has to work.
+    """
+    try:
+        cover = coverage.Coverage.from_dict(body["name"], data, name)
+        if cover is None:
+            return None
+        codes, values = sheet.codes(), sheet.values()
+        marks = []
+        for mark in body["marks"]:
+            lat, lon = mark.get("latitude"), mark.get("longitude")
+            if lat is None or lon is None:
+                continue
+            material = (mark.get("commodity") or "").lower()
+            marks.append((*cover.xy(float(lat), float(lon)), codes.get(material),
+                          bool(mark.get("depleted_at")), values.get(material, 0),
+                          mark.get("rigs")))
+        golden = coverage.golden_groups([(x, y, rigs) for x, y, _, spent, _, rigs in marks
+                                         if not spent])
+        image = coverage.picture(cover.mask, marks, (), (), cover.border_m, golden)
+        out = io.BytesIO()
+        image.resize((MAP_PX, MAP_PX), Image.LANCZOS).save(out, format="PNG")
+        return tk.PhotoImage(master=parent, data=out.getvalue())
+    except Exception:
+        logger.exception(f"scan: could not draw {name} on {body['name']}")
+        return None
+
+
 def _field(parent, name):
     tk.Label(parent, text=name, bg=PANEL, fg=DIM, anchor="w",
              font=("Segoe UI", 7)).pack(fill="x", padx=13, pady=(10, 2))
@@ -949,7 +1040,7 @@ def _ground_lines(sheet, body, material):
             f"median {median:,} Cr per tonne" if median else "no price known"]
 
 
-def _rates(parent, sheet, body, focus):
+def _rates(parent, sheet, body, focus, materials=()):
     """What that ground pays, most per location first, with its prices.
 
     Green is a material this body already has a bookmark for: somebody has stood
@@ -960,6 +1051,12 @@ def _rates(parent, sheet, body, focus):
     A picked material leads the line whatever its rate: the question has become
     "where is the jadeite", and a ground listed because it carries it at 4% has
     to say so.
+
+    `materials` is what the picker offers. The three shown are the best three
+    of those, not the best three of the ground: a line recommending copper
+    while copper cannot be picked is a dead end. Filtered before the limit, so
+    the next ones up are promoted - on a thin ground the line still comes out
+    shorter than three, which is what that ground has to offer.
     """
     row = tk.Frame(parent, bg=BG)
     row.pack(fill="x", pady=(8, 0))
@@ -967,14 +1064,24 @@ def _rates(parent, sheet, body, focus):
         tk.Label(row, text="no mining_sheet.json - body types only", bg=BG, fg=WARN,
                  anchor="w", font=("Segoe UI", 9)).pack(side="left")
         return
-    rows = sheet.best(body["ground"], limit=TOP_MATERIALS, minimum=MIN_PCT)
+    measured = sheet.best(body["ground"], minimum=MIN_PCT)
+    rows = measured
+    if materials:
+        offered = {name.lower() for name in materials}
+        rows = [row for row in rows if row["material"].lower() in offered]
+    rows = rows[:TOP_MATERIALS]
     if focus and not any(entry["material"].lower() == focus.lower() for entry in rows):
         rate = sheet.rate(body["ground"], focus)
         if rate is not None:
             rows = [{"material": focus, "pct": rate}] + rows[:TOP_MATERIALS - 1]
     if not rows:
-        tk.Label(row, text="nothing measured on this ground yet", bg=BG, fg=WARN,
-                 anchor="w", font=("Segoe UI", 9)).pack(side="left")
+        # Two different answers. A ground with no rows has never been measured;
+        # a ground whose every row is under the low value line has been, and
+        # saying "nothing measured" about it is a lie the settings tab fixes.
+        tk.Label(row, text="every material here is under the low value line - "
+                           "Settings offers them" if measured
+                      else "nothing measured on this ground yet",
+                 bg=BG, fg=WARN, anchor="w", font=("Segoe UI", 9)).pack(side="left")
         return
     confirmed = {(record.get("commodity") or "").lower() for record in body["marks"]}
     for index, entry in enumerate(rows):

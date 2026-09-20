@@ -64,7 +64,9 @@ No tkinter anywhere in here.
   already in the database wins over its file.
 - **[grounds.py](rs_core/grounds.py)** - what a body is, and what that kind of
   body holds. `classify()` turns a journal Scan into one of ten grounds;
-  `Sheet` reads `mining_sheet.json`. The classifier mirrors the CASE in
+  `Sheet` reads `mining_sheet.json`. `Sheet.worth()` drops everything under
+  `HIGH_VALUE_MIN` (50,000 Cr a tonne, measured on `values()`); `UNSHEETED`
+  prices what the sheet has no rows for, and only when a sheet was read. The classifier mirrors the CASE in
   the classifier the sheet was measured with, so a body lands in the bucket its percentages
   were measured on.
 - **[spansh.py](rs_core/spansh.py)** - on the honk (FSSDiscoveryScan), with a
@@ -239,7 +241,9 @@ Everything in here imports tkinter.
   it is not in front, unless the setting keeps it up through an alt-tab -
   sized from the game window's height and parked in the corner picked under
   EDMC Settings (`rhinospotter_minimap_enabled`, `rhinospotter_minimap_keep`,
-  `rhinospotter_minimap_corner`).
+  `rhinospotter_minimap_corner`). The tab it draws is the whole plugin's, not
+  the map's: `rhinospotter_low_value` and `low_value_shown()` are a materials
+  setting that lives here because this is the file with the tab in it.
   Built once, hidden, and made click-through and no-activate before it is
   first shown; then shown, moved and hidden with Win32 calls that do not take
   the foreground, because it comes up mid-game on its own. A draw that raises

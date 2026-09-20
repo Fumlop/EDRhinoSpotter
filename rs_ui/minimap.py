@@ -46,6 +46,9 @@ FREE_KEY = "rhinospotter_minimap_free"
 POS_KEY = "rhinospotter_minimap_pos"
 ZOOM_KEY = "rhinospotter_minimap_zoom"
 SRV_KEY = "rhinospotter_srv_type"
+# Whether the material lists carry the cheap half. Not a minimap setting - it
+# lives here because this is the file that draws the settings tab.
+LOW_VALUE_KEY = "rhinospotter_low_value"
 # Only the Rhino has the mining scanner the painted area stands for.
 RHINO = "mev_rhino"
 CORNERS = ("top left", "top right", "bottom left", "bottom right")
@@ -104,6 +107,7 @@ _corner = None           # tk.StringVar on the settings tab
 _keep = None             # tk.BooleanVar on the settings tab
 _hotkeys = {}            # hotkey id -> (modifier StringVar, key StringVar) on the settings tab
 _free = None             # tk.BooleanVar on the settings tab
+_low_value = None        # tk.BooleanVar on the settings tab
 _placing = False         # in place-the-map mode: click-through off, drag to move
 _grab = None             # (pointer x, pointer y, window x, window y) while dragging
 
@@ -129,6 +133,16 @@ def corner():
 def free_move():
     """Whether the map sits where it was dragged instead of in a corner."""
     return config.get_bool(FREE_KEY, default=False) if config is not None else False
+
+
+def low_value_shown():
+    """Whether the material lists offer the ones under grounds.HIGH_VALUE_MIN.
+
+    Off by default: a short list of materials worth flying to beats one where
+    copper and water sit between alexandrite and diamond. On, so a deposit that
+    pays badly but is under the ship can still be marked.
+    """
+    return config.get_bool(LOW_VALUE_KEY, default=False) if config is not None else False
 
 
 def offset():
@@ -588,12 +602,13 @@ def stop():
 def prefs(parent):
     """The settings tab: the map on or off, whether it stays up through an
     alt-tab, and which corner it sits in."""
-    global _enabled, _corner, _keep, _free
+    global _enabled, _corner, _keep, _free, _low_value
     frame = nb.Frame(parent)
     _enabled = tk.BooleanVar(value=enabled())
     _corner = tk.StringVar(value=corner())
     _keep = tk.BooleanVar(value=keep_up())
     _free = tk.BooleanVar(value=free_move())
+    _low_value = tk.BooleanVar(value=low_value_shown())
     nb.Checkbutton(frame, text="Minimap in the Rhino - off: not shown, nothing recorded",
                    variable=_enabled).grid(row=0, column=0, columnspan=2,
                                            sticky="w", padx=10, pady=(10, 2))
@@ -626,11 +641,21 @@ def prefs(parent):
         row=7, column=0, sticky="w", padx=10, pady=(2, 10))
     result.grid(row=7, column=1, sticky="w", padx=10, pady=(2, 10))
 
+    # What the Material dropdown and the picker in RhinoData offer. Off, the
+    # cheap half is left out of both and out of the rates line under a body -
+    # never out of a bookmark that already names one.
+    nb.Label(frame, text="Materials").grid(row=8, column=0, sticky="w", padx=10, pady=(6, 2))
+    nb.Checkbutton(frame, text="Offer the low value ones too - under "
+                               f"{grounds.HIGH_VALUE_MIN // 1000}k Cr a tonne at "
+                               "their best ground",
+                   variable=_low_value).grid(row=9, column=0, columnspan=2,
+                                             sticky="w", padx=10, pady=(2, 10))
+
     # The hotkeys: a modifier set and a key each. Taken on OK and registered
     # again at once; the rows under the map name them from the next frame.
-    nb.Label(frame, text="Hotkeys").grid(row=8, column=0, sticky="w", padx=10, pady=(6, 2))
+    nb.Label(frame, text="Hotkeys").grid(row=10, column=0, sticky="w", padx=10, pady=(6, 2))
     _hotkeys.clear()
-    for row, (key_id, name, _, _) in enumerate(hotkey.ACTIONS, start=9):
+    for row, (key_id, name, _, _) in enumerate(hotkey.ACTIONS, start=11):
         mods, key = hotkey.label(key_id).rsplit("+", 1)
         mod_var, key_var = tk.StringVar(value=mods), tk.StringVar(value=key)
         _hotkeys[key_id] = (mod_var, key_var)
@@ -779,6 +804,8 @@ def prefs_changed():
             config.set(KEEP_KEY, bool(_keep.get()))
         if _free is not None:
             config.set(FREE_KEY, bool(_free.get()))
+        if _low_value is not None:
+            config.set(LOW_VALUE_KEY, bool(_low_value.get()))
         changed = False
         for key_id, _, _, config_key in hotkey.ACTIONS:
             if key_id not in _hotkeys:

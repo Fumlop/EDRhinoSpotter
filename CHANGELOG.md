@@ -1,5 +1,23 @@
 # Changelog
 
+## 5.2.0
+
+**Added**
+
+- **Offer the low value ones too**, on the settings tab. Off by default: the Material dropdown, the picker in RhinoData and the rates line under a body carry only materials worth 50k Cr a tonne or more at their best ground - 18 of them. On, all 38. The switch never touches a bookmark that already names a cheap material, its card, or its code on the minimap; it decides what can be picked, not what was.
+- Picking a bookmark draws the saved map it lies on over its card, above the buttons: the ground driven around it with every bookmark of the body on it, no title and no legend. Of the maps that reach the bookmark it is the one whose centre is nearest - the same tie the Mapped tab counts with. A bookmark on no saved map leaves the card as it was.
+
+**Fixed**
+
+- Bromellite had no price and so no code on the minimap: its dots were the only unlabelled ones. No mining location read so far has carried it, so the sheet has no rows to take a median from; its galaxy-wide average sell price, 33,396 Cr, stands in until one does. That puts it in the low value half.
+- Palladium was missing from the Material dropdown. It pays 53k and could not be bookmarked at all. The list is now every material the mining sheet prices plus bromellite, which is minable and has no rows yet, instead of a short list kept by hand beside it.
+
+**Changed**
+
+- Deuterium, jadeite, magnesite, olivine, osmium and quartz pyroxenite were in the dropdown and are under 50k, so they are hidden until the new switch is on - unless you already have a bookmark naming one, or are mining it right now. Both stay pickable whatever they pay: a second mark is matched to the first on the material's name, so a name the dropdown cannot produce is a bookmark that can never be refreshed, only duplicated.
+- Long names are shortened where a column cannot hold them: Methanol Monohydrate Crystals reads Monohydrate. Low Temp Diamonds now abbreviates to LTD as it always said it would - the short-name table knew two older spellings of it and not the one in use.
+- A ground whose every material is under the line says so, instead of "nothing measured on this ground yet", which was a measured ground calling itself unmeasured.
+
 ## 5.1.1
 
 **Added**

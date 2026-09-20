@@ -106,7 +106,46 @@ class TestSheet:
         codes = grounds.Sheet(str(path)).codes()
         assert codes["thortveitite"] == "T"
         assert len(set(codes.values())) == len(codes)
-        assert codes == {"thortveitite": "T", "thorium": "TH", "titanium": "TI", "tritium": "TR"}
+        # Not the whole dict: UNSHEETED materials are priced whatever the sheet
+        # holds, so every reading carries them too.
+        assert {name: codes[name] for name in ("thortveitite", "thorium", "titanium", "tritium")}             == {"thortveitite": "T", "thorium": "TH", "titanium": "TI", "tritium": "TR"}
+
+    def test_worth_drops_what_pays_under_the_line(self, sheet):
+        """Olivine sits exactly on it and stays: the line is "worth the trip",
+        not "worth more than the trip"."""
+        assert sheet.worth(["Monazite", "Olivine", "Magnesite", "Tiny"])             == ("Monazite", "Olivine")
+
+    def test_worth_keeps_the_order_it_was_given(self, sheet):
+        assert sheet.worth(["Olivine", "Monazite"]) == ("Olivine", "Monazite")
+
+    def test_worth_keeps_what_nothing_prices(self, sheet):
+        """Neither a row nor an UNSHEETED stand-in. Hiding it would be a claim
+        about a price nobody has measured."""
+        assert sheet.worth(["Nothing"]) == ("Nothing",)
+
+    def test_an_unsheeted_price_stands_in_and_is_judged(self, sheet):
+        """Bromellite has no rows on any ground, so its market average is what
+        values() carries - and 33k is under the line like any other 33k."""
+        assert sheet.values()["bromellite"] == grounds.UNSHEETED["bromellite"]
+        assert sheet.worth(["Bromellite"]) == ()
+
+    def test_a_measured_row_beats_the_stand_in(self, tmp_path, monkeypatch):
+        import json
+        monkeypatch.setitem(grounds.UNSHEETED, "olivine", 1)
+        path = tmp_path / "mining_sheet.json"
+        path.write_text(json.dumps({"grounds": {"rock 80%+ [none]": [
+            {"material": "Olivine", "pct": 50.0, "median": 60000, "best": 90000},
+        ]}}), encoding="utf-8")
+        assert grounds.Sheet(str(path)).values()["olivine"] == 60000
+
+    def test_worth_takes_its_own_line(self, sheet):
+        assert sheet.worth(["Magnesite"], minimum=40000) == ("Magnesite",)
+
+    def test_worth_without_a_sheet_drops_nothing(self, empty_sheet):
+        """No file, no prices, no filtering - not even the UNSHEETED stand-in.
+        One price in an empty table would hide bromellite and offer copper,
+        which is the filter backwards."""
+        assert empty_sheet.worth(["Copper", "Water", "Bromellite"])             == ("Copper", "Water", "Bromellite")
 
     def test_every_shipped_material_has_its_own_code(self):
         codes = grounds.Sheet().codes()

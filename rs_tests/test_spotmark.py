@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from rs_core import spotmark
+from rs_core import grounds, spotmark
 
 
 class TestRefinedMaterial:
@@ -188,3 +188,24 @@ class TestBodyHere:
 
     def test_empty_status(self):
         assert spotmark.body_here({}) is None
+
+
+class TestMaterialList:
+    """The dropdown's names against the sheet's. A material the sheet prices
+    but the list does not carry cannot be bookmarked at all - palladium pays
+    53k and was missing from the hand-kept short list this replaced."""
+
+    def test_every_priced_material_is_offered(self):
+        priced = set(grounds.Sheet().values())
+        offered = {name.lower() for name in spotmark.MATERIALS}
+        assert not priced - offered
+
+    def test_the_list_is_sorted_and_has_no_repeats(self):
+        assert list(spotmark.MATERIALS) == sorted(set(spotmark.MATERIALS))
+
+    def test_the_high_value_half_is_what_the_panel_shows_by_default(self):
+        kept = grounds.Sheet().worth(spotmark.MATERIALS)
+        assert "Palladium" in kept
+        assert "Copper" not in kept and "Gold" not in kept
+        # No rows anywhere, so its market average decides it like any price.
+        assert "Bromellite" not in kept

@@ -19,15 +19,23 @@ from datetime import datetime, timezone
 # install is EDMC's answer, not a guess here. See rs_core/paths.
 STATUS_PATH = os.path.join(paths.journal_dir(), "Status.json")
 
-# The sheet's 22 materials plus bromellite, which is minable on ice and simply
-# has no rows yet. Hardcoded rather than read off the sheet, so the dropdown
-# fills even when mining_sheet.json is missing.
+# Every material the sheet has rows for, plus bromellite, which is minable on
+# ice and simply has no rows yet. Hardcoded rather than read off the sheet, so
+# the dropdown fills even when mining_sheet.json is missing.
+#
+# The whole list, cheap half included: what the panel offers is this run
+# through Sheet.worth(), and the settings tab decides whether that filter is
+# applied. Palladium pays 53k and was missing from the short list this used to
+# be, which is the bug that made the list the sheet's rather than a copy of it.
 MATERIALS = (
-    "Alexandrite", "Bastnasite", "Bromellite", "Deuterium", "Diamond",
-    "Grandidierite", "Helium", "Helium-3", "Iridium", "Jadeite",
-    "Low Temp Diamonds", "Magnesite", "Monazite", "Olivine", "Osmium",
-    "Periclase Dunite", "Platinum", "Quartz Pyroxenite", "Rhodplumsite",
-    "Ruby", "Sapphire", "Serendibite", "Thortveitite", "Tritium",
+    "Alexandrite", "Bastnasite", "Bromellite", "Copper", "Deuterium",
+    "Diamond", "Gold", "Grandidierite", "Haematite", "Helium", "Helium-3",
+    "Iridium", "Jadeite", "Lithium", "Low Temp Diamonds", "Magnesite",
+    "Methanol Monohydrate Crystals", "Monazite", "Olivine", "Osmium",
+    "Palladium", "Periclase Dunite", "Platinum", "Quartz Pyroxenite",
+    "Rhodplumsite", "Ruby", "Samarium", "Sapphire", "Serendibite", "Silver",
+    "Tantalum", "Thorium", "Thortveitite", "Titanium", "Tritium",
+    "Uraninite", "Uranium", "Water",
 )
 
 

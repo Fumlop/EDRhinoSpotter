@@ -64,6 +64,8 @@ _material = None         # tk.StringVar - the material this spot is mined for
 _density = None          # tk.StringVar - the deposit's HUD Density, or NOT_READ
 _amount = None           # tk.StringVar - the deposit's HUD Amount, or NOT_READ
 _search = None           # tk.StringVar - bookmark search text, not used yet
+_menu = None             # the Material OptionMenu, refilled when the settings change
+_offered = None          # (key, materials) - see _materials
 SEARCH_SHOWN = False     # the Search row under Bookmark, off until search works
 # Density and Amount before anything is picked. Not required: a bookmark without
 # them is still a bookmark, it just cannot say how many tons are left.
@@ -86,7 +88,7 @@ def start(plugin_dir):
 
 def build(parent):
     global _frame, _status, _scan_count, _card_button, _landed_after, _hint
-    global _loc, _rigs, _material, _density, _amount, _search
+    global _loc, _rigs, _material, _density, _amount, _search, _menu
 
     _frame = tk.Frame(parent)
     _frame.columnconfigure(1, weight=1)
@@ -117,7 +119,7 @@ def build(parent):
     _material = tk.StringVar(value=NO_MATERIAL)
     tk.Label(_frame, text="Material", anchor="w").grid(row=2, column=0, sticky="w", padx=2)
     _menu = tk.OptionMenu(_frame, _material, NO_MATERIAL, ALL_MATERIALS,
-                          *spotmark.MATERIALS)
+                          *_materials())
     _style_menu(_menu)
     _menu.grid(row=2, column=1, columnspan=3, sticky="we", padx=2)
 
@@ -246,7 +248,7 @@ def open_scan():
     try:
         scan.show(_frame.winfo_toplevel(), _register, _sheet, _focus(),
                   variable=_material,
-                  materials=(ALL_MATERIALS,) + tuple(spotmark.MATERIALS),
+                  materials=(ALL_MATERIALS,) + _materials(),
                   here=spotmark.body_here(spotmark.read_status()))
     except Exception as err:                       # a broken window must not
         logger.exception("RhinoData failed")       # take the card flow with it
@@ -343,12 +345,67 @@ def stop():
     database.backup()
 
 
+def _materials():
+    """What the Material dropdown and the RhinoData picker offer.
+
+    The whole list when the settings tab says so. Otherwise the ones worth the
+    trip - grounds.HIGH_VALUE_MIN - plus two kinds of exception that have to
+    stay pickable however little they pay:
+
+      every material already bookmarked, because cards.nearby() matches a
+      second mark to the first one on the material's name. Drop the name and
+      that bookmark can never be marked again: the re-mark lands beside it as
+      a duplicate instead of refreshing its Amount and Density.
+
+      whatever is in the box right now, because _prefill_material puts one
+      there when it is being mined, and a value the menu has no entry behind
+      cannot be chosen again once it is left.
+
+    Kept until the bookmarks change, the switch moves or the box does: this
+    reads the database, and the scan window asks on every redraw.
+    """
+    global _offered
+    current = _material.get() if _material is not None else ""
+    key = (minimap.low_value_shown(), database.revision(), current)
+    if _offered is not None and _offered[0] == key:
+        return _offered[1]
+    if key[0]:
+        names = tuple(spotmark.MATERIALS)
+    else:
+        kept = set(_sheet.worth(spotmark.MATERIALS))
+        marked = cards.materials_marked()
+        names = tuple(name for name in spotmark.MATERIALS
+                      if name in kept or name.lower() in marked or name == current)
+    _offered = (key, names)
+    return names
+
+
+def _fill_menu():
+    """Put _materials() in the dropdown, in place.
+
+    Nothing is reset here. _materials() already carries whatever is in the box,
+    so the pick survives a change of the switch rather than being thrown back
+    to All by a settings dialog opened for some unrelated reason.
+    """
+    if _menu is None:
+        return
+    inner = _menu["menu"]
+    inner.delete(0, "end")
+    for name in (NO_MATERIAL, ALL_MATERIALS) + _materials():
+        inner.add_command(label=name, command=lambda pick=name: _material.set(pick))
+
+
 def prefs(parent):
     return minimap.prefs(parent)
 
 
 def prefs_changed():
     minimap.prefs_changed()
+    # The switch may have taken materials out of the list or put them back, and
+    # _on_material_changed only fires when the picked one moves.
+    _fill_menu()
+    if _frame is not None and scan.is_open():
+        _frame.after_idle(open_scan)
 
 
 def _focus():
@@ -423,6 +480,9 @@ def _prefill_material(entry):
     if spotmark.on_ground(spotmark.read_status()):
         _prefilled = refined
         _material.set(refined)
+        # The filter may not carry what was just mined. _materials() lets the
+        # box through, so the dropdown has to be built again to hold it.
+        _fill_menu()
 
 
 def _add_spansh(system, address, answer):

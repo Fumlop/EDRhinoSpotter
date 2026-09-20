@@ -28,6 +28,28 @@ SAME_SPOT_M = 100.0
 _warned = set()
 
 
+def materials_marked(db=None):
+    """Every material the commander has a bookmark for, lowercased.
+
+    One indexed column, no JSON to parse. The panel asks this when it fills its
+    dropdown: a material somebody has already stood on stays pickable whatever
+    it pays, because nearby() matches a second mark to the first one on the
+    name. Drop the name from the dropdown and that bookmark can never be marked
+    again - the re-mark lands beside it as a duplicate instead of updating it.
+
+    A database that cannot be read is logged and empty: the filter then does
+    what it would have done on its own.
+    """
+    try:
+        with database.connect(db) as conn:
+            rows = conn.execute("SELECT DISTINCT commodity FROM bookmarks "
+                                "WHERE commodity IS NOT NULL").fetchall()
+    except (sqlite3.Error, OSError) as err:
+        logger.warning(f"could not read which materials are bookmarked: {err}")
+        return set()
+    return {name.lower() for name, in rows if name}
+
+
 def for_system(system, db=None, quiet=True):
     """Every bookmark marked in that system, in the order they were made.
 

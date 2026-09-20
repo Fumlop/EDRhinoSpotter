@@ -68,6 +68,24 @@ LEGACY = {
 MAGMA = 'rock 80%+ [magma]'
 MAGMA_SPLIT = ('rock 80%+ [metallic magma]', 'rock 80%+ [rocky magma]')
 
+# What a material is worth when the sheet has no rows for it. Bromellite is
+# minable on ice and no mining location read so far has carried it, so it had
+# no price at all: no code on the minimap, and worth() had to keep it on the
+# "unpriced is not cheap" rule rather than judge it.
+#
+# 33,396 Cr is its galaxy-wide average sell price. The sheet's column is a
+# median per ground and this is an average across markets - not the same
+# statistic, and the nearest one that exists for a material with no locations.
+# Its 116,750 best market is the analogue of the sheet's `best` column, which
+# nothing ranks on.
+UNSHEETED = {'bromellite': 33396}
+
+# Where "low value" starts, in credits a tonne. Measured against values() - the
+# median price, best across grounds - so a material is judged on the best ground
+# it has, not on the one under the ship. Sheet.worth() drops everything below it
+# unless the settings tab asks for the cheap half back.
+HIGH_VALUE_MIN = 50000
+
 
 def canonical(ground):
     """A ground key as this version names it, whichever version wrote it."""
@@ -237,15 +255,33 @@ class Sheet:
         across grounds, 0 for one the sheet carries unpriced.
 
         The one ranking of materials by value in the plugin: codes() hands out
-        its letters by it, and the minimap joins a bookmark to the next
-        material down by it. Two callers, one definition of "worth more".
+        its letters by it, worth() draws the low-value line at it, and the
+        minimap joins a bookmark to the next material down by it. Three
+        callers, one definition of "worth more".
+
+        UNSHEETED fills in for a material the sheet has no rows for, and loses
+        to any row the sheet does have: a measurement beats a stand-in. Only
+        with a sheet in hand - a stand-in as the single price in an empty
+        table would make bromellite the one material worth hiding.
         """
-        price = {}
+        price = dict(UNSHEETED) if self.loaded else {}
         for rows in self.grounds.values():
             for row in rows:
                 name = row['material'].lower()
                 price[name] = max(price.get(name, 0), row.get('median') or 0)
         return price
+
+    def worth(self, materials, minimum=HIGH_VALUE_MIN):
+        """`materials` with the cheap ones dropped, order kept.
+
+        Unpriced is not cheap. A material the sheet carries without a median
+        stays in rather than being hidden on a price nobody has measured. An
+        unloaded sheet prices nothing, so nothing is dropped.
+        """
+        price = self.values()
+        return tuple(name for name in materials
+                     if not price.get((name or '').lower(), 0)
+                     or price[name.lower()] >= minimum)
 
     def materials(self, ground, limit=None, minimum=0.0):
         """What that ground has been found to hold, likeliest first.

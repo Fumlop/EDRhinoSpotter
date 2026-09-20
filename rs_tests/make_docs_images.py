@@ -97,10 +97,26 @@ def plant_maps(body):
     for name, lat, lon, location in (("map 1", 12.345678, -98.765432, None),
                                      ("map 2", 12.401233, -98.712001, 9),
                                      ("map 3", 12.910000, -98.100000, None)):
-        data = coverage.Coverage(body, lat, lon, RADIUS_4A).to_dict()
+        cover = coverage.Coverage(body, lat, lon, RADIUS_4A)
+        _drive(cover, lat, lon)
+        data = cover.to_dict()
         data["location"] = location
         coverstore.save(body, name, data)
         coverstore.save_png(body, name, Image.new("RGB", (8, 8)))
+
+
+# How far a planted drive wanders, in degrees of the invented body. A map with
+# no points on it draws as an empty square, which is not what the picture over
+# the bookmark card looks like to anyone who has actually been somewhere.
+DRIVE_STEP = 0.05
+
+
+def _drive(cover, lat, lon):
+    """A few minutes of SRV, so the planted map has ground on it."""
+    for step, (dlat, dlon) in enumerate(((0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, 0))):
+        for n in range(6):
+            cover.add(lat + dlat * DRIVE_STEP * (step + n) / 3.0,
+                      lon + dlon * DRIVE_STEP * (step + n) / 3.0)
 
 
 def settle(window, ticks=40):

@@ -445,3 +445,35 @@ class TestSameBody:
         new = cards.updated({"system_address": 111, "body_id": 3},
                             {"system_address": None, "body_id": None})
         assert new["system_address"] == 111 and new["body_id"] == 3
+
+
+class TestMaterialsMarked:
+    """Which materials the commander has stood on. The Material dropdown keeps
+    every one of them pickable whatever it pays, or the bookmark naming it can
+    never be marked again - see rs_ui/main._materials."""
+
+    def test_one_entry_a_material_lowercased(self):
+        for material in ("Osmium", "osmium", "Monazite"):
+            spotcard.save({"system": "Andel", "planet_name": "Andel 1 a",
+                           "commodity": material, "latitude": 10.0, "longitude": 20.0})
+        assert cards.materials_marked() == {"osmium", "monazite"}
+
+    def test_across_systems_and_bodies(self):
+        spotcard.save({"system": "Andel", "planet_name": "Andel 1 a",
+                       "commodity": "Gold", "latitude": 1.0, "longitude": 2.0})
+        spotcard.save({"system": "Eme", "planet_name": "Eme A 1 b",
+                       "commodity": "Water", "latitude": 3.0, "longitude": 4.0})
+        assert cards.materials_marked() == {"gold", "water"}
+
+    def test_nothing_bookmarked_is_empty(self):
+        assert cards.materials_marked() == set()
+
+    def test_an_unreadable_database_is_empty_not_a_raise(self, monkeypatch):
+        """The filter then does what it would have done on its own, rather
+        than taking the panel down with it."""
+        monkeypatch.setattr(database, "connect", _raise)
+        assert cards.materials_marked() == set()
+
+
+def _raise(*args, **kwargs):
+    raise sqlite3.OperationalError("disk I/O error")

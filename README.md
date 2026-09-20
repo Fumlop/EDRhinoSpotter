@@ -29,8 +29,11 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
   type, each with its distance, how many mining locations it has and how many
   bookmarks you carry on it. Picking one fills the middle and the card.
 - Over the body: the share of that ground's mining locations that carried each
-  material and the median price it sells for. Green is a material this body
-  already has a bookmark for.
+  material and the median price it sells for - the best three you can pick, so
+  the low value switch below decides what it names. Green is a material this
+  body already has a bookmark for.
+- Picking a bookmark draws the saved map it lies on over its card: the ground
+  driven around it, every bookmark of the body on it, no legend.
 - **Bodies:** honk, and Spansh is asked for the system's known bodies, until
   your own FSS scan or fly-by replaces them. The line
   under the buttons says when to FSS instead: a new system, no Spansh bodies,
@@ -42,6 +45,7 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
   `unprobed` = nobody counted the locations yet.
 - **Material** dropdown: pick one and only grounds that ever carried it are
   listed, with its rate first. Bookmark counts then count only that material.
+  Which materials it offers depends on the low value switch under Settings.
 
 <p align="center">
   <img src="docs/rhinoscan-filtered.png?v=5.0.0" width="620"
@@ -161,8 +165,8 @@ Solid joins a material to itself, dotted steps down to the next.</em></p>
 EDMC Settings, RhinoSpotter tab:
 
 <p align="center">
-  <img src="docs/settings.png?v=5.1.0" width="480"
-       alt="The RhinoSpotter settings tab: minimap switches, corner, Free move, saved maps and the hotkey rows">
+  <img src="docs/settings.png?v=5.2.0" width="480"
+       alt="The RhinoSpotter settings tab: minimap switches, corner, Free move, saved maps, the low value materials switch and the hotkey rows">
 </p>
 
 - Minimap on/off, whether it stays up when you alt-tab out of the game, and
@@ -174,6 +178,11 @@ EDMC Settings, RhinoSpotter tab:
 - Saved maps count and size, **Open folder** for the map pictures.
 - **Delete migrated JSON** - after upgrading to 4.2, removes the old JSON files
   the database already holds.
+- **Offer the low value ones too** - off, the Material dropdown, the RhinoData
+  picker and the rates line carry only materials worth 50,000 Cr a tonne or
+  more at their best ground. On, all 38. Off is the default; a material you
+  already have a bookmark for, or one you are mining right now, stays pickable
+  either way.
 - **Hotkeys** - a modifier set (Ctrl+Alt, Ctrl+Shift, Alt+Shift, Ctrl+Alt+Shift)
   and a key (A-Z, 0-9, F1-F12) for each of the four. The keys named in this
   README are the defaults; the rows under the minimap show the ones in use.
