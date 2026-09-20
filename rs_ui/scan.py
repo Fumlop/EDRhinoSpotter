@@ -1538,7 +1538,9 @@ def _drawn_now(body, group, maps):
         sheet = _scan[1] if _scan else None
         marks, golden = _map_marks(cover, system, body, sheet)
         title, legend = minimap.picture_text(cover, system)
-        image = coverage.picture(cover.mask, marks, title, legend, cover.border_m, golden)
+        ground = _scan[0].ground(system, body) if _scan and _scan[0] else None
+        image = coverage.picture(cover.mask, marks, title, legend, cover.border_m, golden,
+                                 ground)
     except Exception:
         logger.exception(f"scan: could not draw {name} on {body}")
         return None
@@ -1579,8 +1581,8 @@ def _map_marks(cover, system, body, sheet):
         marks.append((*cover.xy(lat, lon), codes.get(material),
                       bool(record.get("depleted_at")), values.get(material, 0),
                       record.get("rigs")))
-    golden = coverage.golden_groups([(x, y, rigs) for x, y, _, spent, _, rigs in marks
-                                     if not spent])
+    spots = [(x, y, rigs, value or 0) for x, y, _, spent, value, rigs in marks if not spent]
+    golden = coverage.golden_best(coverage.golden_groups(spots), spots)
     return marks, golden
 
 

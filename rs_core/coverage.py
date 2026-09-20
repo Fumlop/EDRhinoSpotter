@@ -459,7 +459,7 @@ def mapped_locations(found, body, records=()):
 PICTURE_SIDE = int(round(MASK_PX * VIEW_M / REACH_M))
 
 
-def picture(mask, marks=(), title=(), legend=(), border_m=None, golden=()):
+def picture(mask, marks=(), title=(), legend=(), border_m=None, golden=(), ground=None):
     """The whole map as a PIL image, north up, bookmarks on it.
 
     Takes a copy of the mask and the bookmarks (metres) rather than the
@@ -467,10 +467,13 @@ def picture(mask, marks=(), title=(), legend=(), border_m=None, golden=()):
 
     `title` is lines of text above the map, the first one larger; `legend` is
     (code, text) or (code, text, depleted) rows below it, one per bookmark. Both optional - without them
-    the picture is the bare map. `golden` is golden_groups() output, circled in gold.
+    the picture is the bare map. `golden` is golden_best() output, circled in
+    gold and labelled with its credits. `ground` is the body's ground key,
+    drawn under the painted area as on the live map; None is the plain
+    background.
     """
     # No rings: the ground and the bookmarks are what the picture is kept for.
-    image = _draw_layer(mask, PICTURE_SIDE, border_m=border_m, drive=False)
+    image = _draw_layer(mask, PICTURE_SIDE, border_m=border_m, drive=False, ground=ground)
     scale = image.width / (2 * REACH_M)
     _golden(image, golden, scale, PICTURE_SIDE)
     _bookmarks(image, [(image.width / 2 + mx * scale, image.height / 2 - my * scale, *rest)

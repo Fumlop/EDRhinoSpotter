@@ -483,11 +483,12 @@ def _docked(system):
     golden = coverage.golden_best(coverage.golden_groups(spots), spots)
     title, legend = picture_text(_coverage, system)
     border_m = _coverage.border_m
+    ground = _coverage.ground
 
     def draw():
         try:
             coverstore.save_png(body, name, coverage.picture(mask, marks, title, legend, border_m,
-                                                             golden))
+                                                             golden, ground))
         except Exception:
             logger.exception(f"minimap: could not draw the picture of {name} on {body}")
 
