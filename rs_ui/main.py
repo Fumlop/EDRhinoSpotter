@@ -49,9 +49,10 @@ _scan_count = None       # how many landable bodies the current system has
 # an empty one: an OptionMenu with "" in it draws as a blank sunken box with a
 # marker floating in it, which reads as a broken text field.
 NO_MATERIAL = "select material"
-# Picking one filters the scan window to the grounds that carry it. "All" is
-# how you get back, and it sits directly under the placeholder rather than in
-# the alphabet with the materials - it is not one of them.
+# The RhinoData picker's "everything" entry. Only that picker offers it: the
+# panel's Material box names one deposit, and "All" is not a material to name
+# it after. make_card and _prefill_material still test for it, because a
+# session that ran an older version can have it in the box.
 ALL_MATERIALS = "All"
 
 _card_button = None      # Bookmark, until there is an update to install
@@ -60,7 +61,8 @@ _poll_error = None       # the last failure the poll logged, so it logs each kin
 _update_after = None     # the pending hourly look for a new release
 _loc = None              # tk.StringVar - mining location index
 _rigs = None             # tk.StringVar - rigs on the patch
-_material = None         # tk.StringVar - the material this spot is mined for
+_material = None         # tk.StringVar - the material a new bookmark is named after
+_filter = None           # tk.StringVar - the material RhinoData filters to
 _density = None          # tk.StringVar - the deposit's HUD Density, or NOT_READ
 _amount = None           # tk.StringVar - the deposit's HUD Amount, or NOT_READ
 _search = None           # tk.StringVar - bookmark search text, not used yet
@@ -88,7 +90,7 @@ def start(plugin_dir):
 
 def build(parent):
     global _frame, _status, _scan_count, _card_button, _landed_after, _hint
-    global _loc, _rigs, _material, _density, _amount, _search, _menu
+    global _loc, _rigs, _material, _density, _amount, _search, _menu, _filter
 
     _frame = tk.Frame(parent)
     _frame.columnconfigure(1, weight=1)
@@ -117,9 +119,13 @@ def build(parent):
         row=1, column=3, sticky="w", padx=2)
 
     _material = tk.StringVar(value=NO_MATERIAL)
+    # The window's filter, not the panel's material. Separate variables: naming
+    # the deposit under the ship and narrowing the system list are two
+    # questions, and one control answering both meant mining gold refiltered
+    # RhinoData to gold.
+    _filter = tk.StringVar(value=ALL_MATERIALS)
     tk.Label(_frame, text="Material", anchor="w").grid(row=2, column=0, sticky="w", padx=2)
-    _menu = tk.OptionMenu(_frame, _material, NO_MATERIAL, ALL_MATERIALS,
-                          *_materials())
+    _menu = tk.OptionMenu(_frame, _material, NO_MATERIAL, *_materials())
     _style_menu(_menu)
     _menu.grid(row=2, column=1, columnspan=3, sticky="we", padx=2)
 
@@ -172,9 +178,9 @@ def build(parent):
     # Test mode fills the register before the panel exists, and EDMC may also
     # start mid-session with a system already tracked. Either way the count
     # beside RhinoData has to say so without waiting for the next journal line.
-    # One watcher for the whole session. The picker in the scan window writes
-    # to this same variable, so this fires for either of them.
-    _material.trace_add("write", _on_material_changed)
+    # One watcher for the whole session, on the filter only. The picker in the
+    # scan window is the only other control that writes it.
+    _filter.trace_add("write", _on_filter_changed)
 
     # Bookmark starts out grey and the poll turns it on, rather than the other
     # way round: EDMC usually starts while the commander is docked. Cancel
@@ -238,16 +244,16 @@ def open_scan():
 
     Only on the first open: a window already up is redrawn where it stands.
 
-    The window gets the panel's own material variable, not a copy of its
-    value: the picker it draws under the system name writes straight back
-    here, so the two can never disagree about what is being shown.
+    The window gets `_filter`, not `_material`: the picker it draws under the
+    system name writes the filter, and the panel's Material box goes on saying
+    what the next bookmark is called.
     """
     if not _frame:
         return
     logger.debug(f"open_scan: focus={_focus()!r}")
     try:
         scan.show(_frame.winfo_toplevel(), _register, _sheet, _focus(),
-                  variable=_material,
+                  variable=_filter,
                   materials=(ALL_MATERIALS,) + _materials(),
                   here=spotmark.body_here(spotmark.read_status()))
     except Exception as err:                       # a broken window must not
@@ -255,19 +261,18 @@ def open_scan():
         _set_status(f"no scan window: {err}")
 
 
-def _on_material_changed(*_):
-    """Redraw the scan window for the material that was just picked.
+def _on_filter_changed(*_):
+    """Redraw the scan window for the material the filter was just set to.
 
-    One watcher, added once when the panel is built. The filter changes which
-    groups exist and how tall the window is, so the view is drawn again rather
-    than updated in place - it is a dozen labels.
+    The filter changes which groups exist and how tall the window is, so the
+    view is drawn again rather than updated in place - it is a dozen labels.
 
     Deferred by one idle tick: the write happens while the menu that caused it
-    is still on screen, and taking that menu's parent apart from underneath it
-    is how Tk is told to destroy a widget in the middle of using it.
+    is still on screen, and destroying that menu's parent from under it is
+    what Tk refuses.
     """
     open_now = bool(_frame) and scan.is_open()
-    logger.debug(f"material changed to {_material.get()!r}, "
+    logger.debug(f"filter changed to {_filter.get()!r}, "
                  f"scan open={open_now} - {'redrawing' if open_now else 'nothing to do'}")
     if open_now:
         _frame.after_idle(open_scan)
@@ -354,16 +359,16 @@ def _materials():
       that bookmark can never be marked again: the re-mark lands beside it as
       a duplicate instead of refreshing its Amount and Density.
 
-      whatever is in the box right now, because _prefill_material puts one
-      there when it is being mined, and a value the menu has no entry behind
-      cannot be chosen again once it is left.
+      whatever either control holds right now - _prefill_material puts a
+      material in the box when it is being mined, and a value with no menu
+      entry behind it cannot be chosen again once it is left.
 
-    Kept until the bookmarks change, the switch moves or the box does: this
-    reads the database, and the scan window asks on every redraw.
+    Kept until the bookmarks change, the switch moves or either control does:
+    this reads the database, and the scan window asks on every redraw.
     """
     global _offered
-    current = _material.get() if _material is not None else ""
-    key = (minimap.low_value_shown(), database.revision(), current)
+    held = tuple(var.get() for var in (_material, _filter) if var is not None)
+    key = (minimap.low_value_shown(), database.revision(), held)
     if _offered is not None and _offered[0] == key:
         return _offered[1]
     if key[0]:
@@ -372,7 +377,7 @@ def _materials():
         kept = set(_sheet.worth(spotmark.MATERIALS))
         marked = cards.materials_marked()
         names = tuple(name for name in spotmark.MATERIALS
-                      if name in kept or name.lower() in marked or name == current)
+                      if name in kept or name.lower() in marked or name in held)
     _offered = (key, names)
     return names
 
@@ -388,7 +393,7 @@ def _fill_menu():
         return
     inner = _menu["menu"]
     inner.delete(0, "end")
-    for name in (NO_MATERIAL, ALL_MATERIALS) + _materials():
+    for name in (NO_MATERIAL,) + _materials():
         inner.add_command(label=name, command=lambda pick=name: _material.set(pick))
 
 
@@ -406,8 +411,8 @@ def prefs_changed():
 
 
 def _focus():
-    """The material the window should filter to, or None for everything."""
-    chosen = _material.get() if _material else ""
+    """The material RhinoData filters to, or None for everything."""
+    chosen = _filter.get() if _filter else ""
     return None if chosen in ("", NO_MATERIAL, ALL_MATERIALS) else chosen
 
 

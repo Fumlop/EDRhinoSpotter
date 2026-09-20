@@ -123,9 +123,9 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
     even when the material filter would drop its ground: the body under the
     ship is the one thing on screen that is not a choice.
 
-    `variable` is the panel's own material StringVar, not a copy. The picker in
-    the rail writes to it, so choosing here is the same act as choosing down in
-    the panel and the two can never disagree.
+    `variable` is the panel's filter StringVar, not a copy, so the picker in
+    the rail and `focus` can never disagree. It is not the panel's Material
+    box: that one names the next bookmark and is left alone.
     """
     global _window, _scan
 

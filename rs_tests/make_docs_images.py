@@ -235,9 +235,9 @@ def main_images():
     cards.by_body = lambda system: {f"{SYSTEM} 4 a": bookmarks(f"{SYSTEM} 4 a", None)}
     picker = ("All",) + tuple(("Alexandrite", "Jadeite", "Monazite", "Olivine"))
     for focus, name in ((None, "rhinoscan.png"), ("Monazite", "rhinoscan-filtered.png")):
-        main._material.set(focus or "All")
+        main._filter.set(focus or "All")
         window = scan.show(root, found, sheet, focus,
-                           variable=main._material, materials=picker)
+                           variable=main._filter, materials=picker)
         window.attributes("-topmost", True)
         window.deiconify()
         window.lift()
@@ -254,11 +254,11 @@ def main_images():
     # anything is built. The panel reopens the scan window when the material
     # changes, and that was destroying the window this grabs, halfway
     # through settling it.
-    main._material.set("All")
+    main._filter.set("All")
     settle(root, 10)
 
     scan.show(root, found, sheet, None,
-              variable=main._material, materials=picker)
+              variable=main._filter, materials=picker)
     window = scan._window
     # Standing on the body among the bookmarks, so the location lines and the
     # card have a distance to say. The real Status.json would put every one of
@@ -280,7 +280,7 @@ def main_images():
     spotmark.read_status = was_status
 
     scan.show(root, found, sheet, None,
-              variable=main._material, materials=picker)
+              variable=main._filter, materials=picker)
     window = scan._window
     scan._state["body"] = body
     scan._state["view"] = "mapped"

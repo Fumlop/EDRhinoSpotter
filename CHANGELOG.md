@@ -1,5 +1,16 @@
 # Changelog
 
+## 5.3.1
+
+**Fixed**
+
+- The panel's **Material** box and RhinoData's material filter were one control. Picking a material to bookmark refiltered the window, and mining anything on the ground refiltered it again through the prefill - the window jumped to gold because a by-product was refined. They are two variables now: the box names the next bookmark, the picker under the system name narrows the window, and neither touches the other.
+- **All** is gone from the panel's Material box. It was only ever the way back out of the filter; a bookmark cannot be named "All", and pressing Bookmark with it selected was refused anyway. The RhinoData picker still carries it.
+
+**Changed**
+
+- `mining_sheet.json` refreshed: 992 mining locations, up from 928. Scorpii Sector MC-V a2-3 8 a, an icy body, added 19 of them. No material crossed the 50,000 Cr/t line, so the default dropdown is the same 18.
+
 ## 5.3.0
 
 **Added**
