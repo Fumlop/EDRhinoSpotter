@@ -1,6 +1,6 @@
 # Changelog
 
-## 5.5.0
+## 5.5.1
 
 **Added**
 
@@ -12,7 +12,8 @@
 
 - **Share map** draws the picture again on every press. It opened the saved PNG before, so a location marked or worked out since kept the picture it was saved with.
 - Textures ship as JPEG at quality 90, no chroma subsampling: 2.3 MB against 15.1 as PNG, within 3 of 255 a pixel at the size the map draws them, and 19 ms to decode against 80. The PNG set from before is deleted at startup once the JPEG is in place - the in-plugin update replaces the whole folder anyway, this is for an install unzipped by hand.
-- The settings tab lays its rows out by counter. Two widgets went into the same row when one was inserted by hand.
+- The settings tab lays its rows out by counter, and a test builds it. Two widgets went into the same row when one was inserted by hand.
+- 5.5.0 was withdrawn minutes after it went up; this is that release with the textures at a tenth of the size and the Ground switch dropped.
 
 ## 5.4.0
 
