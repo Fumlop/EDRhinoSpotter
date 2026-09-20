@@ -138,9 +138,8 @@ def free_move():
 def low_value_shown():
     """Whether the material lists offer the ones under grounds.HIGH_VALUE_MIN.
 
-    Off by default: a short list of materials worth flying to beats one where
-    copper and water sit between alexandrite and diamond. On, so a deposit that
-    pays badly but is under the ship can still be marked.
+    Off by default. Price is measured on Sheet.values(): the median, best
+    across grounds.
     """
     return config.get_bool(LOW_VALUE_KEY, default=False) if config is not None else False
 
@@ -643,11 +642,11 @@ def prefs(parent):
 
     # What the Material dropdown and the picker in RhinoData offer. Off, the
     # cheap half is left out of both and out of the rates line under a body -
-    # never out of a bookmark that already names one.
+    # never out of a bookmark that already names one, nor out of a material
+    # being mined right now. See rs_ui/main._materials.
     nb.Label(frame, text="Materials").grid(row=8, column=0, sticky="w", padx=10, pady=(6, 2))
-    nb.Checkbutton(frame, text="Offer the low value ones too - under "
-                               f"{grounds.HIGH_VALUE_MIN // 1000}k Cr a tonne at "
-                               "their best ground",
+    nb.Checkbutton(frame, text="Show materials under "
+                               f"{grounds.HIGH_VALUE_MIN:,} Cr/t",
                    variable=_low_value).grid(row=9, column=0, columnspan=2,
                                              sticky="w", padx=10, pady=(2, 10))
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.2.1
+
+**Changed**
+
+- The settings switch reads **Show materials under 50,000 Cr/t**. It was "Offer the low value ones too - under 50k Cr a tonne at their best ground", which described the idea rather than the control.
+
 ## 5.2.0
 
 **Added**

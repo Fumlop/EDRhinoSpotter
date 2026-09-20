@@ -165,8 +165,8 @@ Solid joins a material to itself, dotted steps down to the next.</em></p>
 EDMC Settings, RhinoSpotter tab:
 
 <p align="center">
-  <img src="docs/settings.png?v=5.2.0" width="480"
-       alt="The RhinoSpotter settings tab: minimap switches, corner, Free move, saved maps, the low value materials switch and the hotkey rows">
+  <img src="docs/settings.png?v=5.2.1" width="480"
+       alt="The RhinoSpotter settings tab: minimap switches, corner, Free move, saved maps, the materials switch and the hotkey rows">
 </p>
 
 - Minimap on/off, whether it stays up when you alt-tab out of the game, and
@@ -178,11 +178,10 @@ EDMC Settings, RhinoSpotter tab:
 - Saved maps count and size, **Open folder** for the map pictures.
 - **Delete migrated JSON** - after upgrading to 4.2, removes the old JSON files
   the database already holds.
-- **Offer the low value ones too** - off, the Material dropdown, the RhinoData
-  picker and the rates line carry only materials worth 50,000 Cr a tonne or
-  more at their best ground. On, all 38. Off is the default; a material you
-  already have a bookmark for, or one you are mining right now, stays pickable
-  either way.
+- **Show materials under 50,000 Cr/t** - off by default. Off, the Material
+  dropdown, the RhinoData picker and the rates line carry 18 materials; on,
+  all 38. Price is the median, best across grounds. Exceptions either way: a
+  material you already have a bookmark for, and one you are mining right now.
 - **Hotkeys** - a modifier set (Ctrl+Alt, Ctrl+Shift, Alt+Shift, Ctrl+Alt+Shift)
   and a key (A-Z, 0-9, F1-F12) for each of the four. The keys named in this
   README are the defaults; the rows under the minimap show the ones in use.
