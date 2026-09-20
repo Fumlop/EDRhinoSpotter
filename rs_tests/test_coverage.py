@@ -490,6 +490,26 @@ class TestRender:
         for name in ('icy', 'rocky-ice', 'rocky', 'rocky-metal', 'metallic'):
             assert (coverage.TEXTURE_DIR / f"{name}.png").is_file()
 
+    def test_every_set_has_a_file_for_every_family(self):
+        for name in ('icy', 'rocky-ice', 'rocky', 'rocky-metal', 'metallic'):
+            for folder in coverage.TEXTURE_FOLDER.values():
+                assert (folder / f"{name}.png").is_file()
+
+    def test_the_set_switch_redraws_the_ground_in_the_other_one(self):
+        corner = (3, 3)                    # unpainted, off the grid lines
+        try:
+            textured = fresh()
+            textured.ground = 'icy'
+            coverage.texture_set('lit')
+            lit = coverage.render(textured, 0, 0, None, 240).getpixel(corner)
+            coverage.texture_set('flat')
+            assert coverage.texture_set() == 'flat'
+            assert coverage.render(textured, 0, 0, None, 240).getpixel(corner) != lit
+            coverage.texture_set('nonsense')
+            assert coverage.texture_set() == coverage.TEXTURE_SETS[0]
+        finally:
+            coverage.texture_set(coverage.TEXTURE_SETS[0])
+
     def test_a_known_ground_draws_its_texture_and_an_unknown_one_plain(self):
         bg = palette.rgb(palette.BG)
         plain, textured = fresh(), fresh()

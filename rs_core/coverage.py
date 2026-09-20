@@ -169,7 +169,7 @@ class Coverage:
         self.location = None
         self._last = None
         self._clip = None       # the border as a mask, while one is set
-        self._layer = None      # ((version, side, ring centre, border), image)
+        self._layer = None      # (Coverage.layer's key, image)
         # The body's ground key (rs_core.grounds), which picks the texture the
         # unpainted ground is drawn in. None: the plain background.
         self.ground = None
@@ -337,7 +337,7 @@ class Coverage:
         """The whole mask drawn at the scale of a map this big showing `view`
         metres either side, kept until something new is painted."""
         ring_at = tuple(round(v) for v in self.anchor())
-        key = (self.version, side, view, ring_at, self.border_m, self.ground)
+        key = (self.version, side, view, ring_at, self.border_m, self.ground, _set)
         if self._layer is None or self._layer[0] != key:
             self._layer = (key, _draw_layer(self.mask, side, ring_at, self.border_m, view=view,
                                             ground=self.ground))
@@ -795,13 +795,33 @@ def _distances(image, points, side, centre, per_px, marker=None):
 # The ground the SRV drives on, under the painted area: one picture a ground
 # family, made in EDIntel's lab/radar_backgrounds and shipped as PNGs.
 TEXTURE_DIR = Path(__file__).resolve().parent.parent / "texture"
+# The sets to draw them from, the first one the default: "lit" is texture/lit/,
+# heightfields shaded by one sun; "flat" is texture/, the set that shipped
+# before it.
+TEXTURE_SETS = ("lit", "flat")
 TEXTURE_OF = {
     'metal-rich': 'metallic',
     'high-metal-content': 'rocky-metal',
     'rocky-ice': 'rocky-ice',
     'icy': 'icy',
 }
-_textures = {}           # (name, pixels) -> RGB image, or None when it would not load
+TEXTURE_FOLDER = {"flat": TEXTURE_DIR, "lit": TEXTURE_DIR / "lit"}
+_textures = {}           # (set, name, pixels) -> RGB image, or None when it would not load
+_set = TEXTURE_SETS[0]
+
+
+def texture_set(name=None):
+    """The set in use, after setting it to `name` when one is given. A name
+    outside TEXTURE_SETS counts as the first. A switch drops the loaded
+    textures; Coverage.layer carries the set in its key, so the map is redrawn
+    on the next reading."""
+    global _set
+    if name is not None:
+        want = name if name in TEXTURE_SETS else TEXTURE_SETS[0]
+        if want != _set:
+            _set = want
+            _textures.clear()
+    return _set
 
 
 def texture_name(ground):
@@ -819,13 +839,14 @@ def _texture(ground, size):
     name = texture_name(ground)
     if name is None:
         return None
-    key = (name, size)
+    key = (_set, name, size)
     if key not in _textures:
+        folder = TEXTURE_FOLDER[_set]
         try:
-            with Image.open(TEXTURE_DIR / f"{name}.png") as picture:
+            with Image.open(folder / f"{name}.png") as picture:
                 _textures[key] = picture.convert("RGB").resize((size, size), Image.BICUBIC)
         except OSError as err:
-            logger.warning(f"minimap: no {name} texture, plain ground instead: {err}")
+            logger.warning(f"minimap: no {_set} {name} texture, plain ground instead: {err}")
             _textures[key] = None
     return _textures[key]
 

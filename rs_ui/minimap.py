@@ -49,6 +49,8 @@ SRV_KEY = "rhinospotter_srv_type"
 # Whether the material lists carry the cheap half. Not a minimap setting - it
 # lives here because this is the file that draws the settings tab.
 LOW_VALUE_KEY = "rhinospotter_low_value"
+# Which coverage.TEXTURE_SETS the unpainted ground is drawn from.
+GROUND_KEY = "rhinospotter_ground_set"
 # Only the Rhino has the mining scanner the painted area stands for.
 RHINO = "mev_rhino"
 CORNERS = ("top left", "top right", "bottom left", "bottom right")
@@ -107,6 +109,7 @@ _keep = None             # tk.BooleanVar on the settings tab
 _hotkeys = {}            # hotkey id -> (modifier StringVar, key StringVar) on the settings tab
 _free = None             # tk.BooleanVar on the settings tab
 _low_value = None        # tk.BooleanVar on the settings tab
+_ground = None           # tk.StringVar on the settings tab
 _lifted = False          # the game is over the map, so it is being lifted every tick
 _placing = False         # in place-the-map mode: click-through off, drag to move
 _grab = None             # (pointer x, pointer y, window x, window y) while dragging
@@ -142,6 +145,14 @@ def low_value_shown():
     across grounds.
     """
     return config.get_bool(LOW_VALUE_KEY, default=False) if config is not None else False
+
+
+def ground_set():
+    """Which of coverage.TEXTURE_SETS the ground under the painted area is
+    drawn from. Anything else stored counts as the first."""
+    default = coverage.TEXTURE_SETS[0]
+    value = config.get_str(GROUND_KEY, default=default) if config is not None else default
+    return value if value in coverage.TEXTURE_SETS else default
 
 
 def offset():
@@ -237,6 +248,7 @@ def update(root, status, system=None, ids=None, ground=None):
     would stop it rescheduling - Bookmark would stop greying out with it.
     """
     global _coverage, _in_srv, _failed, _here
+    coverage.texture_set(ground_set())
     if not status:
         # A read that landed mid-write. Not a reason to take the map down and
         # count the next fix as a fresh launch.
@@ -601,13 +613,14 @@ def stop():
 def prefs(parent):
     """The settings tab: the map on or off, whether it stays up through an
     alt-tab, and which corner it sits in."""
-    global _enabled, _corner, _keep, _free, _low_value
+    global _enabled, _corner, _keep, _free, _low_value, _ground
     frame = nb.Frame(parent)
     _enabled = tk.BooleanVar(value=enabled())
     _corner = tk.StringVar(value=corner())
     _keep = tk.BooleanVar(value=keep_up())
     _free = tk.BooleanVar(value=free_move())
     _low_value = tk.BooleanVar(value=low_value_shown())
+    _ground = tk.StringVar(value=ground_set())
     nb.Checkbutton(frame, text="Minimap in the Rhino - off: not shown, nothing recorded",
                    variable=_enabled).grid(row=0, column=0, columnspan=2,
                                            sticky="w", padx=10, pady=(10, 2))
@@ -627,34 +640,38 @@ def prefs(parent):
     nb.Label(frame, text="Painted means driven within "
                          f"{coverage.SCAN_RADIUS_M / 1000:.0f} km, not scanned.").grid(
         row=5, column=0, columnspan=2, sticky="w", padx=10, pady=2)
+    nb.Label(frame, text="Ground - lit: shaded relief, snow on the ice").grid(
+        row=6, column=0, sticky="w", padx=10, pady=2)
+    nb.OptionMenu(frame, _ground, _ground.get(), *coverage.TEXTURE_SETS).grid(
+        row=6, column=1, sticky="w", padx=10, pady=2)
     count, size = coverstore.usage()
     amount = f"{size / 1048576:.1f} MB" if size >= 1048576 else f"{size / 1024:.0f} KB"
     nb.Label(frame, text=f"Saved maps: {count} ({amount})").grid(
-        row=6, column=0, sticky="w", padx=10, pady=(2, 10))
+        row=7, column=0, sticky="w", padx=10, pady=(2, 10))
     nb.Button(frame, text="Open folder", command=_open_folder).grid(
-        row=6, column=1, sticky="w", padx=10, pady=(2, 10))
+        row=7, column=1, sticky="w", padx=10, pady=(2, 10))
     # The JSON files 4.1 wrote, once the database holds them.
     result = nb.Label(frame, text="")
     nb.Button(frame, text="Delete migrated JSON",
               command=lambda: _delete_migrated(frame, result)).grid(
-        row=7, column=0, sticky="w", padx=10, pady=(2, 10))
-    result.grid(row=7, column=1, sticky="w", padx=10, pady=(2, 10))
+        row=8, column=0, sticky="w", padx=10, pady=(2, 10))
+    result.grid(row=8, column=1, sticky="w", padx=10, pady=(2, 10))
 
     # What the Material dropdown and the picker in RhinoData offer. Off, the
     # cheap half is left out of both and out of the rates line under a body -
     # never out of a bookmark that already names one, nor out of a material
     # being mined right now. See rs_ui/main._materials.
-    nb.Label(frame, text="Materials").grid(row=8, column=0, sticky="w", padx=10, pady=(6, 2))
+    nb.Label(frame, text="Materials").grid(row=9, column=0, sticky="w", padx=10, pady=(6, 2))
     nb.Checkbutton(frame, text="Show materials under "
                                f"{grounds.HIGH_VALUE_MIN:,} Cr/t",
-                   variable=_low_value).grid(row=9, column=0, columnspan=2,
+                   variable=_low_value).grid(row=10, column=0, columnspan=2,
                                              sticky="w", padx=10, pady=(2, 10))
 
     # The hotkeys: a modifier set and a key each. Taken on OK and registered
     # again at once; the rows under the map name them from the next frame.
-    nb.Label(frame, text="Hotkeys").grid(row=10, column=0, sticky="w", padx=10, pady=(6, 2))
+    nb.Label(frame, text="Hotkeys").grid(row=11, column=0, sticky="w", padx=10, pady=(6, 2))
     _hotkeys.clear()
-    for row, (key_id, name, _, _) in enumerate(hotkey.ACTIONS, start=11):
+    for row, (key_id, name, _, _) in enumerate(hotkey.ACTIONS, start=12):
         mods, key = hotkey.label(key_id).rsplit("+", 1)
         mod_var, key_var = tk.StringVar(value=mods), tk.StringVar(value=key)
         _hotkeys[key_id] = (mod_var, key_var)
@@ -805,6 +822,9 @@ def prefs_changed():
             config.set(FREE_KEY, bool(_free.get()))
         if _low_value is not None:
             config.set(LOW_VALUE_KEY, bool(_low_value.get()))
+        if _ground is not None:
+            config.set(GROUND_KEY, _ground.get())
+            coverage.texture_set(ground_set())
         changed = False
         for key_id, _, _, config_key in hotkey.ACTIONS:
             if key_id not in _hotkeys:
