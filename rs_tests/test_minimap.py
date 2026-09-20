@@ -130,6 +130,51 @@ class TestPlaceMode:
         assert minimap._lock() is False
 
 
+class FakeNotebook:
+    """EDMC's myNotebook, as far as prefs() uses it: plain tkinter widgets."""
+
+    import tkinter as _tk
+    Frame = _tk.Frame
+    Label = _tk.Label
+    Button = _tk.Button
+    Checkbutton = _tk.Checkbutton
+
+    @staticmethod
+    def OptionMenu(master, variable, default, *values):
+        import tkinter as tk
+        return tk.OptionMenu(master, variable, default, *values)
+
+
+class TestPrefsLayout:
+    """The settings tab is built, not just saved: a row written by hand put
+    the Materials label and its checkbox in row 9 together, and the tab raised
+    on open."""
+
+    def test_every_widget_gets_a_cell_of_its_own(self, monkeypatch):
+        import tkinter as tk
+        try:
+            root = tk.Tk()
+        except tk.TclError:
+            pytest.skip("no display")
+        root.withdraw()
+        monkeypatch.setattr(minimap, "nb", FakeNotebook)
+        try:
+            frame = minimap.prefs(root)
+            taken = set()
+            for widget in frame.winfo_children():
+                info = widget.grid_info()
+                if not info:
+                    continue
+                row, column = int(info["row"]), int(info["column"])
+                for k in range(int(info.get("columnspan", 1))):
+                    cell = (row, column + k)
+                    assert cell not in taken, f"{widget} lands on {cell} twice"
+                    taken.add(cell)
+            assert len(taken) > 12
+        finally:
+            root.destroy()
+
+
 class TestPrefsSaving:
     """What the OK button writes. The hotkey loop sits after the map settings
     and a block inserted between them once took it into its branch, so hotkeys
