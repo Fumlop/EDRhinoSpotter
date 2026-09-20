@@ -34,6 +34,18 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
   body already has a bookmark for.
 - Picking a bookmark draws the saved map it lies on over its card: the ground
   driven around it, every bookmark of the body on it, no legend.
+- **Edit** at the end of a deposit row opens the bookmark for correction:
+  material, rigs, amount, density and location. Coordinates, heading and the
+  time it was marked are readings and stay as they were.
+
+<p align="center">
+  <img src="docs/edit.png?v=5.3.0" width="360"
+       alt="The Edit bookmark dialog: material, rigs, amount, density and location, with the coordinates shown read-only">
+</p>
+
+- Standing on the deposit again and pressing **Bookmark** does the same for
+  rigs, amount and density without opening anything: a mark within 100 m of a
+  bookmark for the same material updates it instead of adding a second.
 - **Bodies:** honk, and Spansh is asked for the system's known bodies, until
   your own FSS scan or fly-by replaces them. The line
   under the buttons says when to FSS instead: a new system, no Spansh bodies,

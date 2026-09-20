@@ -1,21 +1,21 @@
-"""A file written whole or not at all.
+"""All-or-nothing file writes.
 
-Written to a temporary file beside the target and moved onto it: EDMC can be
-closed at any moment. A reader sees the old file or the new one, never half of
-one. Used for the map pictures and migrate.done; the rest is in the database.
+Writes to a NamedTemporaryFile in the target's directory, then os.replace()
+onto the target. A concurrent reader sees the old file or the new one.
 
-On failure the temporary file is removed and the error raised; the target is
-left as it was. The folder has to exist - the callers make it.
+On failure the temporary file is removed and the exception re-raised; the
+target is unchanged. The target directory must exist.
 
-No tkinter. See rs_tests/test_atomic.py.
+Used for map pictures and migrate.done. No tkinter. Tests in
+rs_tests/test_atomic.py.
 """
 
 import os
 import tempfile
 import time
 
-# Windows refuses to replace a file something else has open - a viewer
-# holding the map picture. A few short waits get past a brief hold.
+# os.replace raises PermissionError on Windows while another process holds the
+# target open (an image viewer on a map picture). 5 tries, 50 ms apart.
 REPLACE_TRIES = 5
 REPLACE_WAIT_S = 0.05
 

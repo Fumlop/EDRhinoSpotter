@@ -1,46 +1,43 @@
-"""How many tons a bookmarked deposit still holds, as a range.
+"""Tons left in a bookmarked deposit, as a (low, high) range.
 
-Full deposit: a number of tons for every rig circle the deposit draws - the
-working assumption is that its reserve is built from those circles - and that
-number depends on Density. Two deposits measured, both Monazite, both four rig
-positions, both High Amount at the start and mined to Depleted by two
-commanders:
+Model: tons = rig positions * tons-per-position * share-left. Tons-per-position
+depends on Density, share-left on Amount.
 
-  Low Density,    13 Sep 2026: 782 t in one journal + 368 t reported by
-                  the other = 1,150 t, 287.5 t a position.
-  Medium Density, 15-17 Sep 2026, Eme A 1 a loc 9: 1,193 t in one journal
-                  + 344 t reported by the other = 1,537 t, 384 t a position.
+TONS_PER_RIG, measured on two Monazite deposits, 4 rig positions each, High
+Amount to Depleted, two commanders per deposit:
 
-Same material, same size, mined the same way; Density is the one recorded
-difference, and Medium held a third more. One deposit each, so each band is
-that deposit give or take four percent. Nothing yet says whether High holds
-more again, so High - and a bookmark with no Density read - get the span of
-both bands: a range that admits not knowing, rather than one that is wrong.
+  Low Density,    13 Sep 2026:              782 t + 368 t = 1,150 t
+                                            -> 287.5 t per position
+  Medium Density, 15-17 Sep 2026,           1,193 t + 344 t = 1,537 t
+  Eme A 1 a loc 9                           -> 384 t per position
 
-The public depletion traces (Rhino Evidence Register PE-042/043/044,
-1,716-1,841 t) record neither Density nor rig count. At six positions they come
-to 286-307 t each, which is Low.
+Same material, same rig count, same method; Density is the only recorded
+difference. One deposit per band, so each is that deposit +/- 4%. High is
+unmeasured, so High and a missing Density take the span of both bands.
 
-The chunk bands by Density (PE-071: Low 2,600 / Medium 1,500 / High 500 chunks)
-rank Low above Medium, the opposite of the tons measured here. Chunks are not
-tons, and they are not used.
+Not used: Rhino Evidence Register PE-042/043/044 (1,716-1,841 t) record neither
+Density nor rig count; at 6 positions they give 286-307 t each, i.e. Low. The
+PE-071 chunk bands (Low 2,600 / Medium 1,500 / High 500 chunks) rank Low above
+Medium, inverting the tons measured here; chunks are not tons.
 
-Share still in the deposit, by Amount - where the traces changed label:
-  High -> Medium after 33.5-43.4 % was mined, Medium -> Low after 65.8-73.3 %.
-So High is 56.6-100 % left, Medium 26.7-66.5 %, Low 0-34.2 %.
+SHARE_LEFT, from the label transitions in the same traces: High -> Medium after
+33.5-43.4% mined, Medium -> Low after 65.8-73.3%.
 
-No tkinter. See rs_tests/test_deposit.py.
+No tkinter. Tests in rs_tests/test_deposit.py.
 """
+
+# Rig positions a deposit can hold. The game accepts no more.
+MAX_RIGS = 10
 
 DENSITIES = ("Low", "Medium", "High")
 AMOUNTS = ("High", "Medium", "Low", "Depleted")
 
-# Tons a rig position holds in a full deposit, by Density.
+# Tons per rig position in a full deposit, by Density. See module docstring.
 TONS_PER_RIG = {
     "Low": (275, 300),
     "Medium": (370, 400),
 }
-# High, or no Density read: nothing measured, so the span of what was.
+# High and missing Density: unmeasured, so the span of both measured bands.
 TONS_PER_RIG_UNKNOWN = (TONS_PER_RIG["Low"][0], TONS_PER_RIG["Medium"][1])
 
 SHARE_LEFT = {
@@ -52,9 +49,11 @@ SHARE_LEFT = {
 
 
 def tons_left(rigs, amount, density=None):
-    """(low, high) tons still in the deposit, rounded to 10 t, or None when
-    the rig count or the Amount is missing. A High or missing Density widens
-    the range rather than refusing one."""
+    """(low, high) tons left, rounded to 10 t.
+
+    None when `amount` is not in SHARE_LEFT or `rigs` is not a positive int.
+    A High or missing `density` widens the range instead of returning None.
+    """
     share = SHARE_LEFT.get(amount)
     if share is None or not isinstance(rigs, int) or isinstance(rigs, bool) or rigs <= 0:
         return None
@@ -64,7 +63,7 @@ def tons_left(rigs, amount, density=None):
 
 
 def describe(rigs, amount, density=None):
-    """'≈ 620-1,200 t left', 'depleted', or '' when there is nothing to say."""
+    """'≈ 620-1,200 t left', 'depleted', or '' when tons_left() is None."""
     if amount == "Depleted":
         return "depleted"
     span = tons_left(rigs, amount, density)

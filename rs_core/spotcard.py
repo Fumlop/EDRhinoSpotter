@@ -1,15 +1,15 @@
-"""One marked mining spot, written to the database as a bookmark.
+"""Writes one marked spot to the bookmarks table.
 
-A record per spot - body, material, rigs, location, heading,
-coordinates, when and who - everything read from Status.json at the press.
-The bookmarks page, Guide, the minimap's dots and the map picture's legend
-all read it back through rs_core/cards.py.
+One row per spot: body, material, rigs, location, heading, coordinates, time
+and commander, all read from Status.json at the press. Read back through
+rs_core/cards.py by the bookmarks page, Guide, the minimap dots and the map
+picture legend.
 
-It was a PNG card with this JSON beside it. The saved map picture shows the
-spot with its neighbours, so the card is gone; older cards on disk are left
-where they are, and rs_core/migrate.py reads their JSON in once.
+Before 4.2 a spot was a PNG card plus a JSON sidecar. Old cards are left on
+disk; rs_core/migrate.py imports their JSON once. CARDS_ROOT and card_dir()
+still locate them.
 
-The fonts helper stays here: the map picture draws its text with it.
+_font() lives here because the map picture draws its text with it.
 """
 
 import functools
@@ -19,17 +19,16 @@ from PIL import ImageFont
 
 from rs_core import database, names
 
-# Where 4.1 and before kept bookmarks, one JSON file each. Read by
-# rs_core/migrate.py, and still where an old card's PNG is found.
+# Bookmark storage up to 4.1: one JSON file each. Read by rs_core/migrate.py;
+# old card PNGs are still found here.
 CARDS_ROOT = os.path.join(os.environ.get("LOCALAPPDATA")
                           or os.path.expanduser("~"), "RhinoSpotter", "cards")
 
 
 def card_dir(system):
-    r"""%LOCALAPPDATA%\RhinoSpotter\cards\<System>\.
+    r"""%LOCALAPPDATA%\RhinoSpotter\cards\<System>\, via names.safe().
 
-    Spaces kept: this is the folder Explorer shows, and the name the game uses
-    is easier to find in a list than the same name with underscores in it.
+    Spaces are kept; this path is shown in Explorer.
     """
     return os.path.join(CARDS_ROOT, names.safe(system))
 
@@ -39,8 +38,11 @@ FONTS = r"C:\Windows\Fonts"
 
 @functools.lru_cache(maxsize=64)
 def _font(name, size):
-    """Kept: the minimap asks for three faces a frame and truetype() re-reads
-    the file every time. A handful of (name, size) pairs are ever used."""
+    """ImageFont for (name, size) from C:\Windows\Fonts, or load_default().
+
+    Cached: the minimap requests 3 faces per frame and truetype() re-reads the
+    file on every call. Fewer than 64 distinct pairs are used.
+    """
     try:
         return ImageFont.truetype(os.path.join(FONTS, name), size)
     except OSError:
@@ -48,11 +50,13 @@ def _font(name, size):
 
 
 def save(spot, id=None, db=None):
-    """spot: a spotmark.mark() dict plus 'commodity' and 'rigs'. Returns the
-    bookmark's id. With `id`, that bookmark is replaced.
+    """Write `spot` and return the bookmark id. With `id`, replace that row.
 
-    Raises when it cannot be written: this row is the bookmark, and the panel
-    says why it is not there rather than claiming it is.
+    `spot` is a spotmark.mark() dict plus 'commodity' and 'rigs'. Values that
+    are not int, float, str or None are stringified.
+
+    Raises sqlite3.Error / OSError on failure rather than returning None: the
+    row is the bookmark, and the caller reports the failure.
     """
     record = {key: (None if value is None else
                     value if isinstance(value, (int, float, str)) else str(value))

@@ -1,24 +1,19 @@
-r"""A name Windows will accept as a file or a folder.
+r"""System and body names -> path segments Windows accepts.
 
-The folder an old card sits in and the folder a map's pictures go in both
-need one. It was three copies of the same loop, back when the card's file name
-and the cache file for a system needed it too.
+Used for the card folder and the map picture folder.
 
-No tkinter and no PIL. See rs_tests/test_names.py.
+No tkinter or PIL. Tests in rs_tests/test_names.py.
 """
 
-# What Windows refuses in a path segment. Real system names carry some of them:
-# "Col 285 Sector KM-V d2-36" is fine, one with a colon in it is not, and one
-# bad system must not take the whole cache down.
+# Characters Windows refuses in a path segment. Some system names contain
+# them, so every segment is filtered rather than validated.
 BAD = r'<>:"/\|?*'
 
 
 def safe(text, fallback="unknown"):
-    r"""`text` with everything Windows refuses replaced by an underscore.
+    r"""`text` with every BAD character replaced by '_', trimmed.
 
-    Spaces stay: the folder is what Explorer shows, and
-    `Col_285_Sector_LS-P_b7-1` is harder to read there than the name the game
-    uses.
+    Spaces are kept. Empty or whitespace-only input returns `fallback`.
     """
     cleaned = "".join("_" if ch in BAD else ch for ch in (text or "")).strip()
     return cleaned or fallback

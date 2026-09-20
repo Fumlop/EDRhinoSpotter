@@ -1,21 +1,16 @@
-"""What a body is, and what that kind of body has been found to hold.
+"""Body class -> ground key, and ground key -> material rates.
 
-No tkinter, no network, no database, so it can be checked without EDMC in the
-way. See rs_tests/test_grounds.py.
+No tkinter, network or database imports; testable without EDMC. Tests in
+rs_tests/test_grounds.py.
 
-Two halves:
+classify()  journal Scan event -> one of the 11 keys in GROUND_ORDER. Reads
+            PlanetClass and Volcanism, both present on any Scan event (FSS
+            resolve or auto-scan on arrival). FSSDiscoveryScan carries neither.
+Sheet       reads mining_sheet.json, packaged with the plugin. materials(),
+            best(), rate() and sample() look a ground up in it.
 
-  classify()  turns a journal Scan into one of the ten grounds the mining
-              sheet measures. PlanetClass and Volcanism arrive with any Scan
-              event - the FSS resolving a body, or the auto-scan on arrival.
-              The honk itself emits none: it finds the bodies, it does not
-              describe them.
-  materials() looks that ground up in mining_sheet.json, the mining sheet
-              frozen at the time the plugin was packaged.
-
-What a mining location actually holds is in no game feed. These are the rates
-across every location read so far, which is a reason to fly somewhere, not a
-promise about what is under you.
+The percentages are measured over mining locations already read. No game feed
+reports what a location holds.
 """
 
 import json
@@ -24,7 +19,7 @@ import os
 RULES_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                           "mining_sheet.json")
 
-# The order a system map is read in: metal, then rock, then ice.
+# Display order: metal, rock, ice.
 GROUND_ORDER = (
     'metal-rich',
     'high-metal-content',
@@ -53,10 +48,10 @@ GROUND_LABEL = {
     'icy':                          'Icy World',
 }
 
-# Names earlier versions wrote. The system cache holds bodies classified back
-# then, and a hand-copied sheet can be old. canonical() reads them as the current
-# key. 'rock 80%+ [magma]' is both magma kinds together, which is all 4.1.3 and
-# older knew - Sheet serves it from the split rows and the other way round.
+# Ground keys written by 4.1.3 and older, still present in the system cache and
+# in hand-copied sheets. canonical() maps them to current keys. 'rock 80%+
+# [magma]' covers both magma kinds: Sheet._join_magma builds it from the split
+# rows, Sheet._key serves the split keys from it.
 LEGACY = {
     'volcanic magma':               'rock 80%+ [magma]',
     'volcanic silicate':            'rock 80%+ [silicate vapour geysers]',
@@ -68,45 +63,37 @@ LEGACY = {
 MAGMA = 'rock 80%+ [magma]'
 MAGMA_SPLIT = ('rock 80%+ [metallic magma]', 'rock 80%+ [rocky magma]')
 
-# What a material is worth when the sheet has no rows for it. Bromellite is
-# minable on ice and no mining location read so far has carried it, so it had
-# no price at all: no code on the minimap, and worth() had to keep it on the
-# "unpriced is not cheap" rule rather than judge it.
-#
-# 33,396 Cr is its galaxy-wide average sell price. The sheet's column is a
-# median per ground and this is an average across markets - not the same
-# statistic, and the nearest one that exists for a material with no locations.
-# Its 116,750 best market is the analogue of the sheet's `best` column, which
-# nothing ranks on.
+# Fallback price in Cr/t for materials with no rows in mining_sheet.json.
+# Bromellite: no location read so far has carried it, so values() gave it 0 and
+# codes() skipped it. 33,396 Cr is its galaxy-wide average sell price - a market
+# average, not the sheet's per-ground median, and the only figure available for
+# a material with no locations.
 UNSHEETED = {'bromellite': 33396}
 
-# Where "low value" starts, in credits a tonne. Measured against values() - the
-# median price, best across grounds - so a material is judged on the best ground
-# it has, not on the one under the ship. Sheet.worth() drops everything below it
-# unless the settings tab asks for the cheap half back.
+# Low-value threshold in Cr/t, measured against values() (median, best across
+# grounds). Sheet.worth() drops everything below it. Disabled by the
+# rhinospotter_low_value setting.
 HIGH_VALUE_MIN = 50000
 
 
 def canonical(ground):
-    """A ground key as this version names it, whichever version wrote it."""
+    """LEGACY key -> current key. Current and unknown keys pass through."""
     return LEGACY.get(ground, ground)
 
-# Magma and silicate carry opposite materials - monazite reads 45.6% on magma
-# and 7.9% on silicate - so the volcanism decides the ground before the
-# composition does, for a rocky body. Metallic and rocky magma differ again:
-# sapphire 29% against 0%, silver 17% against 44%.
+# For a rocky body, volcanism is tested before composition: monazite reads
+# 45.6% on magma against 7.9% on silicate, sapphire 29% on metallic magma
+# against 0% on rocky, silver 17% against 44%.
 _SILICATE = 'silicate'
-# Silicate magma is not a geyser. The sheet keeps it apart (geology.py buckets it
-# as sil_magma), so it must not fall into silicate geysers here on the word.
+# Tested before _SILICATE: the sheet buckets silicate magma separately
+# (geology.py sil_magma), and both strings contain "silicate".
 _SILICATE_MAGMA = 'silicate magma'
 
 
 def classify(body):
-    """A journal Scan dict -> a ground key, or None if it is not landable.
+    """Journal Scan dict -> ground key, or None when not landable.
 
-    Mirrors the classifier the sheet was measured with, so the ground a body
-    lands in here is the ground its percentages came from. Anything else is
-    two tables that look alike and disagree.
+    Reads Landable, PlanetClass and Volcanism. Must stay identical to the
+    classifier mining_sheet.json was measured with.
     """
     if not body or not body.get('Landable'):
         return None
@@ -114,9 +101,8 @@ def classify(body):
     if not planet:
         return None
 
-    # Body class first, because the game's own word beats anything inferred.
-    # "Rocky ice" is checked before "icy" only for readability - neither
-    # prefix matches the other.
+    # PlanetClass before Volcanism. "rocky ice" before "icy" is ordering for
+    # readability only; neither prefix matches the other.
     if planet.startswith('metal rich') or planet.startswith('metal-rich'):
         return 'metal-rich'
     if planet.startswith('high metal'):
@@ -141,12 +127,11 @@ def classify(body):
 
 
 def reground(body):
-    """A cached body's ground as this version would classify it.
+    """Cached body dict -> ground key under the current classifier.
 
-    The cache keeps PlanetClass and Volcanism beside the ground, so a body
-    stored under an older name - one [magma] for both kinds - is classified
-    again rather than waiting for a rescan. Without a class, the name is only
-    translated.
+    Reclassifies from the stored planet_class and volcanism when present, so a
+    body cached under a pre-4.1.4 key is split without a rescan. Falls back to
+    canonical(body['ground']).
     """
     if body.get('planet_class'):
         ground = classify({'Landable': True, 'PlanetClass': body['planet_class'],
@@ -157,17 +142,17 @@ def reground(body):
 
 
 def label(ground):
-    """The ground said the way the system map says it."""
+    """Ground key -> GROUND_LABEL text, or the key itself, or 'unknown'."""
     ground = canonical(ground)
     return GROUND_LABEL.get(ground, ground or 'unknown')
 
 
 class Sheet:
-    """The exported mining sheet, read once.
+    """mining_sheet.json, parsed once at construction.
 
-    A missing or broken file is not a crash: the panel still lists the bodies
-    and their types, it just cannot say what they hold. That is the honest
-    failure - the body list comes from the journal and owes nothing to this.
+    A missing or unparsable file sets .error, leaves .grounds empty and .loaded
+    False; every lookup then returns empty. Callers must not depend on it: the
+    body list comes from the journal.
     """
 
     def __init__(self, path=RULES_PATH):
@@ -191,11 +176,12 @@ class Sheet:
         self._join_magma()
 
     def _join_magma(self):
-        """The combined [magma] ground, rebuilt from the split one.
+        """Build self.grounds[MAGMA] from the two MAGMA_SPLIT keys.
 
-        A cached body with no stored class still says [magma]; reground()
-        splits every other one. Hits are recovered as pct x locations, so the
-        rate is the one a single column would have measured.
+        No-op when the sheet already carries MAGMA or neither split key. Hits
+        are recovered as pct * locations / 100, then re-divided by the combined
+        location count. Needed for cached bodies with no stored planet_class,
+        which reground() cannot split.
         """
         split = [g for g in MAGMA_SPLIT if g in self.grounds]
         if MAGMA in self.grounds or not split:
@@ -214,8 +200,8 @@ class Sheet:
         self.locations[MAGMA] = total
 
     def _key(self, ground):
-        """The sheet's key for a ground: an old combined sheet answers for
-        both magma kinds until a newer one is in place."""
+        """Ground key -> the key to look up. A split magma key falls back to
+        MAGMA when the sheet carries only the combined rows."""
         ground = canonical(ground)
         if ground not in self.grounds and ground in MAGMA_SPLIT and MAGMA in self.grounds:
             return MAGMA
@@ -226,14 +212,14 @@ class Sheet:
         return bool(self.grounds)
 
     def codes(self):
-        """{material, lowercased: short code} for labels on the minimap.
+        """{lowercased material: 1-3 letter code} for minimap dot labels.
 
-        Every code is different. The most valuable material gets its first
-        letter, the next one to want that letter gets it plus the first of its
-        own letters still free: Thortveitite T, Thorium TH, Titanium TI. Capitals
-        throughout - a lowercase l beside a dot at 12 px reads as a 1. Value
-        is the median price, best across grounds; a refreshed sheet that
-        re-ranks prices can move a code.
+        Codes are unique. Assigned by descending values(), ties by name: first
+        letter, else first letter plus the first free letter of the name, else
+        first letter plus a digit. Thortveitite T, Thorium TH, Titanium TI.
+
+        Upper case throughout: lowercase l reads as 1 at 12 px. A sheet refresh
+        that re-ranks prices can reassign codes.
         """
         price = {name: value for name, value in self.values().items()}
         taken, codes = set(), {}
@@ -251,18 +237,15 @@ class Sheet:
         return codes
 
     def values(self):
-        """{material, lowercased: what it is worth} - the median price, best
-        across grounds, 0 for one the sheet carries unpriced.
+        """{lowercased material: Cr/t} - the median price, best across grounds.
 
-        The one ranking of materials by value in the plugin: codes() hands out
-        its letters by it, worth() draws the low-value line at it, and the
-        minimap joins a bookmark to the next material down by it. Three
-        callers, one definition of "worth more".
+        0 for a material the sheet carries with median 0 or null. Seeded from
+        UNSHEETED when .loaded; a sheet row always overrides the seed. Not
+        seeded on an unloaded sheet, where it would be the only price and would
+        invert worth().
 
-        UNSHEETED fills in for a material the sheet has no rows for, and loses
-        to any row the sheet does have: a measurement beats a stand-in. Only
-        with a sheet in hand - a stand-in as the single price in an empty
-        table would make bromellite the one material worth hiding.
+        The single value ranking: codes(), worth() and the minimap's
+        next-material-down join all read it.
         """
         price = dict(UNSHEETED) if self.loaded else {}
         for rows in self.grounds.values():
@@ -272,10 +255,9 @@ class Sheet:
         return price
 
     def worth(self, materials, minimum=HIGH_VALUE_MIN):
-        """`materials` with the cheap ones dropped, order kept.
+        """`materials` without those priced under `minimum`. Order kept.
 
-        Unpriced is not cheap. A material the sheet carries without a median
-        stays in rather than being hidden on a price nobody has measured. An
+        A material values() prices at 0 is kept: unpriced is not cheap. An
         unloaded sheet prices nothing, so nothing is dropped.
         """
         price = self.values()
@@ -284,33 +266,28 @@ class Sheet:
                      or price[name.lower()] >= minimum)
 
     def materials(self, ground, limit=None, minimum=0.0):
-        """What that ground has been found to hold, likeliest first.
+        """[{material, pct, median, best}, ...] for `ground`, pct descending.
 
-        Returns [{material, pct, median, best}, ...]. `minimum` drops the long
-        tail: on rocky ground sixteen materials qualify and nobody reads past
-        the fourth.
+        `minimum` is a percentage floor, `limit` a row count. Rocky ground has
+        16 rows above 2%.
         """
         rows = [row for row in self.grounds.get(self._key(ground), []) if row['pct'] >= minimum]
         return rows[:limit] if limit else rows
 
     def best(self, ground, limit=None, minimum=0.0):
-        """What that ground pays, most per location first: pct times median.
+        """materials() re-sorted by pct * median descending.
 
-        Likeliest-first put copper, haematite and titanium at the top of
-        high-metal ground once the sheet carried the cheap half - common and
-        worth nothing. A median of 0 is unpriced; those sort last rather than
-        vanish, so a ground with nothing priced still says what it holds.
+        Sorting by pct alone put copper, haematite and titanium at the top of
+        high-metal ground. Rows with median 0 sort last but are kept.
         """
         rows = sorted(self.materials(ground, minimum=minimum),
                       key=lambda row: -row['pct'] * (row.get('median') or 0))
         return rows[:limit] if limit else rows
 
     def rate(self, ground, material):
-        """What that ground reads for one material, or None if it never has.
+        """pct for one material on `ground`, or None when it has no row.
 
-        None, not zero: a material nobody has found on a ground and a material
-        found on none of its locations are different claims, and only the
-        second one is a measurement.
+        None, not 0: no row means unmeasured, a row of 0 means measured at 0.
         """
         for row in self.grounds.get(self._key(ground), []):
             if row['material'].lower() == (material or '').lower():
@@ -318,5 +295,5 @@ class Sheet:
         return None
 
     def sample(self, ground):
-        """How many mining locations the percentages for that ground rest on."""
+        """Mining locations the ground's percentages were measured over."""
         return self.locations.get(self._key(ground), 0)

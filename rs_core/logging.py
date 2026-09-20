@@ -1,8 +1,7 @@
-"""One logger, named the way EDMC names plugin loggers.
+"""The plugin's logger, named f"{appname}.RhinoSpotter" as EDMC expects.
 
-EDMC installs a handler per plugin under this name, so a message here lands in
-EDMC's own log rather than in a file nobody opens. Outside EDMC the fallback
-keeps prints off stdout, which would otherwise mix into a test run.
+EDMC installs a handler per plugin under that name. Outside EDMC the logger
+gets a NullHandler so test runs stay clean.
 """
 
 import logging
@@ -18,10 +17,7 @@ except ImportError:                                  # bare interpreter, tests
     if not logger.handlers:
         logger.addHandler(logging.NullHandler())
 
-# Info and up. The nine info lines in the plugin are all once-per-event - the
-# map going down and coming back, a guide starting and closing, a migration -
-# and they are exactly what gets asked about after the fact: "the map vanished
-# and I do not know why". At WARNING that answer cost a RHINOSPOTTER_DEBUG=1
-# and an EDMC restart, by which time the state that hid it was gone. Per-tick
-# lines are debug and stay behind the variable.
+# INFO by default, DEBUG with RHINOSPOTTER_DEBUG set. The 9 info-level lines
+# are once-per-event (map shown/hidden, guide start/stop, migration) and are
+# what post-hoc questions need. Per-tick lines are debug.
 logger.setLevel(logging.DEBUG if os.environ.get("RHINOSPOTTER_DEBUG") else logging.INFO)

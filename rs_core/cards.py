@@ -227,29 +227,61 @@ def location_at(system, body, lat, lon, radius, db=None, within=SAME_LOCATION_M,
     return best
 
 
-def updated(old, spot):
-    """The old bookmark with the new mark's Amount and Density, nothing else.
+# What the Edit dialog may change. Coordinates, heading, commander and
+# marked_at are excluded: they are readings taken at the press, and the
+# coordinates identify the deposit.
+EDITABLE = ("commodity", "rigs", "amount", "density", "location_index")
 
-    The first mark is where the deposit is: its position, heading, location,
-    rigs and time stay. Only the readings that change as it is mined are taken
-    from the new one, and only the ones picked - a picker left at "-" does not
-    wipe what was there. `updated_at` says when. An Amount other than Depleted
-    takes the Depleted mark off: the deposit reads live again.
+
+def edited(old, fields):
+    """`old` with the EDITABLE keys of `fields` applied.
+
+    Values of None clear the field, unlike updated(), where None means the
+    commander left the control alone. Keys outside EDITABLE are ignored.
+
+    Sets updated_at. An `amount` other than 'Depleted' clears depleted_at.
     """
-    record = {key: value for key, value in old.items()
-              if key not in ("path", "id", "distance_m")}
-    for key in ("amount", "density"):
-        if spot.get(key) is not None:
-            record[key] = spot[key]
-    # A bookmark made before the IDs were kept takes them from the new mark.
-    for key in ("system_address", "body_id"):
-        if record.get(key) is None and spot.get(key) is not None:
-            record[key] = spot[key]
+    record = _without_row_keys(old)
+    for key in EDITABLE:
+        if key in fields:
+            record[key] = fields[key]
+    return _touched(record, fields.get("amount"))
+
+
+def _without_row_keys(old):
+    """`old` minus the columns for_system() adds, which are not record data."""
+    return {key: value for key, value in old.items()
+            if key not in ("path", "id", "distance_m")}
+
+
+def _touched(record, amount):
+    """Stamp updated_at, and clear depleted_at for a live Amount."""
     record["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    amount = spot.get("amount")
     if amount is not None and amount != "Depleted":
         record.pop("depleted_at", None)
     return record
+
+
+def updated(old, spot):
+    """`old` with Rigs, Amount and Density taken from `spot`.
+
+    Position, heading, location, commander and marked_at stay as first marked;
+    coordinates are what identifies the deposit. Only the three fields a
+    commander re-reads off the HUD are copied, and only when set - a picker
+    left at "-" or an empty Rigs box leaves the old value.
+
+    Sets updated_at. An `amount` other than 'Depleted' clears depleted_at.
+    Fills system_address and body_id when `old` predates them.
+    """
+    record = _without_row_keys(old)
+    for key in ("rigs", "amount", "density"):
+        if spot.get(key) is not None:
+            record[key] = spot[key]
+    # Bookmarks written before these columns existed take them from the mark.
+    for key in ("system_address", "body_id"):
+        if record.get(key) is None and spot.get(key) is not None:
+            record[key] = spot[key]
+    return _touched(record, spot.get("amount"))
 
 
 def by_body(system, db=None):

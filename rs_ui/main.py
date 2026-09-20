@@ -113,7 +113,7 @@ def build(parent):
     tk.Label(_frame, text="Rigs", anchor="w").grid(row=1, column=2, sticky="e", padx=2)
     # Ten is what a deposit can hold; the box used to go to twelve, which was
     # a number nobody can enter in the game.
-    tk.Spinbox(_frame, from_=0, to=MAX_RIGS, textvariable=_rigs, width=4).grid(
+    tk.Spinbox(_frame, from_=0, to=deposit.MAX_RIGS, textvariable=_rigs, width=4).grid(
         row=1, column=3, sticky="w", padx=2)
 
     _material = tk.StringVar(value=NO_MATERIAL)
@@ -275,9 +275,6 @@ def _on_material_changed(*_):
 
 # How often Status.json is read to see whether Bookmark has anything to mark.
 # One small file, and the answer changes at walking pace.
-# Rig positions a mining location can hold.
-MAX_RIGS = 10
-
 LANDED_POLL_MS = 1000
 
 
@@ -579,7 +576,7 @@ def _render_card(spot, token):
             message = None
         else:
             spotcard.save(cards.updated(old, spot), id=old["id"])
-            message = (f"updated Amount/Density of the {spot.get('commodity')} "
+            message = (f"updated Rigs/Amount/Density of the {spot.get('commodity')} "
                        f"bookmark {old['distance_m']:.0f} m away")
     except Exception as err:
         message = f"no bookmark: {err}"

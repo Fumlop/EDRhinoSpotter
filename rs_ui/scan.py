@@ -25,7 +25,7 @@ from tkinter import messagebox
 from PIL import Image
 
 from rs_core import (cards, coverage, coverstore, database, deposit, grounds, guide, palette,
-                     spotmark)
+                     spotcard, spotmark)
 from rs_core.logging import logger
 from rs_ui import overlay, rhino
 
@@ -671,8 +671,9 @@ def _bookmark_row(parent, record, picked):
     tk.Label(row, text=f"{left or '-':>{LEFT_W}}", bg=bg,
              fg=ALERT if dead else (WARN if left else DIM), anchor="e",
              font=("Consolas", 9)).pack(side="left")
+    _button(row, "Edit", lambda: _edit_bookmark(record)).pack(side="right", padx=(6, 0))
 
-    _clickable(row, lambda: _pick_record(record))
+    _clickable(row, lambda: _pick_record(record), skip_buttons=True)
 
 
 def _worked_out(record):
@@ -1189,6 +1190,149 @@ def _stop_guide():
     overlay.stop()
     _state["status"] = "The arrow is down."
     _draw()
+
+
+# The Edit dialog: what an unset Amount or Density reads, how wide the value
+# column is, and how far the body name wraps.
+NOT_SET = "-"
+EDIT_FIELD_PX = 170
+EDIT_WIDTH_PX = 300
+
+
+def _style_field(widget):
+    """A dialog control in the window's colours.
+
+    Tk draws Menubutton, Spinbox and Entry in the system theme - grey and white
+    - which is what they were against the dark dialog. Menu entries are on the
+    Menu widget, not the Menubutton, so the dropdown is configured separately.
+    """
+    widget.config(bg=PANEL, fg=FG, relief="solid", borderwidth=1,
+                  highlightthickness=0, font=("Consolas", 9))
+    if isinstance(widget, tk.Menubutton):
+        widget.config(anchor="w", padx=6, pady=2, indicatoron=True,
+                      activebackground=PANEL, activeforeground=ACCENT)
+        widget["menu"].config(bg=PANEL, fg=FG, activebackground=BG,
+                              activeforeground=ACCENT, borderwidth=1,
+                              activeborderwidth=0, tearoff=False)
+        return
+    widget.config(insertbackground=FG, disabledbackground=PANEL,
+                  readonlybackground=PANEL, selectbackground=RULE,
+                  selectforeground=FG)
+    if isinstance(widget, tk.Spinbox):
+        widget.config(buttonbackground=PANEL)
+
+
+def _pickable(record):
+    """Materials the Edit dialog offers: what the picker offers, plus this
+    bookmark's own material when the low value filter hides it."""
+    offered = [name for name in (_scan[4] if _scan else ()) if name in spotmark.MATERIALS]
+    current = record.get("commodity")
+    if current and current not in offered:
+        offered.insert(0, current)
+    return offered or list(spotmark.MATERIALS)
+
+
+def _edit_bookmark(record):
+    """Change what was typed at the press: material, rigs, amount, density,
+    location. Coordinates, heading and marked_at are readings and stay.
+
+    Modal over the window, because the list under it is rebuilt on save.
+    """
+    if _window is None:
+        return
+    box = tk.Toplevel(_window, bg=BG)
+    box.title("Edit bookmark")
+    box.transient(_window)
+    box.resizable(False, False)
+    box.columnconfigure(1, weight=1, minsize=EDIT_FIELD_PX)
+
+    tk.Label(box, text=f"{_loc(record.get('location_index'))} on "
+                       f"{record.get('planet_name') or 'no body'}",
+             bg=BG, fg=FG, anchor="w", justify="left", wraplength=EDIT_WIDTH_PX,
+             font=("Segoe UI", 11, "bold")).grid(
+        row=0, column=0, columnspan=2, sticky="w", padx=14, pady=(14, 0))
+    tk.Label(box, text=_coords(record) or "no coordinates", bg=BG, fg=DIM, anchor="w",
+             font=("Consolas", 8)).grid(row=1, column=0, columnspan=2, sticky="w",
+                                        padx=14, pady=(2, 8))
+
+    material = tk.StringVar(value=record.get("commodity") or "")
+    rigs = tk.StringVar(value="" if record.get("rigs") is None else str(record["rigs"]))
+    amount = tk.StringVar(value=record.get("amount") or NOT_SET)
+    density = tk.StringVar(value=record.get("density") or NOT_SET)
+    location = tk.StringVar(value="" if record.get("location_index") is None
+                            else str(record["location_index"]))
+
+    def field(row, text, widget):
+        tk.Label(box, text=text, bg=BG, fg=FG_SOFT, anchor="w",
+                 font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", padx=(14, 8), pady=3)
+        _style_field(widget)
+        widget.grid(row=row, column=1, sticky="we", padx=(0, 14), pady=3)
+
+    field(2, "Material", tk.OptionMenu(box, material, *_pickable(record)))
+    field(3, "Rigs", tk.Spinbox(box, from_=0, to=deposit.MAX_RIGS, textvariable=rigs))
+    field(4, "Amount", tk.OptionMenu(box, amount, NOT_SET, *deposit.AMOUNTS))
+    field(5, "Density", tk.OptionMenu(box, density, NOT_SET, *deposit.DENSITIES))
+    field(6, "Location", tk.Entry(box, textvariable=location))
+
+    buttons = tk.Frame(box, bg=BG)
+    buttons.grid(row=7, column=0, columnspan=2, sticky="e", padx=14, pady=(10, 14))
+    _button(buttons, "Cancel", box.destroy).pack(side="right")
+    _button(buttons, "Save",
+            lambda: _save_edit(box, record, material.get(), rigs.get(),
+                               amount.get(), density.get(), location.get())
+            ).pack(side="right", padx=(0, 6))
+
+    _centre_over(box, _window)
+    box.grab_set()
+    box.wait_window()
+
+
+def _centre_over(box, parent):
+    """Put `box` in the middle of `parent`.
+
+    update_idletasks first: a Toplevel reports 1x1 until Tk has laid it out,
+    and the sum would centre it off the top left corner.
+    """
+    box.update_idletasks()
+    x = parent.winfo_rootx() + (parent.winfo_width() - box.winfo_width()) // 2
+    y = parent.winfo_rooty() + (parent.winfo_height() - box.winfo_height()) // 2
+    box.geometry(f"+{max(0, x)}+{max(0, y)}")
+
+
+def _save_edit(box, record, material, rigs, amount, density, location):
+    """Write the dialog back to the bookmark, then redraw.
+
+    An unparsable Rigs or Location is left as it was rather than refused: the
+    dialog has no room for an error line, and the field shows what was kept.
+    """
+    fields = {
+        "commodity": material or record.get("commodity"),
+        "rigs": _int_or(rigs, record.get("rigs")),
+        "amount": None if amount == NOT_SET else amount,
+        "density": None if density == NOT_SET else density,
+        "location_index": _int_or(location, record.get("location_index")),
+    }
+    try:
+        spotcard.save(cards.edited(record, fields), id=record["id"])
+    except Exception as err:
+        logger.exception("scan: could not save the edit")
+        messagebox.showwarning("Edit bookmark", f"Not saved: {err}", parent=box)
+        return
+    box.destroy()
+    _state["selected"] = _key(dict(record, **fields))
+    _state["status"] = f"{_loc(fields['location_index'])}, {fields['commodity']}, edited."
+    _draw()
+
+
+def _int_or(text, fallback):
+    """'4' -> 4, '' -> None, anything else -> `fallback`."""
+    text = (text or "").strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        return fallback
 
 
 def _delete_bookmark(record):

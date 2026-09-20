@@ -1,21 +1,18 @@
-"""Where the spot is, from where you are standing.
+"""Distance and bearing from a Status.json position to a bookmark.
 
-Status.json says where the ship or the SRV is and which way it is pointing; a
-bookmark says where the patch is. This turns the two into one arrow: how far,
-and how far round from the nose.
+fix() combines the two into the reading the overlay arrow draws: metres to the
+target and degrees from the nose.
 
-Great circle rather than the flat earth measure.py uses. A patch is a few
-hundred metres across and flat is right for that, but you start guiding from
-orbital cruise, and over a hundred kilometres flat is not.
+Great circle, not the flat approximation in measure.py: guiding starts in
+orbital cruise at over 100 km, where flat is wrong.
 
-No tkinter, so the maths can be checked without EDMC or a display. See
-rs_tests/test_guide.py.
+No tkinter. Tests in rs_tests/test_guide.py.
 """
 
 import math
 
-# Close enough to be looking at it. The mining location itself is bigger than
-# this, so a tighter number would be measuring the drift of Status.json.
+# Arrival radius in metres. A mining location is wider than this; below it the
+# reading would track Status.json drift.
 ARRIVED_M = 50.0
 
 
@@ -40,13 +37,15 @@ def distance(lat, lon, to_lat, to_lon, radius):
 
 
 def fix(status, target):
-    """One reading, from one Status.json and one bookmark.
+    """One Status.json dict + one bookmark -> the reading the overlay draws.
 
-    `state` is what the overlay draws, and every case that is not "guiding" or
-    "arrived" is a case where there is no arrow to draw. They are separate
-    states rather than one "no fix" because they need different words: sitting
-    in orbit and sitting on the wrong body look identical from the cockpit and
-    want opposite actions.
+    Returns {state, body, distance_m, bearing_deg, relative_deg, altitude_m}.
+    state is one of: 'no target' (bookmark has no coordinates), 'no body'
+    (supercruise, docked, game not running), 'wrong body', 'no position' (right
+    body, too high for coordinates), 'guiding', 'arrived' (<= ARRIVED_M).
+
+    Only 'guiding' and 'arrived' carry a distance and bearing. The other four
+    are kept apart because they need different text.
     """
     reading = {
         "state": "no target",
@@ -61,7 +60,7 @@ def fix(status, target):
         return reading
 
     if not reading["body"]:
-        # Supercruise, a station, or the game is not running.
+        # Supercruise, docked, or the game is not running.
         reading["state"] = "no body"
         return reading
     if reading["body"] != target.get("planet_name"):
@@ -71,16 +70,15 @@ def fix(status, target):
     lat, lon = status.get("Latitude"), status.get("Longitude")
     radius = status.get("PlanetRadius")
     if lat is None or lon is None or not radius:
-        # On the right body but too high for the game to give coordinates.
+        # Right body, but above the altitude where Status.json has lat/lon.
         reading["state"] = "no position"
         return reading
 
     reading["distance_m"] = distance(lat, lon, to_lat, to_lon, radius)
     reading["bearing_deg"] = bearing(lat, lon, to_lat, to_lon)
 
-    # Heading is -1 when the game has none to give, which is most of the way
-    # down. Without it the arrow can only point north-up, and saying so is
-    # better than rotating by a number that means nothing.
+    # Status.json Heading is -1 for most of the descent. relative_deg stays
+    # None then, and the overlay draws north-up.
     heading = status.get("Heading")
     if heading is not None and heading >= 0:
         reading["relative_deg"] = (reading["bearing_deg"] - heading) % 360.0
@@ -90,7 +88,7 @@ def fix(status, target):
 
 
 def metres(value):
-    """A distance as it is read out loud: 42 m, 950 m, 1.4 km, 118 km."""
+    """Metres -> '42 m', '950 m', '1.4 km', '118 km'. None -> '-'."""
     if value is None:
         return "-"
     if value < 1000:
@@ -104,8 +102,10 @@ COMPASS = ("N", "NE", "E", "SE", "S", "SW", "W", "NW")
 
 
 def compass(degrees):
-    """The bearing as a word, for when there is no heading to turn it into an
-    arrow - a number of degrees is not something anyone flies by."""
+    """Degrees -> one of the 8 COMPASS points. None -> ''.
+
+    Used when relative_deg is None and no arrow can be rotated.
+    """
     if degrees is None:
         return ""
     return COMPASS[int((degrees % 360.0) / 45.0 + 0.5) % 8]

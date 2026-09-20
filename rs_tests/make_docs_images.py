@@ -119,6 +119,35 @@ def _drive(cover, lat, lon):
                       lon + dlon * DRIVE_STEP * (step + n) / 3.0)
 
 
+def edit_image(window, record, scale):
+    """The Edit dialog, centred on the window it was opened from.
+
+    _edit_bookmark is modal: wait_window blocks and grab_set takes the pointer,
+    neither of which a screenshot run survives. Both are stubbed on the
+    Toplevel as it is created.
+    """
+    boxes = []
+    made = tk.Toplevel
+
+    def capture(*args, **kwargs):
+        box = made(*args, **kwargs)
+        box.wait_window = lambda *a, **k: None
+        box.grab_set = lambda *a, **k: None
+        boxes.append(box)
+        return box
+
+    tk.Toplevel = capture
+    try:
+        scan._edit_bookmark(record)
+    finally:
+        tk.Toplevel = made
+    box = boxes[0]
+    box.attributes("-topmost", True)
+    settle(box)
+    grab(box, "edit.png", scale, top_margin=34)
+    box.destroy()
+
+
 def settle(window, ticks=40):
     """Tk lays out on idle, and a grab of a window mid-layout is a grab of
     whatever was behind it."""
@@ -246,6 +275,7 @@ def main_images():
     window.lift()
     settle(window)
     grab(window, "bookmarks.png", scale, top_margin=34)
+    edit_image(window, marks[1], scale)
     window.destroy()
     spotmark.read_status = was_status
 

@@ -1,42 +1,32 @@
-r"""Where the game writes, asked rather than assumed.
+r"""Resolves the Elite Dangerous journal folder.
 
-The journal folder was spelled out in two places as
+The default path is only a fallback: a moved folder, a synced profile, a Steam
+library elsewhere or an install under Proton is already resolved by EDMC, so
+EDMC is asked first. See journal_dir().
 
-    %USERPROFILE%\Saved Games\Frontier Developments\Elite Dangerous
+EDMC is imported inside the function, not at module level, so the module
+imports in a bare interpreter.
 
-which is the default and not the answer. A commander who moved the folder - a
-second drive, a synced profile, a Steam library somewhere else, an install
-under Proton - has told EDMC where it is, and EDMC is already reading it. So
-ask EDMC first and keep the default as the last resort.
-
-Nothing here imports EDMC at module level: the plugin has to import in a bare
-interpreter for the tests.
-
-No tkinter. See rs_tests/test_paths.py.
+No tkinter. Tests in rs_tests/test_paths.py.
 """
 
 import os
 
 from rs_core.logging import logger
 
-# The default install, and the fallback when nothing better answers.
+# Default install path, expanded only as the last fallback.
 WINDOWS_JOURNAL = r"%USERPROFILE%\Saved Games\Frontier Developments\Elite Dangerous"
 
 
 def journal_dir():
-    """The folder Status.json and the journals are in.
+    """Path to the folder holding Status.json and the journal files.
 
-    Three sources, in the order of how much they know:
+    Tried in order:
 
-    1. `monitor.currentdir` - the folder EDMC is watching right now. It is the
-       one that has already resolved the default, the commander's override and
-       whatever the platform does, because it is the folder EDMC's own journal
-       reading comes out of.
-    2. The `journaldir` setting - what the commander typed, when they typed
-       anything. Empty on a default install, which is why it cannot be the
-       only source.
-    3. The Windows default, expanded. Outside EDMC - the tests, the replay
-       tool - this is all there is.
+    1. monitor.currentdir - the folder EDMC is watching; already resolved for
+       platform, default and override.
+    2. the journaldir setting - set only when the commander typed a path.
+    3. WINDOWS_JOURNAL, expandvars'd. The only source outside EDMC.
     """
     try:
         from monitor import monitor                # EDMC

@@ -1,5 +1,16 @@
 # Changelog
 
+## 5.3.0
+
+**Added**
+
+- **Edit** at the end of a deposit row opens the bookmark for correction: material, rigs, amount, density and location. Coordinates, heading and the time it was marked are readings taken at the press and stay as they were; the dialog shows the coordinates but does not offer them. Closes #4.
+
+**Changed**
+
+- Standing on a deposit and pressing Bookmark again now updates the rig count as well as Amount and Density. Rigs is the field guessed at the first mark - you set 4 and the deposit turns out to hold 3 - and until now a re-mark could not correct it. Each field is only taken when set, so an empty Rigs box or a picker left at "-" still wipes nothing.
+- Comments and docstrings converted to a technical register in `grounds`, `palette`, `names`, `atomic`, `logging`, `paths`, `deposit`, `spotcard`, `guide` and `cards`. The rule is in `CLAUDE.md`; the remaining modules follow.
+
 ## 5.2.1
 
 **Changed**

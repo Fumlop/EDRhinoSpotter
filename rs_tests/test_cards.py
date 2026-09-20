@@ -338,19 +338,23 @@ class TestUpdated:
            "heading": 77, "rigs": 4, "location_index": 13, "amount": "High",
            "density": "Low", "id": 5, "path": None, "distance_m": 12.0}
 
-    def test_only_amount_and_density_change(self):
+    def test_only_rigs_amount_and_density_change(self):
+        """Rigs is guessed at the first mark - issue #4 - so a re-mark on the
+        spot corrects it. Where the deposit is stays as first marked."""
         new = cards.updated(self.OLD, {"marked_at": "2026-09-13 20:30:00", "latitude": 10.001,
                                        "longitude": 20.001, "heading": 200, "rigs": 6,
                                        "location_index": 14, "amount": "Low", "density": "Medium"})
+        assert new["rigs"] == 6
         assert new["amount"] == "Low" and new["density"] == "Medium"
-        for key in ("marked_at", "latitude", "longitude", "heading", "rigs", "location_index"):
+        for key in ("marked_at", "latitude", "longitude", "heading", "location_index"):
             assert new[key] == self.OLD[key]
         assert "updated_at" in new
         assert "id" not in new and "path" not in new and "distance_m" not in new
 
     def test_an_unpicked_reading_keeps_the_old_one(self):
-        new = cards.updated(self.OLD, {"amount": None, "density": None})
-        assert new["amount"] == "High" and new["density"] == "Low"
+        """Pickers at '-' and an empty Rigs box wipe nothing."""
+        new = cards.updated(self.OLD, {"rigs": None, "amount": None, "density": None})
+        assert (new["rigs"], new["amount"], new["density"]) == (4, "High", "Low")
 
     def test_a_live_amount_clears_depleted(self):
         old = {"marked_at": "a", "depleted_at": "2026-09-13T20:37:35+00:00"}
@@ -445,6 +449,53 @@ class TestSameBody:
         new = cards.updated({"system_address": 111, "body_id": 3},
                             {"system_address": None, "body_id": None})
         assert new["system_address"] == 111 and new["body_id"] == 3
+
+
+
+class TestEdited:
+    """The Edit dialog's write path. Issue #4: the rig count and the material
+    are typed at the press and are the two fields a commander gets wrong."""
+
+    OLD = {"marked_at": "2026-09-13 18:40:00", "latitude": 10.0, "longitude": 20.0,
+           "heading": 77, "rigs": 4, "location_index": 13, "amount": "High",
+           "density": "Low", "commodity": "Monazite", "id": 5, "path": None,
+           "distance_m": 12.0}
+
+    def test_every_editable_field_is_written(self):
+        new = cards.edited(self.OLD, {"commodity": "Osmium", "rigs": 6,
+                                      "amount": "Low", "density": "Medium",
+                                      "location_index": 15})
+        assert new["commodity"] == "Osmium" and new["rigs"] == 6
+        assert new["amount"] == "Low" and new["density"] == "Medium"
+        assert new["location_index"] == 15
+
+    def test_where_the_deposit_is_cannot_be_edited(self):
+        new = cards.edited(self.OLD, {"latitude": 99.0, "longitude": 99.0, "heading": 1,
+                                      "marked_at": "3311-01-01T00:00:00"})
+        for key in ("latitude", "longitude", "heading", "marked_at"):
+            assert new[key] == self.OLD[key]
+
+    def test_a_field_left_out_keeps_its_value(self):
+        new = cards.edited(self.OLD, {"rigs": 6})
+        assert new["rigs"] == 6
+        assert new["amount"] == "High" and new["commodity"] == "Monazite"
+
+    def test_none_clears_a_field(self):
+        """Unlike updated(), where None means the control was left alone."""
+        new = cards.edited(self.OLD, {"amount": None, "density": None,
+                                      "location_index": None})
+        assert new["amount"] is None and new["density"] is None
+        assert new["location_index"] is None
+
+    def test_the_row_columns_are_not_written_back(self):
+        new = cards.edited(self.OLD, {"rigs": 6})
+        assert "id" not in new and "path" not in new and "distance_m" not in new
+        assert "updated_at" in new
+
+    def test_a_live_amount_clears_depleted(self):
+        old = dict(self.OLD, depleted_at="2026-09-13T20:37:35+00:00")
+        assert "depleted_at" not in cards.edited(old, {"amount": "Medium"})
+        assert cards.edited(old, {"amount": "Depleted"})["depleted_at"]
 
 
 class TestMaterialsMarked:
