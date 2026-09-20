@@ -5,6 +5,7 @@
 **Added**
 
 - **A second ground texture set, `lit`.** Settings > Ground picks it: `flat` is the set that shipped, `lit` is a heightfield per ground family lit by one sun at 315 degrees, 34 degrees up - craters with rims and ejecta, fracture networks, snow lying on the flat and in the hollows with blue ice in the wind scours, ore veins on the metal grounds. Made in EDIntel's `lab/radar_backgrounds/hifi.py` with numpy and scipy; what ships is PNG, so the plugin still loads it with PIL alone. `texture/lit/` is 15.1 MB on top of the 6.4 MB of `texture/`.
+- **The map picture carries the three best golden groups, priced.** Every group of bookmarks within 2.5 km whose rigs add up to five was circled; now the best three by credits an hour are, each labelled with what a trip takes out - 11 t a rig position at that spot's median price. The hour is 300 s a spot (12 pieces, one every 25 s, the rigs at a spot running together) plus the drive round its members at 25 km/h.
 
 ## 5.4.0
 

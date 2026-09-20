@@ -477,8 +477,10 @@ def _docked(system):
     mask = _coverage.mask.copy()
     marks = [(*_coverage.xy(lat, lon), code, depleted, value, rigs)
              for lat, lon, code, depleted, value, rigs in _bookmarks(system, body)]
-    golden = coverage.golden_groups([(x, y, rigs) for x, y, _, depleted, _, rigs in marks
-                                     if not depleted])
+    # The best coverage.GOLDEN_SHOWN by Cr/h, not every group that qualifies.
+    spots = [(x, y, rigs, value or 0) for x, y, _, depleted, value, rigs in marks
+             if not depleted]
+    golden = coverage.golden_best(coverage.golden_groups(spots), spots)
     title, legend = picture_text(_coverage, system)
     border_m = _coverage.border_m
 

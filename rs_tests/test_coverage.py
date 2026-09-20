@@ -792,6 +792,35 @@ class TestGolden:
         (cx, cy, radius, _), = coverage.golden_groups([(0, 0, 3), (2000, 0, 3)])
         assert (round(cx), round(cy), round(radius)) == (1000, 0, 1000)
 
+    def test_the_trip_is_eleven_tons_a_rig_at_that_spot_price(self):
+        spots = [(0, 0, 3, 100_000), (1000, 0, 3, 100_000)]
+        (*_, credits), = coverage.golden_best(coverage.golden_groups(spots), spots, most=1)
+        assert credits == 6 * coverage.RIG_TONS * 100_000
+
+    def test_the_tightest_group_wins_on_credits_an_hour(self):
+        # Two 3/3 groups of the same price, 10 km apart so neither takes the
+        # other in: 200 m between the members of one, 2 km between the other's.
+        spots = [(0, 0, 3, 50_000), (200, 0, 3, 50_000),
+                 (10_000, 0, 3, 50_000), (12_000, 0, 3, 50_000)]
+        best = coverage.golden_best(coverage.golden_groups(spots), spots)
+        assert len(best) == 2
+        assert round(best[0][0]) == 100 and round(best[1][0]) == 11_000
+
+    def test_only_the_best_three_are_carried(self):
+        spots = []
+        for k in range(5):
+            spots += [(20_000 * k, 0, 3, 10_000 * (k + 1)),
+                      (20_000 * k + 300, 0, 3, 10_000 * (k + 1))]
+        groups = coverage.golden_groups(spots)
+        best = coverage.golden_best(groups, spots)
+        assert len(groups) == 5 and len(best) == coverage.GOLDEN_SHOWN
+        assert [round(g[0] / 1000) for g in best] == [80, 60, 40]
+
+    def test_a_group_without_prices_keeps_its_place(self):
+        spots = [(0, 0, 3), (500, 0, 3)]
+        (*_, credits), = coverage.golden_best(coverage.golden_groups(spots), spots)
+        assert credits == 0
+
     def test_the_picture_circles_a_golden_group_in_gold(self):
         spots = [(0, 0, 3), (1500, 0, 3)]
         marks = [(x, y, "T", False) for x, y, _ in spots]

@@ -511,22 +511,42 @@ GOLDEN_RIGS = 5
 GOLD = palette.rgb(palette.GOLD)
 
 
+# One rig position in a placement round: 12 pieces, one every 25 s, 11 t in
+# all (measured 9-11 t a rig, 67 t off six). The rigs at a spot run together
+# and the collection circuit at 75 m spacing takes about as long as the next
+# piece needs, so a spot costs RIG_S whatever its rig count.
+RIG_TONS = 11.0
+RIG_S = 12 * 25.0
+# Driving between the spots of a group, on bumpy ground.
+DRIVE_MS = 25_000 / 3600
+# How many groups the picture carries: the best by Cr/h.
+GOLDEN_SHOWN = 3
+
+
+def _golden_points(spots):
+    """[(x, y, rigs, Cr/t), ...] of the spots that hold a rig - the list
+    golden_groups() indexes. `spots` are (x, y, rigs) or (x, y, rigs, Cr/t)."""
+    return [(float(x), float(y), int(rest[0]), float(rest[1]) if len(rest) > 1 else 0.0)
+            for x, y, *rest in spots if rest and rest[0]]
+
+
 def golden_groups(spots):
     """[(cx, cy, radius, members), ...] - metres - for the golden groups among
-    `spots`, (x, y, rigs) in metres with depleted ones already left out.
+    `spots`, (x, y, rigs) or (x, y, rigs, Cr/t) in metres with depleted ones
+    already left out. `members` index _golden_points(spots).
 
     Candidate centres are every spot and every midpoint between two; the spots
     within GOLDEN_RADIUS_M of one are a group when their rigs add up to
     GOLDEN_RIGS. A group inside a bigger one is dropped. The circle drawn round a
     group sits on its members' centroid and reaches the furthest of them.
     """
-    points = [(float(x), float(y), int(r)) for x, y, r in spots if r]
-    centres = [(x, y) for x, y, _ in points]
+    points = _golden_points(spots)
+    centres = [(x, y) for x, y, *_ in points]
     centres += [((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
                 for i, a in enumerate(points) for b in points[i + 1:]]
     found = set()
     for cx, cy in centres:
-        members = frozenset(i for i, (x, y, _) in enumerate(points)
+        members = frozenset(i for i, (x, y, *_) in enumerate(points)
                             if math.hypot(x - cx, y - cy) <= GOLDEN_RADIUS_M)
         if sum(points[i][2] for i in members) >= GOLDEN_RIGS:
             found.add(members)
@@ -539,14 +559,66 @@ def golden_groups(spots):
     return groups
 
 
+def _tour_m(members, points):
+    """Metres round a group's spots, nearest neighbour from the one closest to
+    the centroid, not returning to it."""
+    left = [points[i][:2] for i in members]
+    if len(left) < 2:
+        return 0.0
+    mx = sum(x for x, _ in left) / len(left)
+    my = sum(y for _, y in left) / len(left)
+    at = min(left, key=lambda p: math.hypot(p[0] - mx, p[1] - my))
+    left.remove(at)
+    total = 0.0
+    while left:
+        nxt = min(left, key=lambda p: math.hypot(p[0] - at[0], p[1] - at[1]))
+        total += math.hypot(nxt[0] - at[0], nxt[1] - at[1])
+        at = nxt
+        left.remove(at)
+    return total
+
+
+def golden_best(groups, spots, most=GOLDEN_SHOWN):
+    """The `most` groups worth the stop, best Cr/h first:
+    [(cx, cy, radius, members, credits), ...]. `spots` is what golden_groups()
+    was given, so the members index the same list.
+
+    A trip takes RIG_TONS a rig at that spot's Cr/t; it costs RIG_S a spot
+    plus the tour round them at DRIVE_MS. Groups priced at 0 Cr/t keep their
+    order from golden_groups().
+    """
+    points = _golden_points(spots)
+    ranked = []
+    for group in groups:
+        members = group[3]
+        credits = sum(points[i][2] * RIG_TONS * points[i][3] for i in members)
+        hours = (len(members) * RIG_S + _tour_m(members, points) / DRIVE_MS) / 3600.0
+        ranked.append((credits / hours if hours else 0.0, credits, group))
+    ranked.sort(key=lambda row: -row[0])
+    return [(*group, credits) for _, credits, group in ranked[:most]]
+
+
+def _money(credits):
+    """Credits as 970k or 1.4M, for a label on the map."""
+    if credits >= 1e6:
+        return f"{credits / 1e6:.1f}M"
+    return f"{credits / 1e3:.0f}k"
+
+
 def _golden(image, groups, scale, side):
-    """A gold circle round each golden group, under the dots."""
+    """A gold circle round each golden group, under the dots, labelled with
+    the credits a trip takes when the group carries them."""
     draw = ImageDraw.Draw(image)
     pad = _mark_radius(side) + 5
-    for mx, my, radius, _ in groups:
+    font = spotcard._font("consolab.ttf", max(11, side // 40))
+    for mx, my, radius, _, *credits in groups:
         cx, cy = image.width / 2 + mx * scale, image.height / 2 - my * scale
         r = radius * scale + pad
         draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=GOLD, width=2)
+        if credits and credits[0]:
+            text = _money(credits[0])
+            draw.text((cx - font.getlength(text) / 2, cy - r - font.size - 2), text,
+                      font=font, fill=GOLD)
 
 
 def bearing(x, y, to_x, to_y):
