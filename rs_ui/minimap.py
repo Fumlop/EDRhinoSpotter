@@ -73,7 +73,6 @@ NOTICE_S = 4
 SW_HIDE = 0
 SW_SHOWNOACTIVATE = 4
 HWND_TOPMOST = -1
-HWND_NOTOPMOST = -2
 SWP_NOACTIVATE = 0x10
 SWP_NOSIZE = 0x01
 SWP_NOMOVE = 0x02
@@ -108,6 +107,7 @@ _keep = None             # tk.BooleanVar on the settings tab
 _hotkeys = {}            # hotkey id -> (modifier StringVar, key StringVar) on the settings tab
 _free = None             # tk.BooleanVar on the settings tab
 _low_value = None        # tk.BooleanVar on the settings tab
+_lifted = False          # the game is over the map, so it is being lifted every tick
 _placing = False         # in place-the-map mode: click-through off, drag to move
 _grab = None             # (pointer x, pointer y, window x, window y) while dragging
 
@@ -924,22 +924,42 @@ def _place(side, where, rect, base=None):
         # _shown saying it was up. Showing a shown window again costs nothing.
         if not _shown or not user32.IsWindowVisible(_handle):
             user32.ShowWindow(_handle, SW_SHOWNOACTIVATE)
-        if _under_game(user32):
-            # Elite came back to the front and took the top of the Z-order with
-            # it. The call above does not fix that: asking for HWND_TOPMOST
-            # while already topmost leaves the order inside the topmost group
-            # alone. Dropping out and back in moves it.
-            for after in (HWND_NOTOPMOST, HWND_TOPMOST):
-                user32.SetWindowPos(_handle, after, 0, 0, 0, 0,
-                                    SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE)
-            logger.info("minimap: the game was over the map, lifted back")
+        _lift_over_game(user32)
     elif not _shown:
         _window.deiconify()
     _shown = True
 
 
+def _lift_over_game(user32):
+    """Put the map back above Elite when Elite has got over it.
+
+    One SetWindowPos with the game as hWndInsertAfter, which orders the map
+    directly above that one window. It was a pair of calls - out to
+    HWND_NOTOPMOST and back to HWND_TOPMOST - because asking for HWND_TOPMOST
+    while already topmost does not reorder inside the topmost group. That pair
+    leaves the map non-topmost between the two calls, so a borderless game is
+    composited over it for that frame; at one tick a second that is a blink,
+    and the debug log carried 2,010 of them in a day.
+
+    Logged on the change, not on the tick: the game can sit over the map for
+    minutes, and that is one event.
+    """
+    global _lifted
+    game = _under_game(user32)
+    if not game:
+        if _lifted:
+            logger.debug("minimap: back above the game")
+            _lifted = False
+        return
+    user32.SetWindowPos(_handle, game, 0, 0, 0, 0,
+                        SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE)
+    if not _lifted:
+        logger.debug("minimap: the game got over the map, lifting it back")
+        _lifted = True
+
+
 def _under_game(user32):
-    """Whether Elite's window sits above the map in the Z-order.
+    """Elite's window handle when it sits above the map, else None.
 
     Walked rather than assumed: the map is topmost and so is a game in
     borderless, and which of two topmost windows is in front is decided by
@@ -947,18 +967,18 @@ def _under_game(user32):
     a map that has not moved since.
     """
     if not _handle:
-        return False
+        return None
     game = user32.FindWindowW(None, overlay.GAME_TITLE)
     if not game:
-        return False
+        return None
     above = user32.GetWindow(_handle, GW_HWNDPREV)
     for _ in range(Z_ORDER_LOOKUP):
         if not above:
-            return False
+            return None
         if above == game:
-            return True
+            return game
         above = user32.GetWindow(above, GW_HWNDPREV)
-    return False
+    return None
 
 
 def _header(status, body, system):

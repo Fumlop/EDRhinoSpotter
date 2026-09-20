@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.4.0
+
+**Added**
+
+- **Search a system** in RhinoData. A box at the top of the rail, over the system name, listing the systems you hold bookmarks in - three letters before it answers, three matches at most, most recently marked first. Picking one shows that system's bodies and bookmarks, read from the body cache, so it works with the ship parked anywhere. A green **Back to \<system\>** under the name returns to the one you are in. Bookmark is untouched by it: marking always lands in the system the journal says you are in, never the one being looked at.
+
+**Fixed**
+
+- **Share map** on a location whose map had no picture did nothing visible. The PNG is written when the SRV goes back in the ship, so a drive that ended any other way left the points in the database and nothing to open - and the only sign was a line at the foot of the middle pane. The picture is now drawn from those points on the press, saved, and opened.
+- **The minimap blinked once a second when the game was over it.** Getting back above a borderless Elite was two calls, out of HWND_NOTOPMOST and back in, and between them the map is not topmost - so the game was composited over it for that frame. It is one `SetWindowPos` against the game's own window now, which also fixes it not sticking: re-entering the topmost band does not put you at the front of it, ordering against a named window does.
+- That lift logged at INFO on every tick - 2,010 lines in one day. It is debug, and only when the state changes.
+
 ## 5.3.1
 
 **Fixed**

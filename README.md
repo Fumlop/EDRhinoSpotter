@@ -32,6 +32,10 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
   material and the median price it sells for - the best three you can pick, so
   the low value switch below decides what it names. Green is a material this
   body already has a bookmark for.
+- **Systems with bookmarks** - the box at the top of the rail. Three letters,
+  three matches; pick one and the window shows that system, wherever the ship
+  is. The green **Back to <system>** under the name returns. Bookmark always
+  marks the system you are actually in.
 - Picking a bookmark draws the saved map it lies on over its card: the ground
   driven around it, every bookmark of the body on it, no legend.
 - **Edit** at the end of a deposit row opens the bookmark for correction:

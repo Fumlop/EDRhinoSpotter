@@ -24,10 +24,10 @@ from tkinter import messagebox
 
 from PIL import Image
 
-from rs_core import (cards, coverage, coverstore, database, deposit, grounds, guide, palette,
-                     spotcard, spotmark)
+from rs_core import (bodies, cards, coverage, coverstore, database, deposit, grounds, guide,
+                     palette, spotcard, spotmark, store)
 from rs_core.logging import logger
-from rs_ui import overlay, rhino
+from rs_ui import minimap, overlay, rhino
 
 # Three. A fourth is the least likely material anyway, and a row of four pairs
 # reads as a run of words rather than a list.
@@ -104,7 +104,19 @@ _state = {
     "map": None,          # the map row the card is showing, by its own key
     "collapsed": set(),   # (body, location index) of every folded location
     "status": "",
+    "system": None,       # a system browsed from the search box, or None for the live one
+    "search": "",         # what is typed in the search box
 }
+
+# The browsed system's register, kept between draws: adopt() re-reads the body
+# cache, and a draw happens on every click in the window.
+_browsed = None
+
+# The search box: how many letters before it answers, and how many systems it
+# names. Three of each - a list that opens on an empty box is in the way, and a
+# fourth row pushes the body list down the rail.
+SEARCH_MIN = 3
+SEARCH_HITS = 3
 
 
 def is_open():
@@ -240,7 +252,8 @@ def _draw():
     """
     if _window is None or not _window.winfo_exists() or _scan is None:
         return
-    register, sheet, focus, variable, materials = _scan
+    live, sheet, focus, variable, materials = _scan
+    register = _shown_register(live)
     _remember_scroll()
     _clear(_window)
 
@@ -263,7 +276,7 @@ def _draw():
     rail = tk.Frame(outer, bg=PANEL, width=RAIL_WIDTH)
     rail.pack(side="left", fill="y")
     rail.pack_propagate(False)
-    _rail(rail, register, sheet, focus, variable, materials, listed, body)
+    _rail(rail, register, sheet, focus, variable, materials, listed, body, live)
 
     card = tk.Frame(outer, bg=BG, width=CARD_WIDTH)
     card.pack(side="right", fill="y")
@@ -359,16 +372,24 @@ def _loc(index):
 # ------------------------------------------------------------------- the rail
 
 
-def _rail(parent, register, sheet, focus, variable, materials, listed, body):
-    """The system, the material picker, and every body under it."""
+def _rail(parent, register, sheet, focus, variable, materials, listed, body, live=None):
+    """The search box, the system, the material picker, and every body under it."""
     head = tk.Frame(parent, bg=PANEL)
     head.pack(fill="x", padx=13, pady=(14, 0))
+    _search_box(head)
     name = tk.Label(head, text=register.system or "no system yet", bg=PANEL, fg=FG,
                     anchor="w", justify="left", font=("Segoe UI", 12, "bold"),
                     wraplength=RAIL_WIDTH - 26)
-    name.pack(fill="x")
+    name.pack(fill="x", pady=(6, 0))
     # Click the system name. Nothing says so - that is the point of it.
     name.bind("<Button-1>", lambda event: rhino.run(name.winfo_toplevel()))
+
+    # Only while a searched system is shown. Bookmark always marks where the
+    # ship is, so this is the way back to the system that can be marked.
+    if _state["system"] and live is not None and live.system:
+        back = _button(head, f"\u25c0  Back to {live.system}", _back_to_live)
+        back.config(fg=GOOD, font=("Segoe UI", 9, "bold"))
+        back.pack(fill="x", pady=(6, 0))
 
     count = len(register)
     marks = sum(len(entry["shown"]) for entry in listed)
@@ -392,6 +413,108 @@ def _rail(parent, register, sheet, focus, variable, materials, listed, body):
     if not listed:
         tk.Label(listing, text="nothing listed here yet", bg=PANEL, fg=DIM, anchor="w",
                  font=("Segoe UI", 9)).pack(fill="x", padx=13, pady=(8, 0))
+
+
+def _shown_register(live):
+    """The register the window draws: the live one, or a searched system filled
+    from the body cache.
+
+    Register.adopt() is the cache's own path in, so a browsed system lists and
+    groups exactly as the live one does. Kept between draws - adopt() re-reads
+    the cache and every click redraws.
+    """
+    global _browsed
+    system = _state["system"]
+    if not system or system == live.system:
+        return live
+    if _browsed is None or _browsed.system != system:
+        _browsed = bodies.Register()
+        _browsed.adopt(system, store.load(system))
+    return _browsed
+
+
+def _bookmarked_systems():
+    """[(system, bookmarks), ...], most recently marked first.
+
+    Only systems that hold bookmarks: the search box is for finding a bookmark
+    again, and a system with none is not an answer to that.
+    """
+    try:
+        with database.connect() as conn:
+            return conn.execute(
+                "SELECT system, count(*) FROM bookmarks WHERE system IS NOT NULL "
+                "GROUP BY system ORDER BY max(id) DESC").fetchall()
+    except Exception as err:                       # sqlite3.Error, OSError
+        logger.warning(f"scan: could not list the bookmarked systems: {err}")
+        return []
+
+
+def _search_box(parent):
+    """Type a system, pick it, and the page shows that system's bookmarks.
+
+    Only systems that hold bookmarks are listed - the box exists to find a
+    bookmark again, and a system with none is not an answer to that.
+
+    An entry rather than a picker: the list grows with every system marked in,
+    and a dropdown of fifty is a scroll-hunt.
+
+    Silent under SEARCH_MIN letters, and at most SEARCH_HITS matches.
+    """
+    typed = tk.StringVar(value=_state["search"])
+    entry = tk.Entry(parent, textvariable=typed, bg=BG, fg=FG, insertbackground=FG,
+                     relief="solid", borderwidth=1, highlightthickness=0,
+                     font=("Segoe UI", 9))
+    tk.Label(parent, text="SYSTEMS WITH BOOKMARKS", bg=PANEL, fg=DIM, anchor="w",
+             font=("Segoe UI", 7)).pack(fill="x", pady=(0, 2))
+    entry.pack(fill="x")
+
+    hits = tk.Frame(parent, bg=PANEL)
+    hits.pack(fill="x")
+
+    def redraw(*_):
+        text = typed.get().strip().lower()
+        _state["search"] = typed.get()
+        for child in hits.winfo_children():
+            child.destroy()
+        if len(text) < SEARCH_MIN:
+            return
+        found = [(system, n) for system, n in _bookmarked_systems()
+                 if text in system.lower()]
+        for system, n in found[:SEARCH_HITS]:
+            row = tk.Label(hits, text=f"{system[:24]:<24} {n:>2} bm", bg=PANEL,
+                           fg=ACCENT if system == _state["system"] else FG_SOFT,
+                           anchor="w", font=("Consolas", 9))
+            row.pack(fill="x")
+            _clickable(row, lambda pick=system: _browse(pick))
+        if not found:
+            tk.Label(hits, text="no bookmarks in a system of that name", bg=PANEL,
+                     fg=DIM, anchor="w", font=("Segoe UI", 8)).pack(fill="x")
+
+    typed.trace_add("write", redraw)
+    redraw()
+
+
+def _browse(system):
+    """Show a searched system. Nothing about marking changes - the panel's
+    Bookmark button reads the journal, not this."""
+    if system == _state["system"]:
+        return
+    _state["system"] = system
+    _state["body"] = None
+    _state["selected"] = None
+    _state["map"] = None
+    _state["status"] = f"Showing {system}. Bookmark still marks where the ship is."
+    _draw()
+
+
+def _back_to_live():
+    _state["system"] = None
+    _state["search"] = ""
+    _state["body"] = None
+    _state["selected"] = None
+    _state["map"] = None
+    _state["status"] = ""
+    _draw()
 
 
 def _rail_footer(parent, sheet):
@@ -1384,14 +1507,81 @@ def _share_map(body, group):
     Found on the press rather than on the draw: it rebuilds a mask for every
     saved map of the body, and doing that for every location of every draw cost
     more than the whole rest of the window.
+
+    A map with no picture yet is drawn here and saved. minimap writes the PNG
+    when the SRV goes back in the ship; a drive that ended any other way left
+    the points in the database and nothing to open.
     """
     maps = coverstore.maps(body, system_address=_system_address())
-    picture = _picture(body, group, maps)
+    picture = _picture(body, group, maps) or _drawn_now(body, group, maps)
     if picture:
         _open_card(picture)
         return
     _state["status"] = "No saved map holds this location yet."
     _draw()
+
+
+def _drawn_now(body, group, maps):
+    """The map under these bookmarks, drawn from its points and saved. Or None
+    when no saved map reaches them, or the draw fails - both leave the caller
+    with the same "nothing to open" it had before."""
+    data = next((data for record in group
+                 for data in [_map_data(body, record, maps)] if data), None)
+    if data is None:
+        return None
+    name, stored = data
+    try:
+        cover = coverage.Coverage.from_dict(body, stored, name)
+        if cover is None:
+            return None
+        system = _scan[0].system if _scan and _scan[0] else None
+        sheet = _scan[1] if _scan else None
+        marks, golden = _map_marks(cover, system, body, sheet)
+        title, legend = minimap.picture_text(cover, system)
+        image = coverage.picture(cover.mask, marks, title, legend, cover.border_m, golden)
+    except Exception:
+        logger.exception(f"scan: could not draw {name} on {body}")
+        return None
+    saved = coverstore.save_png(body, name, image)
+    logger.info(f"scan: drew {name} on {body} on the press - "
+                f"{'saved' if saved else 'not saved'}")
+    return saved
+
+
+def _map_data(body, record, maps):
+    """(name, stored map) the bookmark lies on, or None."""
+    lat, lon = record.get("latitude"), record.get("longitude")
+    if lat is None or lon is None:
+        return None
+    try:
+        name = coverage.map_at(maps, body, float(lat), float(lon))
+    except (TypeError, ValueError):
+        return None
+    return (name, dict(maps)[name]) if name else None
+
+
+def _map_marks(cover, system, body, sheet):
+    """(marks, golden groups) for every bookmark of the body the map reaches.
+
+    Same shape minimap hands coverage.picture: metres east and north of the
+    origin, the material's code, whether it is worked out, what it is worth and
+    how many rigs are on it.
+    """
+    codes = sheet.codes() if sheet is not None else {}
+    values = sheet.values() if sheet is not None else {}
+    marks = []
+    for record in (cards.for_system(system) if system else ()):
+        lat, lon = record.get("latitude"), record.get("longitude")
+        if (record.get("planet_name") != body or not isinstance(lat, (int, float))
+                or not isinstance(lon, (int, float)) or not cover.reaches(lat, lon)):
+            continue
+        material = (record.get("commodity") or "").lower()
+        marks.append((*cover.xy(lat, lon), codes.get(material),
+                      bool(record.get("depleted_at")), values.get(material, 0),
+                      record.get("rigs")))
+    golden = coverage.golden_groups([(x, y, rigs) for x, y, _, spent, _, rigs in marks
+                                     if not spent])
+    return marks, golden
 
 
 def _refresh():
@@ -1414,7 +1604,9 @@ def _refresh():
 def _system_address():
     """The SystemAddress of the register's system, or None - what keeps a body's
     maps apart from those of a body with the same name elsewhere."""
-    return _scan[0].system_address if _scan else None
+    if not _scan:
+        return None
+    return _shown_register(_scan[0]).system_address
 
 
 def _by_location(records):
