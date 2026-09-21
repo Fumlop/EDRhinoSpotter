@@ -185,7 +185,8 @@ try:
 
     # 2. Latest release detection against the live release page.
     tag = update.fetch_latest()
-    local_tags = git("tag", "--sort=-v:refname").decode().split()
+    # Pre-release tags ("v5.7.0-beta.1") are not what releases/latest lands on.
+    local_tags = [t for t in git("tag", "--sort=-v:refname").decode().split() if "-" not in t]
     try:
         api = requests.get(f"https://api.github.com/repos/{update.REPO}/releases?per_page=100",
                            timeout=15)
