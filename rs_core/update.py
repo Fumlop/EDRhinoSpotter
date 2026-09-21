@@ -27,7 +27,7 @@ try:
 except ImportError:         # a bare interpreter without it
     requests = None
 
-VERSION = "5.6.4"
+VERSION = "5.7.0-beta.1"
 
 # For testing the update path without publishing a throwaway release: set
 # RHINOSPOTTER_VERSION to something older and the running plugin will see the
@@ -73,8 +73,13 @@ def parse(version):
 
 def is_newer(latest, current=None):
     """Strictly newer. Equal is not an update, and neither is older - a local
-    build ahead of the release must not be told to downgrade."""
-    return parse(latest) > parse(current if current is not None else RUNNING)
+    build ahead of the release must not be told to downgrade. A pre-release
+    ('5.7.0-beta.1') sorts under its final ('5.7.0'), so a beta is offered it."""
+    current = current if current is not None else RUNNING
+
+    def rank(version):
+        return (*parse(version), 0 if "-" in (version or "") else 1)
+    return rank(latest) > rank(current)
 
 
 def _open(url, timeout):

@@ -10,6 +10,7 @@ worker fails minutes later somewhere unrelated.
 """
 
 import threading
+import time
 import tkinter as tk
 
 from rs_core import (bodies, cards, coverage, database, deposit, grounds, instance, migrate,
@@ -25,6 +26,8 @@ except ImportError:      # running outside EDMC
 # Who holds rs_core.instance when this process does, and the holder's text
 # when another one does: then no panel, journal, hotkeys or writes here.
 OWNER = "the EDMC plugin"
+# How long start() waits for a previous EDMC to let the lock go, seconds.
+LOCK_WAIT_S = 5.0
 _refused = None
 
 _system = ""
@@ -85,6 +88,13 @@ def start(plugin_dir, owner=OWNER):
     # lock file runs unlocked, as before the lock existed.
     try:
         _refused = instance.acquire(owner)
+        # Held by an EDMC still exiting after a restart: up to LOCK_WAIT_S
+        # for it to go. Standalone holding it is refused at once.
+        waited = 0.0
+        while _refused and _refused.startswith(OWNER) and waited < LOCK_WAIT_S:
+            time.sleep(0.25)
+            waited += 0.25
+            _refused = instance.acquire(owner)
     except OSError as err:
         logger.warning(f"no instance lock, running without one: {err}")
     if _refused is not None:
@@ -552,7 +562,8 @@ def _add_spansh(system, address, answer):
         spansh.mark_answered(address)
         # Hosted (standalone.py): its own redraw picks the bodies up, and
         # open_scan would pull the window over the game.
-        if _register.add_known(system, address, found) and scan.is_open()                 and not scan.hosted():
+        if (_register.add_known(system, address, found) and scan.is_open()
+                and not scan.hosted()):
             open_scan()
     _refresh_scan_count()
 

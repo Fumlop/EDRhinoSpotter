@@ -35,7 +35,10 @@ def newest(folder):
         return None
     if not names:
         return None
-    return max((os.path.join(folder, name) for name in names), key=os.path.getctime)
+    try:
+        return max((os.path.join(folder, name) for name in names), key=os.path.getctime)
+    except OSError:                     # deleted between listdir and getctime; the next poll asks again
+        return None
 
 
 class Journal:

@@ -1,5 +1,16 @@
 # Changelog
 
+## 5.7.0-beta.1
+
+**Added**
+
+- Standalone, no EDMC: `standalone.py`, or `RhinoSpotter-5.7.0-beta.1-Setup.exe` (per-user, no admin, Python bundled). RhinoData is the main window; the EDMC panel sits on its Bookmarks tab with a Settings button. Same data as the plugin; `db\instance.lock` keeps the two from running at once. Settings in `standalone.json`, log in `log\rhinospotter.log`. No update check.
+- `installer/build.py`: PyInstaller + Inno Setup. E2E: `rs_e2etest/standalone_e2e.py`, `rs_e2etest/installer_e2e.py`.
+
+**Changed**
+
+- The EDMC plugin takes the same lock at start; while the standalone holds it, the panel says so and does nothing else.
+
 ## 5.6.4
 
 **Fixed**

@@ -21,6 +21,7 @@ RhinoSpotter/
 ├── rs_ui/               everything that is
 ├── rs_tests/            pytest suite
 ├── rs_e2etest/          end-to-end harnesses
+├── installer/           standalone Setup.exe: build.py (PyInstaller + Inno Setup), RhinoSpotter.iss
 ├── mining_sheet.json    the mining sheet, frozen when the plugin was packaged
 ├── cards/               rendered cards (gitignored)
 ├── data/                screenshots and sidecars (gitignored)
@@ -364,6 +365,10 @@ mapping the unit tests it replaced.
   two standalones, a killed one, and the EDMC hooks.
 - **data_e2e.py** - migrate, replay (`--rebuild`, `--testmode`, a locked db)
   and `rs_api` against copies of the db and the journals.
+- **installer_e2e.py** - the built Setup.exe installed silently into the run
+  folder, the installed exe run on test data, uninstalled.
+- **paths_e2e.py** - the journal folder found after a move, before and after
+  EDMC's monitor starts.
 
 ## Where the data comes from
 

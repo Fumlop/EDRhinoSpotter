@@ -120,7 +120,9 @@ HOTKEYS = {"rhinospotter_hotkey_center": "Ctrl+Alt+Shift+F9",
            "rhinospotter_hotkey_data": "Ctrl+Alt+Shift+F12"}
 os.makedirs(ROOT_A)
 with open(os.path.join(ROOT_A, "standalone.json"), "w", encoding="utf-8") as handle:
-    json.dump(HOTKEYS, handle)
+    # journaldir: rs_core/paths asks the Saved Games known folder before
+    # %USERPROFILE%, so the redirected USERPROFILE alone reads the real journals.
+    json.dump(dict(HOTKEYS, journaldir=JDIR_A), handle)
 
 
 def append(text):
@@ -462,11 +464,11 @@ driver_thread.join(30)          # its checks after close run before part B takes
 
 PY = sys.executable
 STANDALONE = os.path.join(PLUGIN, "standalone.py")
-ENV_B, ROOT_B, _ = env_for("b")
+ENV_B, ROOT_B, JDIR_B = env_for("b")
 LOCK_B = os.path.join(ROOT_B, "db", "instance.lock")
 os.makedirs(ROOT_B)
 with open(os.path.join(ROOT_B, "standalone.json"), "w", encoding="utf-8") as handle:
-    json.dump(HOTKEYS, handle)                   # not the user's Ctrl+Alt defaults
+    json.dump(dict(HOTKEYS, journaldir=JDIR_B), handle)   # not the user's Ctrl+Alt defaults
 children = []
 
 
