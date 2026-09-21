@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.6.5
+
+**Fixed**
+
+- The map on the Bookmarks page circled every golden group; it shows the best 3 by Cr/h now, as Share map and the minimap do.
+
 ## 5.6.4
 
 **Fixed**
