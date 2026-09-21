@@ -176,7 +176,8 @@ try:
         headings = [line.strip() for line in handle if line.startswith("## ")]
     check("1 changelog leads with update.VERSION", headings and headings[0] == f"## {update.VERSION}",
           f"{headings[0] if headings else None} vs {update.VERSION}")
-    check("1 VERSION is three numbers", len(update.VERSION.split(".")) == 3
+    check("1 VERSION is three numbers, a pre-release suffix allowed",
+          re.fullmatch(r"\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?", update.VERSION) is not None
           and update.parse(update.VERSION) != (0, 0, 0), update.VERSION)
     check("1 RHINOSPOTTER_VERSION read at import", update.RUNNING == OLDER, update.RUNNING)
     before = start_plugin()
@@ -352,8 +353,12 @@ finally:
     silent.close()
 
 check("live plugin folder untouched", snapshot(PLUGIN, skip=("rs_e2etest",)) == live_plugin_before)
-check("live %LOCALAPPDATA%\\RhinoSpotter untouched",
-      (snapshot(LIVE_DATA) if os.path.isdir(LIVE_DATA) else {}) == live_data_before)
+live_data_after = snapshot(LIVE_DATA) if os.path.isdir(LIVE_DATA) else {}
+# A running EDMC writes there too (db, maps); the changed files are named so a
+# failure can be told apart from one this harness caused.
+check("live %LOCALAPPDATA%\\RhinoSpotter untouched", live_data_after == live_data_before,
+      sorted(k for k in set(live_data_before) | set(live_data_after)
+             if live_data_before.get(k) != live_data_after.get(k))[:6])
 
 failed = [r for r in results if not r[1]]
 with open(os.path.join(OUT, "report.txt"), "w", encoding="utf-8") as report:
