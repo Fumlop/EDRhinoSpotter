@@ -33,18 +33,19 @@ import time
 from rs_core import bodies, grounds, migrate, paths, store
 from rs_core.logging import logger
 
-JOURNAL_DIR = paths.journal_dir()
 JOURNAL_GLOB = "Journal."
 DAYS = 3
 
 
-def journal_files(root=JOURNAL_DIR, days=DAYS, now=None):
+def journal_files(root=None, days=DAYS, now=None):
     """Journal files touched in the last `days`, oldest first.
 
     Modification time rather than the timestamp in the filename: a session
     that ran past midnight keeps writing to yesterday's file, and sorting by
-    name would replay it before things that happened earlier.
+    name would replay it before things that happened earlier. `root` None:
+    rs_core.paths.journal_dir(), asked now.
     """
+    root = root or paths.journal_dir()
     cutoff = (now if now is not None else time.time()) - days * 86400
     try:
         names = os.listdir(root)
@@ -138,7 +139,7 @@ def rank(systems, sheet):
     return [(system, seen, value) for value, _, system, seen in rows]
 
 
-def best(root=JOURNAL_DIR, days=DAYS, sheet=None):
+def best(root=None, days=DAYS, sheet=None):
     """The best system in the recent journals -> (system, bodies), or None."""
     sheet = sheet or grounds.Sheet()
     systems = replay(journal_files(root, days))
@@ -194,7 +195,7 @@ def rebuild(systems):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Rank the systems in recent journals")
     parser.add_argument("--days", type=int, default=DAYS)
-    parser.add_argument("--root", default=JOURNAL_DIR)
+    parser.add_argument("--root", default=None, help="journal folder; default: rs_core.paths")
     parser.add_argument("--top", type=int, default=10)
     parser.add_argument("--testmode", action="store_true",
                         help="write the best system to the cache, so the next "

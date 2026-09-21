@@ -15,10 +15,6 @@ import re
 from rs_core import paths
 from datetime import datetime, timezone
 
-# Beside the journals, wherever those are - a moved folder or a second
-# install is EDMC's answer, not a guess here. See rs_core/paths.
-STATUS_PATH = os.path.join(paths.journal_dir(), "Status.json")
-
 # Every material the sheet has rows for, plus bromellite, which is minable on
 # ice and simply has no rows yet. Hardcoded rather than read off the sheet, so
 # the dropdown fills even when mining_sheet.json is missing.
@@ -100,9 +96,13 @@ def leaves_location(entry):
     return entry.get("event") == "Liftoff" and entry.get("PlayerControlled", True)
 
 
-def read_status(path=STATUS_PATH):
+def read_status(path=None):
     """Status.json, or an empty dict - the game rewrites it constantly and a
-    read that lands mid-write must not cost you the mark."""
+    read that lands mid-write must not cost you the mark.
+
+    `path` None: beside the journals, asked of rs_core.paths on every read.
+    """
+    path = path or os.path.join(paths.journal_dir(), "Status.json")
     try:
         with open(path, encoding="utf-8") as handle:
             return json.load(handle)

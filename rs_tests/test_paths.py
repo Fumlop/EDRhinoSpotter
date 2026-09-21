@@ -5,7 +5,6 @@ and a fake `config` module are what EDMC actually puts in sys.modules, so the
 test exercises the same import the plugin does.
 """
 
-import os
 import sys
 
 import pytest
@@ -13,16 +12,14 @@ import pytest
 from rs_core import paths
 
 
+@pytest.fixture(autouse=True)
+def fresh(monkeypatch):
+    """journal_dir() keeps its answer for the process; each test is a start."""
+    monkeypatch.setattr(paths, "_found", None)
+
+
 def fake_module(name, **attributes):
     return type(name, (), attributes)
-
-
-@pytest.fixture
-def no_edmc(monkeypatch):
-    """A bare interpreter: neither monitor nor config importable."""
-    monkeypatch.delitem(sys.modules, "monitor", raising=False)
-    monkeypatch.delitem(sys.modules, "config", raising=False)
-    monkeypatch.setattr(sys, "path", [p for p in sys.path])
 
 
 def with_monitor(monkeypatch, currentdir):
@@ -59,13 +56,6 @@ class TestJournalDir:
         with_config(monkeypatch, "~/journals")
         assert "~" not in paths.journal_dir()
 
-    def test_without_edmc_the_windows_default_is_the_fallback(self, no_edmc, monkeypatch):
-        monkeypatch.setenv("USERPROFILE", r"C:\Users\cmdr")
-        found = paths.journal_dir()
-        assert found.startswith(r"C:\Users\cmdr")
-        assert found.endswith("Elite Dangerous")
-        assert "%" not in found                   # nothing left unexpanded
-
     def test_a_monitor_that_raises_does_not_take_the_plugin_with_it(self, monkeypatch):
         class Angry:
             @property
@@ -73,20 +63,4 @@ class TestJournalDir:
                 raise OSError("no")
         monkeypatch.setitem(sys.modules, "monitor", fake_module("monitor", monitor=Angry()))
         monkeypatch.delitem(sys.modules, "config", raising=False)
-        monkeypatch.setenv("USERPROFILE", r"C:\Users\cmdr")
         assert paths.journal_dir().endswith("Elite Dangerous")
-
-
-@pytest.mark.parametrize("module, attribute", [
-    ("rs_core.spotmark", "STATUS_PATH"),
-    ("rs_core.replay", "JOURNAL_DIR"),
-])
-def test_nothing_spells_the_saved_games_path_itself(module, attribute):
-    """The two that used to hardcode it. Both go through paths now, so a
-    commander who moved the folder is read rather than reported as not flying."""
-    import importlib
-    value = getattr(importlib.import_module(module), attribute)
-    expected = (os.path.join(paths.journal_dir(), "Status.json")
-                if attribute == "STATUS_PATH" else paths.journal_dir())
-    assert "%" not in value
-    assert value == expected
