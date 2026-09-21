@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.6.4
+
+**Fixed**
+
+- A moved Saved Games folder was not found: Status.json and the journals were looked for under `%USERPROFILE%\Saved Games`. The path was fixed at import, ~1.4 s before EDMC's monitor starts. Now looked up once a start, in order: the folder EDMC watches, the one typed in EDMC's settings, EDMC's default (the Saved Games known folder), then `%USERPROFILE%`. Kept once EDMC's monitor answers.
+
 ## 5.6.3
 
 **Fixed**
