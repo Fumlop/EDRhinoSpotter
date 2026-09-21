@@ -91,6 +91,8 @@ HINT = ("A location folds. The arrow the card starts draws over the game, top "
         "middle - borderless or windowed only.")
 
 _window = None           # only ever one, so the button cannot bury the panel
+_host = None             # standalone.py: the root drawn into instead of a Toplevel
+_dock = None             # standalone.py: the panel frame, a child of _host, kept across draws
 _scan = None             # (register, sheet, focus, variable, materials)
 _canvases = {}           # the scrolling canvases of the draw on screen
 _scroll = {}             # how far each of them had been scrolled, by name
@@ -121,6 +123,21 @@ SEARCH_HITS = 3
 
 def is_open():
     return _window is not None and bool(_window.winfo_exists())
+
+
+def host(window, dock):
+    """Draw into `window` instead of a Toplevel, with `dock` on the Bookmarks tab.
+
+    standalone.py only. `dock` must be a child of `window`: it is packed into
+    the middle pane with `in_`, which Tk allows only inside the same toplevel.
+    Escape is not bound to destroy `window`.
+    """
+    global _host, _dock
+    _host, _dock = window, dock
+
+
+def hosted():
+    return _host is not None
 
 
 def show(parent, register, sheet, focus=None, variable=None, materials=(), here=None):
@@ -161,7 +178,7 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
         return _window
 
     logger.debug(f"scan: open, system={register.system!r} focus={focus!r}")
-    _window = tk.Toplevel(parent)
+    _window = _host if _host is not None else tk.Toplevel(parent)
     _window.configure(bg=BG)
     # Debug only, and only on the window itself: whatever takes it away, this is
     # the line that names it. A window that vanishes with no Python frame behind
@@ -172,7 +189,8 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
     # moment something else is clicked.
     _window.attributes("-topmost", True)
     _window.bind("<FocusIn>", _drop_topmost, add="+")
-    _window.bind("<Escape>", lambda event: _window.destroy())
+    if _host is None:
+        _window.bind("<Escape>", lambda event: _window.destroy())
     _window.focus_force()
     _size(_window)
 
@@ -231,7 +249,18 @@ def _log_destroy(event):
 
 def _clear(window):
     for child in window.winfo_children():
-        child.destroy()
+        if child is not _dock:
+            child.destroy()
+
+
+def _pack_dock(parent):
+    """The standalone panel into `parent`, where the next pack call puts it.
+    Unpacked again when `parent` is destroyed by the next draw."""
+    if _dock is None:
+        return
+    _dock.pack(in_=parent, fill="x", padx=16, pady=(10, 0))
+    # Older than the pane frames in stacking order: without lift() they cover it.
+    _dock.lift()
 
 
 # ---------------------------------------------------------------- the drawing
@@ -609,6 +638,7 @@ def _middle(parent, register, sheet, focus, body, records, groups, maps, materia
     pane that knows what is folded, and the card is downstream of that.
     """
     if body is None:
+        _pack_dock(parent)
         _empty(parent, register, focus)
         return None
 
@@ -642,6 +672,8 @@ def _middle(parent, register, sheet, focus, body, records, groups, maps, materia
              font=("Segoe UI", 9)).pack(fill="x", pady=(4, 0))
     _rates(head, sheet, body, focus, materials)
 
+    if _state["view"] == "bookmarks":
+        _pack_dock(parent)
     if _state["view"] == "mapped":
         picked = _mapped_list(parent, body, mapped, unknown)
     else:

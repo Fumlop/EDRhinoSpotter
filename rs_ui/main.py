@@ -12,8 +12,8 @@ worker fails minutes later somewhere unrelated.
 import threading
 import tkinter as tk
 
-from rs_core import (bodies, cards, coverage, database, deposit, grounds, migrate, palette,
-                     spansh, spotcard, spotmark, store, update)
+from rs_core import (bodies, cards, coverage, database, deposit, grounds, instance, migrate,
+                     palette, spansh, spotcard, spotmark, store, update)
 from rs_core.logging import logger
 from rs_ui import hotkey, minimap, scan
 
@@ -21,6 +21,11 @@ try:
     from theme import theme
 except ImportError:      # running outside EDMC
     theme = None
+
+# Who holds rs_core.instance when this process does, and the holder's text
+# when another one does: then no panel, journal, hotkeys or writes here.
+OWNER = "the EDMC plugin"
+_refused = None
 
 _system = ""
 _cmdr = None
@@ -74,8 +79,17 @@ SEARCH_SHOWN = False     # the Search row under Bookmark, off until search works
 NOT_READ = "-"
 
 
-def start(plugin_dir):
-    global _sheet
+def start(plugin_dir, owner=OWNER):
+    global _sheet, _refused
+    # Before anything touches the data folder. A folder that cannot hold the
+    # lock file runs unlocked, as before the lock existed.
+    try:
+        _refused = instance.acquire(owner)
+    except OSError as err:
+        logger.warning(f"no instance lock, running without one: {err}")
+    if _refused is not None:
+        logger.warning(f"not started: {_refused} holds {instance.PATH}")
+        return "RhinoSpotter"
     # Before anything reads the database: the JSON files of 4.1 go in once.
     try:
         migrate.run()
@@ -91,9 +105,23 @@ def start(plugin_dir):
     return "RhinoSpotter"
 
 
-def build(parent):
+def refused():
+    """The refusal line when another RhinoSpotter holds the data folder, else None."""
+    if _refused is None:
+        return None
+    return f"RhinoSpotter off: {_refused} is running on the same data. Close it and restart."
+
+
+def build(parent, updates=True):
+    """The panel. `updates`: look for a release hourly; standalone.py passes False."""
     global _frame, _status, _scan_count, _card_button, _landed_after, _hint
     global _loc, _rigs, _material, _density, _amount, _search, _menu, _filter
+
+    if _refused is not None:
+        frame = tk.Frame(parent)
+        tk.Label(frame, text=refused(), anchor="w", wraplength=320, justify="left",
+                 fg=palette.ALERT).grid(row=0, column=0, sticky="w", padx=2, pady=4)
+        return frame
 
     _frame = tk.Frame(parent)
     _frame.columnconfigure(1, weight=1)
@@ -193,7 +221,8 @@ def build(parent):
     _poll_landed()
 
     _refresh_scan_count()
-    _check_updates()
+    if updates:
+        _check_updates()
     hotkey.start({hotkey.CENTER: lambda: _on_ui(minimap.center_here),
                   hotkey.BORDER: lambda: _on_ui(minimap.border_here),
                   hotkey.SIZE: lambda: _on_ui(minimap.bigger),
@@ -333,6 +362,8 @@ def stop():
     longer there.
     """
     global _landed_after, _done_after, _update_after
+    if _refused is not None:
+        return
     _landed_after = _cancel_landed()
     _done_after = _cancel_done()
     if _update_after and _frame:
@@ -348,6 +379,7 @@ def stop():
     _writes.flush()
     # After every write, so the copy has them.
     database.backup()
+    instance.release()
 
 
 def _materials():
@@ -401,10 +433,17 @@ def _fill_menu():
 
 
 def prefs(parent):
+    if _refused is not None:
+        import myNotebook as nb                    # EDMC's; plugin_prefs must return an nb.Frame
+        frame = nb.Frame(parent)
+        nb.Label(frame, text=refused()).grid(row=0, column=0, sticky="w", padx=10, pady=10)
+        return frame
     return minimap.prefs(parent)
 
 
 def prefs_changed():
+    if _refused is not None:
+        return
     minimap.prefs_changed()
     # The switch may have taken materials out of the list or put them back, and
     # _on_material_changed only fires when the picked one moves.
@@ -421,6 +460,8 @@ def _focus():
 
 def journal_entry(cmdr, is_beta, system, station, entry, state):
     global _system, _cmdr
+    if _refused is not None:
+        return
 
     if system:
         _system = system
@@ -509,7 +550,9 @@ def _add_spansh(system, address, answer):
         _spansh[address] = "answered"
         _spansh_known[address] = known
         spansh.mark_answered(address)
-        if _register.add_known(system, address, found) and scan.is_open():
+        # Hosted (standalone.py): its own redraw picks the bodies up, and
+        # open_scan would pull the window over the game.
+        if _register.add_known(system, address, found) and scan.is_open()                 and not scan.hosted():
             open_scan()
     _refresh_scan_count()
 

@@ -18,6 +18,29 @@ Unpack into `%LOCALAPPDATA%\EDMarketConnector\plugins\RhinoSpotter\` so that
 Updates: when a release is out, **Bookmark** reads **Update**. Press it, then
 restart EDMC. Your data is not in the plugin folder and is never touched.
 
+## Without EDMC
+
+    pip install pillow requests
+    python standalone.py
+
+Tested with Python 3.13 on Windows, run from this folder or a clone of the
+repo. One window: RhinoData, with the panel EDMC shows (Location, Rigs,
+Material, Amount, Density, Bookmark) on its Bookmarks tab, and a **Settings**
+button under it. It reads the newest journal in
+`%USERPROFILE%\Saved Games\Frontier Developments\Elite Dangerous` and
+Status.json beside it; a different folder goes in `standalone.json` as
+`"journaldir"`.
+
+Same data as the plugin. The plugin and `standalone.py` never run together:
+the second one to start says which one holds the data and stays off (plugin)
+or exits (standalone). No update check - pull the repo instead.
+
+| What | Where |
+|---|---|
+| Settings | `%LOCALAPPDATA%\RhinoSpotter\standalone.json` (EDMC's are not read) |
+| Log | `%LOCALAPPDATA%\RhinoSpotter\log\rhinospotter.log` |
+| Lock | `%LOCALAPPDATA%\RhinoSpotter\db\instance.lock` |
+
 ## RhinoData - where to land
 
 <p align="center">
