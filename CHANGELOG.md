@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.6.0
+
+**Changed**
+
+- **Place the map** shows the map with Settings open, in the SRV or not. Drag it anywhere, any monitor; double-click or Esc locks it.
+- Free move: position saved as screen pixels, clamped to the nearest monitor. No longer follows the game window. Free move off: game-window corner as before.
+
 ## 5.5.1
 
 **Added**

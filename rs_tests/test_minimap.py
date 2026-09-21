@@ -74,7 +74,7 @@ class FakeConfig:
         self.values[key] = value
 
 
-GAME = (100, 50, 1700, 950)          # a windowed game, 1600 x 900
+GAME = (100, 50, 1700, 950)          # a monitor's work area, 1600 x 900
 
 
 class TestFreeMove:
@@ -83,37 +83,37 @@ class TestFreeMove:
     def test_off_by_default(self):
         assert minimap.free_move() is False
 
-    def test_the_offset_is_from_the_game_window_not_the_screen(self, monkeypatch):
+    def test_the_position_is_screen_pixels(self, monkeypatch):
         monkeypatch.setattr(minimap, "config",
-                            FakeConfig(**{minimap.POS_KEY: "40,30"}))
-        assert minimap.offset() == (40, 30)
-        assert minimap.free_xy(GAME, 260, 380, (40, 30)) == (140, 80)
+                            FakeConfig(**{minimap.POS_KEY: "140,80"}))
+        assert minimap.position() == (140, 80)
+        assert minimap.free_xy(GAME, 260, 380, (140, 80)) == (140, 80)
 
-    def test_the_game_moving_takes_the_map_with_it(self):
-        moved = (500, 200, 2100, 1100)
-        assert minimap.free_xy(moved, 260, 380, (40, 30)) == (540, 230)
+    def test_a_position_on_a_second_monitor_stays_there(self):
+        right_monitor = (1920, 0, 3840, 1040)
+        assert minimap.free_xy(right_monitor, 260, 380, (2100, 80)) == (2100, 80)
 
-    def test_an_offset_past_the_edge_is_pulled_back_inside(self):
-        """The game gets resized and a monitor gets unplugged. A map parked
-        outside the window cannot be dragged back."""
+    def test_a_position_past_the_edge_is_pulled_back_onto_the_monitor(self):
+        """A monitor gets unplugged. A map parked off every screen cannot be
+        dragged back."""
         x, y = minimap.free_xy(GAME, 260, 380, (5000, 5000))
         assert (x, y) == (1700 - 260, 950 - 380)
 
-    def test_a_negative_offset_stops_at_the_top_left(self):
+    def test_a_negative_position_stops_at_the_top_left(self):
         assert minimap.free_xy(GAME, 260, 380, (-800, -800)) == (100, 50)
 
-    def test_a_window_bigger_than_the_game_still_starts_inside_it(self):
-        assert minimap.free_xy(GAME, 4000, 4000, (10, 10)) == (100, 50)
+    def test_a_window_bigger_than_the_monitor_still_starts_on_it(self):
+        assert minimap.free_xy(GAME, 4000, 4000, (110, 60)) == (100, 50)
 
-    def test_nonsense_in_the_setting_is_no_offset_at_all(self, monkeypatch):
+    def test_nonsense_in_the_setting_is_no_position_at_all(self, monkeypatch):
         """Then the map is back in its corner, which is somewhere it can be seen."""
         for stored in ("", "left", "10", "10,20,30", "a,b"):
             monkeypatch.setattr(minimap, "config", FakeConfig(**{minimap.POS_KEY: stored}))
-            assert minimap.offset() is None
+            assert minimap.position() is None
 
-    def test_no_config_no_offset(self, monkeypatch):
+    def test_no_config_no_position(self, monkeypatch):
         monkeypatch.setattr(minimap, "config", None)
-        assert minimap.offset() is None
+        assert minimap.position() is None
 
 
 class TestPlaceMode:
@@ -123,7 +123,7 @@ class TestPlaceMode:
         monkeypatch.setattr(minimap, "_window", None)
         monkeypatch.setattr(minimap, "_notice_now", said.append)
         assert minimap.place() is False
-        assert said and "SRV" in said[0]
+        assert said and "no map window" in said[0]
 
     def test_locking_when_nothing_is_being_placed_is_a_no_op(self, monkeypatch):
         monkeypatch.setattr(minimap, "_placing", False)

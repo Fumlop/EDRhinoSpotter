@@ -1,6 +1,6 @@
 """The minimap over the game: what the scanner has been driven over.
 
-Up while you are in the SRV, hidden when you are not. Fed the Status.json the
+Up while you are in the SRV or placing it from Settings, hidden otherwise. Fed the Status.json the
 panel already reads once a second, so it has no timer of its own. The painting
 is rs_core.coverage; this is the window, the corner it sits in, and the
 settings that switch it on and pick the corner.
@@ -41,10 +41,10 @@ ENABLED_KEY = "rhinospotter_minimap_enabled"
 CORNER_KEY = "rhinospotter_minimap_corner"
 KEEP_KEY = "rhinospotter_minimap_keep"
 FREE_KEY = "rhinospotter_minimap_free"
-# Where the commander dragged it, as "dx,dy" from the game window's top
-# left - the game gets moved and resized, and a corner-free map has to
-# follow it rather than sit at a screen coordinate.
-POS_KEY = "rhinospotter_minimap_pos"
+# Where the commander dragged it, as "x,y" screen pixels of its top left -
+# any monitor, and it stays there when the game window moves. Not
+# rhinospotter_minimap_pos: that held an offset from the game window (5.5.1).
+POS_KEY = "rhinospotter_minimap_xy"
 ZOOM_KEY = "rhinospotter_minimap_zoom"
 SRV_KEY = "rhinospotter_srv_type"
 # Whether the material lists carry the cheap half. Not a minimap setting - it
@@ -111,6 +111,7 @@ _low_value = None        # tk.BooleanVar on the settings tab
 _lifted = False          # the game is over the map, so it is being lifted every tick
 _placing = False         # in place-the-map mode: click-through off, drag to move
 _grab = None             # (pointer x, pointer y, window x, window y) while dragging
+_held = None             # the widget whose Tk grab place() took - EDMC's Settings dialog
 
 
 def enabled():
@@ -145,32 +146,56 @@ def low_value_shown():
     return config.get_bool(LOW_VALUE_KEY, default=False) if config is not None else False
 
 
-def offset():
-    """(dx, dy) from the game window's top left, or None.
+def position():
+    """(x, y) in screen pixels, or None.
 
     Stored as text because EDMC's config holds strings and ints, and a pair
-    of them is neither. Anything unreadable is no offset at all, which puts
+    of them is neither. Anything unreadable is no position at all, which puts
     the map back in its corner rather than at 0,0."""
     if config is None:
         return None
     try:
-        dx, dy = config.get_str(POS_KEY, default="").split(",")
-        return int(dx), int(dy)
+        x, y = config.get_str(POS_KEY, default="").split(",")
+        return int(x), int(y)
     except (AttributeError, TypeError, ValueError):
         return None
 
 
-def free_xy(rect, width, height, where):
-    """Where a dragged map goes, kept inside the game window.
+def free_xy(bounds, width, height, where):
+    """Where a dragged map goes: `where`, clamped inside `bounds` - the
+    monitor it lands on.
 
-    Clamped rather than trusted: the game gets resized, a second monitor
-    gets unplugged, and an offset measured against yesterday's window would
-    put the map off the screen with no way to drag it back."""
-    left, top, right, bottom = rect
-    dx, dy = where
-    x = min(max(left, left + dx), max(left, right - width))
-    y = min(max(top, top + dy), max(top, bottom - height))
+    Clamped because a monitor gets unplugged and a stored position would then
+    put the map off every screen."""
+    left, top, right, bottom = bounds
+    x = min(max(left, where[0]), max(left, right - width))
+    y = min(max(top, where[1]), max(top, bottom - height))
     return x, y
+
+
+def _monitor_rect(x, y, width, height):
+    """(left, top, right, bottom) of the monitor nearest this
+    rectangle, or None off Windows. MonitorFromRect, MONITOR_DEFAULTTONEAREST."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class MONITORINFO(ctypes.Structure):
+            _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", wintypes.RECT),
+                        ("rcWork", wintypes.RECT), ("dwFlags", wintypes.DWORD)]
+
+        user32 = ctypes.windll.user32
+        user32.MonitorFromRect.restype = wintypes.HANDLE
+        user32.GetMonitorInfoW.argtypes = [wintypes.HANDLE, ctypes.POINTER(MONITORINFO)]
+        rect = wintypes.RECT(x, y, x + width, y + height)
+        monitor = user32.MonitorFromRect(ctypes.byref(rect), 2)
+        info = MONITORINFO(cbSize=ctypes.sizeof(MONITORINFO))
+        if not monitor or not user32.GetMonitorInfoW(monitor, ctypes.byref(info)):
+            return None
+        area = info.rcMonitor
+        return area.left, area.top, area.right, area.bottom
+    except (ImportError, AttributeError, OSError):
+        return None
 
 
 def _step():
@@ -292,6 +317,7 @@ def update(root, status, system=None, ids=None, ground=None):
     except Exception:
         logger.exception("minimap: could not draw, down until the next launch")
         _failed = True
+        _lock()                       # a hidden map must not keep Settings' grab
         hide()
 
 
@@ -556,6 +582,8 @@ def _down(reason):
     and an EDMC restart - by which time whatever hid it was over.
     """
     global _why
+    if _placing:
+        return                   # Settings -> Place the map keeps it up, in the SRV or not
     if reason != _why:
         logger.info(f"minimap: down, {reason}")
         _why = reason
@@ -587,7 +615,7 @@ def hide():
 def stop():
     """EDMC is closing: the window goes, the map is written first."""
     global _window, _canvas, _handle, _shown, _placed, _photo, _drawn
-    global _coverage, _saved, _in_srv, _failed, _marks, _why
+    global _coverage, _saved, _in_srv, _failed, _marks, _why, _placing, _held
     _writes.flush()
     if _window is not None:
         try:
@@ -595,8 +623,8 @@ def stop():
         except tk.TclError:
             pass
     _window = _canvas = _handle = _placed = _photo = _drawn = _coverage = _saved = _marks = None
-    _shown = _in_srv = _failed = False
-    _why = None
+    _shown = _in_srv = _failed = _placing = False
+    _why = _held = None
     _fresh.clear()
 
 
@@ -642,8 +670,9 @@ def prefs(parent):
          lambda f: nb.OptionMenu(f, _corner, _corner.get(), *CORNERS))
     line(lambda f: nb.Checkbutton(
         f, text="Free move - put it where you dragged it, not in a corner", variable=_free))
-    line(lambda f: nb.Button(f, text="Place the map", command=place),
-         lambda f: nb.Label(f, text="In the SRV: drag it, then double-click or Esc."))
+    line(lambda f: nb.Button(f, text="Place the map",
+                             command=lambda: place(frame.nametowidget("."))),
+         lambda f: nb.Label(f, text="Drag it, any monitor, then double-click or Esc."))
     line(lambda f: nb.Label(f, text="Painted means driven within "
                                     f"{coverage.SCAN_RADIUS_M / 1000:.0f} km, not scanned."))
 
@@ -685,6 +714,8 @@ def prefs(parent):
             return box
 
         line(lambda f, name=name: nb.Label(f, text=name), keys)
+    # Settings closed, by OK or the window's X, while placing: locked where it is.
+    frame.bind("<Destroy>", lambda event: _lock(), add="+")
     return frame
 
 
@@ -718,7 +749,12 @@ def _delete_migrated(frame, result):
 
 
 def place(root=None):
-    """Place the map: click-through off, drag it, Esc or a click to lock.
+    """Place the map: click-through off, drag it, Esc or a double-click to lock.
+
+    `root` is EDMC's main window, to build the map under outside the SRV; there
+    it shows as an empty frame of the size it will have. The Tk grab EDMC's
+    Settings dialog holds (prefs.py grab_set) is taken for the drag and handed
+    back in _lock - under it the map gets no mouse events.
 
     A drag and not a hover, because the window cannot feel a hover. It is
     WS_EX_TRANSPARENT so the mouse goes through it to the game - that is
@@ -727,13 +763,20 @@ def place(root=None):
     So the mode is entered from the settings tab, and while it is on the
     window takes the mouse like an ordinary one.
     """
-    global _placing
-    if _window is None or not _window.winfo_exists():
-        _notice_now("start the SRV first - there is no map to place yet")
-        return False
+    global _placing, _held
     if _placing:
         return _lock()
+    if (_window is None or not _window.winfo_exists()) and (root is None or not _build(root)):
+        _notice_now("no map window here to place")
+        return False
+    if not _shown:
+        _preview()
     _placing = True
+    try:
+        _held = _window.grab_current()
+        _window.grab_set()
+    except tk.TclError:
+        _held = None
     overlay._click_through(_window, on=False)
     try:
         _window.attributes("-alpha", 1.0)
@@ -750,6 +793,23 @@ def place(root=None):
     return True
 
 
+def _preview():
+    """An empty map frame, sized as in the SRV, where the map would be."""
+    global _drawn
+    rect = overlay._game_rect()
+    height = rect[3] - rect[1] if rect else None
+    base = coverage.map_side(height)
+    side = coverage.map_side(height, zoom())
+    unit, _, _, width, full = _layout(side, base)
+    _canvas.delete("all")
+    _canvas.create_rectangle(1, 1, width - 2, full - 2, outline=palette.ACCENT, width=2)
+    _canvas.create_text(width / 2, full / 2, text="Minimap\n\ndrag it here\ndouble-click or Esc",
+                        fill=palette.FG, justify="center",
+                        font=("Segoe UI", max(9, round(10 * unit)), "bold"))
+    _drawn = None                            # the SRV draws over it on its next tick
+    _place(side, corner(), rect, base)
+
+
 def _take(event):
     global _grab
     _grab = (event.x_root, event.y_root, _window.winfo_x(), _window.winfo_y())
@@ -763,22 +823,24 @@ def _drag(event):
 
 
 def _drop(event):
-    """Remember where it was dropped, as an offset from the game window."""
+    """Remember where it was dropped, in screen pixels. A click without a
+    move, the first half of the locking double-click, stores nothing."""
     global _grab, _placed
+    moved = _grab is not None and (_window.winfo_x(), _window.winfo_y()) != _grab[2:]
     _grab = None
-    rect = overlay._game_rect()
-    left, top = (rect[0], rect[1]) if rect else (0, 0)
+    if not moved:
+        return
     if config is not None:
-        config.set(POS_KEY, f"{_window.winfo_x() - left},{_window.winfo_y() - top}")
+        config.set(POS_KEY, f"{_window.winfo_x()},{_window.winfo_y()}")
         config.set(FREE_KEY, True)
     if _free is not None:
         _free.set(True)
-    _placed = None                           # the next tick reads the new offset
+    _placed = None                           # the next tick reads the new position
 
 
 def _lock():
     """Out of place mode: the mouse goes through it again."""
-    global _placing, _grab
+    global _placing, _grab, _held
     if not _placing:
         return False
     _drop(None) if _grab else None
@@ -792,6 +854,16 @@ def _lock():
         _window.attributes("-alpha", MAP_ALPHA)
     except tk.TclError:
         pass
+    try:
+        _window.grab_release()
+        if _held is not None and _held.winfo_exists():
+            _held.grab_set()
+            _held.focus_force()
+    except tk.TclError:
+        pass
+    _held = None
+    if not _in_srv:
+        hide()
     _notice_now("placed")
     logger.info("minimap: placed")
     return True
@@ -908,7 +980,7 @@ def _layout(side, base=None):
 
 
 def _place(side, where, rect, base=None):
-    """Into the corner, shown, and on top - every tick, since the game gets
+    """Into the corner or the dragged position, shown, and on top - every tick, since the game gets
     moved and a game going fullscreen takes the top of the Z-order with it."""
     global _placed, _shown
     _, _, _, width, height = _layout(side, base)
@@ -917,9 +989,10 @@ def _place(side, where, rect, base=None):
     else:
         left, top = 0, 0
         right, bottom = _window.winfo_screenwidth(), _window.winfo_screenheight()
-    dragged = offset() if free_move() else None
+    dragged = position() if free_move() else None
     if dragged is not None:
-        x, y = free_xy((left, top, right, bottom), width, height, dragged)
+        screen = _monitor_rect(*dragged, width, height) or (left, top, right, bottom)
+        x, y = free_xy(screen, width, height, dragged)
     else:
         inset = max(16, int((bottom - top) * 0.03))
         x = left + inset if "left" in where else right - inset - width
