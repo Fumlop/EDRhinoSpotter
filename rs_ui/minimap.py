@@ -970,8 +970,8 @@ def _layout(side, base=None):
 
 
 def _place(side, where, rect, base=None):
-    """Into the corner or the dragged position, shown, and on top - every tick, since the game gets
-    moved and a game going fullscreen takes the top of the Z-order with it."""
+    """Into the corner or the dragged position, shown, and on top: moved every
+    tick, HWND_TOPMOST re-sent every overlay.TOPMOST_EVERY_S and on a re-show."""
     global _placed, _shown
     _, _, _, width, height = _layout(side, base)
     if rect:
@@ -1001,11 +1001,12 @@ def _place(side, where, rect, base=None):
         _placed = geometry
     if _handle and not _placing:          # while dragging, Tk's geometry() moves it
         user32 = _user32()
-        overlay.set_topmost(_handle, x, y, width, height)
         # Asked every tick, not trusted from _shown: after a hide through Win32
         # the map stayed down once Guide and RhinoData had been used, with
-        # _shown saying it was up. Showing a shown window again costs nothing.
-        if not _shown or not user32.IsWindowVisible(_handle):
+        # _shown saying it was up.
+        hidden = not _shown or not user32.IsWindowVisible(_handle)
+        overlay.set_topmost(_handle, x, y, width, height, force=hidden)
+        if hidden:
             user32.ShowWindow(_handle, SW_SHOWNOACTIVATE)
     elif not _shown:
         _window.deiconify()

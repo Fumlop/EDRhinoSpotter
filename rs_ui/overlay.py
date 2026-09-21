@@ -36,6 +36,10 @@ WIDTH = 240
 HEIGHT = 190
 POLL_MS = 500
 
+# How often set_topmost re-sends HWND_TOPMOST for a window that has not moved,
+# seconds. A move, or a window just shown again, is sent at once.
+TOPMOST_EVERY_S = 5
+
 # How long a message stays up before the overlay takes itself down, when it
 # never managed to point anywhere. You pressed Guide on the wrong body, it says
 # so, and then it is gone - nobody should have to press Stop to clear a
@@ -70,6 +74,7 @@ _hidden = False          # hidden because Elite is not the window in front
 _frames = {}             # (bucket, colour) -> PhotoImage, built as angles come up
 _typed_user32 = None     # own WinDLL: argtypes set here stay off EDMC's ctypes.windll.user32
 _topmost_errors = {}     # handle -> last SetWindowPos error, logged when it changes
+_topmost_sent = {}       # handle -> ((x, y, width, height), monotonic s) of the last send
 
 
 def _key(record):
@@ -252,11 +257,6 @@ def _place():
         set_topmost(user32.GetParent(_window.winfo_id()) or _window.winfo_id(), x, y, WIDTH, HEIGHT)
     except (ImportError, AttributeError, OSError):
         pass
-    # Said again every tick. Topmost is a request, not a promise - a game
-    # going fullscreen takes the top of the Z-order with it, and the arrow
-    # that was over it is then behind it with nothing to say so.
-    _window.attributes("-topmost", True)
-    _window.lift()
 
 
 def foreground_title():
@@ -297,18 +297,27 @@ def _show(visible):
         user32 = ctypes.windll.user32
         handle = user32.GetParent(_window.winfo_id()) or _window.winfo_id()
         user32.ShowWindow(handle, 4 if visible else 0)   # SW_SHOWNOACTIVATE, SW_HIDE
+        if visible:
+            _topmost_sent.pop(handle, None)              # raised on the next _place
     except (ImportError, AttributeError, OSError):
         return
     _hidden = not visible
 
 
-def set_topmost(handle, x, y, width, height):
+def set_topmost(handle, x, y, width, height, force=False):
     """SetWindowPos(HWND_TOPMOST, SWP_NOACTIVATE): moved, sized, top of the topmost band.
 
     Typed: HWND_TOPMOST is (HWND)-1, and an untyped -1 is sent as a 32-bit int,
-    refused with ERROR_INVALID_WINDOW_HANDLE (1400).
+    refused with ERROR_INVALID_WINDOW_HANDLE (1400). Skipped, unless `force`,
+    when the window has not moved and the last good send is under
+    TOPMOST_EVERY_S old.
     """
     global _typed_user32
+    now = time.monotonic()
+    rect = (x, y, width, height)
+    last = _topmost_sent.get(handle)
+    if not force and last and last[0] == rect and now - last[1] < TOPMOST_EVERY_S:
+        return
     import ctypes
     from ctypes import wintypes
     if _typed_user32 is None:
@@ -318,6 +327,8 @@ def set_topmost(handle, x, y, width, height):
         _typed_user32.SetWindowPos.restype = wintypes.BOOL
     ok = _typed_user32.SetWindowPos(handle, wintypes.HWND(-1), x, y, width, height, 0x10)
     error = 0 if ok else ctypes.get_last_error()
+    if ok:
+        _topmost_sent[handle] = (rect, now)
     if error != _topmost_errors.get(handle, 0):
         if error:
             logger.warning(f"overlay: SetWindowPos HWND_TOPMOST failed, error {error}")

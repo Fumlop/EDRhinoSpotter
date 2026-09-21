@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.6.2
+
+**Changed**
+
+- Minimap and guide arrow re-send `HWND_TOPMOST` at most every 5 s while standing still; at once on a move, a re-show or after a failed send. The arrow's Tk `-topmost` + `lift()` every 500 ms is gone. Mitigation until exclusive fullscreen is tested against a window raised over it every tick.
+
 ## 5.6.1
 
 **Fixed**
