@@ -68,6 +68,8 @@ _here = None             # when HERE was first shown on this run
 _pointed = False         # whether this run ever drew an arrow
 _hidden = False          # hidden because Elite is not the window in front
 _frames = {}             # (bucket, colour) -> PhotoImage, built as angles come up
+_typed_user32 = None     # own WinDLL: argtypes set here stay off EDMC's ctypes.windll.user32
+_topmost_errors = {}     # handle -> last SetWindowPos error, logged when it changes
 
 
 def _key(record):
@@ -247,8 +249,7 @@ def _place():
     try:
         import ctypes
         user32 = ctypes.windll.user32
-        handle = user32.GetParent(_window.winfo_id()) or _window.winfo_id()
-        user32.SetWindowPos(handle, -1, x, y, WIDTH, HEIGHT, 0x10)   # HWND_TOPMOST, SWP_NOACTIVATE
+        set_topmost(user32.GetParent(_window.winfo_id()) or _window.winfo_id(), x, y, WIDTH, HEIGHT)
     except (ImportError, AttributeError, OSError):
         pass
     # Said again every tick. Topmost is a request, not a promise - a game
@@ -299,6 +300,28 @@ def _show(visible):
     except (ImportError, AttributeError, OSError):
         return
     _hidden = not visible
+
+
+def set_topmost(handle, x, y, width, height):
+    """SetWindowPos(HWND_TOPMOST, SWP_NOACTIVATE): moved, sized, top of the topmost band.
+
+    Typed: HWND_TOPMOST is (HWND)-1, and an untyped -1 is sent as a 32-bit int,
+    refused with ERROR_INVALID_WINDOW_HANDLE (1400).
+    """
+    global _typed_user32
+    import ctypes
+    from ctypes import wintypes
+    if _typed_user32 is None:
+        _typed_user32 = ctypes.WinDLL("user32", use_last_error=True)
+        _typed_user32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int,
+                                               ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+        _typed_user32.SetWindowPos.restype = wintypes.BOOL
+    ok = _typed_user32.SetWindowPos(handle, wintypes.HWND(-1), x, y, width, height, 0x10)
+    error = 0 if ok else ctypes.get_last_error()
+    if error != _topmost_errors.get(handle, 0):
+        if error:
+            logger.warning(f"overlay: SetWindowPos HWND_TOPMOST failed, error {error}")
+        _topmost_errors[handle] = error
 
 
 def _game_rect():

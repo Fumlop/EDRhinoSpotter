@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.6.1
+
+**Fixed**
+
+- Minimap fell behind Elite after another window (e.g. a shared map picture) took the front, and stayed there. `SetWindowPos(HWND_TOPMOST)` was sent untyped and refused with error 1400 on every tick since it was written; it is typed now, and the lift that ordered the map against Elite's window - putting it behind - is gone. Same fix for the guide arrow.
+
 ## 5.6.0
 
 **Changed**
