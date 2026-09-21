@@ -26,6 +26,7 @@ rs_tests/test_replay.py.
 import argparse
 import json
 import os
+import sqlite3
 import sys
 import time
 
@@ -148,27 +149,46 @@ def best(root=JOURNAL_DIR, days=DAYS, sheet=None):
     return system, seen
 
 
-def rebuild(systems):
-    """Write every system found into the cache. Returns how many.
+def _merged(system, seen):
+    """`seen` over what the cache holds for that system, sorted by name.
 
-    EDMC replays the journal file it is watching and nothing older, so a body
-    scanned in an earlier session never reaches the plugin - it is in a file
-    EDMC will never read. This walks the lot and fills the cache in, which is
-    the only way to recover a system scanned before the plugin was installed
-    or while it was not running.
-
-    Merged rather than replaced: a system already cached keeps the bodies this
-    pass did not see. Two journals of the same system describe different parts
-    of it, and the union is the true one.
+    Bodies: the union; two journals of one system describe different parts.
+    Fields: the journal's win, except a None over a value the cache holds, so
+    cache-only ones such as Spansh's `locations` are kept. A journal
+    `locations` brings its own `locations_from`: Register.bodies() leaves the
+    key out for the commander's own count.
+    Raises sqlite3.Error, OSError, ValueError when the cache cannot be read.
     """
-    written = 0
+    known = {body["name"]: body for body in store.load(system, strict=True)}
+    for body in seen:
+        held = known.get(body["name"], {})
+        fresh = {key: value for key, value in body.items()
+                 if value is not None or held.get(key) is None}
+        if fresh.get("locations") is not None:
+            held = {key: value for key, value in held.items() if key != "locations_from"}
+        known[body["name"]] = {**held, **fresh}
+    return sorted(known.values(), key=lambda b: b["name"])
+
+
+def rebuild(systems):
+    """Write every system found into the cache, merged over it. Returns
+    (written, failed): how many, and [(system, reason), ...] not written.
+
+    For bodies scanned in journal files EDMC never replays - before the plugin
+    was installed, or while it was not running.
+    """
+    written, failed = 0, []
     for system, seen in systems.items():
-        known = {body["name"]: body for body in store.load(system)}
-        for body in seen:
-            known[body["name"]] = body
-        if store.save(system, sorted(known.values(), key=lambda b: b["name"])):
+        try:
+            bodies_now = _merged(system, seen)
+        except (sqlite3.Error, OSError, ValueError) as err:
+            failed.append((system, f"cache not read, left as it was: {err}"))
+            continue
+        if store.save(system, bodies_now):
             written += 1
-    return written
+        else:
+            failed.append((system, "not written, see the log"))
+    return written, failed
 
 
 def main(argv=None):
@@ -194,17 +214,31 @@ def main(argv=None):
         return 1
 
     ordered = rank(systems, sheet)
+    failures = 0
     if args.rebuild:
-        written = rebuild(systems)
+        written, failed = rebuild(systems)
         print(f"\nrebuilt {written} system(s) in the cache")
-        print("  start EDMC and they are all there, no re-scanning")
+        for system, reason in failed:
+            print(f"  FAILED {system}: {reason}")
+        failures += len(failed)
+        if not failed:
+            print("  start EDMC and they are all there, no re-scanning")
 
     if args.testmode:
         system, seen, value = ordered[0]
-        path = store.save(system, seen)
+        try:
+            path = store.save(system, _merged(system, seen))
+            reason = "not written, see the log"
+        except (sqlite3.Error, OSError, ValueError) as err:
+            path = None
+            reason = f"cache not read, left as it was: {err}"
         print(f"\ntest mode: {system} (score {value}, {len(seen)} landable)")
-        print(f"  -> {path}")
-        print("  start EDMC and jump nowhere - RhinoData shows it")
+        if path is None:
+            failures += 1
+            print(f"  FAILED: {reason}")
+        else:
+            print(f"  -> {path}")
+            print("  start EDMC and jump nowhere - RhinoData shows it")
 
     for system, seen, value in ordered[:args.top]:
         counted = sum(body.get("locations") or 0 for body in seen)
@@ -213,7 +247,7 @@ def main(argv=None):
             rows = sheet.best(ground, limit=3, minimum=2.0)
             best_of = "  ".join(f"{row['material']} {row['pct']}%" for row in rows) or "-"
             print(f"   {grounds.label(ground):<28} {len(found):>2} body(s)   {best_of}")
-    return 0
+    return 1 if failures else 0
 
 
 def _by_ground(seen):

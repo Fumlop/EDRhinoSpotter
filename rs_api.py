@@ -99,16 +99,17 @@ def revision(path=None):
 
     Read from the database, not from a counter in memory: a counter belongs to
     the process that did the writing, so a separate application polling one gets
-    the same value for ever and never refreshes. This counts the rows and takes
-    the highest id and the latest stored record, so an insert, a delete, a
-    depleted flip and an edit each move it.
+    the same value for ever and never refreshes. A CRC32 over every row's id,
+    depleted_at and data, so an insert, a delete, a depleted flip and an edit
+    of any row each move it. 0: no bookmarks, or the database not readable.
+    Reads every row: 0.6 ms at 62 bookmarks, 11 ms at 5,062.
     """
-    rows = _rows("SELECT count(*), coalesce(max(id), 0), "
-                 "       coalesce(max(coalesce(depleted_at, '')), ''), "
-                 "       coalesce(max(data), '') FROM bookmarks", [], path)
-    if not rows:
-        return 0
-    return zlib.crc32("|".join(str(value) for value in rows[0]).encode("utf-8"))
+    rows = _rows("SELECT id, coalesce(depleted_at, ''), data FROM bookmarks ORDER BY id",
+                 [], path)
+    crc = 0
+    for row in rows:
+        crc = zlib.crc32("|".join(str(value) for value in row).encode("utf-8"), crc)
+    return crc
 
 
 # ------------------------------------------------------------------ the parts

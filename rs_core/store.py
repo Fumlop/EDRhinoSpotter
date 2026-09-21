@@ -54,11 +54,13 @@ def save(system, bodies, db=None):
         return None
 
 
-def load(system, db=None):
+def load(system, db=None, strict=False):
     """The bodies cached for that system, or [].
 
     Every failure is the same empty answer. A cache that cannot be read is a
     cache that is not there, and the panel says "honk the system" either way.
+    `strict`: raise instead - for a caller that merges and then saves, where
+    [] from a locked db would replace the system with less than it held.
     """
     try:
         with database.connect(db) as conn:
@@ -66,6 +68,8 @@ def load(system, db=None):
                                 "ORDER BY rowid", (system,)).fetchall()
         bodies = [json.loads(data) for _, data in rows]
     except (sqlite3.Error, OSError, ValueError) as err:
+        if strict:
+            raise
         logger.warning(f"could not read the cache of {system}: {err}")
         return []
     # The address belongs to the system: a body scanned before it was known

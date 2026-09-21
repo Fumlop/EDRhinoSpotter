@@ -18,6 +18,7 @@ RhinoSpotter/
 ├── rs_core/             everything that is not a widget
 ├── rs_ui/               everything that is
 ├── rs_tests/            pytest suite
+├── rs_e2etest/          end-to-end harnesses
 ├── mining_sheet.json    the mining sheet, frozen when the plugin was packaged
 ├── cards/               rendered cards (gitignored)
 ├── data/                screenshots and sidecars (gitignored)
@@ -115,8 +116,10 @@ No tkinter anywhere in here.
   Register the live plugin uses, and a score for what they found. Every
   landable body is worth the best rate its ground has ever shown and the
   system is worth the sum, because the question is not "is there something
-  here" but "is there enough here". `--testmode` writes the winner to the
-  cache - see below.
+  here" but "is there enough here". `--rebuild` writes every system and
+  `--testmode` the winner, each merged over the cache (journal fields win,
+  Spansh's `locations` kept); a system whose cache cannot be read is left as
+  it was, printed as FAILED, and the exit code is 1. `--testmode`: see below.
 - **[update.py](rs_core/update.py)** - the version number, and whether there
   is a newer release. `VERSION` here is the one source; the changelog repeats
   it as its top heading and a test fails if the two drift. Releases are tagged
@@ -294,18 +297,11 @@ Everything in here imports tkinter.
 - **test_database.py** - the schema on a new file, a block that raises writes
   nothing, bookmark columns, an import source taken once, and the backup: the
   copy holds the data, two kept, a failed copy pushes none out.
-- **test_migrate.py** - everything readable comes in, the old files are left
-  byte for byte, migrate.done lists what came in and what was skipped, a
-  database that cannot be written leaves no marker, with the marker no folder
-  is listed, and a second run adds nothing and keeps newer rows.
 - **test_names.py** - every character Windows refuses, spaces kept, and the
   fallback for a name with nothing left in it.
 - **test_palette.py** - that the window draws from the one palette, and
   that a colour which is not six hex digits raises rather than silently
   becoming black.
-- **test_replay.py** - which files count as recent, that a second visit does
-  not lose the first, and that a ground the sheet never measured is worth
-  nothing rather than guessed at.
 - **test_spansh.py** - the mapping to the journal's words; the request (User-Agent,
   404 as an answer, every failure pausing); the politeness rules (honk only,
   once a session, 30-day answer mark across restarts, pause, undiscovered);
@@ -316,10 +312,23 @@ Everything in here imports tkinter.
   or row that cannot be read, and the debounce: a
   burst is one write, the last change per key is the one written and two keys are both written, flush takes the
   pending write with it, and a burst longer than the delay still reaches disk.
-- **test_update.py** - version comparison, that every network failure is the
-  same silent no-answer, and the installer: a zip from somewhere else and a
-  truncated download both change nothing, a replaced directory loses the
-  module deleted upstream, and the exported sheet survives.
+## End to end (`rs_e2etest/`)
+
+`python rs_e2etest/<name>_e2e.py` from the plugin folder. Each runs the real
+modules on real windows, files, journals or releases, with `LOCALAPPDATA`
+pointed at `rs_e2etest/out/<timestamp>/` before `rs_core` is imported, and
+writes `report.txt` there; exit 1 on a failure. Each has a `.md` beside it
+listing what it stands in for and what that hides, and a `coverage-*.md`
+mapping the unit tests it replaced.
+
+- **minimap_e2e.py** - placing from Settings, drag, lock, stored position,
+  corner, topmost and its 5 s re-send, re-show, Scarab/Rhino, the settings tab.
+- **hotkey_e2e.py** - the real RegisterHotKey path, a combo taken by another
+  process, restart and stop.
+- **update_e2e.py** - the real GitHub release installed into a copy of the
+  plugin; corrupt, foreign and unreachable downloads refused.
+- **data_e2e.py** - migrate, replay (`--rebuild`, `--testmode`, a locked db)
+  and `rs_api` against copies of the db and the journals.
 
 ## Where the data comes from
 

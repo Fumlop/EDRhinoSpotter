@@ -81,8 +81,10 @@ bookmark on it.
 
 ### `revision()`
 
-A number that changes when the bookmarks do. Poll it, and read again when it
-moves; it is one small query. It is computed from the rows themselves rather
+A number that changes when the bookmarks do - an insert, a delete, a depleted
+flip or an edit of any row. Poll it, and read again when it moves. 0: no
+bookmarks, or the database not readable. It reads every row: 0.6 ms at 62
+bookmarks, 11 ms at 5,062. It is computed from the rows themselves rather
 than from a counter in memory, because a counter belongs to the process that
 did the writing - a separate application polling one would see the same value
 for ever.

@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.6.3
+
+**Fixed**
+
+- `replay.py --rebuild` replaced each cached body with the journal's, dropping Spansh's location counts; it merges now, journal fields over the cache.
+- `replay.py --testmode` replaced the whole system, dropping cached bodies the journals did not name; merged the same way.
+- `replay.py` with the database locked read an empty cache and saved over it, wiping the system, then printed "rebuilt N" and exited 0. The system is left as it was, printed as FAILED, exit code 1.
+- `rs_api.revision()` did not move when a depleted mark was taken off or a bookmark edited unless it was the newest row. It is a CRC over every row now: 0.6 ms at 62 bookmarks, 11 ms at 5,062.
+
+**Changed**
+
+- UI and flow tests are end to end in `rs_e2etest/` (minimap, hotkeys, update, migrate/replay/API); the unit tests they replaced are gone.
+
 ## 5.6.2
 
 **Changed**

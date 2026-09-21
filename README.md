@@ -236,4 +236,4 @@ once a session per system), GitHub for the update check.
 
 Debug log: set `RHINOSPOTTER_DEBUG=1` before starting EDMC.
 
-Tests: `pytest` - no network, game or display. Code layout: `structure.md`.
+Tests: `pytest` - no network, game or display; end to end: `rs_e2etest/`. Code layout: `structure.md`.
