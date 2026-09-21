@@ -14,6 +14,7 @@ import http.server
 import io
 import logging
 import os
+import re
 import socket
 import subprocess
 import sys
