@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.6.7
+
+**Changed**
+
+- Golden circles are at most 1.5 km in radius. The 2.5 km limit picked the members but not the circle, which sits on their centroid and was drawn up to 3.4 km (HIP 44291 4 a). A group whose circle would exceed 1.5 km is dropped; a smaller one inside it can still show.
+
 ## 5.6.6
 
 **Fixed**

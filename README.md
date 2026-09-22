@@ -160,8 +160,8 @@ of the picked bookmark:
   left off; press Ctrl+Alt+M to read the rest.
 - Saved per body; a launch within 10 km carries on the same map, EDMC restarts
   included. Each dock saves a picture with a legend of the bookmarks on it.
-- The picture circles golden groups in gold: bookmarks within 2.5 km of one
-  point, not depleted, 5 or more rigs together - one Rhino stop.
+- The picture circles golden groups in gold: bookmarks in a circle of at most
+  1.5 km radius, not depleted, 5 or more rigs together - one Rhino stop.
 - Hidden while Elite is not the front window.
 - "Painted" means driven within 2 km, not proven scanned - the game logs no scan.
 
