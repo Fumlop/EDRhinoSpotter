@@ -415,6 +415,23 @@ def _rail(parent, register, sheet, focus, variable, materials, listed, body, liv
                  font=("Segoe UI", 9)).pack(fill="x", padx=13, pady=(8, 0))
 
 
+def arrived():
+    """Redraw an open window for the system just jumped to, without raising it.
+
+    Drops the picked body, bookmark and map of the old system. A system browsed
+    from the search box stays shown.
+    """
+    if not is_open():
+        return
+    if not _state["system"]:
+        _state["body"] = None
+        _state["selected"] = None
+        _state["map"] = None
+        _state["collapsed"] = set()
+        _state["status"] = ""
+    _draw()
+
+
 def _shown_register(live):
     """The register the window draws: the live one, or a searched system filled
     from the body cache.

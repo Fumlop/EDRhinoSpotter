@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.6.6
+
+**Fixed**
+
+- An open RhinoData window kept showing the system it was opened in after a jump. It redraws on FSDJump, CarrierJump and Location now, without coming to the front; a system picked in the search box stays shown.
+
 ## 5.6.5
 
 **Fixed**

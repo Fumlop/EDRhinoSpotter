@@ -329,6 +329,8 @@ mapping the unit tests it replaced.
   plugin; corrupt, foreign and unreachable downloads refused.
 - **data_e2e.py** - migrate, replay (`--rebuild`, `--testmode`, a locked db)
   and `rs_api` against copies of the db and the journals.
+- **scan_arrive_e2e.py** - an open RhinoData window redrawn on FSDJump without
+  `scan.show()`; a browsed system kept; a no-op control.
 
 ## Where the data comes from
 

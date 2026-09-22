@@ -449,8 +449,12 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     # Arriving in a system scanned before fills the list straight from disk -
     # EDMC hands plugins only new journal lines, and last week's honk is gone.
     # The register does that itself through on_arrive; this only redraws.
+    before = _register.system
     if _register.track(entry, system=system):
         _refresh_scan_count()
+        # scan.show() would raise the window over the game on every jump.
+        if _register.system != before:
+            scan.arrived()
 
     # The honk: ask Spansh for the bodies the journal will not describe until
     # they are scanned - once a session per system, see spansh.should_ask. Off
