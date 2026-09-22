@@ -1,5 +1,30 @@
 # Changelog
 
+## 5.6.9
+
+**Added**
+
+- Tons collected at a bookmark, counted from `MiningRefined`. One event is 1 t
+  (checked against the SRV `Cargo.Count` on two journals); the ton goes to the
+  nearest bookmark within 175 m on that body, and a bookmark whose material is
+  the one refined beats a nearer one that is not. By-products are counted under
+  their own name. Tons refined near no bookmark, or with an unreadable
+  Status.json, are counted and logged at shutdown rather than dropped quietly.
+- Cycles. The tons between the first one refined and the Depleted mark are one
+  cycle, kept on the bookmark with the rigs, Density and Amount it opened at.
+  A cycle that opened at Amount High and ended depleted is what the deposit
+  held; two of them on one bookmark are the min-max of what it regrows. Mining
+  a depleted spot again opens a new cycle instead of reopening the old one.
+- The bookmark table has a Mined column: the best measured cycle once one has
+  measured the deposit, and ≥ the tons collected so far until then.
+- The card says how much was collected and what the deposit measured, and -
+  once it is depleted - how many days ago that was, against an assumed 14-day
+  regen. The 14 days is an assumption: Amount was not back at High immediately
+  after a depletion.
+- `python -m rs_core.yields` prints tons per rig position per Density band from
+  the measured cycles, beside the shipped `deposit.TONS_PER_RIG`. It prints;
+  it does not edit - a deposit mined before it was bookmarked reads low.
+
 ## 5.6.8
 
 **Fixed**

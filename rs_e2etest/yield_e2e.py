@@ -1,0 +1,293 @@
+"""E2E harness for the yield tally. Checks and blind spots: yield.md.
+
+Run from the plugin folder:  python rs_e2etest/yield_e2e.py
+Writes rs_e2etest/out/<timestamp>/report.txt and one folder per scenario.
+Exit code 1 on a failure.
+
+The child runs the real load.journal_entry over the real MiningRefined lines of
+a copied journal, against a Status.json it writes itself - the game's own file
+is live-only and the coordinates have to be put where the bookmarks are. Its
+LOCALAPPDATA is the scenario folder, set before the interpreter starts, so the
+live database is never opened.
+"""
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+from datetime import datetime, timedelta, timezone
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+PLUGIN = os.path.dirname(HERE)
+
+# The 171-ton Diamond session. Copied, never read in place.
+JOURNAL = "Journal.2026-09-21T211951.01.log"
+
+BODY = "Aramo A 1"
+SYSTEM = "Aramo"
+RADIUS = 1_500_000.0        # m, a small rocky body
+LAT, LON = 12.345678, -45.678901
+
+
+def _metres_east(lat, lon, metres, radius):
+    """`lon` moved east by `metres` at latitude `lat`."""
+    import math
+    return lon + math.degrees(metres / (radius * math.cos(math.radians(lat))))
+
+
+# ----------------------------------------------------------------- the child
+
+
+def child():
+    import logging
+    sys.path.insert(0, PLUGIN)
+    logging.getLogger("RhinoSpotter").addHandler(
+        logging.FileHandler(os.environ["E2E_LOG"], encoding="utf-8"))
+
+    from rs_core import cards, coverage, database, paths, spotcard, yields
+    assert database.PATH.startswith(os.environ["LOCALAPPDATA"]), database.PATH
+
+    scratch = os.environ["LOCALAPPDATA"]
+    paths.journal_dir = lambda: scratch
+    coverage.clear_old_textures = lambda: None
+    # TALLY was built at import with delay=FLUSH_S, so the live value is the
+    # one on the debounce, not the constant.
+    yields.TALLY._writes.delay = 0.05
+
+    import load
+    load.plugin_start3(PLUGIN)
+
+    results = []
+
+    def check(name, got, want):
+        results.append((name, got == want, f"{got!r} != {want!r}"))
+
+    def status(lat, lon, body=BODY, altitude=0.0):
+        with open(os.path.join(scratch, "Status.json"), "w", encoding="utf-8") as handle:
+            json.dump({"BodyName": body, "Latitude": lat, "Longitude": lon,
+                       "Altitude": altitude, "PlanetRadius": RADIUS, "Heading": 0}, handle)
+
+    def bookmark(material, lat, lon, rigs=4, amount="High", density="Medium"):
+        return spotcard.save({"system": SYSTEM, "planet_name": BODY, "latitude": lat,
+                              "longitude": lon, "planet_radius": RADIUS,
+                              "commodity": material, "rigs": rigs, "amount": amount,
+                              "density": density, "location_index": 1,
+                              "marked_at": _stamp(0)})
+
+    def row(id):
+        with database.connect() as conn:
+            return json.loads(conn.execute("SELECT data FROM bookmarks WHERE id = ?",
+                                           (id,)).fetchone()[0])
+
+    def feed(lines):
+        for entry in lines:
+            load.journal_entry("E2E", False, SYSTEM, None, entry, {})
+        yields.TALLY.flush()
+
+    refined = _refined_lines(os.path.join(scratch, JOURNAL))
+    check("journal carries the 171 refined lines", len(refined), 171)
+
+    # 1. The real session, all of it at the bookmark.
+    diamond = bookmark("Diamond", LAT, LON)
+    status(LAT, LON)
+    feed(_restamp(refined))
+    cycles = yields.cycles(row(diamond))
+    check("one open cycle", len(cycles), 1)
+    # The session's 171 t are 127 Diamond + 44 Ruby: the third CargoTransfer of
+    # that journal is ruby 44. A by-product is counted at the spot it came out
+    # of, under its own name.
+    check("171 t counted, by-product under its own name",
+          cycles[0]["tons"], {"Diamond": 127, "Ruby": 44})
+    check("cycle carries the conditions it was mined under",
+          (cycles[0]["rigs"], cycles[0]["density"], cycles[0]["amount_at_start"]),
+          (4, "Medium", "High"))
+    check("nothing unplaced", yields.TALLY.unplaced, 0)
+
+    # 2. A ton refined 5 km off every bookmark is counted as unplaced, not onto
+    #    the nearest one.
+    status(LAT, _metres_east(LAT, LON, 5000.0, RADIUS))
+    feed(_restamp(refined[:3]))
+    check("3 t off the bookmarks are unplaced", yields.TALLY.unplaced, 3)
+    check("and did not reach the bookmark",
+          yields.cycles(row(diamond))[0]["tons"], {"Diamond": 127, "Ruby": 44})
+
+    # 2b. A read that lands mid-write costs the ton, and is counted.
+    with open(os.path.join(scratch, "Status.json"), "w", encoding="utf-8") as handle:
+        handle.write('{"BodyName": "Ara')
+    feed(_restamp(refined[:2]))
+    check("2 t with an unreadable Status.json", yields.TALLY.unread, 2)
+
+    # 2c. Refined 2 km up is asteroid mining, not this deposit: not counted and
+    #     not a loss.
+    status(LAT, LON, altitude=2000.0)
+    feed(_restamp(refined[:7]))
+    check("7 t refined off the ground are neither placed nor counted lost",
+          (yields.TALLY.unplaced, yields.TALLY.unread), (3, 2))
+
+    # 3. Material beats distance: the Ruby bookmark is 120 m further away than
+    #    the Alexandrite one, and the ruby is still its.
+    alex = bookmark("Alexandrite", LAT, LON)
+    ruby = bookmark("Ruby", LAT, _metres_east(LAT, LON, 120.0, RADIUS))
+    status(LAT, LON)
+    feed(_restamp([{"event": "MiningRefined", "Type": "$ruby_name;"}] * 11
+                  + [{"event": "MiningRefined", "Type": "$alexandrite_name;"}] * 46))
+    check("11 t of ruby to the Ruby bookmark",
+          yields.totals(row(ruby)), {"Ruby": 11})
+    check("46 t of alexandrite to the Alexandrite bookmark",
+          yields.totals(row(alex)), {"Alexandrite": 46})
+
+    # 4. EDMC replaying the journal at startup: lines older than the plugin
+    #    start are skipped.
+    from rs_ui import main
+    before = main._replayed
+    feed([{"event": "MiningRefined", "Type": "$diamond_name;",
+           "timestamp": "2020-01-01T00:00:00Z"}] * 5)
+    check("5 replayed lines skipped", main._replayed - before, 5)
+    check("and no tons added", yields.totals(row(diamond)), {"Diamond": 127, "Ruby": 44})
+
+    # 5. Depleted closes the cycle, including tons still pending at the press.
+    yields.TALLY._writes.delay = 3600.0        # nothing reaches the row on its own
+    status(LAT, LON)
+    for entry in _restamp([{"event": "MiningRefined", "Type": "$diamond_name;"}] * 9):
+        load.journal_entry("E2E", False, SYSTEM, None, entry, {})
+    record = dict(row(diamond), id=diamond)
+    check("depleted written", cards.set_depleted(record, True), True)
+    closed = yields.cycles(row(diamond))
+    check("still one cycle", len(closed), 1)
+    check("closed depleted", closed[0].get("ended"), "depleted")
+    check("the 9 pending tons landed in the closed cycle",
+          closed[0]["tons"], {"Diamond": 136, "Ruby": 44})
+    check("the deposit measures 180 t", yields.capacity(row(diamond)), (180, 180, 1))
+    yields.TALLY._writes.delay = 0.05
+
+    # 6. Mining it again after the regen opens a second cycle rather than
+    #    reopening the closed one.
+    feed(_restamp([{"event": "MiningRefined", "Type": "$diamond_name;"}] * 4))
+    again = yields.cycles(row(diamond))
+    check("a second cycle", len(again), 2)
+    check("the closed one untouched", again[0]["tons"], {"Diamond": 136, "Ruby": 44})
+    check("the new one has the 4 t", again[1]["tons"], {"Diamond": 4})
+
+    # 6b. The Mined column: the best measured cycle once there is one, and what
+    #     is in the open cycle until then.
+    from rs_ui import scan
+    check("Mined column reads the measured cycle", yields.short(row(diamond)), "180 t")
+    check("Mined column is a floor while nothing has measured it",
+          yields.short(row(alex)), "≥46 t")
+    check("header and row line up",
+          len(scan._columns("Material", "Rigs", "Mined", "Est. left")),
+          len(scan._columns("Alexandrite", "4", "≥46 t", "≈ 620-1,200 t left")))
+
+    # 6c. Edit and re-mark write the whole record back through spotcard.save.
+    #     The cycles must survive both as a dict, with the tons the tally wrote
+    #     while the dialog was open.
+    edited = cards.edited(dict(row(alex), id=alex), {"rigs": 6})
+    spotcard.save(edited, id=alex)
+    check("edit keeps the cycles a dict", type(row(alex).get("yield")).__name__, "dict")
+    check("edit keeps the tons", yields.totals(row(alex)), {"Alexandrite": 46})
+    check("edit still wrote the field it was for", row(alex).get("rigs"), 6)
+
+    status(LAT, LON)
+    for entry in _restamp([{"event": "MiningRefined", "Type": "$alexandrite_name;"}] * 3):
+        load.journal_entry("E2E", False, SYSTEM, None, entry, {})
+    spotcard.save(cards.updated(dict(row(alex), id=alex), {"amount": "Medium"}), id=alex)
+    check("a re-mark takes the tons pending at the time with it",
+          yields.totals(row(alex)), {"Alexandrite": 49})
+
+    # 6d. Amount Depleted through the Edit dialog closes the cycle, as the
+    #     Depleted button does.
+    spotcard.save(cards.edited(dict(row(alex), id=alex), {"amount": "Depleted"}), id=alex)
+    check("edited to Depleted closes the cycle",
+          [cycle.get("ended") for cycle in yields.cycles(row(alex))], ["depleted"])
+    check("and stamps depleted_at", bool(row(alex).get("depleted_at")), True)
+
+    # 6e. The location map's cache key: a tally write must not throw the
+    #     70-160 ms repaint away, an edit to what it draws must.
+    body = {"name": BODY, "marks": [row(alex)]}
+    was = scan._marks_key(body)
+    yields.add(body["marks"][0], {"Alexandrite": 7})
+    check("tons do not move the map picture key", scan._marks_key(body), was)
+    body["marks"][0]["rigs"] = 7
+    check("rigs do", scan._marks_key(body) != was, True)
+
+    # 7. The regen assumption, on the mark just written and on an old one.
+    fresh = row(diamond)
+    check("fresh depletion is not regrown", yields.regenerated(fresh), False)
+    old = dict(fresh, depleted_at=_stamp(-15 * 86400))
+    check("15 days past is regrown", yields.regenerated(old), True)
+
+    for name, ok, detail in results:
+        print(f"{'PASS' if ok else 'FAIL'} {name}" + ("" if ok else f"  [{detail}]"))
+    return 0 if all(ok for _, ok, _ in results) else 1
+
+
+def _stamp(offset_s):
+    return (datetime.now(timezone.utc) + timedelta(seconds=offset_s)).strftime(
+        "%Y-%m-%dT%H:%M:%SZ")
+
+
+def _restamp(entries):
+    """The same lines, stamped now: main._refined drops anything older than the
+    plugin start, which scenario 4 tests."""
+    return [dict(entry, timestamp=_stamp(0)) for entry in entries]
+
+
+def _refined_lines(path):
+    found = []
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                continue
+            if entry.get("event") == "MiningRefined":
+                found.append(entry)
+    return found
+
+
+# ---------------------------------------------------------------- the parent
+
+
+def main():
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    out = os.path.join(HERE, "out", stamp)
+    os.makedirs(out, exist_ok=True)
+
+    source = _find_journal()
+    if source is None:
+        print(f"{JOURNAL} not found under the journal folder - nothing to replay")
+        return 1
+    shutil.copy2(source, os.path.join(out, JOURNAL))
+
+    env = dict(os.environ, LOCALAPPDATA=out, E2E_LOG=os.path.join(out, "plugin.log"),
+               PYTHONIOENCODING="utf-8")
+    run = subprocess.run([sys.executable, os.path.abspath(__file__), "--child"],
+                         cwd=PLUGIN, env=env, capture_output=True, text=True,
+                         encoding="utf-8")
+    report = run.stdout + (f"\n--- stderr ---\n{run.stderr}" if run.stderr else "")
+
+    cli = subprocess.run([sys.executable, "-m", "rs_core.yields"], cwd=PLUGIN, env=env,
+                         capture_output=True, text=True, encoding="utf-8")
+    report += f"\n--- python -m rs_core.yields ---\n{cli.stdout}{cli.stderr}"
+    ok = run.returncode == 0 and "t/rig" in cli.stdout
+    report += f"\nresult: {'PASS' if ok else 'FAIL'}\n"
+
+    with open(os.path.join(out, "report.txt"), "w", encoding="utf-8") as handle:
+        handle.write(report)
+    print(report)
+    print(out)
+    return 0 if ok else 1
+
+
+def _find_journal():
+    sys.path.insert(0, PLUGIN)
+    from rs_core import paths
+    candidate = os.path.join(paths.journal_dir(), JOURNAL)
+    return candidate if os.path.isfile(candidate) else None
+
+
+if __name__ == "__main__":
+    if "--child" in sys.argv:
+        raise SystemExit(child())
+    raise SystemExit(main())

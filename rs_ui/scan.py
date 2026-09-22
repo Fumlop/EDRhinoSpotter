@@ -25,7 +25,7 @@ from tkinter import messagebox
 from PIL import Image
 
 from rs_core import (bodies, cards, coverage, coverstore, database, deposit, grounds, guide,
-                     palette, spotcard, spotmark, store)
+                     palette, spotcard, spotmark, store, yields)
 from rs_core.logging import logger
 from rs_ui import minimap, overlay, rhino
 
@@ -37,9 +37,11 @@ MIN_PCT = 2.0
 # Wide enough for "15 d a" and every other body designation in a normal system.
 NAME_WIDTH = 8
 
-# The bookmark table, in characters: material, rigs, what is left of it.
+# The bookmark table, in characters: material, rigs, tons taken out of it,
+# what is left of it.
 MATERIAL_W = 22
 RIGS_W = 6
+MINED_W = 9
 LEFT_W = 20
 # The map table: location, the maps on it, how many bookmarks lie on them.
 LOCATION_W = 10
@@ -713,7 +715,7 @@ def _bookmark_list(parent, body, groups, maps):
     # The 4px of the accent strip every row starts with, so the headings sit
     # over the columns they name rather than four pixels left of them.
     tk.Frame(header, bg=BG, width=4).pack(side="left", fill="y")
-    tk.Label(header, text=INDENT + _columns("Material", "Rigs", "Est. left"), bg=BG,
+    tk.Label(header, text=INDENT + _columns("Material", "Rigs", "Mined", "Est. left"), bg=BG,
              fg=DIM, anchor="w", font=("Consolas", 8)).pack(side="left")
     if groups:
         folded = all(not _unfolded(body["name"], index) for index, _group in groups)
@@ -808,6 +810,12 @@ def _bookmark_row(parent, record, picked):
                                 f"{(str(rigs) if rigs is not None else '-'):>{RIGS_W}} ",
              bg=bg, fg=DIM if dead else ACCENT, anchor="w",
              font=("Consolas", 9)).pack(side="left")
+    # Its own label: a label carries one colour, and the tons measured here are
+    # not the estimate beside them.
+    mined = yields.short(record)
+    tk.Label(row, text=f"{mined or '-':>{MINED_W}} ", bg=bg,
+             fg=GOOD if mined else DIM, anchor="e",
+             font=("Consolas", 9)).pack(side="left")
     tk.Label(row, text=f"{left or '-':>{LEFT_W}}", bg=bg,
              fg=ALERT if dead else (WARN if left else DIM), anchor="e",
              font=("Consolas", 9)).pack(side="left")
@@ -822,11 +830,11 @@ def _worked_out(record):
     return bool(record.get("depleted_at")) or record.get("amount") == "Depleted"
 
 
-def _columns(material, rigs, left):
+def _columns(material, rigs, mined, left):
     """The one place the bookmark table's column widths live, so the header
     cannot drift away from the rows it names."""
     return (f"{material[:MATERIAL_W]:<{MATERIAL_W}} {rigs:>{RIGS_W}} "
-            f"{left:>{LEFT_W}}")
+            f"{mined:>{MINED_W}} {left:>{LEFT_W}}")
 
 
 def _mapped_list(parent, body, mapped, unknown):
@@ -1000,6 +1008,11 @@ def _bookmark_card(box, register, sheet, body, record, maps):
     tk.Label(box, text="worked out" if dead else (left or "tons left unknown"),
              bg=PANEL, fg=ALERT if dead else WARN, anchor="w",
              font=("Consolas", 9)).pack(fill="x", padx=13, pady=(2, 0))
+    # Counted from MiningRefined within yields.ATTRIBUTE_M.
+    collected = yields.describe(record)
+    if collected:
+        tk.Label(box, text=collected, bg=PANEL, fg=GOOD, anchor="w",
+                 font=("Consolas", 9)).pack(fill="x", padx=13, pady=(2, 0))
     for line in _ground_lines(sheet, body, record.get("commodity")):
         tk.Label(box, text=line, bg=PANEL, fg=DIM, anchor="w",
                  font=("Consolas", 8)).pack(fill="x", padx=13, pady=(2, 0))
@@ -1013,6 +1026,13 @@ def _bookmark_card(box, register, sheet, body, record, maps):
                        + (f"  ·  depleted {depleted}" if depleted else "  ·  active"),
              bg=PANEL, fg=FG_SOFT, anchor="w",
              font=("Consolas", 8)).pack(fill="x", padx=13)
+    days = yields.days_since_depleted(record)
+    if days is not None:
+        back = yields.regenerated(record)
+        tk.Label(box, text=f"{days:.0f} d since" + (f", past the assumed "
+                           f"{yields.REGEN_DAYS} d regen" if back else ""),
+                 bg=PANEL, fg=GOOD if back else DIM, anchor="w",
+                 font=("Consolas", 8)).pack(fill="x", padx=13)
 
     _card_buttons(box, record, bool(record.get("depleted_at")), maps)
 
@@ -1110,7 +1130,7 @@ def _location_map(parent, sheet, body, record, maps):
         return
     if not name:
         return
-    key = (body["name"], name, database.revision())
+    key = (body["name"], name, _marks_key(body))
     if _map_picture is None or _map_picture[0] != key:
         photo = _draw_location_map(parent, sheet, body, name, dict(maps)[name])
         if photo is None:
@@ -1120,6 +1140,18 @@ def _location_map(parent, sheet, body, record, maps):
                      borderwidth=0, highlightthickness=0)
     label.image = _map_picture[1]
     label.pack(padx=(0, 14), pady=(14, 0))
+
+
+def _marks_key(body):
+    """The bookmark fields _draw_location_map puts on the picture.
+
+    Not database.revision(): the tally writes a bookmark row every
+    yields.FLUSH_S while mining and none of these move, which threw the
+    70-160 ms repaint away once every 30 s.
+    """
+    return tuple((mark.get("latitude"), mark.get("longitude"),
+                  mark.get("commodity"), bool(mark.get("depleted_at")),
+                  mark.get("rigs")) for mark in body["marks"])
 
 
 def _draw_location_map(parent, sheet, body, name, data):

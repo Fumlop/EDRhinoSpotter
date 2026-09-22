@@ -164,6 +164,22 @@ No tkinter anywhere in here.
   370-400 t at Medium, the span of both at High or unread. The two measured
   deposits behind those are in the docstring. The panel's Density and Amount
   pickers write into the bookmark; the bookmarks list shows the range.
+- **[yields.py](rs_core/yields.py)** - tons refined at a bookmark. One
+  `MiningRefined` is 1 t, placed by the Status.json reading at that moment -
+  the event carries no position. `ATTRIBUTE_M` is a 175 m radius,
+  `cards.SAME_SPOT_M` (100 m, the patch) plus 75 m for chunks collected off it;
+  a bookmark whose `commodity` is the material refined wins over a nearer
+  one. `Tally` holds deltas per row, not records, and `store.Debounced`
+  writes every `FLUSH_S` (30 s) by re-reading the row and adding into its open
+  cycle, so an Edit made meanwhile is not overwritten; `TALLY` is the one
+  instance and `cards.set_depleted` flushes it before closing a cycle. A cycle
+  runs from the first ton to the Depleted mark and keeps the rigs, Density and
+  Amount it opened at. `measured()` is the cycles that opened at Amount High
+  and ended depleted - what the deposit held; anything else bounds it from
+  below. `REGEN_DAYS` (14) is an assumption, replaced by the gap between one
+  cycle's `ended_at` and the next cycle's `from` once there are two.
+  `python -m rs_core.yields` prints t/rig per Density band against
+  `deposit.TONS_PER_RIG`; it never edits it.
 - **[measure.py](rs_core/measure.py)** - area and rig count for a border
   driven in the SRV. Shoelace for the area, ray casting for what is inside,
   and a 76 m grid for the rigs. Flat earth on purpose: a spot is a few hundred
@@ -329,6 +345,10 @@ mapping the unit tests it replaced.
   plugin; corrupt, foreign and unreachable downloads refused.
 - **data_e2e.py** - migrate, replay (`--rebuild`, `--testmode`, a locked db)
   and `rs_api` against copies of the db and the journals.
+- **yield_e2e.py** - the real journal's 171 MiningRefined lines through
+  `load.journal_entry`: attribution, unplaced and unreadable tons, the replay
+  skip, Depleted closing a cycle with the pending tons in it, a second cycle,
+  and the CLI.
 - **scan_arrive_e2e.py** - an open RhinoData window redrawn on FSDJump and on a
   saved bookmark without `scan.show()`; a browsed system kept; no-op controls.
 
@@ -342,6 +362,7 @@ mapping the unit tests it replaced.
 | Systems visited before | `%LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db` | written on every change |
 | What a ground holds | `mining_sheet.json` | shipped with the release |
 | What a location holds | nothing - it is in no feed | screenshot and read by eye |
+| Tons a bookmark has given | journal `MiningRefined`, 1 t each | every ton, while you are within 175 m of it |
 | Where you are, while guiding | `Status.json` | the game, twice a second |
 
 The last row is the whole reason this plugin exists.
