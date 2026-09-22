@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.6.8
+
+**Fixed**
+
+- An open RhinoData window did not show a bookmark just made until it was clicked. It redraws after every saved or updated bookmark, without coming to the front.
+
 ## 5.6.7
 
 **Changed**

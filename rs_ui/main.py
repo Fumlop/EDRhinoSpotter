@@ -597,6 +597,9 @@ def _render_card(spot, token):
 
 def _report(message, token):
     """Stale renders stay quiet - a finished one must not label a running one."""
+    # Every finished save, stale or not: the row is in the database either way.
+    if not message or message.startswith("updated"):
+        scan.refresh()
     if token != _card_token:
         return
     _set_status(message or "")

@@ -13,6 +13,7 @@ count on arrival; the window redrew on open, filter, prefs or a Spansh answer.
 | Replaced | By | Failures it cannot see |
 |---|---|---|
 | EDMC | direct `main.start()` + `main.journal_entry()`; no `main.build()` | the panel, hotkeys and update check around it |
+| Bookmark press | `spotcard.save` of a copied bookmark, then `main._report` | `make_card`'s Status.json read and the worker thread |
 | the game | FSDJump dicts with `StarSystem` only | Location/CarrierJump arrivals (same `ARRIVAL_EVENTS` path in `bodies.Register.track`) |
 | focus / z-order | `scan.show` swapped for a counter during jumps | a raise done by anything other than `scan.show` |
 | the bodies cache | the live db copied via sqlite3 backup | systems not in the cache: the window shows the empty state |
@@ -26,4 +27,7 @@ count on arrival; the window redrew on open, filter, prefs or a Spansh answer.
 5. Jump back redraws again.
 6. A system browsed from the search box stays shown after a jump.
 7. Back to live shows the system jumped to.
-8. Control: `scan.arrived` a no-op leaves the title stale.
+8. A bookmark saved via `spotcard.save` + `main._report`: the rail's `N bm` sum goes up by 1.
+9. `scan.show` not called on the save.
+10. Control: `scan.refresh` a no-op leaves the count stale.
+11. Control: `scan.arrived` a no-op leaves the title stale.

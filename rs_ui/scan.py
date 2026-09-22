@@ -1318,7 +1318,7 @@ def _toggle_guide(record):
     if overlay.guiding(record):
         overlay.stop()
         _state["status"] = "The arrow is down."
-    elif overlay.start(_window, record, on_stop=_refresh) is None:
+    elif overlay.start(_window, record, on_stop=refresh) is None:
         # No arrow to be had here - it said why in the log.
         logger.info("scan: no overlay, the card is unchanged")
         _state["status"] = "No arrow: the game is not on this body."
@@ -1606,10 +1606,10 @@ def _map_marks(cover, system, body, sheet):
     return marks, golden
 
 
-def _refresh():
-    """Draw again, if the window is still there.
+def refresh():
+    """Draw again, if the window is still there. Does not raise it.
 
-    The overlay calls this when it takes itself down, which can be minutes after
+    main calls this after a bookmark is saved. The overlay calls this when it takes itself down, which can be minutes after
     the press and with the window long since gone - so the line that said an
     arrow was up goes with it.
     """

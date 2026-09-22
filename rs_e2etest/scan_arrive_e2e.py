@@ -1,4 +1,4 @@
-"""E2E harness: an open RhinoData window follows a jump. Checks and blind spots: scan-arrive.md.
+"""E2E harness: an open RhinoData window follows a jump and a saved bookmark. Checks and blind spots: scan-arrive.md.
 
 Run from the plugin folder:  python rs_e2etest/scan_arrive_e2e.py
 Writes rs_e2etest/out/<timestamp>/report.txt. Exit code 1 on a failure.
@@ -32,7 +32,7 @@ sys.path.insert(0, PLUGIN)
 
 import tkinter as tk                                     # noqa: E402
 
-from rs_core import coverage, database                   # noqa: E402
+from rs_core import cards, coverage, database, spotcard  # noqa: E402
 from rs_ui import main, scan                             # noqa: E402
 
 assert database.PATH.startswith(DATA), database.PATH
@@ -47,6 +47,26 @@ def check(name, ok, detail=""):
 def jump(system):
     main.journal_entry("CMDR Test", False, system, None,
                        {"event": "FSDJump", "StarSystem": system}, {})
+    root.update()
+
+
+def marks_shown():
+    """Sum of the rail's "N bm" labels in the open window."""
+    total, stack = 0, [scan._window]
+    while stack:
+        widget = stack.pop()
+        stack.extend(widget.winfo_children())
+        if isinstance(widget, tk.Label) and str(widget.cget("text")).endswith(" bm"):
+            total += int(widget.cget("text").split()[0])
+    return total
+
+
+def save_one():
+    """A copy of HOME's newest bookmark, 0.2 deg north, written as Bookmark writes it."""
+    spot = {k: v for k, v in cards.for_system(HOME)[-1].items() if k not in ("id", "path", "depleted_at")}
+    spot["latitude"] += 0.2
+    spotcard.save(spot)
+    main._report(None, main._card_token)
     root.update()
 
 
@@ -91,11 +111,26 @@ try:
     check("7 back to live after the jump shows the new system",
           title().startswith(f"RhinoData - {AWAY}"), title())
 
+    jump(HOME)
+    before = marks_shown()
+    save_one()
+    check("8 a saved bookmark shows in the open window", marks_shown() == before + 1,
+          f"{before} -> {marks_shown()}")
+    check("9 window not raised by the save", not shows, f"{len(shows)} calls")
+    real_refresh = scan.refresh
+    scan.refresh = lambda: None
+    before = marks_shown()
+    save_one()
+    check("10 control: with scan.refresh a no-op the count stays stale", marks_shown() == before,
+          f"{before} -> {marks_shown()}")
+    scan.refresh = real_refresh
+    jump(AWAY)
+
     # Control: without the arrival hook the window must go stale, or checks 2 and 5 prove nothing.
     real_arrived = scan.arrived
     scan.arrived = lambda: None
     jump(HOME)
-    check("8 control: with scan.arrived a no-op the title stays stale",
+    check("11 control: with scan.arrived a no-op the title stays stale",
           title().startswith(f"RhinoData - {AWAY}"), title())
     scan.arrived = real_arrived
 except Exception:
