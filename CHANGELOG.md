@@ -4,26 +4,28 @@
 
 **Added**
 
-- Tons collected at a bookmark, counted from `MiningRefined`. One event is 1 t
-  (checked against the SRV `Cargo.Count` on two journals); the ton goes to the
-  nearest bookmark within 175 m on that body, and a bookmark whose material is
-  the one refined beats a nearer one that is not. By-products are counted under
-  their own name. Tons refined near no bookmark, or with an unreadable
-  Status.json, are counted and logged at shutdown rather than dropped quietly.
-- Cycles. The tons between the first one refined and the Depleted mark are one
-  cycle, kept on the bookmark with the rigs, Density and Amount it opened at.
-  A cycle that opened at Amount High and ended depleted is what the deposit
-  held; two of them on one bookmark are the min-max of what it regrows. Mining
-  a depleted spot again opens a new cycle instead of reopening the old one.
-- The bookmark table has a Mined column: the best measured cycle once one has
-  measured the deposit, and ≥ the tons collected so far until then.
-- The card says how much was collected and what the deposit measured, and -
-  once it is depleted - how many days ago that was, against an assumed 14-day
-  regen. The 14 days is an assumption: Amount was not back at High immediately
-  after a depletion.
-- `python -m rs_core.yields` prints tons per rig position per Density band from
-  the measured cycles, beside the shipped `deposit.TONS_PER_RIG`. It prints;
-  it does not edit - a deposit mined before it was bookmarked reads low.
+- Tons collected at a bookmark, from `MiningRefined`: 1 event = 1 t, to the
+  nearest bookmark within 175 m on that body, material match before distance.
+  By-products under their own name. Tons with no bookmark in range, or no
+  Status.json reading, are counted and logged at shutdown.
+- Cycles: first ton to the Depleted mark, holding the rigs, Density and Amount
+  at the open. One opened at Amount High and closed depleted is the deposit's
+  capacity; two give its min-max. A depleted spot mined again opens a new one.
+- Bookmark table: Mined column - the best measured cycle, or ≥ the tons so far.
+- Card: tons collected, capacity, and days since the Depleted mark against
+  `yields.REGEN_DAYS` = 14, assumed, not measured.
+- `python -m rs_core.yields`: t/rig per Density band against
+  `deposit.TONS_PER_RIG`. Prints, never writes.
+
+**Changed**
+
+- The location map's picture cache keys on the bookmark fields it draws, not
+  `database.revision()`: a yield write every 30 s threw the 70-160 ms repaint
+  away.
+- `spotcard.save` keeps dict and list values instead of `str()`-ing them. An
+  Edit or a re-mark turned `yield` into a string every later read raised on.
+- `cards.edited` / `cards.updated` re-read `yield` off the row; Amount Depleted
+  set there closes the cycle, as the Depleted button does.
 
 ## 5.6.8
 
