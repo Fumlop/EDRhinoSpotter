@@ -8,7 +8,8 @@ coordinates.
 
 ## Checked
 
-- 171 real lines counted into one open cycle, the by-product under its own name.
+- 171 real lines: 127 t Diamond into one open cycle, 44 t Ruby by-product
+  counted in `byproduct`, not into the bookmark.
 - The cycle keeps the rigs, density and Amount it was opened at.
 - 5 km off every bookmark: counted in `unplaced`, not onto the nearest one.
 - A Status.json read that lands mid-write: counted in `unread`.

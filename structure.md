@@ -168,8 +168,8 @@ No tkinter anywhere in here.
   `MiningRefined` is 1 t, placed by the Status.json reading at that moment -
   the event carries no position. `ATTRIBUTE_M` is a 175 m radius,
   `cards.SAME_SPOT_M` (100 m, the patch) plus 75 m for chunks collected off it;
-  a bookmark whose `commodity` is the material refined wins over a nearer
-  one. `Tally` holds deltas per row, not records, and `store.Debounced`
+  only a bookmark whose `commodity` is the material refined takes the ton;
+  by-products are counted in `Tally.byproduct` and logged at shutdown. `Tally` holds deltas per row, not records, and `store.Debounced`
   writes every `FLUSH_S` (30 s) by re-reading the row and adding into its open
   cycle, so an Edit made meanwhile is not overwritten; `TALLY` is the one
   instance and `cards.set_depleted` flushes it before closing a cycle. A cycle

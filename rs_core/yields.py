@@ -39,9 +39,8 @@ FLUSH_S = 30.0
 def nearest(records, body, lat, lon, radius, material=None, within=ATTRIBUTE_M):
     """(record, metres) for the bookmark a ton belongs to, or None.
 
-    On `body`, within `within` metres, nearest first. A bookmark whose
-    `commodity` is `material` beats a nearer one that is not - by-products are
-    refined at the spot the main material is.
+    On `body`, within `within` metres, nearest first. With `material`, only
+    bookmarks whose `commodity` is that material.
     """
     if not radius or lat is None or lon is None:
         return None
@@ -59,10 +58,11 @@ def nearest(records, body, lat, lon, radius, material=None, within=ATTRIBUTE_M):
             continue
         if metres > within:
             continue
-        rank = ((record.get("commodity") or "").lower() != wanted, metres)
-        if best is None or rank < best[0]:
-            best = (rank, record, metres)
-    return None if best is None else (best[1], best[2])
+        if wanted and (record.get("commodity") or "").lower() != wanted:
+            continue
+        if best is None or metres < best[1]:
+            best = (record, metres)
+    return best
 
 
 def _now():
@@ -201,8 +201,9 @@ class Tally:
     Deltas per row, not records: a flush re-reads the row, adds the delta into
     its open cycle and writes that, so an Edit made meanwhile is not lost.
 
-    `unplaced` counts tons with no bookmark within ATTRIBUTE_M, `unread` tons
-    whose Status.json read landed mid-write. main.stop() logs both.
+    `unplaced` counts tons with no bookmark within ATTRIBUTE_M, `byproduct`
+    tons with a bookmark in range but none of that material, `unread` tons
+    whose Status.json read landed mid-write. main.stop() logs all three.
     """
 
     def __init__(self, delay=FLUSH_S, db=None):
@@ -211,15 +212,16 @@ class Tally:
         self._pending = {}              # thread and read on the timer thread
         self._writes = store.Debounced(delay=delay, write=self._write)
         self.unplaced = 0
+        self.byproduct = 0
         self.unread = 0
         self._cache = None       # (system, revision) -> the bookmarks read
 
     def refined(self, status, system, material, when=None):
         """Count 1 t of `material` at the Status.json reading `status`.
 
-        The bookmark it was counted into, or None when there is none within
-        ATTRIBUTE_M, the reading has no position, or it was not refined on the
-        ground.
+        The bookmark it was counted into, or None when no bookmark of
+        `material` is within ATTRIBUTE_M, the reading has no position, or it
+        was not refined on the ground. By-products are not counted.
         """
         if not material:
             return None
@@ -233,10 +235,14 @@ class Tally:
         if not body:
             self.unread += 1
             return None
-        found = nearest(self._bookmarks(system), body, status.get("Latitude"),
-                        status.get("Longitude"), status.get("PlanetRadius"), material)
+        records = self._bookmarks(system)
+        at = (body, status.get("Latitude"), status.get("Longitude"), status.get("PlanetRadius"))
+        found = nearest(records, *at, material)
         if found is None:
-            self.unplaced += 1
+            if nearest(records, *at) is None:
+                self.unplaced += 1
+            else:
+                self.byproduct += 1
             return None
         record, _ = found
         with self._lock:

@@ -95,10 +95,10 @@ def child():
     cycles = yields.cycles(row(diamond))
     check("one open cycle", len(cycles), 1)
     # The session's 171 t are 127 Diamond + 44 Ruby: the third CargoTransfer of
-    # that journal is ruby 44. A by-product is counted at the spot it came out
-    # of, under its own name.
-    check("171 t counted, by-product under its own name",
-          cycles[0]["tons"], {"Diamond": 127, "Ruby": 44})
+    # that journal is ruby 44. The by-product is not counted into the bookmark.
+    check("127 t of the bookmark's material counted",
+          cycles[0]["tons"], {"Diamond": 127})
+    check("44 t by-product counted as by-product", yields.TALLY.byproduct, 44)
     check("cycle carries the conditions it was mined under",
           (cycles[0]["rigs"], cycles[0]["density"], cycles[0]["amount_at_start"]),
           (4, "Medium", "High"))
@@ -110,7 +110,7 @@ def child():
     feed(_restamp(refined[:3]))
     check("3 t off the bookmarks are unplaced", yields.TALLY.unplaced, 3)
     check("and did not reach the bookmark",
-          yields.cycles(row(diamond))[0]["tons"], {"Diamond": 127, "Ruby": 44})
+          yields.cycles(row(diamond))[0]["tons"], {"Diamond": 127})
 
     # 2b. A read that lands mid-write costs the ton, and is counted.
     with open(os.path.join(scratch, "Status.json"), "w", encoding="utf-8") as handle:
@@ -125,8 +125,9 @@ def child():
     check("7 t refined off the ground are neither placed nor counted lost",
           (yields.TALLY.unplaced, yields.TALLY.unread), (3, 2))
 
-    # 3. Material beats distance: the Ruby bookmark is 120 m further away than
-    #    the Alexandrite one, and the ruby is still its.
+    # 3. Only a bookmark of the material refined takes the ton: the Ruby one
+    #    is 120 m further away than the Alexandrite one and still gets the ruby. The Diamond bookmark
+    #    at 0 m takes neither.
     alex = bookmark("Alexandrite", LAT, LON)
     ruby = bookmark("Ruby", LAT, _metres_east(LAT, LON, 120.0, RADIUS))
     status(LAT, LON)
@@ -136,6 +137,8 @@ def child():
           yields.totals(row(ruby)), {"Ruby": 11})
     check("46 t of alexandrite to the Alexandrite bookmark",
           yields.totals(row(alex)), {"Alexandrite": 46})
+    check("and none to the Diamond bookmark",
+          yields.totals(row(diamond)), {"Diamond": 127})
 
     # 4. EDMC replaying the journal at startup: lines older than the plugin
     #    start are skipped.
@@ -144,7 +147,7 @@ def child():
     feed([{"event": "MiningRefined", "Type": "$diamond_name;",
            "timestamp": "2020-01-01T00:00:00Z"}] * 5)
     check("5 replayed lines skipped", main._replayed - before, 5)
-    check("and no tons added", yields.totals(row(diamond)), {"Diamond": 127, "Ruby": 44})
+    check("and no tons added", yields.totals(row(diamond)), {"Diamond": 127})
 
     # 5. Depleted closes the cycle, including tons still pending at the press.
     yields.TALLY._writes.delay = 3600.0        # nothing reaches the row on its own
@@ -157,8 +160,8 @@ def child():
     check("still one cycle", len(closed), 1)
     check("closed depleted", closed[0].get("ended"), "depleted")
     check("the 9 pending tons landed in the closed cycle",
-          closed[0]["tons"], {"Diamond": 136, "Ruby": 44})
-    check("the deposit measures 180 t", yields.capacity(row(diamond)), (180, 180, 1))
+          closed[0]["tons"], {"Diamond": 136})
+    check("the deposit measures 136 t", yields.capacity(row(diamond)), (136, 136, 1))
     yields.TALLY._writes.delay = 0.05
 
     # 6. Mining it again after the regen opens a second cycle rather than
@@ -166,18 +169,31 @@ def child():
     feed(_restamp([{"event": "MiningRefined", "Type": "$diamond_name;"}] * 4))
     again = yields.cycles(row(diamond))
     check("a second cycle", len(again), 2)
-    check("the closed one untouched", again[0]["tons"], {"Diamond": 136, "Ruby": 44})
+    check("the closed one untouched", again[0]["tons"], {"Diamond": 136})
     check("the new one has the 4 t", again[1]["tons"], {"Diamond": 4})
 
     # 6b. The Mined column: the best measured cycle once there is one, and what
     #     is in the open cycle until then.
     from rs_ui import scan
-    check("Mined column reads the measured cycle", yields.short(row(diamond)), "180 t")
+    check("Mined column reads the measured cycle", yields.short(row(diamond)), "136 t")
     check("Mined column is a floor while nothing has measured it",
           yields.short(row(alex)), "≥46 t")
     check("header and row line up",
-          len(scan._columns("Material", "Rigs", "Mined", "Est. left")),
-          len(scan._columns("Alexandrite", "4", "≥46 t", "≈ 620-1,200 t left")))
+          len(scan._columns("Material", "Rigs", "Brg", "Dist", "Mined", "Est. left")),
+          len(scan._columns("Alexandrite", "4", "359°", "5.7 km", "≥46 t",
+                            "≈ 620-1,200 t left")))
+
+    # 6b'. Bearing and distance from the location's centre: due east 120 m of a
+    #      set centre is 90° / 120 m; a map with no centre set gives '-'.
+    ruby_row = dict(row(ruby), id=ruby)
+    centred = [("loc1", {"origin": [LAT, LON], "center": [LAT, LON], "radius": RADIUS,
+                         "stamps": []})]
+    check("east of the centre reads 90° 120 m",
+          scan._from_centre(centred, BODY, ruby_row), ("90°", "120 m"))
+    uncentred = [("loc1", {"origin": [LAT, LON], "radius": RADIUS, "stamps": []})]
+    check("no centre set reads '-'",
+          scan._from_centre(uncentred, BODY, ruby_row), ("-", "-"))
+    check("no map reads '-'", scan._from_centre([], BODY, ruby_row), ("-", "-"))
 
     # 6c. Edit and re-mark write the whole record back through spotcard.save.
     #     The cycles must survive both as a dict, with the tons the tally wrote

@@ -1,5 +1,25 @@
 # Changelog
 
+## 5.7.1
+
+**Added**
+
+- Bookmark table: Brg and Dist columns - bearing and distance from the centre
+  of the saved map the bookmark lies on, set with Ctrl+Alt+Z. `-` with no map
+  there or no centre set.
+
+**Changed**
+
+- Tons count only into a bookmark of the material refined, within 175 m.
+  By-products are no longer written to the bookmark; they are counted and
+  logged at shutdown as `t by-product not counted`. Cycles written by 5.6.9
+  keep their by-product tons in Mined.
+- Bookmark table: Material column 22 -> 17 characters, and Edit is packed
+  before the labels, so a narrow pane clips Est. left instead of the button.
+- Bookmark table header in Consolas 9, as the rows: at 8 it drifted left of
+  the columns it names.
+- Docs pictures re-rendered.
+
 ## 5.6.9
 
 **Added**

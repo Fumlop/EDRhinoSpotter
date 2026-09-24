@@ -37,10 +37,12 @@ MIN_PCT = 2.0
 # Wide enough for "15 d a" and every other body designation in a normal system.
 NAME_WIDTH = 8
 
-# The bookmark table, in characters: material, rigs, tons taken out of it,
-# what is left of it.
-MATERIAL_W = 22
+# The bookmark table, in characters: material, rigs, bearing and distance from
+# the location's centre, tons taken out of it, what is left of it.
+MATERIAL_W = 17     # "Quartz Pyroxenite", the longest _short() name
 RIGS_W = 6
+BEARING_W = 4
+FROM_W = 6
 MINED_W = 9
 LEFT_W = 20
 # The map table: location, the maps on it, how many bookmarks lie on them.
@@ -80,7 +82,7 @@ CARD_WIDTH = 310
 # picture pushed Share map and Mark depleted off the bottom of the window.
 MAP_PX = 240
 
-# Material names that do not fit a 22-character column or a one-line sentence.
+# Material names that do not fit a MATERIAL_W column or a one-line sentence.
 SHORT_NAMES = {
     "low temperature diamonds": "LTD",
     "low temp. diamonds": "LTD",
@@ -715,8 +717,8 @@ def _bookmark_list(parent, body, groups, maps):
     # The 4px of the accent strip every row starts with, so the headings sit
     # over the columns they name rather than four pixels left of them.
     tk.Frame(header, bg=BG, width=4).pack(side="left", fill="y")
-    tk.Label(header, text=INDENT + _columns("Material", "Rigs", "Mined", "Est. left"), bg=BG,
-             fg=DIM, anchor="w", font=("Consolas", 8)).pack(side="left")
+    tk.Label(header, text=INDENT + _columns("Material", "Rigs", "Brg", "Dist", "Mined", "Est. left"), bg=BG,
+             fg=DIM, anchor="w", font=("Consolas", 9)).pack(side="left")
     if groups:
         folded = all(not _unfolded(body["name"], index) for index, _group in groups)
         _button(header, "Open all" if folded else "Fold all",
@@ -747,7 +749,7 @@ def _bookmark_list(parent, body, groups, maps):
         if not open_here:
             continue
         for record in rows:
-            _bookmark_row(listing, record, picked)
+            _bookmark_row(listing, body["name"], record, picked, maps)
     return picked
 
 
@@ -786,7 +788,7 @@ def _location_header(parent, body, index, group, maps, status, open_here):
     tk.Frame(parent, bg=PANEL, height=1).pack(fill="x", padx=(0, 16), pady=(4, 0))
 
 
-def _bookmark_row(parent, record, picked):
+def _bookmark_row(parent, body, record, picked, maps):
     """One deposit inside its location: material, rigs, what is left of it.
 
     One line. Where it is and when it was marked live on the card now, which is
@@ -798,6 +800,9 @@ def _bookmark_row(parent, record, picked):
     row = tk.Frame(parent, bg=bg)
     row.pack(fill="x", padx=(0, 16), pady=1)
     tk.Frame(row, bg=ACCENT if lit else bg, width=4).pack(side="left", fill="y")
+    # Packed before the labels: pack gives out width in call order, so a
+    # narrow pane clips Est. left instead of dropping the button.
+    _button(row, "Edit", lambda: _edit_bookmark(record)).pack(side="right", padx=(6, 0))
 
     rigs = record.get("rigs")
     left = deposit.describe(rigs, record.get("amount"), record.get("density"))
@@ -810,6 +815,10 @@ def _bookmark_row(parent, record, picked):
                                 f"{(str(rigs) if rigs is not None else '-'):>{RIGS_W}} ",
              bg=bg, fg=DIM if dead else ACCENT, anchor="w",
              font=("Consolas", 9)).pack(side="left")
+    bearing, away = _from_centre(maps, body, record)
+    tk.Label(row, text=f"{bearing:>{BEARING_W}} {away:>{FROM_W}} ", bg=bg,
+             fg=DIM if dead else FG_SOFT, anchor="e",
+             font=("Consolas", 9)).pack(side="left")
     # Its own label: a label carries one colour, and the tons measured here are
     # not the estimate beside them.
     mined = yields.short(record)
@@ -819,7 +828,6 @@ def _bookmark_row(parent, record, picked):
     tk.Label(row, text=f"{left or '-':>{LEFT_W}}", bg=bg,
              fg=ALERT if dead else (WARN if left else DIM), anchor="e",
              font=("Consolas", 9)).pack(side="left")
-    _button(row, "Edit", lambda: _edit_bookmark(record)).pack(side="right", padx=(6, 0))
 
     _clickable(row, lambda: _pick_record(record), skip_buttons=True)
 
@@ -830,11 +838,30 @@ def _worked_out(record):
     return bool(record.get("depleted_at")) or record.get("amount") == "Depleted"
 
 
-def _columns(material, rigs, mined, left):
+def _columns(material, rigs, bearing, away, mined, left):
     """The one place the bookmark table's column widths live, so the header
     cannot drift away from the rows it names."""
     return (f"{material[:MATERIAL_W]:<{MATERIAL_W}} {rigs:>{RIGS_W}} "
+            f"{bearing:>{BEARING_W}} {away:>{FROM_W}} "
             f"{mined:>{MINED_W}} {left:>{LEFT_W}}")
+
+
+def _from_centre(maps, body, record):
+    """('123°', '850 m') from the bookmark's map centre to the bookmark.
+
+    ('-', '-') off any map, or on a map whose `center` was never set (Ctrl+Alt+Z).
+    """
+    found = _map_data(body, record, maps)
+    centre = found[1].get("center") if found else None
+    if not centre:
+        return "-", "-"
+    try:
+        clat, clon = float(centre[0]), float(centre[1])
+        lat, lon = float(record["latitude"]), float(record["longitude"])
+        metres = guide.distance(clat, clon, lat, lon, float(found[1]["radius"]))
+    except (IndexError, TypeError, ValueError):
+        return "-", "-"
+    return f"{round(guide.bearing(clat, clon, lat, lon)) % 360}°", guide.metres(metres)
 
 
 def _mapped_list(parent, body, mapped, unknown):

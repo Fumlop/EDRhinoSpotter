@@ -358,8 +358,9 @@ def stop():
     # two-second thread would go with it.
     _writes.flush()
     _tally.flush()
-    if _tally.unplaced or _tally.unread or _replayed:
+    if _tally.unplaced or _tally.byproduct or _tally.unread or _replayed:
         logger.info(f"mining: {_tally.unplaced} t refined near no bookmark, "
+                    f"{_tally.byproduct} t by-product not counted, "
                     f"{_tally.unread} t with no Status.json reading, "
                     f"{_replayed} replayed lines skipped")
     # After every write, so the copy has them.
@@ -454,9 +455,9 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     elif spotmark.leaves_location(entry) and _loc is not None:
         _loc.set("")
 
-    # 1 t into the bookmark it was refined at, and the material into the
-    # dropdown so the Bookmark made there is already filled. Never over a
-    # material picked by hand: a by-product must not rename the bookmark.
+    # 1 t into the bookmark of that material it was refined at, and the
+    # material into the dropdown so the Bookmark made there is already filled.
+    # Never over a material picked by hand: a by-product must not rename it.
     if entry.get("event") == "MiningRefined":
         _refined(entry, system)
     elif entry.get("event") in ("DockSRV", "Liftoff"):
@@ -495,7 +496,8 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 
 
 def _refined(entry, system):
-    """One MiningRefined: 1 t into the nearest bookmark, and the dropdown.
+    """One MiningRefined: 1 t into the nearest bookmark of that material, and
+    the dropdown.
 
     One Status.json read for both. A line older than the plugin start is a
     replay of this session's journal and is counted in _replayed, not again.

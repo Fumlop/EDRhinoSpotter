@@ -7,7 +7,7 @@ bookmarks for the patches you find, a minimap of the ground you have scanned,
 and an arrow that guides you back.
 
 <p align="center">
-  <img src="docs/plugin.png?v=5.0.0" alt="The RhinoSpotter panel in EDMC">
+  <img src="docs/plugin.png?v=5.7.1" alt="The RhinoSpotter panel in EDMC">
 </p>
 
 ## Install
@@ -21,7 +21,7 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
 ## RhinoData - where to land
 
 <p align="center">
-  <img src="docs/rhinoscan.png?v=5.0.0" width="620"
+  <img src="docs/rhinoscan.png?v=5.7.1" width="620"
        alt="The RhinoData window: bodies of the system on the left, one body's bookmarks folded by location in the middle, the picked bookmark on a card to the right">
 </p>
 
@@ -43,7 +43,7 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
   time it was marked are readings and stay as they were.
 
 <p align="center">
-  <img src="docs/edit.png?v=5.3.0" width="360"
+  <img src="docs/edit.png?v=5.7.1" width="360"
        alt="The Edit bookmark dialog: material, rigs, amount, density and location, with the coordinates shown read-only">
 </p>
 
@@ -64,7 +64,7 @@ restart EDMC. Your data is not in the plugin folder and is never touched.
   Which materials it offers depends on the low value switch under Settings.
 
 <p align="center">
-  <img src="docs/rhinoscan-filtered.png?v=5.0.0" width="620"
+  <img src="docs/rhinoscan-filtered.png?v=5.7.1" width="620"
        alt="The same window filtered to one material: only the grounds that carry it are listed, and the counts follow">
 </p>
 <p align="center"><em>The same system with Material set: the grounds that never
@@ -75,7 +75,7 @@ carried it are gone.</em></p>
   picked. **Bookmarks** and **Mapped N/M** are tabs on the body, not pages.
 
 <p align="center">
-  <img src="docs/mapped.png?v=5.0.0" width="440"
+  <img src="docs/mapped.png?v=5.7.1" width="440"
        alt="The Mapped tab of one body, with the maps saved for each location and the card of the picked map">
 </p>
 <p align="center"><em>The Mapped tab: the locations this body has a saved map
@@ -98,13 +98,15 @@ for, and the maps that no location could be tied to.</em></p>
   Density instead of adding a new one.
 
 <p align="center">
-  <img src="docs/bookmarks.png?v=5.0.0" width="620"
+  <img src="docs/bookmarks.png?v=5.7.1" width="620"
        alt="One body's bookmarks folded into their locations, and the card carrying coordinates, deposit and the buttons">
 </p>
 
 A location line says how many deposits it holds, which materials, how many are
 worked out, how far the nearest one is, and carries **Share map** - the saved
-map picture for that location. Clicking it folds the location away. On the card
+map picture for that location. Clicking it folds the location away. Each
+bookmark row gives rigs, bearing and distance from the location's centre (set
+with Ctrl+Alt+Z), tons mined there, and the estimated tons left. On the card
 of the picked bookmark:
 
 - **Guide** - arrow over the game (top middle) with direction and distance,
@@ -122,11 +124,11 @@ of the picked bookmark:
 
 <table align="center">
   <tr>
-    <td align="center"><img src="docs/minimap.png?v=5.0.0" width="230"
+    <td align="center"><img src="docs/minimap.png?v=5.7.1" width="230"
          alt="The minimap before a center is set"></td>
-    <td align="center"><img src="docs/minimap-center.png?v=5.0.0" width="230"
+    <td align="center"><img src="docs/minimap-center.png?v=5.7.1" width="230"
          alt="The minimap with a center set"></td>
-    <td align="center"><img src="docs/minimap-border.png?v=5.0.0" width="230"
+    <td align="center"><img src="docs/minimap-border.png?v=5.7.1" width="230"
          alt="The minimap with center and border"></td>
   </tr>
   <tr>
@@ -166,7 +168,7 @@ of the picked bookmark:
 - "Painted" means driven within 2 km, not proven scanned - the game logs no scan.
 
 <p align="center">
-  <img src="docs/minimap-big.png?v=5.0.0" width="300"
+  <img src="docs/minimap-big.png?v=5.7.1" width="300"
        alt="The minimap at 1.8x, every distance carrying its number">
 </p>
 <p align="center"><em>Ctrl+Alt+M: 2x, the size that draws the distances.
@@ -181,7 +183,7 @@ Solid joins a material to itself, dotted steps down to the next.</em></p>
 EDMC Settings, RhinoSpotter tab:
 
 <p align="center">
-  <img src="docs/settings.png?v=5.2.1" width="480"
+  <img src="docs/settings.png?v=5.7.1" width="480"
        alt="The RhinoSpotter settings tab: minimap switches, corner, Free move, saved maps, the materials switch and the hotkey rows">
 </p>
 
