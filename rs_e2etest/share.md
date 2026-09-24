@@ -18,10 +18,11 @@ The RhinoData window is drawn off-screen (-4000, -4000), mapped but not visible.
 9. The four card buttons under Guide me there are not the same width.
 10. The poll costs enough per second to matter.
 11. An imported code comes back after its bookmark was deleted.
+12. Share bookmark redraws the whole window (visible flicker) to set one line.
 
 ## Checked
 
-All of 1-11. 8 includes NaN and zero radius, a 5,000-char body name, an int
+All of 1-12. 8 includes NaN and zero radius, a 5,000-char body name, an int
 over 2^63 and an unknown Amount. 10 is timed: 1,000 `_check_clipboard()` calls
 on an unchanged clipboard (Windows sequence number unchanged).
 

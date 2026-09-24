@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.7.2
+
+**Fixed**
+
+- Share bookmark and Copy coords set the status line in place instead of
+  redrawing the whole RhinoData window: the window flickered on every press.
+- The clipboard import retries on the next 1 s poll when another program has
+  the clipboard open; that change was skipped for good before.
+
 ## 5.7.1
 
 **Added**

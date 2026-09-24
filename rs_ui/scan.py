@@ -96,6 +96,7 @@ HINT = ("A location folds. The arrow the card starts draws over the game, top "
 
 _window = None           # only ever one, so the button cannot bury the panel
 _scan = None             # (register, sheet, focus, variable, materials)
+_status_label = None     # the middle pane's status line, rebuilt by every _draw()
 _canvases = {}           # the scrolling canvases of the draw on screen
 _scroll = {}             # how far each of them had been scrolled, by name
 
@@ -668,11 +669,21 @@ def _middle(parent, register, sheet, focus, body, records, groups, maps, materia
     else:
         picked = _bookmark_list(parent, body, groups, maps)
 
-    status = tk.Label(parent, text=_state["status"] or HINT, bg=BG, fg=DIM,
-                      anchor="w", justify="left", font=("Segoe UI", 8))
-    status.pack(side="bottom", fill="x", padx=16, pady=(6, 10))
-    status.bind("<Configure>", _wrap_to_width, add="+")
+    global _status_label
+    _status_label = tk.Label(parent, text=_state["status"] or HINT, bg=BG, fg=DIM,
+                             anchor="w", justify="left", font=("Segoe UI", 8))
+    _status_label.pack(side="bottom", fill="x", padx=16, pady=(6, 10))
+    _status_label.bind("<Configure>", _wrap_to_width, add="+")
     return picked
+
+
+def _say(text):
+    """Set the status line without a _draw(): a full redraw rebuilds every pane."""
+    _state["status"] = text
+    if _status_label is not None and _status_label.winfo_exists():
+        _status_label.config(text=text or HINT)
+    else:
+        _draw()
 
 
 def _wrap_to_width(event):
@@ -1570,8 +1581,7 @@ def _copy_coords(record):
     if not text or _window is None:
         return
     clipboard.copy(_window, text)
-    _state["status"] = f"Copied {text}"
-    _draw()
+    _say(f"Copied {text}")
 
 
 def _share_bookmark(record):
@@ -1584,9 +1594,8 @@ def _share_bookmark(record):
     code = share.encode(record)
     share.remember(code)
     clipboard.copy(_window, code)
-    _state["status"] = (f"Copied a RhinoData code for {_short(record.get('commodity'))} - "
-                        f"a RhinoSpotter that sees it on its clipboard imports it")
-    _draw()
+    _say(f"Copied a RhinoData code for {_short(record.get('commodity'))} - "
+         f"a RhinoSpotter that sees it on its clipboard imports it")
 
 
 def _share_map(body, group):

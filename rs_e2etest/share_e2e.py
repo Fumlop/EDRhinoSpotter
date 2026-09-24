@@ -91,6 +91,10 @@ def child_a(results):
 
     buttons["Share bookmark"].invoke()
     root.update()
+    check("12 no redraw on Share: the pressed button still exists",
+          bool(buttons["Share bookmark"].winfo_exists()), True)
+    check("12 status line says Copied", str(scan._status_label.cget("text")).startswith(
+        "Copied a RhinoData code"), True)
     code = root.clipboard_get()
     check("1 clipboard holds a RhinoData line", code.startswith(share.PREFIX), True)
     payload = json.loads(zlib.decompress(base64.urlsafe_b64decode(code[len(share.PREFIX):])))
@@ -240,6 +244,8 @@ def _clipboard(text=None):
 def main():
     out = os.path.join(HERE, "out", datetime.now().strftime("%Y%m%d-%H%M%S"))
     saved = _clipboard()
+    # A RhinoData code already there would be imported by the children's first poll.
+    _clipboard("share_e2e: clipboard cleared for the run")
     report, ok, code = [], True, ""
     try:
         for role in ("a", "b"):

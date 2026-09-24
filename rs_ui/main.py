@@ -347,11 +347,11 @@ def _check_clipboard():
     number = clipboard.sequence()
     if number is not None and number == _clip_sequence:
         return
-    _clip_sequence = number
     try:
         text = _frame.clipboard_get()
     except tk.TclError:
-        return
+        return      # no text, or another program has it open: retried next poll
+    _clip_sequence = number
     if text == _clip_seen:
         return
     _clip_seen = text
