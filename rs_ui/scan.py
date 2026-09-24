@@ -1873,10 +1873,10 @@ def _scrollable(parent, name, bg=BG, padx=(16, 0)):
 
     _canvases[name] = canvas
     _wheel(canvas)
-    # After the layout, not now: the scrollregion is set by the <Configure> the
-    # rows above are about to fire, and moving to a fraction of nothing is a
-    # move to the top.
-    canvas.after_idle(lambda: _restore_scroll(canvas, name))
+    # After the layout: the scrollregion comes from the <Configure> about to fire.
+    # On the root: destroying the canvas deletes the pending command, and tkinter
+    # can reuse its "<id><lambda>" name for a bind lambda Tcl then calls bare.
+    canvas._root().after_idle(lambda: _restore_scroll(canvas, name))
     return inner
 
 

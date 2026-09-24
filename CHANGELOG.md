@@ -20,6 +20,11 @@
   the columns it names.
 - Docs pictures re-rendered.
 
+**Fixed**
+
+- A list's scroll restore is scheduled on the Tk root, not its canvas. Two
+  redraws back to back raised `TypeError: <lambda>() missing ... 'event'`.
+
 ## 5.6.9
 
 **Added**
