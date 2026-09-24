@@ -9,14 +9,15 @@ come back through _on_ui. Tk is not thread-safe, and a widget written from a
 worker fails minutes later somewhere unrelated.
 """
 
+import sqlite3
 import threading
 import tkinter as tk
 from datetime import datetime, timezone
 
 from rs_core import (bodies, cards, coverage, database, deposit, grounds, migrate, palette,
-                     spansh, spotcard, spotmark, store, update, yields)
+                     share, spansh, spotcard, spotmark, store, update, yields)
 from rs_core.logging import logger
-from rs_ui import hotkey, minimap, scan
+from rs_ui import clipboard, hotkey, minimap, scan
 
 try:
     from theme import theme
@@ -49,6 +50,8 @@ _tally = yields.TALLY
 # have no Status.json position behind them now.
 _started_at = None
 _replayed = 0
+_clip_seen = None        # the clipboard text _check_clipboard last looked at
+_clip_sequence = None    # clipboard.sequence() at that look
 _hint = None             # the line under the buttons: honk, or FSS when the honk brought nothing
 
 _frame = None
@@ -325,6 +328,46 @@ def _poll_landed():
         if repr(err) != _poll_error:
             logger.warning(f"landed poll failed, retrying every second: {err!r}", exc_info=True)
             _poll_error = repr(err)
+    # Own try: a failing Status.json read must not stop the import.
+    try:
+        _check_clipboard()
+    except Exception:
+        logger.exception("clipboard import failed")
+
+
+def _check_clipboard():
+    """Import a RhinoData code on the clipboard, once per clipboard text.
+
+    Skips codes this install shared (share.mine) and bookmarks already here
+    (cards.nearby). Non-text clipboard content raises TclError: nothing to do.
+    """
+    global _clip_seen, _clip_sequence
+    # Windows: the text is read only when the sequence number moved, so a
+    # multi-MB copy elsewhere is not read and compared once a second.
+    number = clipboard.sequence()
+    if number is not None and number == _clip_sequence:
+        return
+    _clip_sequence = number
+    try:
+        text = _frame.clipboard_get()
+    except tk.TclError:
+        return
+    if text == _clip_seen:
+        return
+    _clip_seen = text
+    if share.PREFIX not in text:
+        return
+    try:
+        state, spot = share.take(text)
+    except (sqlite3.Error, OSError) as err:
+        logger.warning(f"could not import a shared bookmark: {err}")
+        _note(f"shared bookmark not imported: {err}")
+        return
+    if state == "imported":
+        _note(f"imported {spot['commodity']} on {spot['planet_name']}")
+        scan.refresh()
+    elif state == "known":
+        _note(f"shared {spot['commodity']} on {spot['planet_name']} is already bookmarked")
 
 
 def _cancel_landed():

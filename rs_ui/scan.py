@@ -25,9 +25,9 @@ from tkinter import messagebox
 from PIL import Image
 
 from rs_core import (bodies, cards, coverage, coverstore, database, deposit, grounds, guide,
-                     palette, spotcard, spotmark, store, yields)
+                     palette, share, spotcard, spotmark, store, yields)
 from rs_core.logging import logger
-from rs_ui import minimap, overlay, rhino
+from rs_ui import clipboard, minimap, overlay, rhino
 
 # Three. A fourth is the least likely material anyway, and a row of four pairs
 # reads as a run of words rather than a list.
@@ -1061,41 +1061,40 @@ def _bookmark_card(box, register, sheet, body, record, maps):
                  bg=PANEL, fg=GOOD if back else DIM, anchor="w",
                  font=("Consolas", 8)).pack(fill="x", padx=13)
 
-    _card_buttons(box, record, bool(record.get("depleted_at")), maps)
+    _card_buttons(box, record, bool(record.get("depleted_at")))
 
 
-def _card_buttons(box, record, dead, maps):
-    """Guide across the top, then the pairs. Delete is last and red under the
+def _card_buttons(box, record, dead):
+    """Guide across the top, then a 2 x 2 grid. Delete is last and red under the
     pointer: it is the one that destroys something."""
     buttons = tk.Frame(box, bg=PANEL)
     buttons.pack(fill="x", padx=13, pady=(12, 13))
 
     running = overlay.guiding(record)
-    # Nothing to point at on a bookmark made before the coordinates went into
-    # the sidecar, and nothing to share on a body nobody has driven.
+    # No coordinates (bookmarks older than the sidecar): no Guide, Share or Copy.
     has_fix = record.get("latitude") is not None and record.get("longitude") is not None
     arrow = _button(buttons, "Stop the arrow" if running else "Guide me there",
                     (lambda: _toggle_guide(record)) if has_fix else None)
     arrow.config(fg=GOOD if running else ACCENT, font=("Segoe UI", 9))
     arrow.pack(fill="x")
 
-    pair = tk.Frame(buttons, bg=PANEL)
-    pair.pack(fill="x", pady=(6, 0))
-    _button(pair, "Share map",
-            (lambda: _share_map(record.get("planet_name"), [record]))
-            if (maps and has_fix) else None).pack(side="left", fill="x", expand=True)
-    depleted = _button(pair, "Set active" if dead else "Mark depleted",
+    # 2 x 2 grid, uniform columns: pack with expand sized each button by its text.
+    grid = tk.Frame(buttons, bg=PANEL)
+    grid.pack(fill="x", pady=(6, 0))
+    grid.columnconfigure((0, 1), weight=1, uniform="card")
+    depleted = _button(grid, "Set active" if dead else "Mark depleted",
                        lambda: _toggle_depleted(record))
     depleted.config(fg=WARN)
-    depleted.pack(side="left", fill="x", expand=True, padx=(6, 0))
-
-    pair = tk.Frame(buttons, bg=PANEL)
-    pair.pack(fill="x", pady=(6, 0))
-    _button(pair, "Copy coords",
-            (lambda: _copy_coords(record)) if has_fix else None).pack(
-        side="left", fill="x", expand=True)
-    _button(pair, "Delete", lambda: _delete_bookmark(record), active=ALERT).pack(
-        side="left", fill="x", expand=True, padx=(6, 0))
+    for index, button in enumerate((
+            _button(grid, "Share bookmark",
+                    (lambda: _share_bookmark(record)) if share.shareable(record) else None),
+            depleted,
+            _button(grid, "Copy coords", (lambda: _copy_coords(record)) if has_fix else None),
+            _button(grid, "Delete", lambda: _delete_bookmark(record), active=ALERT))):
+        row, column = divmod(index, 2)
+        # 3 px either side of the gap: padding on one column only made it 6 px narrower.
+        button.grid(row=row, column=column, sticky="ew",
+                    padx=(3, 0) if column else (0, 3), pady=(6 if row else 0, 0))
 
 
 def _map_card(box, body, row):
@@ -1566,17 +1565,27 @@ def _delete_bookmark(record):
 
 
 def _copy_coords(record):
-    """The coordinates onto the clipboard, for a message to somebody else.
-
-    clipboard_clear before append: Tk appends to whatever was there, and the
-    second press would otherwise hand over both.
-    """
+    """The coordinates onto the clipboard, for a message to somebody else."""
     text = _coords(record)
     if not text or _window is None:
         return
-    _window.clipboard_clear()
-    _window.clipboard_append(text)
+    clipboard.copy(_window, text)
     _state["status"] = f"Copied {text}"
+    _draw()
+
+
+def _share_bookmark(record):
+    """The bookmark as a RhinoData code on the clipboard.
+
+    Remembered before the copy, so the clipboard poll in rs_ui.main skips it.
+    """
+    if _window is None:
+        return
+    code = share.encode(record)
+    share.remember(code)
+    clipboard.copy(_window, code)
+    _state["status"] = (f"Copied a RhinoData code for {_short(record.get('commodity'))} - "
+                        f"a RhinoSpotter that sees it on its clipboard imports it")
     _draw()
 
 

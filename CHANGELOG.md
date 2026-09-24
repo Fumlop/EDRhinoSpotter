@@ -4,6 +4,13 @@
 
 **Added**
 
+- Card: **Share bookmark** in place of Share map (Share map stays on the
+  location line). Puts `RhinoData:<code>` on the clipboard; a running
+  RhinoSpotter that finds a code on its clipboard imports it. Not imported:
+  codes shared or imported before by this install (SHA-256 digests in `meta`)
+  and bookmarks already here (same material within 100 m). No commander, dates
+  or tons in the code. The clipboard text is read only when Windows'
+  clipboard sequence number moves.
 - Bookmark table: Brg and Dist columns - bearing and distance from the centre
   of the saved map the bookmark lies on, set with Ctrl+Alt+Z. `-` with no map
   there or no centre set.
@@ -18,6 +25,9 @@
   before the labels, so a narrow pane clips Est. left instead of the button.
 - Bookmark table header in Consolas 9, as the rows: at 8 it drifted left of
   the columns it names.
+- The four card buttons under Guide me there are one width (2 x 2 grid).
+- Copy coords and Share bookmark write the clipboard through Win32: Tk's
+  clipboard text was gone once EDMC closed.
 - Docs pictures re-rendered.
 
 **Fixed**

@@ -164,6 +164,13 @@ No tkinter anywhere in here.
   370-400 t at Medium, the span of both at High or unread. The two measured
   deposits behind those are in the docstring. The panel's Density and Amount
   pickers write into the bookmark; the bookmarks list shows the range.
+- **[share.py](rs_core/share.py)** - a bookmark as `RhinoData:<code>`:
+  URL-safe base64 of zlib'd JSON of `FIELDS` (no commander, dates, tons).
+  `decode()` checks types, ranges and the material name, and inflates to 16 KB
+  at most. Codes shared here are kept as SHA-256 digests in `meta`
+  (`shared:<digest>`), and so are imported ones; `take()` skips those and
+  anything `cards.nearby` finds. main's 1 s landed poll reads the clipboard
+  when `GetClipboardSequenceNumber` moved and calls it once per new text.
 - **[yields.py](rs_core/yields.py)** - tons refined at a bookmark. One
   `MiningRefined` is 1 t, placed by the Status.json reading at that moment -
   the event carries no position. `ATTRIBUTE_M` is a 175 m radius,
@@ -240,6 +247,8 @@ Everything in here imports tkinter.
   rather than PIL's ImageTk, which is the one part of PIL that EDMC's build
   cannot be relied on to carry. A window it cannot build is logged and
   skipped - the bookmark list works without an arrow over the game.
+- **[clipboard.py](rs_ui/clipboard.py)** - text onto the clipboard with
+  Win32 `SetClipboardData`: Tk's clipboard text is gone once EDMC exits.
 - **[scan.py](rs_ui/scan.py)** - the RhinoData window: three panes side by
   side, at 60% of the screen. The rail lists every landable body with its
   distance, locations and bookmark count; the middle holds the picked body's
@@ -345,6 +354,9 @@ mapping the unit tests it replaced.
   plugin; corrupt, foreign and unreachable downloads refused.
 - **data_e2e.py** - migrate, replay (`--rebuild`, `--testmode`, a locked db)
   and `rs_api` against copies of the db and the journals.
+- **share_e2e.py** - Share bookmark in one install, the clipboard import in a
+  second: no personal fields, no re-import of one's own code, no duplicates,
+  mangled codes refused, the four card buttons one width, poll cost.
 - **yield_e2e.py** - the real journal's 171 MiningRefined lines through
   `load.journal_entry`: attribution, unplaced and unreadable tons, the replay
   skip, Depleted closing a cycle with the pending tons in it, a second cycle,

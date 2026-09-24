@@ -112,6 +112,11 @@ of the picked bookmark:
 - **Guide** - arrow over the game (top middle) with direction and distance,
   from orbital cruise down to the SRV. Borderless or windowed.
 - **Mark depleted / Set active** - mark a patch mined out.
+- **Share bookmark** - the bookmark as one `RhinoData:...` line on the
+  clipboard, for Discord or a DM. A RhinoSpotter that sees that line on its
+  clipboard imports it - unless it made the line itself or already has that
+  material within 100 m. The line carries body, position, material, rigs,
+  Amount, Density and location; not your commander name, dates or tons.
 - **Copy coords** - the coordinates onto the clipboard.
 - **Delete** - asks first.
 - With Rigs and Amount set, an estimated tons-left range is shown (experimental).
