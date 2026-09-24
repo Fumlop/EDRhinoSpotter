@@ -25,7 +25,7 @@ from tkinter import messagebox
 from PIL import Image
 
 from rs_core import (bodies, cards, coverage, coverstore, database, deposit, grounds, guide,
-                     palette, spotcard, spotmark, store)
+                     palette, spotcard, spotmark, store, yields)
 from rs_core.logging import logger
 from rs_ui import minimap, overlay, rhino
 
@@ -37,9 +37,13 @@ MIN_PCT = 2.0
 # Wide enough for "15 d a" and every other body designation in a normal system.
 NAME_WIDTH = 8
 
-# The bookmark table, in characters: material, rigs, what is left of it.
-MATERIAL_W = 22
+# The bookmark table, in characters: material, rigs, bearing and distance from
+# the location's centre, tons taken out of it, what is left of it.
+MATERIAL_W = 17     # "Quartz Pyroxenite", the longest _short() name
 RIGS_W = 6
+BEARING_W = 4
+FROM_W = 6
+MINED_W = 9
 LEFT_W = 20
 # The map table: location, the maps on it, how many bookmarks lie on them.
 LOCATION_W = 10
@@ -78,7 +82,7 @@ CARD_WIDTH = 310
 # picture pushed Share map and Mark depleted off the bottom of the window.
 MAP_PX = 240
 
-# Material names that do not fit a 22-character column or a one-line sentence.
+# Material names that do not fit a MATERIAL_W column or a one-line sentence.
 SHORT_NAMES = {
     "low temperature diamonds": "LTD",
     "low temp. diamonds": "LTD",
@@ -444,6 +448,23 @@ def _rail(parent, register, sheet, focus, variable, materials, listed, body, liv
                  font=("Segoe UI", 9)).pack(fill="x", padx=13, pady=(8, 0))
 
 
+def arrived():
+    """Redraw an open window for the system just jumped to, without raising it.
+
+    Drops the picked body, bookmark and map of the old system. A system browsed
+    from the search box stays shown.
+    """
+    if not is_open():
+        return
+    if not _state["system"]:
+        _state["body"] = None
+        _state["selected"] = None
+        _state["map"] = None
+        _state["collapsed"] = set()
+        _state["status"] = ""
+    _draw()
+
+
 def _shown_register(live):
     """The register the window draws: the live one, or a searched system filled
     from the body cache.
@@ -728,8 +749,8 @@ def _bookmark_list(parent, body, groups, maps):
     # The 4px of the accent strip every row starts with, so the headings sit
     # over the columns they name rather than four pixels left of them.
     tk.Frame(header, bg=BG, width=4).pack(side="left", fill="y")
-    tk.Label(header, text=INDENT + _columns("Material", "Rigs", "Est. left"), bg=BG,
-             fg=DIM, anchor="w", font=("Consolas", 8)).pack(side="left")
+    tk.Label(header, text=INDENT + _columns("Material", "Rigs", "Brg", "Dist", "Mined", "Est. left"), bg=BG,
+             fg=DIM, anchor="w", font=("Consolas", 9)).pack(side="left")
     if groups:
         folded = all(not _unfolded(body["name"], index) for index, _group in groups)
         _button(header, "Open all" if folded else "Fold all",
@@ -760,7 +781,7 @@ def _bookmark_list(parent, body, groups, maps):
         if not open_here:
             continue
         for record in rows:
-            _bookmark_row(listing, record, picked)
+            _bookmark_row(listing, body["name"], record, picked, maps)
     return picked
 
 
@@ -799,7 +820,7 @@ def _location_header(parent, body, index, group, maps, status, open_here):
     tk.Frame(parent, bg=PANEL, height=1).pack(fill="x", padx=(0, 16), pady=(4, 0))
 
 
-def _bookmark_row(parent, record, picked):
+def _bookmark_row(parent, body, record, picked, maps):
     """One deposit inside its location: material, rigs, what is left of it.
 
     One line. Where it is and when it was marked live on the card now, which is
@@ -811,6 +832,9 @@ def _bookmark_row(parent, record, picked):
     row = tk.Frame(parent, bg=bg)
     row.pack(fill="x", padx=(0, 16), pady=1)
     tk.Frame(row, bg=ACCENT if lit else bg, width=4).pack(side="left", fill="y")
+    # Packed before the labels: pack gives out width in call order, so a
+    # narrow pane clips Est. left instead of dropping the button.
+    _button(row, "Edit", lambda: _edit_bookmark(record)).pack(side="right", padx=(6, 0))
 
     rigs = record.get("rigs")
     left = deposit.describe(rigs, record.get("amount"), record.get("density"))
@@ -823,10 +847,19 @@ def _bookmark_row(parent, record, picked):
                                 f"{(str(rigs) if rigs is not None else '-'):>{RIGS_W}} ",
              bg=bg, fg=DIM if dead else ACCENT, anchor="w",
              font=("Consolas", 9)).pack(side="left")
+    bearing, away = _from_centre(maps, body, record)
+    tk.Label(row, text=f"{bearing:>{BEARING_W}} {away:>{FROM_W}} ", bg=bg,
+             fg=DIM if dead else FG_SOFT, anchor="e",
+             font=("Consolas", 9)).pack(side="left")
+    # Its own label: a label carries one colour, and the tons measured here are
+    # not the estimate beside them.
+    mined = yields.short(record)
+    tk.Label(row, text=f"{mined or '-':>{MINED_W}} ", bg=bg,
+             fg=GOOD if mined else DIM, anchor="e",
+             font=("Consolas", 9)).pack(side="left")
     tk.Label(row, text=f"{left or '-':>{LEFT_W}}", bg=bg,
              fg=ALERT if dead else (WARN if left else DIM), anchor="e",
              font=("Consolas", 9)).pack(side="left")
-    _button(row, "Edit", lambda: _edit_bookmark(record)).pack(side="right", padx=(6, 0))
 
     _clickable(row, lambda: _pick_record(record), skip_buttons=True)
 
@@ -837,11 +870,30 @@ def _worked_out(record):
     return bool(record.get("depleted_at")) or record.get("amount") == "Depleted"
 
 
-def _columns(material, rigs, left):
+def _columns(material, rigs, bearing, away, mined, left):
     """The one place the bookmark table's column widths live, so the header
     cannot drift away from the rows it names."""
     return (f"{material[:MATERIAL_W]:<{MATERIAL_W}} {rigs:>{RIGS_W}} "
-            f"{left:>{LEFT_W}}")
+            f"{bearing:>{BEARING_W}} {away:>{FROM_W}} "
+            f"{mined:>{MINED_W}} {left:>{LEFT_W}}")
+
+
+def _from_centre(maps, body, record):
+    """('123°', '850 m') from the bookmark's map centre to the bookmark.
+
+    ('-', '-') off any map, or on a map whose `center` was never set (Ctrl+Alt+Z).
+    """
+    found = _map_data(body, record, maps)
+    centre = found[1].get("center") if found else None
+    if not centre:
+        return "-", "-"
+    try:
+        clat, clon = float(centre[0]), float(centre[1])
+        lat, lon = float(record["latitude"]), float(record["longitude"])
+        metres = guide.distance(clat, clon, lat, lon, float(found[1]["radius"]))
+    except (IndexError, TypeError, ValueError):
+        return "-", "-"
+    return f"{round(guide.bearing(clat, clon, lat, lon)) % 360}°", guide.metres(metres)
 
 
 def _mapped_list(parent, body, mapped, unknown):
@@ -1015,6 +1067,11 @@ def _bookmark_card(box, register, sheet, body, record, maps):
     tk.Label(box, text="worked out" if dead else (left or "tons left unknown"),
              bg=PANEL, fg=ALERT if dead else WARN, anchor="w",
              font=("Consolas", 9)).pack(fill="x", padx=13, pady=(2, 0))
+    # Counted from MiningRefined within yields.ATTRIBUTE_M.
+    collected = yields.describe(record)
+    if collected:
+        tk.Label(box, text=collected, bg=PANEL, fg=GOOD, anchor="w",
+                 font=("Consolas", 9)).pack(fill="x", padx=13, pady=(2, 0))
     for line in _ground_lines(sheet, body, record.get("commodity")):
         tk.Label(box, text=line, bg=PANEL, fg=DIM, anchor="w",
                  font=("Consolas", 8)).pack(fill="x", padx=13, pady=(2, 0))
@@ -1028,6 +1085,13 @@ def _bookmark_card(box, register, sheet, body, record, maps):
                        + (f"  ·  depleted {depleted}" if depleted else "  ·  active"),
              bg=PANEL, fg=FG_SOFT, anchor="w",
              font=("Consolas", 8)).pack(fill="x", padx=13)
+    days = yields.days_since_depleted(record)
+    if days is not None:
+        back = yields.regenerated(record)
+        tk.Label(box, text=f"{days:.0f} d since" + (f", past the assumed "
+                           f"{yields.REGEN_DAYS} d regen" if back else ""),
+                 bg=PANEL, fg=GOOD if back else DIM, anchor="w",
+                 font=("Consolas", 8)).pack(fill="x", padx=13)
 
     _card_buttons(box, record, bool(record.get("depleted_at")), maps)
 
@@ -1125,7 +1189,7 @@ def _location_map(parent, sheet, body, record, maps):
         return
     if not name:
         return
-    key = (body["name"], name, database.revision())
+    key = (body["name"], name, _marks_key(body))
     if _map_picture is None or _map_picture[0] != key:
         photo = _draw_location_map(parent, sheet, body, name, dict(maps)[name])
         if photo is None:
@@ -1135,6 +1199,18 @@ def _location_map(parent, sheet, body, record, maps):
                      borderwidth=0, highlightthickness=0)
     label.image = _map_picture[1]
     label.pack(padx=(0, 14), pady=(14, 0))
+
+
+def _marks_key(body):
+    """The bookmark fields _draw_location_map puts on the picture.
+
+    Not database.revision(): the tally writes a bookmark row every
+    yields.FLUSH_S while mining and none of these move, which threw the
+    70-160 ms repaint away once every 30 s.
+    """
+    return tuple((mark.get("latitude"), mark.get("longitude"),
+                  mark.get("commodity"), bool(mark.get("depleted_at")),
+                  mark.get("rigs")) for mark in body["marks"])
 
 
 def _draw_location_map(parent, sheet, body, name, data):
@@ -1160,8 +1236,11 @@ def _draw_location_map(parent, sheet, body, name, data):
             marks.append((*cover.xy(float(lat), float(lon)), codes.get(material),
                           bool(mark.get("depleted_at")), values.get(material, 0),
                           mark.get("rigs")))
-        golden = coverage.golden_groups([(x, y, rigs) for x, y, _, spent, _, rigs in marks
-                                         if not spent])
+        # The best coverage.GOLDEN_SHOWN by Cr/h, as Share map and the minimap draw them.
+        # Circles only: the credit label, 11 px at 400 px, is ~7 px at MAP_PX.
+        spots = [(x, y, rigs, value or 0) for x, y, _, spent, value, rigs in marks if not spent]
+        golden = [group[:4] for group in
+                  coverage.golden_best(coverage.golden_groups(spots), spots)]
         image = coverage.picture(cover.mask, marks, (), (), cover.border_m, golden)
         out = io.BytesIO()
         image.resize((MAP_PX, MAP_PX), Image.LANCZOS).save(out, format="PNG")
@@ -1330,7 +1409,7 @@ def _toggle_guide(record):
     if overlay.guiding(record):
         overlay.stop()
         _state["status"] = "The arrow is down."
-    elif overlay.start(_window, record, on_stop=_refresh) is None:
+    elif overlay.start(_window, record, on_stop=refresh) is None:
         # No arrow to be had here - it said why in the log.
         logger.info("scan: no overlay, the card is unchanged")
         _state["status"] = "No arrow: the game is not on this body."
@@ -1618,10 +1697,10 @@ def _map_marks(cover, system, body, sheet):
     return marks, golden
 
 
-def _refresh():
-    """Draw again, if the window is still there.
+def refresh():
+    """Draw again, if the window is still there. Does not raise it.
 
-    The overlay calls this when it takes itself down, which can be minutes after
+    main calls this after a bookmark is saved. The overlay calls this when it takes itself down, which can be minutes after
     the press and with the window long since gone - so the line that said an
     arrow was up goes with it.
     """

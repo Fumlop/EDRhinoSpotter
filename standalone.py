@@ -108,7 +108,7 @@ class App:
         key = (register.system, len(register), database.revision())
         if key != self.redraw_key:
             if self.redraw_key is not None:
-                scan._refresh()
+                scan.refresh()
             self.redraw_key = key
 
     def open_settings(self):

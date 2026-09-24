@@ -126,9 +126,16 @@ def set_depleted(record, depleted, when=None, db=None):
     yes/no - so the day the community knows how long a patch takes to come
     back, the time is already there to count from. No mark, no key.
     The record in hand is updated to match.
+
+    Depleted also closes the open yield cycle; the next ton refined there opens
+    the next one.
     """
+    # Imported here: rs_core.yields reads bookmarks through this module.
+    from rs_core import yields
     if record.get("id") is None:
         return False
+    if depleted and db is None:
+        yields.TALLY.flush()    # pending tons belong in the cycle being closed
     try:
         with database.connect(db) as conn:
             row = conn.execute("SELECT data FROM bookmarks WHERE id = ?",
@@ -139,6 +146,7 @@ def set_depleted(record, depleted, when=None, db=None):
             data = json.loads(row[0])
             if depleted:
                 data["depleted_at"] = when or datetime.now(timezone.utc).isoformat(timespec="seconds")
+                yields.close(data, data["depleted_at"])
             else:
                 data.pop("depleted_at", None)
             database.write_bookmark(conn, data, record["id"])
@@ -148,6 +156,7 @@ def set_depleted(record, depleted, when=None, db=None):
     database.changed()
     if depleted:
         record["depleted_at"] = data["depleted_at"]
+        record["yield"] = data.get("yield")
     else:
         record.pop("depleted_at", None)
     return True
@@ -234,7 +243,7 @@ def location_at(system, body, lat, lon, radius, db=None, within=SAME_LOCATION_M,
 EDITABLE = ("commodity", "rigs", "amount", "density", "location_index")
 
 
-def edited(old, fields):
+def edited(old, fields, db=None):
     """`old` with the EDITABLE keys of `fields` applied.
 
     Values of None clear the field, unlike updated(), where None means the
@@ -242,7 +251,7 @@ def edited(old, fields):
 
     Sets updated_at. An `amount` other than 'Depleted' clears depleted_at.
     """
-    record = _without_row_keys(old)
+    record = _refreshed(old, db)
     for key in EDITABLE:
         if key in fields:
             record[key] = fields[key]
@@ -255,15 +264,46 @@ def _without_row_keys(old):
             if key not in ("path", "id", "distance_m")}
 
 
+def _refreshed(old, db=None):
+    """`old` minus the row keys, with `yield` taken off the row.
+
+    The tally writes the row every yields.FLUSH_S and the Edit dialog is modal,
+    so the copy in hand can be minutes behind. Pending tons are flushed first.
+    """
+    from rs_core import yields
+    if db is None:
+        yields.TALLY.flush()
+    record = _without_row_keys(old)
+    if old.get("id") is None:
+        return record
+    try:
+        with database.connect(db) as conn:
+            row = conn.execute("SELECT data FROM bookmarks WHERE id = ?",
+                               (old["id"],)).fetchone()
+        fresh = json.loads(row[0]).get("yield") if row else None
+    except (sqlite3.Error, OSError, ValueError) as err:
+        logger.warning(f"could not re-read the tons of bookmark {old['id']}: {err}")
+        return record
+    if fresh is not None:
+        record["yield"] = fresh
+    return record
+
+
 def _touched(record, amount):
-    """Stamp updated_at, and clear depleted_at for a live Amount."""
+    """Stamp updated_at. Amount Depleted marks and closes the cycle, any other
+    Amount clears the mark. Set here as well as in set_depleted: the Edit
+    dialog and a re-mark write `amount` straight to the row."""
+    from rs_core import yields
     record["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    if amount is not None and amount != "Depleted":
+    if amount == "Depleted":
+        record.setdefault("depleted_at", record["updated_at"])
+        yields.close(record, record["depleted_at"])
+    elif amount is not None:
         record.pop("depleted_at", None)
     return record
 
 
-def updated(old, spot):
+def updated(old, spot, db=None):
     """`old` with Rigs, Amount and Density taken from `spot`.
 
     Position, heading, location, commander and marked_at stay as first marked;
@@ -274,7 +314,7 @@ def updated(old, spot):
     Sets updated_at. An `amount` other than 'Depleted' clears depleted_at.
     Fills system_address and body_id when `old` predates them.
     """
-    record = _without_row_keys(old)
+    record = _refreshed(old, db)
     for key in ("rigs", "amount", "density"):
         if spot.get(key) is not None:
             record[key] = spot[key]

@@ -1,5 +1,81 @@
 # Changelog
 
+## 5.7.1-beta.1
+
+Standalone beta on 5.7.1: everything in 5.7.1 below, in the standalone
+Setup.exe.
+
+## 5.7.1
+
+**Added**
+
+- Bookmark table: Brg and Dist columns - bearing and distance from the centre
+  of the saved map the bookmark lies on, set with Ctrl+Alt+Z. `-` with no map
+  there or no centre set.
+
+**Changed**
+
+- Tons count only into a bookmark of the material refined, within 175 m.
+  By-products are no longer written to the bookmark; they are counted and
+  logged at shutdown as `t by-product not counted`. Cycles written by 5.6.9
+  keep their by-product tons in Mined.
+- Bookmark table: Material column 22 -> 17 characters, and Edit is packed
+  before the labels, so a narrow pane clips Est. left instead of the button.
+- Bookmark table header in Consolas 9, as the rows: at 8 it drifted left of
+  the columns it names.
+- Docs pictures re-rendered.
+
+## 5.6.9
+
+**Added**
+
+- Tons collected at a bookmark, from `MiningRefined`: 1 event = 1 t, to the
+  nearest bookmark within 175 m on that body, material match before distance.
+  By-products under their own name. Tons with no bookmark in range, or no
+  Status.json reading, are counted and logged at shutdown.
+- Cycles: first ton to the Depleted mark, holding the rigs, Density and Amount
+  at the open. One opened at Amount High and closed depleted is the deposit's
+  capacity; two give its min-max. A depleted spot mined again opens a new one.
+- Bookmark table: Mined column - the best measured cycle, or ≥ the tons so far.
+- Card: tons collected, capacity, and days since the Depleted mark against
+  `yields.REGEN_DAYS` = 14, assumed, not measured.
+- `python -m rs_core.yields`: t/rig per Density band against
+  `deposit.TONS_PER_RIG`. Prints, never writes.
+
+**Changed**
+
+- The location map's picture cache keys on the bookmark fields it draws, not
+  `database.revision()`: a yield write every 30 s threw the 70-160 ms repaint
+  away.
+- `spotcard.save` keeps dict and list values instead of `str()`-ing them. An
+  Edit or a re-mark turned `yield` into a string every later read raised on.
+- `cards.edited` / `cards.updated` re-read `yield` off the row; Amount Depleted
+  set there closes the cycle, as the Depleted button does.
+
+## 5.6.8
+
+**Fixed**
+
+- An open RhinoData window did not show a bookmark just made until it was clicked. It redraws after every saved or updated bookmark, without coming to the front.
+
+## 5.6.7
+
+**Changed**
+
+- Golden circles are at most 1.5 km in radius. The 2.5 km limit picked the members but not the circle, which sits on their centroid and was drawn up to 3.4 km (HIP 44291 4 a). A group whose circle would exceed 1.5 km is dropped; a smaller one inside it can still show.
+
+## 5.6.6
+
+**Fixed**
+
+- An open RhinoData window kept showing the system it was opened in after a jump. It redraws on FSDJump, CarrierJump and Location now, without coming to the front; a system picked in the search box stays shown.
+
+## 5.6.5
+
+**Fixed**
+
+- The map on the Bookmarks page circled every golden group; it shows the best 3 by Cr/h now, as Share map and the minimap do.
+
 ## 5.7.0-beta.1
 
 **Added**

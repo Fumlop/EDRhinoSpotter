@@ -12,9 +12,10 @@ worker fails minutes later somewhere unrelated.
 import threading
 import time
 import tkinter as tk
+from datetime import datetime, timezone
 
 from rs_core import (bodies, cards, coverage, database, deposit, grounds, instance, migrate,
-                     palette, spansh, spotcard, spotmark, store, update)
+                     palette, spansh, spotcard, spotmark, store, update, yields)
 from rs_core.logging import logger
 from rs_ui import hotkey, minimap, scan
 
@@ -47,6 +48,15 @@ _honked = {}             # SystemAddress -> the honk's BodyCount (stars and plan
 _spansh_known = {}       # SystemAddress -> stars and planets Spansh knows there
 _all_found = set()       # SystemAddresses with FSSAllBodiesFound: nothing left to FSS
 _prefilled = None        # the material MiningRefined last put in the dropdown
+# Tons refined near a bookmark, counted into it. Written every yields.FLUSH_S
+# and flushed when the SRV docks, on liftoff, at plugin_stop and before a
+# Depleted mark closes a cycle.
+_tally = yields.TALLY
+# EDMC replays the journal file it is watching at startup, so MiningRefined
+# arrives in bursts on load. Those tons were counted when they happened and
+# have no Status.json position behind them now.
+_started_at = None
+_replayed = 0
 _hint = None             # the line under the buttons: honk, or FSS when the honk brought nothing
 
 _frame = None
@@ -83,7 +93,7 @@ NOT_READ = "-"
 
 
 def start(plugin_dir, owner=OWNER):
-    global _sheet, _refused
+    global _sheet, _refused, _started_at
     # Before anything touches the data folder. A folder that cannot hold the
     # lock file runs unlocked, as before the lock existed.
     try:
@@ -109,6 +119,7 @@ def start(plugin_dir, owner=OWNER):
     # The PNG texture set of 5.5.0 and older, where an install was unzipped
     # over the last one by hand.
     coverage.clear_old_textures()
+    _started_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     _sheet = grounds.Sheet()
     if not _sheet.loaded:
         logger.warning(f"no mining_sheet.json: {_sheet.error}")
@@ -387,6 +398,12 @@ def stop():
     # Last, and not through the timer: EDMC is going, and a scan waiting on a
     # two-second thread would go with it.
     _writes.flush()
+    _tally.flush()
+    if _tally.unplaced or _tally.byproduct or _tally.unread or _replayed:
+        logger.info(f"mining: {_tally.unplaced} t refined near no bookmark, "
+                    f"{_tally.byproduct} t by-product not counted, "
+                    f"{_tally.unread} t with no Status.json reading, "
+                    f"{_replayed} replayed lines skipped")
     # After every write, so the copy has them.
     database.backup()
     instance.release()
@@ -489,19 +506,23 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     elif spotmark.leaves_location(entry) and _loc is not None:
         _loc.set("")
 
-    # Mining a material on the ground picks it in the dropdown, so the Bookmark
-    # made there is already filled. Only on the ground: asteroid mining refines
-    # the same materials in space. Never over a material picked by hand - a
-    # by-product must not rename the bookmark - and only on a change: every
-    # write reopens an open RhinoData window, and a load is dozens of these.
-    if entry.get("event") == "MiningRefined" and _material is not None:
-        _prefill_material(entry)
+    # 1 t into the bookmark of that material it was refined at, and the
+    # material into the dropdown so the Bookmark made there is already filled.
+    # Never over a material picked by hand: a by-product must not rename it.
+    if entry.get("event") == "MiningRefined":
+        _refined(entry, system)
+    elif entry.get("event") in ("DockSRV", "Liftoff"):
+        _tally.flush()
 
     # Arriving in a system scanned before fills the list straight from disk -
     # EDMC hands plugins only new journal lines, and last week's honk is gone.
     # The register does that itself through on_arrive; this only redraws.
+    before = _register.system
     if _register.track(entry, system=system):
         _refresh_scan_count()
+        # scan.show() would raise the window over the game on every jump.
+        if _register.system != before:
+            scan.arrived()
 
     # The honk: ask Spansh for the bodies the journal will not describe until
     # they are scanned - once a session per system, see spansh.should_ask. Off
@@ -525,20 +546,39 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
         _refresh_hint()
 
 
-def _prefill_material(entry):
+def _refined(entry, system):
+    """One MiningRefined: 1 t into the nearest bookmark of that material, and
+    the dropdown.
+
+    One Status.json read for both. A line older than the plugin start is a
+    replay of this session's journal and is counted in _replayed, not again.
+    """
+    global _replayed
+    material = spotmark.refined_material(entry)
+    if not material:
+        return
+    stamp = str(entry.get("timestamp") or "")
+    if _started_at and stamp and stamp < _started_at:
+        _replayed += 1
+        return
+    status = spotmark.read_status()
+    _tally.refined(status, system or _system, material, entry.get("timestamp"))
+    if _material is not None and spotmark.on_ground(status):
+        _prefill_material(material)
+
+
+def _prefill_material(refined):
     global _prefilled
-    refined = spotmark.refined_material(entry)
     current = _material.get()
-    if not refined or current == refined:
+    if current == refined:
         return
     if current not in ("", NO_MATERIAL, ALL_MATERIALS, _prefilled):
         return                  # picked by hand
-    if spotmark.on_ground(spotmark.read_status()):
-        _prefilled = refined
-        _material.set(refined)
-        # The filter may not carry what was just mined. _materials() lets the
-        # box through, so the dropdown has to be built again to hold it.
-        _fill_menu()
+    _prefilled = refined
+    _material.set(refined)
+    # The filter may not carry what was just mined. _materials() lets the
+    # box through, so the dropdown has to be built again to hold it.
+    _fill_menu()
 
 
 def _add_spansh(system, address, answer):
@@ -647,6 +687,9 @@ def _render_card(spot, token):
 
 def _report(message, token):
     """Stale renders stay quiet - a finished one must not label a running one."""
+    # Every finished save, stale or not: the row is in the database either way.
+    if not message or message.startswith("updated"):
+        scan.refresh()
     if token != _card_token:
         return
     _set_status(message or "")

@@ -53,13 +53,15 @@ def save(spot, id=None, db=None):
     """Write `spot` and return the bookmark id. With `id`, replace that row.
 
     `spot` is a spotmark.mark() dict plus 'commodity' and 'rigs'. Values that
-    are not int, float, str or None are stringified.
+    are not int, float, str, dict, list or None are stringified - the record is
+    stored as JSON, and `yield` is a dict of cycles that str() would flatten
+    into a string no reader can parse back.
 
     Raises sqlite3.Error / OSError on failure rather than returning None: the
     row is the bookmark, and the caller reports the failure.
     """
     record = {key: (None if value is None else
-                    value if isinstance(value, (int, float, str)) else str(value))
+                    value if isinstance(value, (int, float, str, dict, list)) else str(value))
               for key, value in spot.items()}
     with database.connect(db) as conn:
         id = database.write_bookmark(conn, record, id)

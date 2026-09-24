@@ -56,7 +56,9 @@ def bookmarks(body, card):
          "commodity": "Jadeite", "rigs": 4, "heading": 214,
          "density": "Low", "amount": "High",
          "latitude": 12.345678, "longitude": -98.765432,
-         "marked_at": "3311-05-14T18:40:00", "path": card},
+         "marked_at": "3311-05-14T18:40:00", "path": card,
+         "yield": {"cycles": [{"from": "3311-05-14T18:55:00", "tons": {"Jadeite": 212},
+                               "rigs": 4, "density": "Low", "amount_at_start": "High"}]}},
         {"system": SYSTEM, "planet_name": body, "location_index": 9,
          "commodity": "Monazite", "rigs": 2, "heading": 77,
          "density": "Medium", "amount": "Low",
@@ -99,6 +101,8 @@ def plant_maps(body):
                                      ("map 3", 12.910000, -98.100000, None)):
         cover = coverage.Coverage(body, lat, lon, RADIUS_4A)
         _drive(cover, lat, lon)
+        # A set centre ~1.5 km south-west, so the Brg and Dist columns carry values.
+        cover.recenter(lat - 0.04, lon - 0.04)
         data = cover.to_dict()
         data["location"] = location
         coverstore.save(body, name, data)

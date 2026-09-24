@@ -509,7 +509,7 @@ def picture(mask, marks=(), title=(), legend=(), border_m=None, golden=(), groun
 # A group of bookmarks the Rhino can work from one stop: at least GOLDEN_RIGS
 # rig positions, none depleted, all within GOLDEN_RADIUS_M of one point. The
 # Rhino carries six rigs; 2/2/1/1, 2/2/2, 2/3/1, 3/3, 1x6 and 2/1/1/1 all count.
-GOLDEN_RADIUS_M = 2500.0
+GOLDEN_RADIUS_M = 1500.0
 GOLDEN_RIGS = 5
 GOLD = palette.rgb(palette.GOLD)
 
@@ -540,8 +540,9 @@ def golden_groups(spots):
 
     Candidate centres are every spot and every midpoint between two; the spots
     within GOLDEN_RADIUS_M of one are a group when their rigs add up to
-    GOLDEN_RIGS. A group inside a bigger one is dropped. The circle drawn round a
-    group sits on its members' centroid and reaches the furthest of them.
+    GOLDEN_RIGS. The circle drawn round a group sits on its members' centroid and
+    reaches the furthest of them; a group whose circle exceeds GOLDEN_RADIUS_M is
+    dropped, then a group inside a bigger kept one.
     """
     points = _golden_points(spots)
     centres = [(x, y) for x, y, *_ in points]
@@ -553,13 +554,16 @@ def golden_groups(spots):
                             if math.hypot(x - cx, y - cy) <= GOLDEN_RADIUS_M)
         if sum(points[i][2] for i in members) >= GOLDEN_RIGS:
             found.add(members)
-    groups = []
-    for members in sorted((g for g in found if not any(g < h for h in found)), key=sorted):
+    circles = {}
+    for members in found:
         mx = sum(points[i][0] for i in members) / len(members)
         my = sum(points[i][1] for i in members) / len(members)
         radius = max(math.hypot(points[i][0] - mx, points[i][1] - my) for i in members)
-        groups.append((mx, my, radius, sorted(members)))
-    return groups
+        if radius <= GOLDEN_RADIUS_M:
+            circles[members] = (mx, my, radius)
+    return [(*circles[members], sorted(members))
+            for members in sorted((g for g in circles if not any(g < h for h in circles)),
+                                  key=sorted)]
 
 
 def _tour_m(members, points):
