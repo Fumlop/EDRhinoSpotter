@@ -28,6 +28,8 @@
 - The four card buttons under Guide me there are one width (2 x 2 grid).
 - Copy coords and Share bookmark write the clipboard through Win32: Tk's
   clipboard text was gone once EDMC closed.
+- `mining_sheet.json`: 1005 locations (was 992; 13 more rock 80%+ metallic
+  magma) and the prices of 2026-09-24.
 - Docs pictures re-rendered.
 
 **Fixed**
