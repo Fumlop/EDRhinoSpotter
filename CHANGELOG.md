@@ -1,5 +1,15 @@
 # Changelog
 
+## 5.7.8
+
+**Fixed**
+
+- A Spansh answer after the honk brought RhinoData to the front and took the
+  focus from the game (`main._add_spansh` went through `scan.show`). Now only
+  the rail is rebuilt in place (`scan.refresh_rail`); a full redraw only when
+  the picked body changes with it. Nothing opens when the window is closed.
+- Docs pictures re-rendered.
+
 ## 5.7.7
 
 **Added**

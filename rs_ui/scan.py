@@ -358,6 +358,7 @@ def _draw():
     rail.pack(side="left", fill="y")
     rail.pack_propagate(False)
     _rail(rail, register, sheet, focus, variable, materials, listed, body, live)
+    _panes["rail"] = rail
 
     card = tk.Frame(outer, bg=BG, width=CARD_WIDTH)
     card.pack(side="right", fill="y")
@@ -1819,6 +1820,26 @@ def _map_marks(cover, system, body, sheet):
     spots = [(x, y, rigs, value or 0) for x, y, _, spent, value, rigs in marks if not spent]
     golden = coverage.golden_best(coverage.golden_groups(spots), spots)
     return marks, golden
+
+
+def refresh_rail():
+    """The rail rebuilt with the register's bodies, the rest left standing (a
+    _draw rebuilds every widget and flickers): for a Spansh answer. _draw when
+    the picked body is not the one the middle pane shows, or none was."""
+    if _window is None or not _window.winfo_exists() or _scan is None:
+        return
+    rail, shown = _panes.get("rail"), _panes.get("body")
+    live, sheet, focus, variable, materials = _scan
+    register = _shown_register(live)
+    listed = _bodies(register, sheet, focus)
+    body = _current(listed)
+    if rail is None or not rail.winfo_exists() or shown is None or body is None             or body["name"] != shown["name"]:
+        _draw()
+        return
+    _remember_scroll()
+    for child in rail.winfo_children():
+        child.destroy()
+    _rail(rail, register, sheet, focus, variable, materials, listed, body, live)
 
 
 def refresh_mined():

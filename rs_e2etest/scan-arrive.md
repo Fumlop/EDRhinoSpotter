@@ -31,3 +31,10 @@ count on arrival; the window redrew on open, filter, prefs or a Spansh answer.
 9. `scan.show` not called on the save.
 10. Control: `scan.refresh` a no-op leaves the count stale.
 11. Control: `scan.arrived` a no-op leaves the title stale.
+12. Honk, Spansh answers with a new body (`main._add_spansh`), window open:
+    `scan.show` not called (it lifts the window and takes focus from Elite),
+    the rail lists the new body, and only the rail is rebuilt: no `_draw`,
+    the middle pane and the card are the same widgets.
+13. The same answer with the window closed: nothing opens.
+14. Rail-only not possible - no body was picked before (the middle showed
+    nothing): falls back to one `_draw`.

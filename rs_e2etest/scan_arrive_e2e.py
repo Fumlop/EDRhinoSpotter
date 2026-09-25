@@ -133,6 +133,59 @@ try:
     check("11 control: with scan.arrived a no-op the title stays stale",
           title().startswith(f"RhinoData - {AWAY}"), title())
     scan.arrived = real_arrived
+
+    # 12: Spansh answers the honk with a body the register does not hold.
+    jump(HOME)
+    address = main._register.system_address
+    new_body = {"name": f"{HOME} E2E 9 z", "ground": "icy", "distance": 99.0, "locations": 3,
+                "volcanism": "", "planet_class": "Icy body"}
+
+    def rail_names():
+        found, stack = [], [scan._window]
+        while stack:
+            widget = stack.pop()
+            stack.extend(widget.winfo_children())
+            if isinstance(widget, tk.Label):
+                found.append(str(widget.cget("text")))
+        return found
+
+    shows.clear()
+    # open_scan() returns early without the panel's frame; with none, check 12
+    # would pass on the old code that raised the window.
+    main._frame = tk.Frame(root)
+    # Control 11 left the window stale on AWAY; in sync with HOME first, or the
+    # rail-only path rightly falls back (the picked body changes).
+    scan._draw()
+    root.update()
+    draws, real_draw = [], scan._draw
+    scan._draw = lambda: (draws.append(1), real_draw())
+    outer = scan._window.winfo_children()[0]
+    middle_card = [w for w in outer.winfo_children() if w is not scan._panes.get("rail")]
+    main._add_spansh(HOME, address, ([new_body], 99))
+    root.update()
+    check("12 Spansh answer, window open: scan.show not called", not shows, f"{len(shows)} calls")
+    check("12 and the new body is listed", any("E2E 9 z" in t for t in rail_names()),
+          "not in the rail")
+    check("12 only the rail rebuilt: no _draw, middle and card the same widgets",
+          not draws and all(w.winfo_exists() for w in middle_card)
+          and middle_card == [w for w in outer.winfo_children()
+                              if w is not scan._panes.get("rail")],
+          f"{len(draws)} draws")
+    # 14: no body was picked before: rail-only is not enough, one _draw.
+    scan._panes["body"] = None
+    scan.refresh_rail()
+    check("14 nothing picked before: falls back to one _draw", len(draws) == 1,
+          f"{len(draws)} draws")
+    scan._draw = real_draw
+    # 13: the same kind of answer with the window closed.
+    scan._window.destroy()
+    root.update()
+    shows.clear()
+    new_body = dict(new_body, name=f"{HOME} E2E 9 y")
+    main._add_spansh(HOME, address, ([new_body], 100))
+    root.update()
+    check("13 window closed: nothing opens", (not shows) and not scan.is_open(),
+          f"{len(shows)} calls, open={scan.is_open()}")
 except Exception:
     check("harness ran without an exception", False, traceback.format_exc())
 finally:

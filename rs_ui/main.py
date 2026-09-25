@@ -622,8 +622,10 @@ def _add_spansh(system, address, answer):
         _spansh[address] = "answered"
         _spansh_known[address] = known
         spansh.mark_answered(address)
-        if _register.add_known(system, address, found) and scan.is_open():
-            open_scan()
+        # Redrawn in place: scan.show lifts the window and takes the focus
+        # from the game, which is where the honk was pressed.
+        if _register.add_known(system, address, found):
+            scan.refresh_rail()
     _refresh_scan_count()
 
 
