@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.7.12
+
+**Fixed**
+
+- The update check ran every hour and turned the Bookmark button into Update
+  mid-session; a press meant to bookmark updated the plugin instead, and the
+  bookmark was not saved. The check now runs once, when EDMC starts.
+
 ## 5.7.11
 
 **Fixed**

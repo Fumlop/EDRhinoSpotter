@@ -21,6 +21,10 @@ changed to Alexandrite on the same spot, Bookmark pressed - two bookmarks at
 - The status line not saying which material became which.
 - A shared code (`share.take`) of another material within 100 m:
   merged. Import dedupes on the same material only; share_e2e covers it.
+- The update check booked again after start: an hourly look turned the
+  Bookmark button into Update mid-session, and a press there updated instead
+  of saving (reported 2026-09-25 as "not saved"). One `update.check_async` at
+  `main.build`, no Tk `after` left that calls `_check_updates`.
 
 ## Not covered
 

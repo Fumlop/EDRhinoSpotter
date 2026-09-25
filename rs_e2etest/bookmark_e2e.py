@@ -31,6 +31,9 @@ def child():
     from rs_ui import main
     assert database.PATH.startswith(os.environ["LOCALAPPDATA"]), database.PATH
     coverage.clear_old_textures = lambda: None
+    from rs_core import update
+    checks = []
+    update.check_async = lambda callback: checks.append(callback)   # no network
     main.start(PLUGIN)
     root = tk.Tk()
     root.withdraw()
@@ -103,6 +106,13 @@ def child():
     state, _ = share.take(share.encode(spot("Diamond", lat=north(20))))
     check("imported as its own bookmark", state == "imported" and len(rows()) == 3,
           f"{state!r}, {len(rows())} rows")
+
+    print("update check")
+    pending = [str(root.tk.call("after", "info", i))
+               for i in root.tk.splitlist(root.tk.call("after", "info"))]
+    check("one update check, at build", len(checks) == 1, len(checks))
+    check("no later update check booked", not any("_check_updates" in p for p in pending),
+          pending)
 
     root.destroy()
     print(f"\nfails {len(fails)}")

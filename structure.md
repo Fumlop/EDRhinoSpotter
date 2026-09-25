@@ -124,7 +124,7 @@ No tkinter anywhere in here.
   is a newer release. `VERSION` here is the one source; the changelog repeats
   it as its top heading and a test fails if the two drift. Releases are tagged
   on GitHub, and the update check compares against the newest tag there - read
-  from the releases/latest redirect, not the API, and repeated hourly. Also
+  from the releases/latest redirect, not the API, once at start. Also
   puts a release in place, if there is one. The zipball is extracted to a temp folder inside the
   plugin and copied in a second pass, so a truncated download cannot leave
   half a plugin behind. `KEEP` names what an update may not overwrite. The

@@ -75,7 +75,6 @@ ALL_MATERIALS = "All"
 _card_button = None      # Bookmark, until there is an update to install
 _landed_after = None     # the pending look at whether we are on the ground
 _poll_error = None       # the last failure the poll logged, so it logs each kind once
-_update_after = None     # the pending hourly look for a new release
 _loc = None              # tk.StringVar - mining location index
 _rigs = None             # tk.StringVar - rigs on the patch
 _material = None         # tk.StringVar - the material a new bookmark is named after
@@ -394,15 +393,9 @@ def stop():
     teardown by design; left alone it fires once against a frame that is no
     longer there.
     """
-    global _landed_after, _done_after, _update_after
+    global _landed_after, _done_after
     _landed_after = _cancel_landed()
     _done_after = _cancel_done()
-    if _update_after and _frame:
-        try:
-            _frame.after_cancel(_update_after)
-        except (ValueError, tk.TclError):
-            pass
-    _update_after = None
     hotkey.stop()
     minimap.stop()
     # Last, and not through the timer: EDMC is going, and a scan waiting on a
@@ -719,18 +712,13 @@ def _report(message, token):
     _set_done(DONE_TEXT if not message or message.startswith("updated") else "")
 
 
-# How often a running EDMC looks for a new release. Once at start was all it
-# did, and a session left open for a day never heard of one.
-UPDATE_CHECK_MS = 60 * 60 * 1000
-
-
 def _check_updates():
-    """Look for a release now, and again in an hour."""
-    global _update_after
+    """Look for a release, once, at start. Not again: a release found mid-session
+    turns the Bookmark button into Update, and a press meant to bookmark
+    updated instead."""
     if not _frame:
         return
     update.check_async(_on_update_checked)
-    _update_after = _frame.after(UPDATE_CHECK_MS, _check_updates)
 
 
 def _on_update_checked(tag, newer):
