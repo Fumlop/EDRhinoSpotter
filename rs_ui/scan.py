@@ -126,6 +126,9 @@ _card_tons = {}
 _rows = {}
 _panes = {}
 
+# On open, a location with a bookmark this close to the ship is unfolded, m.
+UNFOLD_M = 5000.0
+
 # The row marker of the bookmark the ship is at; INDENT's width.
 HERE_MARK = "  ◉   "
 
@@ -162,7 +165,8 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
     box: that one names the next bookmark and is left alone.
 
     `location`: the panel's Location on `here`. On open only that location is
-    unfolded (and the one of a bookmark within 175 m of the SRV, _mark_here).
+    unfolded, the one of a bookmark within 175 m of the SRV (_mark_here), and
+    every location with a bookmark within UNFOLD_M of the ship (_unfold_near).
     """
     global _window, _scan
 
@@ -174,6 +178,7 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
         # The material changed under us, so whatever the last press said is
         # about a list that is being rebuilt.
         _state["status"] = ""
+        _unfold_near()
         _mark_here()
         _draw()
         # lift() alone leaves a window behind another program, or minimised,
@@ -212,9 +217,29 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
     if here:
         _state["body"] = here
     _state["here"] = _state["here_picked"] = None
+    _unfold_near()
     _mark_here()
     _draw()
     return _window
+
+
+def _unfold_near():
+    """On open: unfold every location holding a bookmark within UNFOLD_M of the
+    Status.json position, whatever number it was filed under - a mistyped
+    Location otherwise hides it. Live system only; no position, nothing."""
+    live = _scan[0] if _scan else None
+    if live is None or not live.system or _state["system"]:
+        return
+    status = spotmark.read_status()
+    body, lat, lon = status.get("BodyName"), status.get("Latitude"), status.get("Longitude")
+    radius = status.get("PlanetRadius")
+    if not body or lat is None or lon is None or not radius:
+        return
+    for record in cards.for_system(live.system):
+        if record.get("planet_name") != body or record.get("latitude") is None                 or record.get("longitude") is None:
+            continue
+        if guide.distance(lat, lon, record["latitude"], record["longitude"], radius) <= UNFOLD_M:
+            _state["opened"].add((body, record.get("location_index")))
 
 
 def _on_front(event):

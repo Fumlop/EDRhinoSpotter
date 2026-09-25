@@ -18,10 +18,18 @@ Ways it can fail end to end:
 7. Status.json torn mid-write: an exception, or the mark dropped for one bad read.
 8. In the ship or on foot at a bookmark: it is marked (SRV only).
 9. Out of the SRV and back in at the same spot: a hand pick is taken away.
-10. Opened with the panel's Location at 22, not at a bookmark: a location
-    other than 22 unfolded, or 22 folded.
-11. Opened with no Location and no bookmark in range: any location unfolded.
+10. Opened with the panel's Location at 22, 20 km off every bookmark: a
+    location other than 22 unfolded, or 22 folded.
+11. Opened with no Location, 20 km off every bookmark: any location unfolded.
 12. A location unfolded by hand folds again on the next draw.
+13. Opened 3 km from a bookmark filed under another location than the
+    panel's (a mistyped number): that location stays folded.
+14. Opened with the nearest bookmark 6 km away (over scan.UNFOLD_M, 5 km):
+    its location unfolded anyway.
+15. Opened with no position in Status.json (supercruise): a location
+    unfolded by distance.
+16. Folded by hand, then the window brought to the front (<Activate>): it
+    unfolds again - only an open unfolds by distance.
 """
 
 import json
@@ -134,7 +142,9 @@ try:
         root.update()
     check("1 row marked on open", marked_rows(window), ["Monazite"])
     check("1+3 card on the nearest bookmark", picked(), "Monazite")
-    check("1 its location unfolded, no other", scan._state["opened"], {(BODY, 9)})
+    # All three lie within scan.UNFOLD_M (0, 120 m, 1 km): all three unfolded.
+    check("1 its location unfolded, and every one within 5 km", scan._state["opened"],
+          {(BODY, 9), (BODY, 22), (BODY, 15)})
 
     # 4: drove to the Olivine, window to the front.
     status(LAT, east(1000.0))
@@ -209,8 +219,8 @@ try:
                 found.append(widget.cget("text"))
         return found.count("▼"), found.count("▶")
 
-    # 10: 5 km off every bookmark, the panel's Location at 22.
-    status(LAT, east(5000.0))
+    # 10: 20 km off every bookmark (past scan.UNFOLD_M), the panel's Location at 22.
+    status(LAT, east(20000.0))
     window = reopen(22)
     check("10 Location 22: only 22 unfolded", (scan._state["opened"], arrows(window)),
           ({(BODY, 22)}, (1, 2)))
@@ -224,6 +234,27 @@ try:
     root.update()
     check("12 hand unfold survives a redraw", ((BODY, 15) in scan._state["opened"],
                                                arrows(window)), (True, (1, 2)))
+
+    # 13-16: an Opal filed under loc 4, 12 km west of the others.
+    mark("Opal", east(-12000.0), 4)
+    # 13: 3 km from the Opal, panel's Location 22: loc 4 unfolded by distance.
+    status(LAT, east(-9000.0))
+    window = reopen(22)
+    check("13 bookmark 3 km away under another location: unfolded",
+          scan._state["opened"], {(BODY, 22), (BODY, 4)})
+    # 16: folded by hand, window to the front: stays folded.
+    scan._fold(BODY, 4)
+    front(window)
+    check("16 hand fold survives <Activate>", (BODY, 4) in scan._state["opened"], False)
+    # 14: 6 km from the Opal, 18 km from the rest: nothing by distance.
+    status(LAT, east(-18000.0))
+    window = reopen(22)
+    check("14 bookmark 6 km away: folded", scan._state["opened"], {(BODY, 22)})
+    # 15: no position (supercruise): nothing by distance.
+    with open(os.path.join(OUT, "Status.json"), "w", encoding="utf-8") as handle:
+        json.dump({"BodyName": BODY, "Flags": 0}, handle)
+    window = reopen(22)
+    check("15 no position: nothing unfolded by distance", scan._state["opened"], {(BODY, 22)})
 except Exception:
     results.append(("harness ran without an exception", False, traceback.format_exc()))
 finally:

@@ -1,5 +1,15 @@
 # Changelog
 
+## 5.7.9
+
+**Fixed**
+
+- A bookmark filed under a mistyped Location number stayed folded away when
+  you came back to it. RhinoData now also unfolds, on open, every location
+  with a bookmark within 5 km (`scan.UNFOLD_M`) of the Status.json position,
+  whatever number it carries. Live system only, needs a position; bringing
+  the window to the front does not unfold, so a hand fold stays.
+
 ## 5.7.8
 
 **Fixed**

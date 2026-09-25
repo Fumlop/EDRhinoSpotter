@@ -288,7 +288,7 @@ def child():
                              "locations": 7, "volcanism": "", "planet_class": "Metal rich body"}])
     fresh = bookmark("Diamond", LAT, _metres_east(LAT, LON, 3000.0, RADIUS))
     folded = spotcard.save({"system": SYSTEM, "planet_name": BODY, "latitude": LAT,
-                            "longitude": _metres_east(LAT, LON, 6000.0, RADIUS),
+                            "longitude": _metres_east(LAT, LON, 9000.0, RADIUS),  # 6 km: past scan.UNFOLD_M
                             "planet_radius": RADIUS, "commodity": "Diamond", "rigs": 2,
                             "location_index": 2, "marked_at": _stamp(0)})
     status(LAT, _metres_east(LAT, LON, 3000.0, RADIUS))
