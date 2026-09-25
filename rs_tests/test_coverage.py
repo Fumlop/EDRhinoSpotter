@@ -580,10 +580,11 @@ class TestRender:
         for step in range(0, 4001, 30):
             cover.add(*at(step, 0))
         first = cover.layer(240)
+        pixels = first.tobytes()
         cover.add(*at(2000, 0))                     # 2 km back: stamps, inside the strip
-        assert cover.layer(240) is first
+        assert cover.layer(240) is first and first.tobytes() == pixels
         cover.add(*at(0, 5000))
-        assert cover.layer(240) is not first
+        assert cover.layer(240).tobytes() != pixels  # patched in place since 5.7.3
 
     def centred(self):
         cover = fresh()

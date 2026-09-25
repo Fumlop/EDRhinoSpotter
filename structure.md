@@ -180,11 +180,13 @@ No tkinter anywhere in here.
   writes every `FLUSH_S` (30 s) by re-reading the row and adding into its open
   cycle, so an Edit made meanwhile is not overwritten; `TALLY` is the one
   instance and `cards.set_depleted` flushes it before closing a cycle. A cycle
-  runs from the first ton to the Depleted mark and keeps the rigs, Density and
-  Amount it opened at. `measured()` is the cycles that opened at Amount High
-  and ended depleted - what the deposit held; anything else bounds it from
-  below. `REGEN_DAYS` (14) is an assumption, replaced by the gap between one
-  cycle's `ended_at` and the next cycle's `from` once there are two.
+  runs from the first ton to the Depleted mark, or expires `REGEN_DAYS` (14)
+  after its first ton, and keeps the rigs, Density and Amount it opened at.
+  `current()` is the open cycle under 14 d old - the Mined column. `regrow()`
+  takes Depleted marks 14 d old off, keeping the date in `regrown` (main: at
+  start and on each jump). `measured()` is the cycles that opened at Amount
+  High and ended depleted - what the deposit held; anything else bounds it
+  from below. `REGEN_DAYS` (14) is an assumption, not measured.
   `python -m rs_core.yields` prints t/rig per Density band against
   `deposit.TONS_PER_RIG`; it never edits it.
 - **[measure.py](rs_core/measure.py)** - area and rig count for a border

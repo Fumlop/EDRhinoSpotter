@@ -172,12 +172,14 @@ def child():
     check("the closed one untouched", again[0]["tons"], {"Diamond": 136})
     check("the new one has the 4 t", again[1]["tons"], {"Diamond": 4})
 
-    # 6b. The Mined column: the best measured cycle once there is one, and what
-    #     is in the open cycle until then.
+    # 6b. The Mined column is the current cycle; the card keeps the measured
+    #     capacity beside it.
     from rs_ui import scan
-    check("Mined column reads the measured cycle", yields.short(row(diamond)), "136 t")
-    check("Mined column is a floor while nothing has measured it",
-          yields.short(row(alex)), "≥46 t")
+    check("Mined column reads the current cycle", yields.short(row(diamond)), "4 t")
+    check("card: this cycle and what the deposit held",
+          yields.describe(row(diamond)), "4 t this cycle  ·  held 136 t")
+    check("card before any measured cycle: the floor is the cycle, said once",
+          yields.describe(row(alex)), "46 t this cycle")
     check("header and row line up",
           len(scan._columns("Material", "Rigs", "Brg", "Dist", "Mined", "Est. left")),
           len(scan._columns("Alexandrite", "4", "359°", "5.7 km", "≥46 t",
@@ -232,6 +234,44 @@ def child():
     check("fresh depletion is not regrown", yields.regenerated(fresh), False)
     old = dict(fresh, depleted_at=_stamp(-15 * 86400))
     check("15 days past is regrown", yields.regenerated(old), True)
+
+    # 8. An open cycle expires REGEN_DAYS after its first ton: the Mined column
+    #    empties, and the next ton opens a new cycle; the expired one never
+    #    counts as a measurement.
+    later = datetime.now(timezone.utc) + timedelta(days=15)
+    check("8 open cycle past 14 d: Mined column empty",
+          yields.short(row(diamond), now=later.strftime("%Y-%m-%dT%H:%M:%SZ")), "")
+    record = row(diamond)
+    yields.add(record, {"Diamond": 2}, later.strftime("%Y-%m-%dT%H:%M:%SZ"))
+    check("8 next ton after 14 d: the old cycle ended expired",
+          [cycle.get("ended") for cycle in yields.cycles(record)],
+          ["depleted", "expired", None])
+    check("8 new cycle holds only the new tons", yields.cycles(record)[-1]["tons"],
+          {"Diamond": 2})
+    check("8 expired cycle is not a measurement", len(yields.measured(record)), 1)
+    stale = {"amount": "High", "yield": {"cycles": [
+        {"from": _stamp(-20 * 86400), "tons": {"Diamond": 50}, "amount_at_start": "High"}]}}
+    check("8 Depleted on a cycle past 14 d: not closed as depleted",
+          yields.close(stale), False)
+    check("8 it ended expired, not a measurement",
+          (yields.cycles(stale)[0]["ended"], yields.measured(stale)), ("expired", []))
+
+    # 9. regrow(): a Depleted mark 15 days old comes off, Amount 'Depleted'
+    #    becomes unread, the cycles stay; a fresh mark stays.
+    spotcard.save(dict(row(alex), depleted_at=_stamp(-15 * 86400), amount="Depleted"), id=alex)
+    check("9 regrow takes off the old mark only", yields.regrow(), 1)
+    check("9 old mark gone", row(alex).get("depleted_at"), None)
+    check("9 Amount Depleted -> unread", row(alex).get("amount"), None)
+    check("9 cycles kept", len(yields.cycles(row(alex))), 1)
+    check("9 fresh mark stays", bool(row(diamond).get("depleted_at")), True)
+    check("9 the old date is kept in regrown",
+          [entry["depleted_at"][:10] for entry in row(alex).get("regrown", [])],
+          [_stamp(-15 * 86400)[:10]])
+    hud = spotcard.save({"system": SYSTEM, "planet_name": BODY, "latitude": LAT,
+                         "longitude": LON, "planet_radius": RADIUS, "commodity": "Opal",
+                         "amount": "Depleted", "marked_at": _stamp(-16 * 86400)})
+    check("9 Amount Depleted off the HUD, 16 d old, regrows too", yields.regrow(), 1)
+    check("9 and reads unread", row(hud).get("amount"), None)
 
     for name, ok, detail in results:
         print(f"{'PASS' if ok else 'FAIL'} {name}" + ("" if ok else f"  [{detail}]"))

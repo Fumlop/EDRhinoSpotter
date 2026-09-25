@@ -1,5 +1,34 @@
 # Changelog
 
+## 5.7.3
+
+**Added**
+
+- RhinoData marks the bookmark the SRV is at (SRV only): within 175 m
+  (`yields.ATTRIBUTE_M`) its row gets a ◉, its location unfolds and the card
+  shows it, so Mark depleted is one click. Checked when the window opens and
+  when it comes to the front (`<Activate>`); redrawn only when that bookmark
+  changed, and a bookmark picked by hand in the meantime stays picked.
+- A Depleted mark 14 days old (`yields.REGEN_DAYS`, assumed) comes off on its
+  own, at start and on every jump; an Amount of Depleted (also one read off
+  the HUD at marking) becomes unread. The mark's date is kept in `regrown`,
+  and the log names each bookmark it took off.
+
+**Changed**
+
+- An open cycle ends as `expired` 14 days after its first ton if nobody
+  marked the deposit depleted; the next ton opens a new cycle. Expired cycles
+  never count as a measurement.
+- Mined column: the tons of the current cycle. The card keeps what the
+  deposit held - min-max over measured cycles, or at least the largest cycle.
+- `rs_tests/make_docs_images.py` refuses a grab when another program's window
+  covers it.
+- Minimap: a disc of new ground redraws only the layer around it, not the
+  whole 20 x 20 km layer. Median per disc 93 -> 19 ms at 640 px, 53 -> 11 ms
+  at 480, 8 -> 2 ms at 180. Pixel-identical to a full redraw and to 5.7.2
+  (`rs_e2etest/layer_e2e.py`, 26 saved maps).
+- README shorter, one screenshot a feature; `docs/API.md` technical only.
+
 ## 5.7.2
 
 **Fixed**

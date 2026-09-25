@@ -98,6 +98,7 @@ def start(plugin_dir):
     # The PNG texture set of 5.5.0 and older, where an install was unzipped
     # over the last one by hand.
     coverage.clear_old_textures()
+    yields.regrow()
     _started_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     _sheet = grounds.Sheet()
     if not _sheet.loaded:
@@ -514,6 +515,7 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
         _refresh_scan_count()
         # scan.show() would raise the window over the game on every jump.
         if _register.system != before:
+            yields.regrow()     # a session can outlast REGEN_DAYS
             scan.arrived()
 
     # The honk: ask Spansh for the bodies the journal will not describe until

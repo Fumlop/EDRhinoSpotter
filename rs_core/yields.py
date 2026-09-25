@@ -6,9 +6,10 @@ from Cargo being written up to a second late. The event carries `Type` and
 nothing else - no position, no body - so the ton is placed by the Status.json
 reading at that moment.
 
-Tons are kept as cycles: a run from the first ton to the Depleted mark. A
-cycle that opened at Amount High and ended depleted is the deposit's capacity;
-any other cycle bounds it from below.
+Tons are kept as cycles: a run from the first ton to the Depleted mark, or to
+REGEN_DAYS after its first ton ("expired"). A cycle that opened at Amount High
+and ended depleted is the deposit's capacity; any other cycle bounds it from
+below. A Depleted mark older than REGEN_DAYS is taken off by regrow().
 
 No tkinter and no PIL. `python -m rs_core.yields` prints what the closed cycles
 imply for deposit.TONS_PER_RIG.
@@ -17,7 +18,7 @@ imply for deposit.TONS_PER_RIG.
 import json
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from rs_core import cards, database, guide, spotmark, store
 from rs_core.logging import logger
@@ -27,8 +28,9 @@ from rs_core.logging import logger
 # collected off it. How far they scatter is unmeasured.
 ATTRIBUTE_M = 175.0
 
-# Days before a depleted deposit is assumed to carry material again. Assumed,
-# not measured: Amount was not back at High immediately after a depletion.
+# Days before a depleted deposit is assumed to carry material again, and after
+# which an open cycle expires. Assumed, not measured: Amount was not back at
+# High immediately after a depletion.
 REGEN_DAYS = 14
 
 # Seconds a delta waits before it reaches the row. 171 t in a 90-minute session
@@ -65,10 +67,15 @@ def nearest(records, body, lat, lon, radius, material=None, within=ATTRIBUTE_M):
     return best
 
 
+def _stamp(when):
+    """datetime -> the journal's shape, '2026-09-24T10:00:00Z'."""
+    return when.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def _now():
     """The journal's shape - `cycle["from"]` is a journal timestamp and the two
     are compared as strings in add()."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return _stamp(datetime.now(timezone.utc))
 
 
 def cycles(record):
@@ -77,13 +84,37 @@ def cycles(record):
     return held if isinstance(held, list) else []
 
 
+def _parse(stamp):
+    """A datetime, journal or ISO timestamp -> aware datetime, or None."""
+    if isinstance(stamp, datetime):
+        return stamp if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)
+    try:
+        when = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return when if when.tzinfo else when.replace(tzinfo=timezone.utc)
+
+
 def open_cycle(record):
-    """The cycle tons are being added to, or None. The last one with no
-    `ended`."""
+    """The last cycle with no `ended`, or None. May be past REGEN_DAYS; see current()."""
     found = cycles(record)
     if found and isinstance(found[-1], dict) and not found[-1].get("ended"):
         return found[-1]
     return None
+
+
+def _expired(cycle, when):
+    """Whether open `cycle` is REGEN_DAYS or more past its first ton at `when`."""
+    start, now = _parse(cycle.get("from")), _parse(when)
+    return bool(start and now and now - start >= timedelta(days=REGEN_DAYS))
+
+
+def current(record, now=None):
+    """The open cycle while it is under REGEN_DAYS old, else None."""
+    cycle = open_cycle(record)
+    if cycle is None or _expired(cycle, now or _now()):
+        return None
+    return cycle
 
 
 def add(record, tons, when=None):
@@ -95,6 +126,9 @@ def add(record, tons, when=None):
     """
     when = when or _now()
     cycle = open_cycle(record)
+    if cycle is not None and _expired(cycle, when):
+        _expire(cycle)
+        cycle = None
     if cycle is None:
         cycle = {"from": when, "tons": {}, "rigs": record.get("rigs"),
                  "density": record.get("density"),
@@ -106,13 +140,25 @@ def add(record, tons, when=None):
     return cycle
 
 
+def _expire(cycle):
+    cycle["ended"] = "expired"
+    cycle["ended_at"] = _stamp(_parse(cycle["from"]) + timedelta(days=REGEN_DAYS))
+
+
 def close(record, when=None):
-    """Mark the open cycle depleted. True when there was one."""
+    """Mark the open cycle depleted. True when there was one under REGEN_DAYS old.
+
+    One past REGEN_DAYS is ended 'expired' instead: it never measures the deposit.
+    """
+    when = when or _now()
     cycle = open_cycle(record)
     if cycle is None:
         return False
+    if _expired(cycle, when):
+        _expire(cycle)
+        return False
     cycle["ended"] = "depleted"
-    cycle["ended_at"] = when or _now()
+    cycle["ended_at"] = when
     return True
 
 
@@ -140,52 +186,44 @@ def measured(record):
 def capacity(record):
     """(low, high, measured cycles) tons the deposit has held, or None.
 
-    With no measured cycle, the tons collected so far are the low bound and the
-    high is None - the deposit held at least that much.
+    With no measured cycle, the largest cycle is the low bound and the high is
+    None - the deposit held at least that much.
     """
     full = [cycle_tons(cycle) for cycle in measured(record)]
     if full:
         return (min(full), max(full), len(full))
-    collected = sum(totals(record).values())
-    return None if not collected else (collected, None, 0)
+    largest = max((cycle_tons(cycle) for cycle in cycles(record)), default=0)
+    return None if not largest else (largest, None, 0)
 
 
-def short(record):
-    """Tons in one line: '190 t' from the best cycle that measured the deposit,
-    '≥171 t' when none has, '' when nothing was collected."""
+def short(record, now=None):
+    """The Mined column: tons in the current cycle, '123 t', or ''."""
+    cycle = current(record, now)
+    tons = cycle_tons(cycle) if cycle else 0
+    return f"{tons:,} t" if tons else ""
+
+
+def describe(record, now=None):
+    """The card line: '40 t this cycle · held 1,150-1,190 t (2 cycles)', or ''."""
+    parts = []
+    cycle = current(record, now)
+    if cycle and cycle_tons(cycle):
+        parts.append(f"{cycle_tons(cycle):,} t this cycle")
     span = capacity(record)
-    if span is None:
-        return ""
-    low, high, samples = span
-    return f"{high:,} t" if samples else f"≥{low:,} t"
-
-
-def describe(record):
-    """'1,150 t collected, 2 cycles: 1,150-1,190 t', or ''."""
-    span = capacity(record)
-    if span is None:
-        return ""
-    collected = sum(totals(record).values())
-    low, high, samples = span
-    if samples == 0:
-        return f"{collected:,} t collected, deposit held at least that"
-    if samples == 1:
-        return f"{collected:,} t collected, deposit held {low:,} t"
-    return f"{collected:,} t collected, {samples} cycles: {low:,}-{high:,} t"
+    if span and not (span[2] == 0 and cycle and span[0] == cycle_tons(cycle)):
+        low, high, samples = span
+        parts.append(f"held ≥{low:,} t" if samples == 0 else
+                     f"held {low:,} t" if samples == 1 else
+                     f"held {low:,}-{high:,} t ({samples} cycles)")
+    return "  ·  ".join(parts)
 
 
 def days_since_depleted(record, now=None):
-    """Days since the Depleted mark, or None. Fractional."""
-    marked = record.get("depleted_at")
-    if not marked:
+    """Days since the Depleted mark, or None. Fractional. `now`: datetime or timestamp."""
+    when = _parse(record.get("depleted_at"))
+    if when is None:
         return None
-    try:
-        when = datetime.fromisoformat(str(marked).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if when.tzinfo is None:
-        when = when.replace(tzinfo=timezone.utc)
-    return ((now or datetime.now(timezone.utc)) - when).total_seconds() / 86400.0
+    return ((_parse(now) or datetime.now(timezone.utc)) - when).total_seconds() / 86400.0
 
 
 def regenerated(record, now=None, after=REGEN_DAYS):
@@ -193,6 +231,46 @@ def regenerated(record, now=None, after=REGEN_DAYS):
     carries no Depleted mark."""
     days = days_since_depleted(record, now)
     return None if days is None else days >= after
+
+
+def regrow(db=None, now=None):
+    """Take the Depleted mark off every bookmark depleted REGEN_DAYS or more ago.
+
+    Depleted = `depleted_at`, or Amount 'Depleted' read off the HUD (dated by
+    `marked_at`). The mark moves to `regrown` [{depleted_at, regrown_at}], so the
+    date survives; Amount 'Depleted' becomes None (unread). Returns the count.
+    """
+    moment = _parse(now) or datetime.now(timezone.utc)
+    try:
+        with database.connect(db) as conn:
+            rows = conn.execute("SELECT id, data FROM bookmarks WHERE depleted_at IS NOT NULL "
+                                "OR data LIKE '%\"amount\": \"Depleted\"%'").fetchall()
+            names = []
+            for id, data in rows:
+                try:
+                    record = json.loads(data)
+                except ValueError as err:
+                    logger.warning(f"regrow: skipping unreadable bookmark {id}: {err}")
+                    continue
+                since = record.get("depleted_at") or (
+                    record.get("marked_at") if record.get("amount") == "Depleted" else None)
+                start = _parse(since)
+                if start is None or moment - start < timedelta(days=REGEN_DAYS):
+                    continue
+                record.setdefault("regrown", []).append(
+                    {"depleted_at": since, "regrown_at": _stamp(moment)})
+                record.pop("depleted_at", None)
+                if record.get("amount") == "Depleted":
+                    record["amount"] = None
+                database.write_bookmark(conn, record, id)
+                names.append(f"{record.get('planet_name')} {record.get('commodity')}")
+    except (sqlite3.Error, OSError) as err:
+        logger.warning(f"could not take regrown deposits off Depleted: {err}")
+        return 0
+    if names:
+        database.changed()
+        logger.info(f"past the {REGEN_DAYS} d regen, active again: {', '.join(names)}")
+    return len(names)
 
 
 class Tally:

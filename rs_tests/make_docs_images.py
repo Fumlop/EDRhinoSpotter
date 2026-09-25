@@ -52,19 +52,19 @@ BODIES = [
 # like everything else here: the coordinates are somebody's flight log.
 def bookmarks(body, card):
     return [
-        {"system": SYSTEM, "planet_name": body, "location_index": 22,
+        {"system": SYSTEM, "planet_name": body, "planet_radius": RADIUS_4A, "location_index": 22,
          "commodity": "Jadeite", "rigs": 4, "heading": 214,
          "density": "Low", "amount": "High",
          "latitude": 12.345678, "longitude": -98.765432,
          "marked_at": "3311-05-14T18:40:00", "path": card,
          "yield": {"cycles": [{"from": "3311-05-14T18:55:00", "tons": {"Jadeite": 212},
                                "rigs": 4, "density": "Low", "amount_at_start": "High"}]}},
-        {"system": SYSTEM, "planet_name": body, "location_index": 9,
+        {"system": SYSTEM, "planet_name": body, "planet_radius": RADIUS_4A, "location_index": 9,
          "commodity": "Monazite", "rigs": 2, "heading": 77,
          "density": "Medium", "amount": "Low",
          "latitude": 12.401233, "longitude": -98.712001,
          "marked_at": "3311-05-14T19:12:44", "path": card},
-        {"system": SYSTEM, "planet_name": body, "location_index": 15,
+        {"system": SYSTEM, "planet_name": body, "planet_radius": RADIUS_4A, "location_index": 15,
          "commodity": "Olivine", "rigs": None, "heading": None,
          "latitude": 12.388910, "longitude": -98.690004,
          "marked_at": "3311-05-15T08:02:10", "path": card},
@@ -161,15 +161,62 @@ def settle(window, ticks=40):
         time.sleep(0.03)
 
 
+# Points checked per grab: a GRID_N x GRID_N grid over the grabbed box.
+GRID_N = 7
+
+
+def foreign_windows(x0, y0, x1, y1):
+    """[(x, y, title)] of grid points in the box covered by another process's window.
+
+    Box in Tk logical units. Win32 WindowFromPoint; [] off Windows.
+    """
+    if sys.platform != "win32":
+        return []
+    import ctypes
+    from ctypes import wintypes
+    user32 = ctypes.WinDLL("user32")
+    user32.WindowFromPoint.argtypes = [wintypes.POINT]
+    user32.WindowFromPoint.restype = wintypes.HWND
+    user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+    user32.GetAncestor.restype = wintypes.HWND
+    user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    found = []
+    for i in range(GRID_N):
+        for j in range(GRID_N):
+            x = x0 + (x1 - 1 - x0) * i // (GRID_N - 1)
+            y = y0 + (y1 - 1 - y0) * j // (GRID_N - 1)
+            hwnd = user32.GetAncestor(user32.WindowFromPoint(wintypes.POINT(x, y)), 2)  # GA_ROOT
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if hwnd and pid.value != os.getpid():
+                title = ctypes.create_unicode_buffer(256)
+                user32.GetWindowTextW(hwnd, title, 256)
+                found.append((x, y, title.value or f"hwnd {hwnd}"))
+    return found
+
+
 def grab(window, name, scale, top_margin=0, bottom=6):
     """Save a window, in physical pixels.
 
     Tk reports logical units and ImageGrab works in physical ones. On a display
     at 125% those differ, and every "the text is cut off" in this project so
     far was this and not the layout.
+
+    Raises SystemExit, and writes nothing, when a window of another process
+    covers any point of the box.
     """
     x, y = window.winfo_rootx(), window.winfo_rooty()
     w, h = window.winfo_width(), window.winfo_height()
+    # Clamped to the screen: a point past its edge is in no picture.
+    foreign = foreign_windows(max(0, x), max(0, y - top_margin),
+                              min(window.winfo_screenwidth(), x + w),
+                              min(window.winfo_screenheight(), y + h + bottom))
+    if foreign:
+        titles = sorted({title for _, _, title in foreign})
+        raise SystemExit(f"{name}: not grabbed - {len(foreign)}/{GRID_N * GRID_N} points "
+                         f"covered by {titles}, e.g. at {foreign[0][:2]} in the box "
+                         f"{(x, y - top_margin, x + w, y + h + bottom)}. "
+                         f"Clear the screen and run again.")
     box = (int(x * scale), int((y - top_margin) * scale),
            int((x + w) * scale), int((y + h + bottom) * scale))
     path = os.path.join(DOCS, name)

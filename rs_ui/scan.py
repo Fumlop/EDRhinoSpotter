@@ -111,7 +111,12 @@ _state = {
     "status": "",
     "system": None,       # a system browsed from the search box, or None for the live one
     "search": "",         # what is typed in the search box
+    "here": None,         # _key() of the bookmark within yields.ATTRIBUTE_M of the SRV
+    "here_picked": None,  # the last "here" put on the card; a hand pick after it stays
 }
+
+# The row marker of the bookmark the ship is at; INDENT's width.
+HERE_MARK = "  ◉   "
 
 # The browsed system's register, kept between draws: adopt() re-reads the body
 # cache, and a draw happens on every click in the window.
@@ -154,6 +159,7 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
         # The material changed under us, so whatever the last press said is
         # about a list that is being rebuilt.
         _state["status"] = ""
+        _mark_here()
         _draw()
         # lift() alone leaves a window behind another program, or minimised,
         # where it was: the same way up as a first open, topmost until left.
@@ -178,6 +184,7 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
     _window.attributes("-topmost", True)
     _window.bind("<FocusIn>", _drop_topmost, add="+")
     _window.bind("<Escape>", lambda event: _window.destroy())
+    _window.bind("<Activate>", _on_front, add="+")
     _window.focus_force()
     _size(_window)
 
@@ -189,8 +196,58 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
     _scroll.clear()
     if here:
         _state["body"] = here
+    _state["here"] = _state["here_picked"] = None
+    _mark_here()
     _draw()
     return _window
+
+
+def _on_front(event):
+    """<Activate>: the window came to the front. Redraws only when the bookmark
+    the ship is at changed since the last look."""
+    if event.widget is _window and _mark_here():
+        _draw()
+
+
+def _mark_here():
+    """Pick the bookmark within 175 m of the SRV; True when that bookmark changed.
+
+    Picks: its body, its location unfolded, the card on it. yields.ATTRIBUTE_M.
+    In the SRV only (Status.json Flags & coverage.IN_SRV), live system only.
+    One Status.json read and one cards.for_system() per call.
+    """
+    live, focus = (_scan[0], _scan[2]) if _scan else (None, None)
+    if live is None or not live.system or _state["system"]:
+        return False
+    status = spotmark.read_status()
+    if not status:
+        return False            # torn read: keep what was known
+    record = None
+    if int(status.get("Flags") or 0) & coverage.IN_SRV:
+        found = yields.nearest(cards.for_system(live.system), status.get("BodyName"),
+                               status.get("Latitude"), status.get("Longitude"),
+                               status.get("PlanetRadius"))
+        record = found[0] if found else None
+    # A bookmark the material filter hides cannot be shown or picked.
+    if record and focus and (record.get("commodity") or "").lower() != focus.lower():
+        record = None
+    key = _key(record) if record else None
+    if key == _state["here"]:
+        return False
+    _state["here"] = key
+    if record is None:
+        if _state["status"].startswith("You are at "):
+            _state["status"] = ""
+        return True
+    if key != _state["here_picked"]:
+        _state["here_picked"] = key
+        _state["body"] = record.get("planet_name")
+        _state["view"] = "bookmarks"
+        _state["selected"] = key
+        _state["collapsed"].discard((record.get("planet_name"), record.get("location_index")))
+        _state["status"] = (f"You are at {_loc(record.get('location_index'))}, "
+                            f"{_short(record.get('commodity'))} - picked on the card.")
+    return True
 
 
 def _size(window):
@@ -822,7 +879,8 @@ def _bookmark_row(parent, body, record, picked, maps):
     # Two labels rather than one line: the material is the accent colour and
     # what is left of the deposit is a verdict, and a label carries one colour.
     material = _short(record.get("commodity"))
-    tk.Label(row, text=INDENT + f"{material[:MATERIAL_W]:<{MATERIAL_W}} "
+    mark = HERE_MARK if _key(record) == _state["here"] else INDENT
+    tk.Label(row, text=mark + f"{material[:MATERIAL_W]:<{MATERIAL_W}} "
                                 f"{(str(rigs) if rigs is not None else '-'):>{RIGS_W}} ",
              bg=bg, fg=DIM if dead else ACCENT, anchor="w",
              font=("Consolas", 9)).pack(side="left")
@@ -1064,12 +1122,11 @@ def _bookmark_card(box, register, sheet, body, record, maps):
                        + (f"  ·  depleted {depleted}" if depleted else "  ·  active"),
              bg=PANEL, fg=FG_SOFT, anchor="w",
              font=("Consolas", 8)).pack(fill="x", padx=13)
+    # yields.regrow() takes the mark off at REGEN_DAYS, on start and each jump.
     days = yields.days_since_depleted(record)
     if days is not None:
-        back = yields.regenerated(record)
-        tk.Label(box, text=f"{days:.0f} d since" + (f", past the assumed "
-                           f"{yields.REGEN_DAYS} d regen" if back else ""),
-                 bg=PANEL, fg=GOOD if back else DIM, anchor="w",
+        tk.Label(box, text=f"{days:.0f} d since, back after {yields.REGEN_DAYS} d (assumed)",
+                 bg=PANEL, fg=DIM, anchor="w",
                  font=("Consolas", 8)).pack(fill="x", padx=13)
 
     _card_buttons(box, record, bool(record.get("depleted_at")))

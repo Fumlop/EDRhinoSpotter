@@ -102,6 +102,9 @@ def view_m(zoom=1.0):
 # staircases.
 SS = 2
 
+# px drawn round a patch of the layer and cut off again (_draw_layer's box).
+LAYER_MARGIN = 4
+
 MASK_PX = int(2 * REACH_M / MASK_M_PER_PX)
 
 
@@ -170,6 +173,8 @@ class Coverage:
         self._last = None
         self._clip = None       # the border as a mask, while one is set
         self._layer = None      # (Coverage.layer's key, image)
+        # Mask boxes (px) painted since the layer was drawn; None: redraw it whole.
+        self._dirty = None
         # The body's ground key (rs_core.grounds), which picks the texture the
         # unpainted ground is drawn in. None: the plain background.
         self.ground = None
@@ -250,6 +255,7 @@ class Coverage:
             self.stamps.append((lat, lon))
         self.version += 1
         self._last = None
+        self._dirty = None
 
     def recenter(self, lat, lon):
         """The player says this is the middle of the location: the mask is
@@ -327,6 +333,8 @@ class Coverage:
         if region.histogram()[255] > before:
             self.mask.paste(region, box[:2])
             self.version += 1
+            if self._dirty is not None:
+                self._dirty.append(box)
             return True
         return False
 
@@ -338,9 +346,24 @@ class Coverage:
         metres either side, kept until something new is painted."""
         ring_at = tuple(round(v) for v in self.anchor())
         key = (self.version, side, view, ring_at, self.border_m, self.ground)
-        if self._layer is None or self._layer[0] != key:
+        if self._layer is None or self._dirty is None or self._layer[0][1:] != key[1:]:
             self._layer = (key, _draw_layer(self.mask, side, ring_at, self.border_m, view=view,
                                             ground=self.ground))
+        elif self._layer[0] != key:
+            # Only discs painted since: redraw the layer around them, 4.5 x 4.5 km
+            # a disc of 20 x 20 km. Same pixels as a full draw (rs_e2etest/layer.md).
+            image = self._layer[1]
+            k = image.width / MASK_PX
+            x0 = min(b[0] for b in self._dirty) - 1
+            y0 = min(b[1] for b in self._dirty) - 1
+            x1 = max(b[2] for b in self._dirty) + 1
+            y1 = max(b[3] for b in self._dirty) + 1
+            box = (max(0, int(x0 * k)), max(0, int(y0 * k)),
+                   min(image.width, int(x1 * k) + 1), min(image.height, int(y1 * k) + 1))
+            image.paste(_draw_layer(self.mask, side, ring_at, self.border_m, view=view,
+                                    ground=self.ground, box=box), box[:2])
+            self._layer = (key, image)
+        self._dirty = []
         return self._layer[1]
 
 
@@ -939,20 +962,47 @@ def _texture(ground, size):
     return _textures[key]
 
 
-def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True, view=VIEW_M, ground=None):
+def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True, view=VIEW_M, ground=None,
+                box=None):
     """Painted area, grid, the edge of the mask, the rings around `ring_at`
     (metres, or None for no rings) and the location's border around the centre
-    (metres, or None), over all of REACH_M, at `side` pixels to 2 * view."""
+    (metres, or None), over all of REACH_M, at `side` pixels to 2 * view.
+
+    `box`: (x0, y0, x1, y1) px of the finished layer; only that part is drawn
+    and returned, pixel for pixel as in the whole layer.
+    """
     size = int(round(side * REACH_M / view))
     big = size * SS
     scale = big / (2 * REACH_M)                   # pixels a metre
+    # Drawn with LAYER_MARGIN px round the box, cut off at the end: FIND_EDGES
+    # and wide lines differ in the outer 1-2 px of whatever is drawn.
+    x0, y0, x1, y1 = box or (0, 0, size, size)
+    inner = (x0, y0, x1, y1)
+    if box:
+        x0, y0 = max(0, x0 - LAYER_MARGIN), max(0, y0 - LAYER_MARGIN)
+        x1, y1 = min(size, x1 + LAYER_MARGIN), min(size, y1 + LAYER_MARGIN)
+    ox, oy, w, h = x0 * SS, y0 * SS, (x1 - x0) * SS, (y1 - y0) * SS
 
     def at(mx, my):
-        return big / 2 + mx * scale, big / 2 - my * scale
+        return big / 2 + mx * scale - ox, big / 2 - my * scale - oy
+
+    def circle(mx, my, r):
+        # Pillow truncates ellipse coords toward 0: floored in whole-layer px
+        # first, so a patch (negative coords) lands on the same pixels.
+        cx, cy = big / 2 + mx * scale, big / 2 - my * scale
+        return [math.floor(cx - r) - ox, math.floor(cy - r) - oy,
+                math.floor(cx + r) - ox, math.floor(cy + r) - oy]
 
     texture = _texture(ground, big)
-    image = texture.copy() if texture else Image.new("RGB", (big, big), palette.rgb(palette.BG))
+    if texture:
+        image = texture.crop((ox, oy, ox + w, oy + h))
+    else:
+        image = Image.new("RGB", (w, h), palette.rgb(palette.BG))
+    # Resized whole, then cropped: a resize of a sub-box rounds 1 in 255 off the
+    # whole-image result at scales like 600/400, flipping edge pixels.
     painted = mask.resize((big, big), Image.BILINEAR)
+    if box:
+        painted = painted.crop((ox, oy, ox + w, oy + h))
     image.paste(FILL, mask=painted)
     edge = painted.point(lambda v: 255 if v > 127 else 0).filter(ImageFilter.FIND_EDGES)
     image.paste(EDGE, mask=edge)
@@ -961,11 +1011,12 @@ def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True, view=VIEW_M
     steps = int(REACH_M // GRID_M)
     for k in range(-steps, steps + 1):
         gx, gy = at(k * GRID_M, k * GRID_M)
-        draw.line([(gx, 0), (gx, big)], fill=palette.rgb(palette.RULE), width=SS)
-        draw.line([(0, gy), (big, gy)], fill=palette.rgb(palette.RULE), width=SS)
+        draw.line([(gx, -oy), (gx, big - oy)], fill=palette.rgb(palette.RULE), width=SS)
+        draw.line([(-ox, gy), (big - ox, gy)], fill=palette.rgb(palette.RULE), width=SS)
 
     # Where the mask ends - past it nothing is painted.
-    draw.rectangle([0, 0, big - 1, big - 1], outline=palette.rgb(palette.WARN), width=SS)
+    draw.rectangle([-ox, -oy, big - 1 - ox, big - 1 - oy], outline=palette.rgb(palette.WARN),
+                   width=SS)
 
     # The circles to drive, ring_radii. A pixel wide after the reduce, and dim.
     # With a border they sit round the centre and run out to the border;
@@ -975,21 +1026,20 @@ def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True, view=VIEW_M
     else:
         radii = ring_radii()
     if ring_at is not None:
-        dx, dy = at(*ring_at)
         for radius_m in radii:
-            r = radius_m * scale
-            draw.ellipse([dx - r, dy - r, dx + r, dy + r], outline=RING, width=SS)
+            draw.ellipse(circle(*ring_at, radius_m * scale), outline=RING, width=SS)
 
     # The border the player drove to, bold: it is a claim about the location,
     # which the rings are not.
     if border_m:
-        cx, cy = at(0.0, 0.0)
-        r = border_m * scale
-        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=BORDER, width=3 * SS)
+        draw.ellipse(circle(0.0, 0.0, border_m * scale), outline=BORDER, width=3 * SS)
 
     # A box average is all two-times supersampling needs, and a tenth of what
     # LANCZOS costs.
-    return image.reduce(SS)
+    image = image.reduce(SS)
+    if box:
+        image = image.crop((inner[0] - x0, inner[1] - y0, inner[2] - x0, inner[3] - y0))
+    return image
 
 
 _markers = {}            # (frame or None, pixels) -> RGBA
