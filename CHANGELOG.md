@@ -1,5 +1,29 @@
 # Changelog
 
+## 5.7.4
+
+**Added**
+
+- Settings: Golden circle radius, 500-2500 m in 250 m steps (`rhinospotter_golden_m`),
+  default 1250. Applied at start and on OK, to the gold circles and to RhinoData's order.
+
+**Changed**
+
+- RhinoData lists a location's bookmarks in clusters: the one with the most rigs,
+  then every one within the golden radius of it by rigs, repeated on the rest;
+  worked out last. Was marking order.
+- Golden groups are those clusters (`coverage.clusters`): 5+ rigs, or 4+ when no
+  cluster on the map reaches 5. The circle sits on the spot with the most rigs.
+  Was any point within 1.5 km; groups overlapped and counted spots twice.
+- Default golden radius 1.5 -> 1.25 km: at 1.5 km the ship dropped out of sight.
+- The picked body in the RhinoData rail: name bold in gold, the accent bar gone.
+
+**Fixed**
+
+- The map above a bookmark's card and the dock picture fed every bookmark on the
+  body to the golden groups, not only the ones the map reaches: another location's
+  5-rig cluster kept this map's circles off it. Now as Share map.
+
 ## 5.7.3
 
 **Added**

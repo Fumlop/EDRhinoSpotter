@@ -499,8 +499,11 @@ def _docked(system):
         return
     body, name = _coverage.body, _coverage.name
     mask = _coverage.mask.copy()
+    # Only what this map reaches: golden_groups' 4-rig fallback depends on every
+    # spot it is given (as scan._map_marks for Share map).
     marks = [(*_coverage.xy(lat, lon), code, depleted, value, rigs)
-             for lat, lon, code, depleted, value, rigs in _bookmarks(system, body)]
+             for lat, lon, code, depleted, value, rigs in _bookmarks(system, body)
+             if _coverage.reaches(lat, lon)]
     # The best coverage.GOLDEN_SHOWN by Cr/h, not every group that qualifies.
     spots = [(x, y, rigs, value or 0) for x, y, _, depleted, value, rigs in marks
              if not depleted]

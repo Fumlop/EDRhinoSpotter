@@ -1247,11 +1247,11 @@ def _marks_key(body):
 
 
 def _draw_location_map(parent, sheet, body, name, data):
-    """That map repainted from its points, every bookmark on the body on it.
+    """That map repainted from its points, the bookmarks it reaches on it.
 
-    Every bookmark, not only the ones this map reaches: the ones outside it
-    fall off the edge of the picture on their own, and deciding which reach
-    would be the same sum coverage.picture already does.
+    Only those the map reaches, as _map_marks for Share map: golden_groups'
+    4-rig fallback depends on every spot it is given, so another map's
+    5-rig cluster must not be in the list.
 
     A failure is logged and None - the card is the thing that has to work.
     """
@@ -1263,7 +1263,7 @@ def _draw_location_map(parent, sheet, body, name, data):
         marks = []
         for mark in body["marks"]:
             lat, lon = mark.get("latitude"), mark.get("longitude")
-            if lat is None or lon is None:
+            if lat is None or lon is None or not cover.reaches(float(lat), float(lon)):
                 continue
             material = (mark.get("commodity") or "").lower()
             marks.append((*cover.xy(float(lat), float(lon)), codes.get(material),

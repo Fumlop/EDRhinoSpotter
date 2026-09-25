@@ -7,7 +7,6 @@ Exit code 1 on a failure.
 """
 
 import importlib.util
-import json
 import os
 import sqlite3
 import subprocess
@@ -82,7 +81,12 @@ def child():
         fails.append(f"seeds not most rigs first: {seeds}")
 
     # Golden groups on the saved map picture, HEAD against now.
+    import threading
+    import tkinter as tk
+    from rs_ui import hotkey, main, minimap
     sheet = grounds.Sheet()
+    root = tk.Tk()              # PhotoImage master for the card map, and the settings tab
+    root.withdraw()
 
     def check_map(tag, body, system, lat, lon):
         found_maps = coverstore.maps(body)
@@ -112,27 +116,66 @@ def child():
             os.path.join(out, f"{tag}-before.png"))
         coverage.picture(cover.mask.copy(), marks, golden=golden).save(
             os.path.join(out, f"{tag}-after.png"))
+
+        # The card map and the dock picture must circle what Share map circles.
+        drawn = []
+        real = coverage.picture
+
+        def catch(mask, marks=(), title=(), legend=(), border_m=None, golden=(), ground=None):
+            drawn.append([tuple(round(v) for v in g[:3]) for g in golden])
+            return real(mask, marks, title, legend, border_m, golden, ground)
+
+        share = [tuple(round(v) for v in g[:3]) for g in golden]
+        coverage.picture = catch
+        try:
+            on_body = {"name": body, "marks": [r for r in records if r.get("planet_name") == body]}
+            scan._draw_location_map(root, sheet, on_body, name, dict(found_maps)[name])
+            minimap._coverage = coverage.Coverage.from_dict(body, dict(found_maps)[name], name)
+            minimap._docked(system)
+            for thread in threading.enumerate():
+                if thread.name == "rhinospotter-map-png":
+                    thread.join(10)
+        finally:
+            coverage.picture = real
+            minimap._coverage = None
+        card, dock = (drawn + [None, None])[:2]
+        print(f"  share {share}\n  card  {card}\n  dock  {dock}")
+        if card != share:
+            fails.append(f"{tag}: card map circles differ from Share map")
+        if dock != share:
+            fails.append(f"{tag}: dock picture circles differ from Share map")
         return least
 
     check_map("densest", body, system, group[0]["latitude"], group[0]["longitude"])
-    # Where the SRV is now, from the game's Status.json.
-    status_path = os.path.join(os.environ["USERPROFILE"], "Saved Games", "Frontier Developments",
-                               "Elite Dangerous", "Status.json")
-    try:
-        with open(status_path, encoding="utf-8") as handle:
-            status = json.load(handle)
-        here = next((r for r in records if r.get("planet_name") == status["BodyName"]), None)
-        if here is None:
-            print(f"\nSKIP srv: no bookmarks on {status['BodyName']}")
-        elif check_map("srv", status["BodyName"], here["system"], status["Latitude"],
-                       status["Longitude"]) != coverage.GOLDEN_RIGS_LOW:
-            print("  (srv map has a 5+ cluster: the 4-rig fallback is not exercised there)")
-    except (OSError, KeyError, ValueError) as err:
-        print(f"\nSKIP srv: no Status.json position ({err})")
+
+    # The 4-rig fallback: the first saved map whose best cluster holds exactly 4 rigs.
+    def best_cluster(name, body, system, data):
+        cover = coverage.Coverage.from_dict(body, data, name)
+        marks, _ = scan._map_marks(cover, system, body, sheet)
+        points = coverage._golden_points(
+            [(x, y, rigs, 0) for x, y, _, spent, _, rigs in marks if not spent])
+        sums = [sum(points[i][2] for i in m) for m in coverage.clusters([p[:3] for p in points])]
+        return max(sums, default=0), cover
+
+    fallback = None
+    for name_of in sorted({r["planet_name"] for r in records}):
+        system_of = next(r["system"] for r in records if r["planet_name"] == name_of)
+        for map_name, data in coverstore.maps(name_of):
+            most, cover = best_cluster(map_name, name_of, system_of, data)
+            if most == coverage.GOLDEN_RIGS_LOW:
+                fallback = (name_of, system_of, cover)
+                break
+        if fallback:
+            break
+    if fallback is None:
+        fails.append("no saved map with a 4-rig best cluster: fallback not exercised")
+    else:
+        name_of, system_of, cover = fallback
+        lat, lon = cover.origin
+        if check_map("fallback", name_of, system_of, lat, lon) != coverage.GOLDEN_RIGS_LOW:
+            fails.append("fallback map did not use GOLDEN_RIGS_LOW")
 
     # Settings: the golden radius spinbox, OK, a bad stored value, start.
-    import tkinter as tk
-    from rs_ui import hotkey, main, minimap
 
     class Config:
         """EDMC's config as far as minimap reads and writes it (minimap_e2e's)."""
@@ -166,8 +209,6 @@ def child():
         return found
 
     print("\nsettings")
-    root = tk.Tk()
-    root.withdraw()
     minimap.nb = Notebook
     minimap.config = hotkey.config = Config()
     frame = minimap.prefs(root)

@@ -15,9 +15,14 @@ bookmarks (Aramo AB 1 a, loc 10, 21 on 2026-09-25).
 - A golden circle wider than 1250 m.
 - Fallback (`GOLDEN_RIGS_LOW` = 4): a map with no 5+ cluster must circle its
   4-rig clusters; a map with one 5+ cluster must not circle 4-rig ones.
-  Checked on the location with the most bookmarks (has 5+) and on the SRV's
-  location from Status.json when it has none (Aramo AB 1 a loc 7 on
-  2026-09-25: best cluster 2+2).
+  Checked on the location with the most bookmarks (has 5+) and on the first
+  saved map whose best cluster holds exactly 4 rigs (Aramo AB 1 a map 2 on
+  2026-09-25: 2+2). None found fails the run, not skips it.
+
+- The card map above a bookmark (`scan._draw_location_map`) and Share map
+  (`scan._map_marks`) circling different groups for the same saved map: the
+  card map fed every bookmark on the body, so another map's 5-rig cluster
+  kept this map's 4-rig fallback off. Both must draw the same groups.
 
 ## Settings: golden radius (`rhinospotter_golden_m`), each checked
 
@@ -37,7 +42,7 @@ bookmarks (Aramo AB 1 a, loc 10, 21 on 2026-09-25).
 
 - `report.txt`: the list in `scan._clustered` order - cluster, rigs, metres
   to the seed, material - and the golden groups before (git HEAD) and after.
-- `<tag>-before.png`, `<tag>-after.png` (tag `densest`, `srv`): the saved map picture with HEAD's and the new
+- `<tag>-before.png`, `<tag>-after.png` (tag `densest`, `fallback`, `r1500`): the saved map picture with HEAD's and the new
   golden circles, for the eye.
 
 ## Not covered
