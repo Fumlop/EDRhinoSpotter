@@ -275,7 +275,8 @@ def open_scan():
         scan.show(_frame.winfo_toplevel(), _register, _sheet, _focus(),
                   variable=_filter,
                   materials=(ALL_MATERIALS,) + _materials(),
-                  here=spotmark.body_here(spotmark.read_status()))
+                  here=spotmark.body_here(spotmark.read_status()),
+                  location=_int(_loc.get()) if _loc is not None else None)
     except Exception as err:                       # a broken window must not
         logger.exception("RhinoData failed")       # take the card flow with it
         _set_status(f"no scan window: {err}")

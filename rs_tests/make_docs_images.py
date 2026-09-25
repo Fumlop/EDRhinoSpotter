@@ -285,10 +285,17 @@ def main_images():
     was_by_body = cards.by_body
     cards.by_body = lambda system: {f"{SYSTEM} 4 a": bookmarks(f"{SYSTEM} 4 a", None)}
     picker = ("All",) + tuple(("Alexandrite", "Jadeite", "Monazite", "Olivine"))
+    def open_all():
+        # RhinoData opens with every location folded but the one you are at;
+        # the pictures show the rows.
+        records = cards.by_body(SYSTEM)[f"{SYSTEM} 4 a"]
+        scan._fold_all(f"{SYSTEM} 4 a", scan._by_location(records), False)
+
     for focus, name in ((None, "rhinoscan.png"), ("Monazite", "rhinoscan-filtered.png")):
         main._filter.set(focus or "All")
         window = scan.show(root, found, sheet, focus,
                            variable=main._filter, materials=picker)
+        open_all()
         window.attributes("-topmost", True)
         window.deiconify()
         window.lift()
@@ -310,6 +317,7 @@ def main_images():
 
     scan.show(root, found, sheet, None,
               variable=main._filter, materials=picker)
+    open_all()
     window = scan._window
     # Standing on the body among the bookmarks, so the location lines and the
     # card have a distance to say. The real Status.json would put every one of

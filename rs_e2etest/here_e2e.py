@@ -18,6 +18,10 @@ Ways it can fail end to end:
 7. Status.json torn mid-write: an exception, or the mark dropped for one bad read.
 8. In the ship or on foot at a bookmark: it is marked (SRV only).
 9. Out of the SRV and back in at the same spot: a hand pick is taken away.
+10. Opened with the panel's Location at 22, not at a bookmark: a location
+    other than 22 unfolded, or 22 folded.
+11. Opened with no Location and no bookmark in range: any location unfolded.
+12. A location unfolded by hand folds again on the next draw.
 """
 
 import json
@@ -120,7 +124,6 @@ try:
     mark("Monazite", LON, 9)                 # 0 m
     mark("Jadeite", east(120.0), 22)          # 120 m
     mark("Olivine", east(1000.0), 15)         # 1 km
-    scan._state["collapsed"] = {(BODY, 9)}
 
     # 1 + 3: at the Monazite (0 m); the Jadeite is also in range at 120 m.
     status(LAT, LON)
@@ -131,7 +134,7 @@ try:
         root.update()
     check("1 row marked on open", marked_rows(window), ["Monazite"])
     check("1+3 card on the nearest bookmark", picked(), "Monazite")
-    check("1 its folded location unfolded", (BODY, 9) in scan._state["collapsed"], False)
+    check("1 its location unfolded, no other", scan._state["opened"], {(BODY, 9)})
 
     # 4: drove to the Olivine, window to the front.
     status(LAT, east(1000.0))
@@ -186,6 +189,41 @@ try:
         raised = repr(err)
     check("7 torn Status.json: no raise, the last known mark kept",
           (raised, marked_rows(window)), (None, ["Monazite"]))
+
+    def reopen(location):
+        window.destroy()
+        opened = scan.show(root, register, main._sheet, None, variable=tk.StringVar(),
+                           materials=("All",), here=BODY, location=location)
+        opened.geometry("+-4000+-4000")
+        for _ in range(20):
+            root.update()
+        return opened
+
+    def arrows(window):
+        """(unfolded, folded) location lines drawn."""
+        found, stack = [], [window]
+        while stack:
+            widget = stack.pop()
+            stack.extend(widget.winfo_children())
+            if isinstance(widget, tk.Label) and widget.cget("text") in ("▼", "▶"):
+                found.append(widget.cget("text"))
+        return found.count("▼"), found.count("▶")
+
+    # 10: 5 km off every bookmark, the panel's Location at 22.
+    status(LAT, east(5000.0))
+    window = reopen(22)
+    check("10 Location 22: only 22 unfolded", (scan._state["opened"], arrows(window)),
+          ({(BODY, 22)}, (1, 2)))
+    # 11: no Location, nothing in range.
+    window = reopen(None)
+    check("11 no Location: every location folded", (scan._state["opened"], arrows(window)),
+          (set(), (0, 3)))
+    # 12: unfolded by hand, then a redraw.
+    scan._fold(BODY, 15)
+    scan._draw()
+    root.update()
+    check("12 hand unfold survives a redraw", ((BODY, 15) in scan._state["opened"],
+                                               arrows(window)), (True, (1, 2)))
 except Exception:
     results.append(("harness ran without an exception", False, traceback.format_exc()))
 finally:

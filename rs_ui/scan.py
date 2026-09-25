@@ -81,6 +81,8 @@ CARD_WIDTH = 310
 # card under it keeps its buttons on screen: at the card's full width the
 # picture pushed Share map and Mark depleted off the bottom of the window.
 MAP_PX = 240
+# Half the picked bookmark's diamond on that map, px: over a dot (~4 px at 240).
+DIAMOND_PX = 6
 
 # Material names that do not fit a MATERIAL_W column or a one-line sentence.
 SHORT_NAMES = {
@@ -107,7 +109,7 @@ _state = {
     "view": "bookmarks",  # "bookmarks" or "mapped"
     "selected": None,     # _key() of the bookmark the card is showing
     "map": None,          # the map row the card is showing, by its own key
-    "collapsed": set(),   # (body, location index) of every folded location
+    "opened": set(),      # (body, location index) unfolded; every other one is folded
     "status": "",
     "system": None,       # a system browsed from the search box, or None for the live one
     "search": "",         # what is typed in the search box
@@ -133,7 +135,8 @@ def is_open():
     return _window is not None and bool(_window.winfo_exists())
 
 
-def show(parent, register, sheet, focus=None, variable=None, materials=(), here=None):
+def show(parent, register, sheet, focus=None, variable=None, materials=(), here=None,
+         location=None):
     """Open the window, or raise the one already open.
 
     `focus` is one material. Given one, only the grounds that have ever carried
@@ -148,6 +151,9 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
     `variable` is the panel's filter StringVar, not a copy, so the picker in
     the rail and `focus` can never disagree. It is not the panel's Material
     box: that one names the next bookmark and is left alone.
+
+    `location`: the panel's Location on `here`. On open only that location is
+    unfolded (and the one of a bookmark within 175 m of the SRV, _mark_here).
     """
     global _window, _scan
 
@@ -191,7 +197,7 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
     _state["view"] = "bookmarks"
     _state["selected"] = None
     _state["map"] = None
-    _state["collapsed"] = set()
+    _state["opened"] = {(here, location)} if here and location is not None else set()
     _state["status"] = ""
     _scroll.clear()
     if here:
@@ -244,7 +250,7 @@ def _mark_here():
         _state["body"] = record.get("planet_name")
         _state["view"] = "bookmarks"
         _state["selected"] = key
-        _state["collapsed"].discard((record.get("planet_name"), record.get("location_index")))
+        _state["opened"].add((record.get("planet_name"), record.get("location_index")))
         _state["status"] = (f"You are at {_loc(record.get('location_index'))}, "
                             f"{_short(record.get('commodity'))} - picked on the card.")
     return True
@@ -489,7 +495,7 @@ def arrived():
         _state["body"] = None
         _state["selected"] = None
         _state["map"] = None
-        _state["collapsed"] = set()
+        _state["opened"] = set()
         _state["status"] = ""
     _draw()
 
@@ -1241,10 +1247,27 @@ def _location_map(parent, sheet, body, record, maps):
         if photo is None:
             return
         _map_picture = (key, photo)
-    label = tk.Label(parent, image=_map_picture[1], bg=BG,
-                     borderwidth=0, highlightthickness=0)
-    label.image = _map_picture[1]
-    label.pack(padx=(0, 14), pady=(14, 0))
+    canvas = tk.Canvas(parent, width=MAP_PX, height=MAP_PX, bg=BG,
+                       borderwidth=0, highlightthickness=0)
+    canvas.create_image(0, 0, image=_map_picture[1], anchor="nw")
+    canvas.image = _map_picture[1]
+    # The picked bookmark: a diamond on the canvas, not in the picture, so a
+    # pick costs no re-render. Metres -> px as coverage.picture over 2 * REACH_M.
+    data = dict(maps)[name]
+    try:
+        centre = data.get("center") or data["origin"]
+        probe = coverage.Coverage(body["name"], float(centre[0]), float(centre[1]),
+                                  float(data["radius"]))
+        mx, my = probe.xy(float(lat), float(lon))
+    except (KeyError, IndexError, TypeError, ValueError):
+        mx = my = None
+    if mx is not None:
+        per_m = MAP_PX / (2 * coverage.REACH_M)
+        x, y, r = MAP_PX / 2 + mx * per_m, MAP_PX / 2 - my * per_m, DIAMOND_PX
+        if 0 <= x <= MAP_PX and 0 <= y <= MAP_PX:
+            canvas.create_polygon(x, y - r, x + r, y, x, y + r, x - r, y,
+                                  fill=ACCENT, outline=BG, width=2, tags="picked")
+    canvas.pack(padx=(0, 14), pady=(14, 0))
 
 
 def _marks_key(body):
@@ -1408,20 +1431,20 @@ def _pick_map(key):
 
 
 def _unfolded(body, index):
-    return (body, index) not in _state["collapsed"]
+    return (body, index) in _state["opened"]
 
 
 def _fold(body, index):
-    _state["collapsed"] ^= {(body, index)}
+    _state["opened"] ^= {(body, index)}
     _draw()
 
 
 def _fold_all(body, groups, fold):
     for index, _group in groups:
         if fold:
-            _state["collapsed"].add((body, index))
+            _state["opened"].discard((body, index))
         else:
-            _state["collapsed"].discard((body, index))
+            _state["opened"].add((body, index))
     _draw()
 
 

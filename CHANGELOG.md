@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.7.6
+
+**Added**
+
+- The map above a bookmark's card marks the picked bookmark with a blue diamond,
+  drawn on a Tk canvas over the cached picture: a pick costs no re-render.
+
+**Changed**
+
+- RhinoData opens with every location folded but the one you are at: the
+  panel's Location, and the location of a bookmark within 175 m of the SRV.
+  Was every location unfolded. `scan._state["opened"]` replaces `"collapsed"`.
+
 ## 5.7.5
 
 **Added**

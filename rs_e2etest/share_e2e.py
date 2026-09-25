@@ -68,8 +68,9 @@ def child_a(results):
     register.adopt(SYSTEM, [{"name": BODY, "ground": "rock 80%+ [silicate vapour geysers]",
                              "distance": 1284.0, "locations": 22, "volcanism": "",
                              "planet_class": "Rocky body"}])
+    # Opened at the bookmark's location, as from the panel: every other one is folded.
     window = scan.show(root, register, main._sheet, None, variable=tk.StringVar(),
-                       materials=("All",))
+                       materials=("All",), here=BODY, location=SPOT["location_index"])
     window.geometry("+-4000+-4000")         # mapped, so grid sizes are real, not on screen
     scan._state["body"] = BODY
     scan._draw()
