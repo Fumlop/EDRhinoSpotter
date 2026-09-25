@@ -21,9 +21,11 @@ import base64
 import io
 import os
 import itertools
+import pathlib
 import threading
 import time
 import tkinter as tk
+import webbrowser
 from tkinter import messagebox
 
 from rs_core import (arrow, cards, coverage, coverstore, database, grounds, guide, migrate,
@@ -902,7 +904,9 @@ def _open_folder():
     try:
         os.makedirs(coverstore.ROOT, exist_ok=True)
         os.startfile(coverstore.ROOT)
-    except (OSError, AttributeError) as err:       # AttributeError: not Windows
+    except AttributeError:                         # not Windows: xdg-open via webbrowser
+        webbrowser.open(pathlib.Path(coverstore.ROOT).as_uri())
+    except OSError as err:
         logger.warning(f"minimap: could not open {coverstore.ROOT}: {err}")
 
 

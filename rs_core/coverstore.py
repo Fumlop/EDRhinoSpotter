@@ -32,8 +32,7 @@ from rs_core import atomic, database, names
 from rs_core.logging import logger
 
 # The pictures. The points are in the database.
-ROOT = os.path.join(os.environ.get("LOCALAPPDATA")
-                    or os.path.expanduser("~"), "RhinoSpotter", "coverage")
+ROOT = os.path.join(database.ROOT, "coverage")
 VERSION = 1
 
 

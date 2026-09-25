@@ -52,7 +52,9 @@ No tkinter anywhere in here.
   replacement) or, with `id`, replaces one; `CARDS_ROOT` is where 4.1 kept
   bookmarks and old card PNGs; `_font()` for the map picture's text.
 - **[database.py](rs_core/database.py)** - the one SQLite file,
-  `%LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db`. `connect()` is a
+  `%LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db` (Linux:
+  `$XDG_DATA_HOME/RhinoSpotter`, old `~/RhinoSpotter` copied once by
+  `adopt_legacy()`). `connect()` is a
   connection per piece of work, committed or rolled back and closed - three
   threads write, none share one. Tables `bodies`, `bookmarks`, `maps`: the
   columns a lookup needs plus the whole record as JSON (maps: gzipped).

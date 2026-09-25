@@ -92,6 +92,7 @@ NOT_READ = "-"
 
 def start(plugin_dir):
     global _sheet, _started_at
+    database.adopt_legacy()
     # Before anything reads the database: the JSON files of 4.1 go in once.
     try:
         migrate.run()

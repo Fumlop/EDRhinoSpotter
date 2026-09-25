@@ -21,8 +21,7 @@ from rs_core import database, names
 
 # Bookmark storage up to 4.1: one JSON file each. Read by rs_core/migrate.py;
 # old card PNGs are still found here.
-CARDS_ROOT = os.path.join(os.environ.get("LOCALAPPDATA")
-                          or os.path.expanduser("~"), "RhinoSpotter", "cards")
+CARDS_ROOT = os.path.join(database.ROOT, "cards")
 
 
 def card_dir(system):

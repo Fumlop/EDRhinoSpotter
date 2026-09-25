@@ -363,6 +363,9 @@ def _click_through(window, on=True):
     try:
         import ctypes
         user32 = ctypes.windll.user32
+    except (ImportError, AttributeError, OSError):
+        return                                               # not Windows: no WS_EX styles
+    try:
         handle = user32.GetParent(window.winfo_id()) or window.winfo_id()
         style = user32.GetWindowLongW(handle, -20)           # GWL_EXSTYLE
         if on:

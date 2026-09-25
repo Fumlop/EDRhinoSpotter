@@ -145,6 +145,10 @@ undiscovered systems, paused 1 h after a failed request), GitHub for updates.
 | Map pictures | `%LOCALAPPDATA%\RhinoSpotter\coverage\<Body>\map N.png` |
 | Material rates | `mining_sheet.json` in the plugin folder |
 
+Linux: `$XDG_DATA_HOME/RhinoSpotter` instead of `%LOCALAPPDATA%\RhinoSpotter`
+(`~/.local/share`, Flatpak EDMC `~/.var/app/io.edcd.EDMarketConnector/data`).
+An older `~/RhinoSpotter` is copied there once, on the first start without that folder.
+
 Other plugins and tools read bookmarks through `rs_api.py`: [docs/API.md](docs/API.md).
 
 ## Tools
