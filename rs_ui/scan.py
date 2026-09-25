@@ -645,6 +645,18 @@ def _rail_body(parent, entry, chosen):
     _clickable(row, lambda: _pick_body(entry["name"]))
 
 
+def letter_jump(option_menu, skip=()):
+    """First letter of each entry as its Windows menu mnemonic: with the menu
+    open, a letter highlights the first entry starting with it (Enter picks
+    it), or picks it when only one does. `skip`: labels left without one."""
+    menu = option_menu["menu"]
+    last = menu.index("end")
+    for i in range(0 if last is None else last + 1):
+        label = str(menu.entrycget(i, "label")) if menu.type(i) == "command" else ""
+        if label[:1].isalnum() and label not in skip:
+            menu.entryconfigure(i, underline=0)
+
+
 def _picker(parent, variable, materials, focus):
     """The material picker, under the system name.
 
@@ -669,6 +681,7 @@ def _picker(parent, variable, materials, focus):
                           activeforeground=BG, borderwidth=1,
                           activeborderwidth=0, tearoff=False,
                           font=("Segoe UI", 9))
+    letter_jump(picker)
     picker.pack(fill="x", pady=(4, 0))
     tk.Label(box, text=f"Only {_short(focus)}, everywhere." if focus
                        else "The rail counts and the list follow it.",
@@ -1535,7 +1548,9 @@ def _edit_bookmark(record):
         _style_field(widget)
         widget.grid(row=row, column=1, sticky="we", padx=(0, 14), pady=3)
 
-    field(2, "Material", tk.OptionMenu(box, material, *_pickable(record)))
+    picker = tk.OptionMenu(box, material, *_pickable(record))
+    letter_jump(picker)
+    field(2, "Material", picker)
     field(3, "Rigs", tk.Spinbox(box, from_=0, to=deposit.MAX_RIGS, textvariable=rigs))
     field(4, "Amount", tk.OptionMenu(box, amount, NOT_SET, *deposit.AMOUNTS))
     field(5, "Density", tk.OptionMenu(box, density, NOT_SET, *deposit.DENSITIES))

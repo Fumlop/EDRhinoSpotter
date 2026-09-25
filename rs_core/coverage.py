@@ -163,6 +163,9 @@ class Coverage:
         # The location's border as the player drove it: metres from the centre,
         # or None. Only set once there is a centre to measure from.
         self.border_m = None
+        # (lat, lon) of a Ctrl+Alt+B pressed before any centre; becomes
+        # border_m on recenter(). Nothing is clipped while it waits.
+        self.border_at = None
         # Where the SRV last came out of the ship, (lat, lon). The rings and
         # the footer use it until a centre is set. Kept in memory only.
         self.drop = (lat, lon)
@@ -190,6 +193,8 @@ class Coverage:
             data["center"] = points([self.origin])[0]
         if self.border_m is not None:
             data["border_m"] = round(self.border_m)
+        if self.border_at is not None:
+            data["border_at"] = points([self.border_at])[0]
         if self.system_address is not None:
             data["system_address"] = self.system_address
         if self.body_id is not None:
@@ -206,6 +211,8 @@ class Coverage:
             cover.centered = bool(data.get("center"))
             border = data.get("border_m")
             cover.border_m = float(border) if cover.centered and border else None
+            at = data.get("border_at")
+            cover.border_at = (float(at[0]), float(at[1])) if at and not cover.centered else None
             cover._repaint([(float(lat), float(lon)) for lat, lon in data["stamps"]])
         except (KeyError, TypeError, ValueError):
             return None
@@ -262,14 +269,20 @@ class Coverage:
         rebuilt around it from the saved points, and the rings follow."""
         self.origin = (lat, lon)
         self.centered = True
+        # A kept border point becomes the border, measured from this centre.
+        if self.border_at is not None:
+            self.border_m = math.hypot(*self.xy(*self.border_at))
+            self.border_at = None
         # A border already set keeps its radius around the new centre, and
         # what falls outside it now is dropped.
         self._repaint(list(self.stamps))
 
     def set_border(self, lat, lon):
         """The player stands on the location's edge: its distance from the
-        centre is the border. False, and nothing set, without a centre."""
+        centre is the border. Without a centre the point is kept in border_at,
+        nothing clipped, and False."""
         if not self.centered:
+            self.border_at = (lat, lon)
             return False
         self.border_m = math.hypot(*self.xy(lat, lon))
         self._repaint(list(self.stamps))

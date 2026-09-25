@@ -146,6 +146,7 @@ def build(parent):
     tk.Label(_frame, text="Material", anchor="w").grid(row=2, column=0, sticky="w", padx=2)
     _menu = tk.OptionMenu(_frame, _material, NO_MATERIAL, *_materials())
     _style_menu(_menu)
+    scan.letter_jump(_menu, skip=(NO_MATERIAL,))
     _menu.grid(row=2, column=1, columnspan=3, sticky="we", padx=2)
 
     # What the HUD says about the targeted deposit. Neither is in the journal.
@@ -460,6 +461,7 @@ def _fill_menu():
     inner.delete(0, "end")
     for name in (NO_MATERIAL,) + _materials():
         inner.add_command(label=name, command=lambda pick=name: _material.set(pick))
+    scan.letter_jump(_menu, skip=(NO_MATERIAL,))
 
 
 def prefs(parent):

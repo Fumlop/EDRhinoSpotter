@@ -1,5 +1,20 @@
 # Changelog
 
+## 5.7.5
+
+**Added**
+
+- Material menus (panel, RhinoData filter, Edit dialog): with the menu open, a
+  letter highlights the first material starting with it (Enter picks it), or
+  picks it when only one does. Windows menu mnemonics (`scan.letter_jump`); the
+  panel's "select material" takes none.
+
+**Changed**
+
+- Ctrl+Alt+B before Ctrl+Alt+Z keeps the point (`border_at`, saved with the map)
+  instead of refusing: nothing is clipped, the hint says "border kept - set
+  center", and Ctrl+Alt+Z turns it into the border measured from the centre.
+
 ## 5.7.4
 
 **Added**

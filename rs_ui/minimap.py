@@ -385,26 +385,26 @@ def center_here():
 
 
 def border_here():
-    """The hotkey: where the SRV is now is the location's edge. Needs a centre
-    to measure from; without one the hint line says so for a few seconds."""
+    """The hotkey: where the SRV is now is the location's edge. Without a centre
+    the point is kept (Coverage.border_at) and becomes the border on Ctrl+Alt+Z."""
     global _drawn, _notice
     if not _in_srv or _coverage is None or _here is None:
         logger.debug("minimap: border hotkey outside the SRV, ignored")
         return
     if not _coverage.set_border(*_here):
-        _notice = ("set center first", time.monotonic() + NOTICE_S)
-        _drawn = None
-        return
+        _notice = ("border kept - set center", time.monotonic() + NOTICE_S)
     _drawn = None
     _remember()
-    logger.debug(f"minimap: border set at {_coverage.border_m:.0f} m")
+    logger.debug(f"minimap: border set at {_coverage.border_m:.0f} m" if _coverage.border_m
+                 else "minimap: border point kept until a centre is set")
 
 
 def _remember():
     """Hand the map to the two-second writer when it has changed."""
     global _saved
     state = (_coverage, _coverage.version, _coverage.centered, _coverage.border_m,
-             _coverage.location, _coverage.system_address, _coverage.body_id)
+             _coverage.border_at, _coverage.location, _coverage.system_address,
+             _coverage.body_id)
     if state == _saved:
         return
     if _coverage.name is None:
