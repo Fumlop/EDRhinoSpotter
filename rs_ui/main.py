@@ -693,14 +693,16 @@ def _render_card(spot, token):
     """The file name is not worth reading - either the bookmark is there or
     the reason it is not."""
     try:
-        old = cards.nearby(spot)
+        # Any material: a mark on a bookmarked spot corrects that bookmark.
+        old = cards.nearby(spot, any_material=True)
         if old is None:
             spotcard.save(spot)
             message = None
         else:
             spotcard.save(cards.updated(old, spot), id=old["id"])
-            message = (f"updated Rigs/Amount/Density of the {spot.get('commodity')} "
-                       f"bookmark {old['distance_m']:.0f} m away")
+            was, now = old.get("commodity"), spot.get("commodity")
+            what = f"{was} -> {now}" if was and now and was != now else now
+            message = f"updated the {what} bookmark {old['distance_m']:.0f} m away"
     except Exception as err:
         message = f"no bookmark: {err}"
     _on_ui(_report, message, token)

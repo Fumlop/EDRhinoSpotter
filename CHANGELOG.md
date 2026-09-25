@@ -1,5 +1,16 @@
 # Changelog
 
+## 5.7.10
+
+**Changed**
+
+- Bookmark on a spot that already has a bookmark within 100 m
+  (`cards.SAME_SPOT_M`) updates it whatever its material: the material is
+  taken too (`cards.nearby(any_material=True)`). Changing the material and
+  pressing again gave a second bookmark at 0 m. Position, marked_at, location
+  and counted tons stay; the status line says "Monazite -> Alexandrite".
+  A shared code still merges only with the same material.
+
 ## 5.7.9
 
 **Fixed**
