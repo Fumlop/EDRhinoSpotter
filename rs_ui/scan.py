@@ -117,6 +117,15 @@ _state = {
     "here_picked": None,  # the last "here" put on the card; a hand pick after it stays
 }
 
+# The Mined labels of the drawn rows by _key(), and the card's {"key", "label"}
+# (label None: no tons line): refresh_mined() sets their text without a redraw.
+_mined = {}
+_card_tons = {}
+# The drawn rows by _key(), and the card pane with what _card() was given:
+# _pick_record() relights two rows and rebuilds the card only.
+_rows = {}
+_panes = {}
+
 # The row marker of the bookmark the ship is at; INDENT's width.
 HERE_MARK = "  ◉   "
 
@@ -324,6 +333,10 @@ def _draw():
     register = _shown_register(live)
     _remember_scroll()
     _clear(_window)
+    _mined.clear()
+    _card_tons.clear()
+    _rows.clear()
+    _panes.clear()
 
     listed = _bodies(register, sheet, focus)
     body = _current(listed)
@@ -355,6 +368,7 @@ def _draw():
     picked = _middle(middle, register, sheet, focus, body, records, groups, maps, materials)
 
     _card(card, register, sheet, body, picked, maps)
+    _panes.update(card=card, register=register, sheet=sheet, body=body, maps=maps)
 
 
 def _bodies(register, sheet, focus):
@@ -885,6 +899,7 @@ def _bookmark_row(parent, body, record, picked, maps):
     row = tk.Frame(parent, bg=bg)
     row.pack(fill="x", padx=(0, 16), pady=1)
     tk.Frame(row, bg=ACCENT if lit else bg, width=4).pack(side="left", fill="y")
+    _rows[_key(record)] = row
     # Packed before the labels: pack gives out width in call order, so a
     # narrow pane clips Est. left instead of dropping the button.
     _button(row, "Edit", lambda: _edit_bookmark(record)).pack(side="right", padx=(6, 0))
@@ -908,9 +923,10 @@ def _bookmark_row(parent, body, record, picked, maps):
     # Its own label: a label carries one colour, and the tons measured here are
     # not the estimate beside them.
     mined = yields.short(record)
-    tk.Label(row, text=f"{mined or '-':>{MINED_W}} ", bg=bg,
-             fg=GOOD if mined else DIM, anchor="e",
-             font=("Consolas", 9)).pack(side="left")
+    label = tk.Label(row, text=f"{mined or '-':>{MINED_W}} ", bg=bg,
+                     fg=GOOD if mined else DIM, anchor="e", font=("Consolas", 9))
+    label.pack(side="left")
+    _mined[_key(record)] = label
     tk.Label(row, text=f"{left or '-':>{LEFT_W}}", bg=bg,
              fg=ALERT if dead else (WARN if left else DIM), anchor="e",
              font=("Consolas", 9)).pack(side="left")
@@ -1123,9 +1139,12 @@ def _bookmark_card(box, register, sheet, body, record, maps):
              font=("Consolas", 9)).pack(fill="x", padx=13, pady=(2, 0))
     # Counted from MiningRefined within yields.ATTRIBUTE_M.
     collected = yields.describe(record)
+    label = None
     if collected:
-        tk.Label(box, text=collected, bg=PANEL, fg=GOOD, anchor="w",
-                 font=("Consolas", 9)).pack(fill="x", padx=13, pady=(2, 0))
+        label = tk.Label(box, text=collected, bg=PANEL, fg=GOOD, anchor="w",
+                         font=("Consolas", 9))
+        label.pack(fill="x", padx=13, pady=(2, 0))
+    _card_tons.update(key=_key(record), label=label)
     for line in _ground_lines(sheet, body, record.get("commodity")):
         tk.Label(box, text=line, bg=PANEL, fg=DIM, anchor="w",
                  font=("Consolas", 8)).pack(fill="x", padx=13, pady=(2, 0))
@@ -1419,9 +1438,35 @@ def _pick_view(view):
 
 
 def _pick_record(record):
-    _state["selected"] = _key(record)
-    _state["status"] = ""
-    _draw()
+    """The card on this bookmark: two rows relit and the card pane rebuilt, not
+    the window (a _draw rebuilds every widget and flickers). _draw when the row
+    or the card pane is not there."""
+    key, old = _key(record), _state["selected"]
+    card = _panes.get("card")
+    if key not in _rows or card is None or not card.winfo_exists():
+        _state["selected"] = key
+        _state["status"] = ""
+        _draw()
+        return
+    _state["selected"] = key
+    _say("")
+    if old in _rows and old != key:
+        _light(_rows[old], False)
+    _light(_rows[key], True)
+    for child in card.winfo_children():
+        child.destroy()
+    _card(card, _panes["register"], _panes["sheet"], _panes["body"], record, _panes["maps"])
+
+
+def _light(row, lit):
+    """A list row's background and left strip as _bookmark_row draws them."""
+    bg = PANEL if lit else BG
+    row.config(bg=bg)
+    for child in row.winfo_children():
+        if isinstance(child, tk.Frame) and int(child.cget("width")) == 4:
+            child.config(bg=ACCENT if lit else bg)
+        elif isinstance(child, tk.Label):
+            child.config(bg=bg)
 
 
 def _pick_map(key):
@@ -1774,6 +1819,30 @@ def _map_marks(cover, system, body, sheet):
     spots = [(x, y, rigs, value or 0) for x, y, _, spent, value, rigs in marks if not spent]
     golden = coverage.golden_best(coverage.golden_groups(spots), spots)
     return marks, golden
+
+
+def refresh_mined():
+    """The Mined labels and the card's tons line set in place, no redraw (a
+    redraw rebuilds every widget and flickers). One cards.for_system read.
+    Falls back to _draw when a label is missing: a card whose first ton just
+    came has no tons line to set."""
+    if _window is None or not _window.winfo_exists() or not _scan:
+        return
+    system = _shown_register(_scan[0]).system
+    found = {_key(r): r for r in (cards.for_system(system) if system else ())}
+    if any(key not in found for key in _mined):
+        _draw()
+        return
+    for key, label in _mined.items():
+        mined = yields.short(found[key])
+        label.config(text=f"{mined or '-':>{MINED_W}} ", fg=GOOD if mined else DIM)
+    if _card_tons:
+        key, label = _card_tons["key"], _card_tons["label"]
+        collected = yields.describe(found[key]) if key in found else ""
+        if label is None and collected:
+            _draw()
+        elif label is not None:
+            label.config(text=collected)
 
 
 def refresh():

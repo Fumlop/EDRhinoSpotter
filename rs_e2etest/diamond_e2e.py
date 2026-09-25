@@ -89,6 +89,61 @@ def child():
     nowhere = dict(picks[0], latitude=-picks[0]["latitude"], longitude=picks[0]["longitude"] + 90)
     scan._location_map(frame, sheet, body, nowhere, maps)
     check("no saved map: no canvas", not frame.winfo_children())
+
+    # A pick in the list: two rows relit, the card rebuilt, nothing else.
+    import time
+    from rs_core import bodies
+    print("pick in the list")
+    register = bodies.Register()
+    register.adopt(picks[0]["system"], [{"name": body_name, "ground": "rock 80%+ [metallic magma]",
+                                         "distance": 10.0, "locations": 19, "volcanism": "",
+                                         "planet_class": "Rocky body"}])
+    loc = picks[0]["location_index"]
+    same_loc = [r for r in body["marks"] if r.get("location_index") == loc][:3]
+    window = scan.show(root, register, sheet, None, variable=tk.StringVar(),
+                       materials=("All",), here=body_name, location=loc)
+    window.geometry("+-4000+-4000")
+    scan._pick_record(same_loc[0])
+    root.update()
+    draws, real_draw = [], scan._draw
+
+    def counted():
+        start = time.perf_counter()
+        real_draw()
+        draws.append(time.perf_counter() - start)
+    scan._draw = counted
+    rows_before = dict(scan._rows)
+    rail = window.winfo_children()[0].winfo_children()[0]
+    diamond_at = []
+    for record in same_loc[1:]:
+        old = scan._state["selected"]
+        start = time.perf_counter()
+        scan._pick_record(record)
+        root.update()
+        took = time.perf_counter() - start
+        key = scan._key(record)
+        check("pick: no _draw", len(draws) == 0, len(draws))
+        check("pick: rows and rail are the same widgets",
+              scan._rows == rows_before and bool(rail.winfo_exists()))
+        lit = (scan._rows[old].cget("bg"), scan._rows[key].cget("bg"))
+        check("pick: old row unlit, new row lit", lit == (scan.BG, scan.PANEL), lit)
+        canvas = next((w for w in scan._panes["card"].winfo_children()
+                       if isinstance(w, tk.Canvas)), None)
+        item = canvas.find_withtag("picked") if canvas is not None else ()
+        xs = canvas.coords(item[0]) if item else []
+        diamond_at.append((round(sum(xs[0::2]) / 4), round(sum(xs[1::2]) / 4)) if xs else None)
+        check("pick: card on the new bookmark", scan._card_tons.get("key") == key,
+              scan._card_tons.get("key"))
+        print(f"     pick {took * 1000:.1f} ms")
+    check("pick: diamond moved", len(set(diamond_at)) == len(diamond_at) and None not in diamond_at,
+          diamond_at)
+    scan._draw()
+    print(f"     _draw {draws[-1] * 1000:.1f} ms")
+    draws.clear()
+    hidden = next(r for r in body["marks"] if r.get("location_index") != loc)
+    scan._pick_record(hidden)
+    check("pick of an undrawn row: one _draw", len(draws) == 1, len(draws))
+    window.destroy()
     root.destroy()
 
     print(f"\nfails {len(fails)}")

@@ -273,6 +273,100 @@ def child():
     check("9 Amount Depleted off the HUD, 16 d old, regrows too", yields.regrow(), 1)
     check("9 and reads unread", row(hud).get("amount"), None)
 
+    # 10. RhinoData open while mining: Mined set in place once the tons stop.
+    import time
+    import tkinter as tk
+    from rs_core import bodies, spotmark
+    from rs_ui import main, scan
+    main.QUIET_S = 0.3
+    root = tk.Tk()
+    root.withdraw()
+    main.build(root)
+    main._cancel_landed()
+    register = bodies.Register()
+    register.adopt(SYSTEM, [{"name": BODY, "ground": "metal-rich", "distance": 10.0,
+                             "locations": 7, "volcanism": "", "planet_class": "Metal rich body"}])
+    fresh = bookmark("Diamond", LAT, _metres_east(LAT, LON, 3000.0, RADIUS))
+    folded = spotcard.save({"system": SYSTEM, "planet_name": BODY, "latitude": LAT,
+                            "longitude": _metres_east(LAT, LON, 6000.0, RADIUS),
+                            "planet_radius": RADIUS, "commodity": "Diamond", "rigs": 2,
+                            "location_index": 2, "marked_at": _stamp(0)})
+    status(LAT, _metres_east(LAT, LON, 3000.0, RADIUS))
+    window = scan.show(root, register, main._sheet, None, variable=tk.StringVar(),
+                       materials=("All",), here=BODY, location=1)
+    window.geometry("+-4000+-4000")
+    scan._state["selected"] = scan._key(row(fresh))
+    scan._draw()
+    draws = []
+    real_draw = scan._draw
+
+    def counted():
+        start = time.perf_counter()
+        real_draw()
+        draws.append(time.perf_counter() - start)
+    scan._draw = counted
+
+    def pump(seconds):
+        end = time.monotonic() + seconds
+        while time.monotonic() < end:
+            root.update()
+            time.sleep(0.01)
+
+    def burst(tons):
+        for _ in range(tons):
+            load.journal_entry("E2E", False, SYSTEM, None,
+                               dict(diamond_line, timestamp=_stamp(0)), {})
+            pump(0.1)
+
+    diamond_line = next(e for e in refined if spotmark.refined_material(e) == "Diamond")
+    key = scan._key(row(fresh))
+    check("10 the fresh bookmark's row is drawn", key in scan._mined, True)
+    check("10 a folded location's row is not drawn", scan._key(row(folded)) in scan._mined, False)
+    label = scan._mined.get(key)
+    pump(0.2)
+    draws.clear()
+    burst(3)
+    check("10 nothing while tons keep coming", len(draws), 0)
+    pump(0.6)
+    check("10 first burst: card had no tons line, one _draw", len(draws), 1)
+    check("10 the tons are in the row by then",
+          yields.cycles(row(fresh))[-1]["tons"], {"Diamond": 3})
+    label = scan._mined[key]
+    card = scan._card_tons["label"]
+    draws.clear()
+    real = scan.refresh_mined
+    spent = []
+
+    def timed():
+        start = time.perf_counter()
+        real()
+        spent.append(time.perf_counter() - start)
+    scan.refresh_mined = timed
+    main.scan.refresh_mined = timed
+    burst(2)
+    pump(0.6)
+    check("10 second burst: no _draw", len(draws), 0)
+    check("10 same Mined widget, new tons", (scan._mined[key] is label,
+                                             label.cget("text").strip()), (True, "5 t"))
+    check("10 same card tons widget, new text", (scan._card_tons["label"] is card,
+                                                 card.cget("text").split(" t")[0]), (True, "5"))
+    scan._draw()
+    print(f"     _draw {draws[-1] * 1000:.1f} ms, in place {spent[-1] * 1000:.1f} ms")
+    load.journal_entry("E2E", False, SYSTEM, None,
+                       dict(diamond_line, timestamp="2020-01-01T00:00:00Z"), {})
+    check("10 a replayed ton schedules nothing", main._quiet, None)
+    window.destroy()
+    burst(1)
+    try:
+        pump(0.6)
+        raised = None
+    except Exception as err:                 # noqa: BLE001 - any raise is the failure
+        raised = repr(err)
+    check("10 window closed: timer flushes, no raise",
+          (raised, main._quiet, yields.cycles(row(fresh))[-1]["tons"]),
+          (None, None, {"Diamond": 6}))
+    root.destroy()
+
     for name, ok, detail in results:
         print(f"{'PASS' if ok else 'FAIL'} {name}" + ("" if ok else f"  [{detail}]"))
     return 0 if all(ok for _, ok, _ in results) else 1

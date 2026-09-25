@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.7.7
+
+**Added**
+
+- RhinoData's Mined column and the card's tons line update 5 s
+  (`main.QUIET_S`) after the last ton counted into a bookmark; by-products
+  and unplaced tons do not restart the wait. Set in place (3 ms measured),
+  not a redraw.
+
+**Fixed**
+
+- Picking a bookmark rebuilt the whole window and flickered: now two rows are
+  relit and the card pane rebuilt (35 ms against 176-212 ms for the window).
+
 ## 5.7.6
 
 **Added**

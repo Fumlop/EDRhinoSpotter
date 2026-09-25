@@ -50,6 +50,10 @@ _tally = yields.TALLY
 # have no Status.json position behind them now.
 _started_at = None
 _replayed = 0
+# No ton for this long: the burst is over, the tally is written and an open
+# RhinoData redraws its Mined column. s.
+QUIET_S = 5.0
+_quiet = None            # the Tk after() id of that timer
 _clip_seen = None        # the clipboard text _check_clipboard last looked at
 _clip_sequence = None    # clipboard.sequence() at that look
 _hint = None             # the line under the buttons: honk, or FSS when the honk brought nothing
@@ -560,9 +564,29 @@ def _refined(entry, system):
         _replayed += 1
         return
     status = spotmark.read_status()
-    _tally.refined(status, system or _system, material, entry.get("timestamp"))
+    if _tally.refined(status, system or _system, material, entry.get("timestamp")):
+        _quiet_later()
     if _material is not None and spotmark.on_ground(status):
         _prefill_material(material)
+
+
+def _quiet_later():
+    """(Re)start the QUIET_S timer: every ton counted into a bookmark pushes it
+    back; by-products and unplaced tons do not."""
+    global _quiet
+    if _frame is None:
+        return
+    if _quiet is not None:
+        _frame.after_cancel(_quiet)
+    _quiet = _frame.after(int(QUIET_S * 1000), _burst_over)
+
+
+def _burst_over():
+    """No ton for QUIET_S: write the tally, set RhinoData's Mined in place."""
+    global _quiet
+    _quiet = None
+    _tally.flush()
+    scan.refresh_mined()
 
 
 def _prefill_material(refined):

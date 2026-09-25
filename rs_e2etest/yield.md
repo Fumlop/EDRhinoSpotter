@@ -33,6 +33,16 @@ coordinates.
   the cycles a dict and take the tons pending at the time with them.
 - Amount Depleted set through the Edit dialog closes the cycle and stamps
   depleted_at, as the Depleted button does.
+- RhinoData open while mining (`main.QUIET_S` = 5 s, 0.3 s here): no redraw
+  while tons keep coming, one redraw once no ton came for QUIET_S, and the
+  tons are in the row by then (tally flushed first). A ton replayed from
+  before the plugin start schedules nothing. Window closed: the quiet
+  timer flushes, raises nothing.
+- The burst end must not rebuild the window (it flickered): no `_draw`, the
+  row's Mined label is the same widget with the new tons, the card's tons
+  line likewise. A card that had no tons line yet (first ton of a cycle)
+  falls back to one `_draw`. Rows of folded locations are not drawn and not
+  looked at. Printed: `_draw` and in-place times.
 
 ## Not covered
 

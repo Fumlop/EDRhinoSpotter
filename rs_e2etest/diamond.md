@@ -17,6 +17,16 @@ the location with the most bookmarks, into a withdrawn Tk frame.
   reaching within +-10 km, the picture's whole extent, so a diamond off the
   canvas cannot happen otherwise).
 
+## A pick in the list (`scan._pick_record`), each checked
+
+- The whole window rebuilt (it flickered): `_draw` called, or the rail's and
+  the list's widgets replaced. Only the card pane's children may change.
+- The old row still lit, or the new one not lit (PANEL background, ACCENT
+  strip).
+- The card, and the diamond on its map, not on the new bookmark.
+- A row that is not drawn (folded away meanwhile): falls back to `_draw`.
+- Printed: `_draw` time and pick time.
+
 ## Artifact
 
 - `report.txt`: per pick, the diamond's centre and the picture's pixel there.
