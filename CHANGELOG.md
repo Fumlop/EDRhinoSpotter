@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.7.11
+
+**Fixed**
+
+- The guide arrow stayed up after HERE, and the card kept "Stop the arrow",
+  while Elite was not the window in front (RhinoData open, say): `overlay._tick`
+  returned before the HERE clock. Arrival and the 10 s clock now run with the
+  game in the background; only the drawing waits for focus.
+
+**Changed**
+
+- README: a Features list at the end.
+
 ## 5.7.10
 
 **Changed**

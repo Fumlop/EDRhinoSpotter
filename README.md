@@ -153,6 +153,23 @@ Other plugins and tools read bookmarks through `rs_api.py`: [docs/API.md](docs/A
 
 Debug log: `RHINOSPOTTER_DEBUG=1` before starting EDMC. Code layout: [structure.md](structure.md).
 
+## Features
+
+- **Where to land:** every landable body of the system with its mining locations and the materials its ground carries.
+- **Material filter:** only grounds that ever carried it; type a letter in the menu to jump to it.
+- **Bookmarks:** material, rigs, amount, density and position of the deposit you stand on; a second press on the spot updates it, material too.
+- **Clusters:** a location's bookmarks grouped by the spot with the most rigs and everything within the golden radius.
+- **Golden circles:** the best 3 one-stop groups (5+ rigs, else 4+) circled on the maps, radius set in Settings.
+- **Guide:** an arrow over the game back to any bookmark, from orbit down to the SRV.
+- **Minimap:** the ground you drove in the SRV, your bookmarks on it, center, border and drive rings, 3 zoom steps.
+- **Map pictures:** saved per body, shareable with a legend and the golden circles.
+- **Tons mined:** counted per bookmark from the journal, refreshed 5 s after the last ton.
+- **Depleted marks:** set on the card, taken off after 14 days.
+- **You are here:** the bookmark within 175 m of the SRV marked and picked; locations within 5 km unfolded.
+- **Share bookmark:** one line for Discord; another RhinoSpotter imports it from the clipboard.
+- **Spansh:** bodies of a new system filled in on the honk.
+- **Updates:** from inside EDMC; your data stays outside the plugin folder.
+
 <p align="center">
   <img src="docs/running.png" width="140" alt="">
 </p>

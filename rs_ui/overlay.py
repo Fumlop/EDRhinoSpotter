@@ -182,6 +182,15 @@ def _tick():
     focused = game_focused()
     # Not in front: nothing over the desktop or another window.
     _show(focused)
+    reading = guide.fix(spotmark.read_status(), _target or {})
+    # Arrival and its HERE_MS clock run with the game in the background too:
+    # RhinoData in front kept the arrow, and the card's Stop, up for good.
+    if reading["state"] == "arrived" and _here is None:
+        _here = time.monotonic()
+    if _here is not None and (time.monotonic() - _here) * 1000 >= HERE_MS:
+        logger.info("overlay: arrived, closing")
+        stop()
+        return
     if not focused and _game_rect() is not None:
         # Alt-tabbed out of a running game. A message nobody can see is not
         # being read, so its clock waits. With no game at all it runs, and a
@@ -189,7 +198,6 @@ def _tick():
         _since = None
         _after = _window.after(POLL_MS, _tick)
         return
-    reading = guide.fix(spotmark.read_status(), _target or {})
 
     # A guide that never got going is a message, and a message that has been
     # read is in the way. One that has pointed at something stays: losing the
@@ -204,19 +212,10 @@ def _tick():
             stop()
             return
 
-    # Ten seconds from the first HERE, whether or not you roll off the spot
-    # again: the guide got you there.
-    if _here is not None and (time.monotonic() - _here) * 1000 >= HERE_MS:
-        logger.info("overlay: arrived, closing")
-        stop()
-        return
-
     try:
         if focused:
             _place()
             _draw(reading)
-            if reading["state"] == "arrived" and _here is None:
-                _here = time.monotonic()
     except Exception:
         # Same rule as building it: an arrow that cannot be drawn is one the
         # commander does without, not a traceback every half second.
