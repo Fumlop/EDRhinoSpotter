@@ -25,7 +25,7 @@ from tkinter import messagebox
 from PIL import Image
 
 from rs_core import (bodies, cards, coverage, coverstore, database, deposit, grounds, guide,
-                     palette, share, spotcard, spotmark, store, yields)
+                     measure, palette, share, spotcard, spotmark, store, yields)
 from rs_core.logging import logger
 from rs_ui import clipboard, minimap, overlay, rhino
 
@@ -624,18 +624,16 @@ def _rail_body(parent, entry, chosen):
     """
     row = tk.Frame(parent, bg=PANEL)
     row.pack(fill="x")
-    # The picked body carries the accent down its left edge: a background alone
-    # was not enough to find at a glance in a list of ten.
-    tk.Frame(row, bg=ACCENT if chosen else PANEL, width=4).pack(side="left", fill="y")
     inner = tk.Frame(row, bg=PANEL)
-    inner.pack(side="left", fill="x", expand=True, padx=(9, 13), pady=5)
+    inner.pack(side="left", fill="x", expand=True, padx=(13, 13), pady=5)
 
     marks = len(entry["shown"])
     locations = entry.get("locations")
     distance = entry.get("distance")
+    # The picked body: name bold in gold.
     tk.Label(inner, text=entry["short"][:NAME_WIDTH], bg=PANEL,
-             fg=FG if chosen else FG_SOFT, anchor="w", width=NAME_WIDTH,
-             font=("Consolas", 10)).pack(side="left")
+             fg=GOLD if chosen else FG_SOFT, anchor="w", width=NAME_WIDTH,
+             font=("Consolas", 10, "bold" if chosen else "normal")).pack(side="left")
     tk.Label(inner, text=f"{distance:,.0f} Ls" if distance is not None else "-",
              bg=PANEL, fg=DIM, anchor="e", width=9,
              font=("Consolas", 9)).pack(side="left")
@@ -1224,7 +1222,7 @@ def _location_map(parent, sheet, body, record, maps):
         return
     if not name:
         return
-    key = (body["name"], name, _marks_key(body))
+    key = (body["name"], name, _marks_key(body), coverage.golden_m)
     if _map_picture is None or _map_picture[0] != key:
         photo = _draw_location_map(parent, sheet, body, name, dict(maps)[name])
         if photo is None:
@@ -1770,7 +1768,28 @@ def _by_location(records):
     groups = {}
     for record in records:
         groups.setdefault(record.get("location_index"), []).append(record)
-    return sorted(groups.items(), key=lambda item: (item[0] is None, item[0] or 0))
+    return sorted(((index, _clustered(group)) for index, group in groups.items()),
+                  key=lambda item: (item[0] is None, item[0] or 0))
+
+
+def _clustered(group):
+    """One location's bookmarks in coverage.clusters() order - the golden groups'
+    rule - worked out last. No coordinates or planet_radius: by rigs after them."""
+    def rigs(record):
+        return int(record.get("rigs") or 0)
+
+    live = [r for r in group if not _worked_out(r)]
+    gone = [r for r in group if _worked_out(r)]
+    radius = next((r["planet_radius"] for r in group if r.get("planet_radius")), None)
+    placed = [r for r in live if radius and r.get("latitude") is not None
+              and r.get("longitude") is not None]
+    loose = sorted((r for r in live if r not in placed), key=lambda r: -rigs(r))
+    if not placed:
+        return loose + gone
+    xy = measure.to_metres([(r["latitude"], r["longitude"]) for r in placed], radius)
+    points = [(x, y, rigs(r)) for (x, y), r in zip(xy, placed)]
+    ordered = [placed[i] for members in coverage.clusters(points) for i in members]
+    return ordered + loose + gone
 
 
 def _picture(body, group, maps):

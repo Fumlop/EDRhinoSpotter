@@ -532,8 +532,13 @@ def picture(mask, marks=(), title=(), legend=(), border_m=None, golden=(), groun
 # A group of bookmarks the Rhino can work from one stop: at least GOLDEN_RIGS
 # rig positions, none depleted, all within GOLDEN_RADIUS_M of one point. The
 # Rhino carries six rigs; 2/2/1/1, 2/2/2, 2/3/1, 3/3, 1x6 and 2/1/1/1 all count.
-GOLDEN_RADIUS_M = 1500.0
+GOLDEN_RADIUS_M = 1250.0          # default; 1.5 km drove the ship out of sight
+# The radius in use: Settings, 500-2500 m in 250 m steps (minimap.apply_golden).
+# Also RhinoData's cluster order.
+golden_m = GOLDEN_RADIUS_M
 GOLDEN_RIGS = 5
+# Used instead when no cluster on the map reaches GOLDEN_RIGS.
+GOLDEN_RIGS_LOW = 4
 GOLD = palette.rgb(palette.GOLD)
 
 
@@ -556,37 +561,43 @@ def _golden_points(spots):
             for x, y, *rest in spots if rest and rest[0]]
 
 
+def clusters(points, radius=None):
+    """[[i, ...], ...] indexing `points` (x, y, rigs) in metres: the point with the
+    most rigs, then every point left within `radius` (default golden_m) of it by
+    rigs; repeated on what is left. Ties keep input order. O(n^2)."""
+    radius = radius or golden_m
+    left = sorted(range(len(points)), key=lambda i: -(points[i][2] or 0))
+    found = []
+    while left:
+        seed = left.pop(0)
+        sx, sy = points[seed][:2]
+        near = [i for i in left if math.hypot(points[i][0] - sx, points[i][1] - sy) <= radius]
+        found.append([seed] + near)
+        left = [i for i in left if i not in near]
+    return found
+
+
 def golden_groups(spots):
     """[(cx, cy, radius, members), ...] - metres - for the golden groups among
     `spots`, (x, y, rigs) or (x, y, rigs, Cr/t) in metres with depleted ones
     already left out. `members` index _golden_points(spots).
 
-    Candidate centres are every spot and every midpoint between two; the spots
-    within GOLDEN_RADIUS_M of one are a group when their rigs add up to
-    GOLDEN_RIGS. The circle drawn round a group sits on its members' centroid and
-    reaches the furthest of them; a group whose circle exceeds GOLDEN_RADIUS_M is
-    dropped, then a group inside a bigger kept one.
+    A cluster (clusters()) whose rigs add up to GOLDEN_RIGS, or GOLDEN_RIGS_LOW
+    when none does. The circle sits on the seed - the spot with the most rigs,
+    where the ship parks - and reaches the furthest member, at most
+    golden_m.
     """
     points = _golden_points(spots)
-    centres = [(x, y) for x, y, *_ in points]
-    centres += [((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
-                for i, a in enumerate(points) for b in points[i + 1:]]
-    found = set()
-    for cx, cy in centres:
-        members = frozenset(i for i, (x, y, *_) in enumerate(points)
-                            if math.hypot(x - cx, y - cy) <= GOLDEN_RADIUS_M)
-        if sum(points[i][2] for i in members) >= GOLDEN_RIGS:
-            found.add(members)
-    circles = {}
-    for members in found:
-        mx = sum(points[i][0] for i in members) / len(members)
-        my = sum(points[i][1] for i in members) / len(members)
-        radius = max(math.hypot(points[i][0] - mx, points[i][1] - my) for i in members)
-        if radius <= GOLDEN_RADIUS_M:
-            circles[members] = (mx, my, radius)
-    return [(*circles[members], sorted(members))
-            for members in sorted((g for g in circles if not any(g < h for h in circles)),
-                                  key=sorted)]
+    found = [(sum(points[i][2] for i in members), members)
+             for members in clusters([p[:3] for p in points])]
+    least = GOLDEN_RIGS if any(rigs >= GOLDEN_RIGS for rigs, _ in found) else GOLDEN_RIGS_LOW
+    groups = []
+    for rigs, members in found:
+        if rigs >= least:
+            sx, sy = points[members[0]][:2]
+            reach = max(math.hypot(points[i][0] - sx, points[i][1] - sy) for i in members)
+            groups.append((sx, sy, reach, sorted(members)))
+    return groups
 
 
 def _tour_m(members, points):

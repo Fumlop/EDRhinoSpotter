@@ -114,7 +114,9 @@ Arrow top middle over the game with distance to the bookmark. Borderless or wind
 Keys are changeable in Settings.
 
 Each dock saves a map picture; **Share map** on a location line opens it.
-Gold circles mark the best 3 golden groups: 5+ rigs within 1.5 km, one Rhino stop.
+Gold circles mark the best 3 golden groups: 5+ rigs within 1.25 km of the spot with the most
+rigs (4+ when the map has no 5), one Rhino stop. RhinoData lists a location's bookmarks in
+the same groups, most rigs first.
 
 <p align="center">
   <img src="docs/mapshare.png?v=5.0.0" width="440" alt="A saved map picture with bookmarks and legend">
@@ -127,6 +129,7 @@ Gold circles mark the best 3 golden groups: 5+ rigs within 1.5 km, one Rhino sto
 </p>
 
 - Minimap on/off, keep it up when alt-tabbed, corner, or **Free move** (drag it anywhere, any monitor).
+- **Golden circle radius:** 500-2500 m in 250 m steps, default 1250. Also sets how RhinoData groups a location's bookmarks.
 - **Show materials under 50,000 Cr/t:** off = 18 materials, on = all 38.
 - Hotkeys: modifier + key for each of the four.
 

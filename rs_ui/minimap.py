@@ -50,6 +50,9 @@ SRV_KEY = "rhinospotter_srv_type"
 # Whether the material lists carry the cheap half. Not a minimap setting - it
 # lives here because this is the file that draws the settings tab.
 LOW_VALUE_KEY = "rhinospotter_low_value"
+# Golden circle radius, m: coverage.golden_m.
+GOLDEN_KEY = "rhinospotter_golden_m"
+GOLDEN_STEPS = tuple(range(500, 2501, 250))
 # Only the Rhino has the mining scanner the painted area stands for.
 RHINO = "mev_rhino"
 CORNERS = ("top left", "top right", "bottom left", "bottom right")
@@ -99,6 +102,7 @@ _keep = None             # tk.BooleanVar on the settings tab
 _hotkeys = {}            # hotkey id -> (modifier StringVar, key StringVar) on the settings tab
 _free = None             # tk.BooleanVar on the settings tab
 _low_value = None        # tk.BooleanVar on the settings tab
+_golden = None           # tk.StringVar on the settings tab, metres
 _placing = False         # in place-the-map mode: click-through off, drag to move
 _grab = None             # (pointer x, pointer y, window x, window y) while dragging
 _held = None             # the widget whose Tk grab place() took - EDMC's Settings dialog
@@ -134,6 +138,21 @@ def low_value_shown():
     across grounds.
     """
     return config.get_bool(LOW_VALUE_KEY, default=False) if config is not None else False
+
+
+def golden():
+    """Golden circle radius in m from config; not one of GOLDEN_STEPS: the default."""
+    default = int(coverage.GOLDEN_RADIUS_M)
+    try:
+        value = int(config.get_int(GOLDEN_KEY, default=default)) if config is not None else default
+    except (TypeError, ValueError):
+        return default
+    return value if value in GOLDEN_STEPS else default
+
+
+def apply_golden():
+    """Set coverage.golden_m from config: at start and on Settings OK."""
+    coverage.golden_m = float(golden())
 
 
 def position():
@@ -628,8 +647,9 @@ def prefs(parent):
     Rows come from `place_at`, not from numbers written here: hand-numbered
     rows put two widgets in row 9 the last time one was inserted.
     """
-    global _enabled, _corner, _keep, _free, _low_value
+    global _enabled, _corner, _keep, _free, _low_value, _golden
     frame = nb.Frame(parent)
+    _golden = tk.StringVar(value=str(golden()))
     _enabled = tk.BooleanVar(value=enabled())
     _corner = tk.StringVar(value=corner())
     _keep = tk.BooleanVar(value=keep_up())
@@ -665,6 +685,15 @@ def prefs(parent):
          lambda f: nb.Label(f, text="Drag it, any monitor, then double-click or Esc."))
     line(lambda f: nb.Label(f, text="Painted means driven within "
                                     f"{coverage.SCAN_RADIUS_M / 1000:.0f} km, not scanned."))
+    def steps(f):
+        # Readonly: the arrows step through GOLDEN_STEPS, nothing typed in. Tk sets
+        # the variable to the first value on creation, so it is set again after.
+        box = tk.Spinbox(f, values=GOLDEN_STEPS, textvariable=_golden, width=6,
+                         state="readonly", wrap=False)
+        _golden.set(str(golden()))
+        return box
+
+    line(lambda f: nb.Label(f, text="Golden circle radius from the most-rigs spot, m"), steps)
 
     count, size = coverstore.usage()
     amount = f"{size / 1048576:.1f} MB" if size >= 1048576 else f"{size / 1024:.0f} KB"
@@ -887,6 +916,9 @@ def prefs_changed():
             config.set(FREE_KEY, bool(_free.get()))
         if _low_value is not None:
             config.set(LOW_VALUE_KEY, bool(_low_value.get()))
+        if _golden is not None:
+            config.set(GOLDEN_KEY, int(_golden.get()))
+            apply_golden()
         changed = False
         for key_id, _, _, config_key in hotkey.ACTIONS:
             if key_id not in _hotkeys:

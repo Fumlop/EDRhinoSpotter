@@ -98,6 +98,7 @@ def start(plugin_dir):
     # The PNG texture set of 5.5.0 and older, where an install was unzipped
     # over the last one by hand.
     coverage.clear_old_textures()
+    minimap.apply_golden()
     yields.regrow()
     _started_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     _sheet = grounds.Sheet()
