@@ -26,16 +26,18 @@ in the game loses it to EDMC while EDMC runs, with nothing to say so.
 Callbacks run on this thread. The caller hands in something that bounces them
 to Tk, the way every other worker in the plugin does.
 
-Off Windows there is no RegisterHotKey: the same callbacks are fired by chat
-text, `!rs center` / `border` / `zoom` / `data`, read from the journal's
-SendText event (chat()). label() then names the chat command.
+Linux: an X11 grab instead (hotkey_x11), live only while an X11 window such
+as Elite under Proton has the focus. Off Windows the same callbacks are also
+fired by chat text, `!rs center` / `border` / `zoom` / `data`, read from the
+journal's SendText event (chat()); with no grab live, label() names those.
 """
 
 import string
 import threading
 
+from rs_core import system
 from rs_core.logging import logger
-from rs_ui import overlay
+from rs_ui import hotkey_x11, overlay
 
 try:
     from config import config
@@ -92,8 +94,8 @@ def parse(combo):
 
 
 def available():
-    """Whether RegisterHotKey exists here: Windows only."""
-    return overlay.win32()
+    """Whether the key combos work here: Windows, or a live X11 grab."""
+    return overlay.win32() or bool(hotkey_x11.grabbed())
 
 
 def chat_command(key_id):
@@ -104,7 +106,7 @@ def chat_command(key_id):
 def chat(entry):
     """Off Windows: a SendText entry naming a chat command fires its callback.
     The key id fired, or None. On Windows always None."""
-    if entry.get("event") != "SendText" or available():
+    if entry.get("event") != "SendText" or overlay.win32():
         return None
     typed = " ".join(str(entry.get("Message") or "").lower().split())
     for key_id, word in CHAT.items():
@@ -115,16 +117,21 @@ def chat(entry):
     return None
 
 
-def label(key_id):
-    """What a key is bound to now: the one set in Settings, or its default.
-    Off Windows the chat command."""
-    if not available():
-        return chat_command(key_id)
+def _combo(key_id):
+    """The combo set in Settings for this key, or its default."""
     for kid, _, default, config_key in ACTIONS:
         if kid == key_id:
             combo = config.get_str(config_key, default=default) if config is not None else default
             return combo if parse(combo) else default
     raise KeyError(key_id)
+
+
+def label(key_id):
+    """What a key is bound to now: the one set in Settings, or its default.
+    With no key working here (no X11 grab) the chat command."""
+    if not available():
+        return chat_command(key_id)
+    return _combo(key_id)
 
 
 def restart():
@@ -141,9 +148,12 @@ def start(callbacks):
     _callbacks = dict(callbacks)
     if _thread is not None and _thread.is_alive():
         return
-    if not available():
-        logger.info("hotkey: not Windows, no hotkeys; type in chat: "
-                    + ", ".join(chat_command(key_id) for key_id in CHAT))
+    if not overlay.win32():
+        chat = ", ".join(chat_command(key_id) for key_id in CHAT)
+        if system.LINUX:
+            hotkey_x11.start({key_id: _combo(key_id) for key_id in _callbacks}, _callbacks)
+        if not hotkey_x11.grabbed():
+            logger.info(f"hotkey: no hotkeys here; type in chat: {chat}")
         return
     ready = threading.Event()
     _thread = threading.Thread(target=_listen, args=(dict(callbacks), ready),
@@ -155,6 +165,7 @@ def start(callbacks):
 def stop():
     """Unregister by ending the listening thread's message loop."""
     global _thread, _thread_id
+    hotkey_x11.stop()
     if _thread_id is not None:
         try:
             import ctypes

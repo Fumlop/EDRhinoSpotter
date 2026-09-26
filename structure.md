@@ -212,6 +212,9 @@ No tkinter anywhere in here.
   the cards cannot drift apart. They used to be two schemes and looked like
   two tools.
 - **[logging.py](rs_core/logging.py)** - one logger, named so EDMC picks it up.
+- **[system.py](rs_core/system.py)** - what it runs on, read once: `WINDOWS`,
+  `LINUX`, `FLATPAK`, `SESSION` (wayland/x11). `main.start` logs `describe()`.
+  `overlay.win32()` and `hotkey.available()` read it.
 
 ## UI (`rs_ui/`)
 

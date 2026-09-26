@@ -144,8 +144,11 @@ try:
     check("2 Windows: label is the key", hotkey.label(hotkey.CENTER) == "Ctrl+Alt+Z",
           hotkey.label(hotkey.CENTER))
 
-    real_available = hotkey.available
-    hotkey.available = lambda: False
+    # Off Windows, no X11 grab: Win32 off, the RegisterHotKey thread ended.
+    hotkey.stop()
+    real_win32 = overlay.win32
+    overlay.win32 = lambda: False
+    check("2 simulated Linux, no grab: hotkeys not available", not hotkey.available())
     for typed, want in (("!rs center", "center"), ("!rs border", "border"),
                         ("!rs zoom", "zoom"), ("!rs data", "data"),
                         ("  !RS   Zoom ", "zoom")):
@@ -169,7 +172,8 @@ try:
 
     frame = main.prefs(root)
     shown = texts(frame)
-    check("5 Settings says Windows only", any("Windows only" in t for t in shown))
+    check("5 Settings says hotkeys are not working here",
+          any("not working here" in t for t in shown))
     check("5 Settings lists !rs center", "!rs center" in shown)
     check("5 no hotkey OptionMenus", not any("Ctrl+" in t for t in shown),
           [t for t in shown if "Ctrl+" in t])
@@ -178,7 +182,8 @@ try:
     written = {k: v for k, v in config.values.items() if k.startswith("rhinospotter_hotkey")}
     check("5 Settings OK writes no hotkey", not written, repr(written))
     frame.destroy()
-    hotkey.available = real_available
+    hotkey.stop()
+    overlay.win32 = real_win32
 
     # ------------------------------------------------------------ #10
     out("#10 material pick")

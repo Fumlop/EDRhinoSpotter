@@ -15,7 +15,7 @@ import tkinter as tk
 from datetime import datetime, timezone
 
 from rs_core import (bodies, cards, coverage, database, deposit, grounds, migrate, palette,
-                     share, spansh, spotcard, spotmark, store, update, yields)
+                     share, spansh, spotcard, spotmark, store, system, update, yields)
 from rs_core.logging import logger
 from rs_ui import clipboard, hotkey, minimap, scan
 
@@ -92,6 +92,7 @@ NOT_READ = "-"
 
 def start(plugin_dir):
     global _sheet, _started_at
+    logger.info(f"running on {system.describe()}")
     database.adopt_legacy()
     # Before anything reads the database: the JSON files of 4.1 go in once.
     try:

@@ -1,7 +1,7 @@
 # E2E: Linux chat commands (#12), arrow position (#11), material pick (#10)
 
 Harness: `rs_e2etest/linux_e2e.py`. Runs on Windows with the Win32 paths
-switched off in-process (`hotkey.available`, `overlay.win32` -> False,
+switched off in-process (`overlay.win32` -> False, no X11 grab,
 `overlay._game_rect` -> None). Drives the real `main.journal_entry`,
 `minimap.prefs`, `overlay.start` / `_tick` and the arrow's Tk drag bindings.
 Seeded from a read-only copy of the live db (real bookmarks).

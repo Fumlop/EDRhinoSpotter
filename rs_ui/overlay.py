@@ -24,7 +24,7 @@ import io
 import time
 import tkinter as tk
 
-from rs_core import arrow, guide, palette, spotmark
+from rs_core import arrow, guide, palette, spotmark, system
 from rs_core.logging import logger
 
 try:
@@ -283,13 +283,8 @@ def _place():
 
 
 def win32():
-    """Whether the Win32 calls exist here."""
-    try:
-        import ctypes
-        ctypes.windll.user32
-    except (ImportError, AttributeError, OSError):
-        return False
-    return True
+    """Whether the Win32 calls exist here: rs_core.system.WINDOWS."""
+    return system.WINDOWS
 
 
 def position(key=POS_KEY):

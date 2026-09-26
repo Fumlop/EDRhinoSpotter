@@ -772,7 +772,7 @@ def prefs(parent, worth=()):
     # again at once; the rows under the map name them from the next frame.
     _hotkeys.clear()
     if not hotkey.available():
-        line(lambda f: nb.Label(f, text="Hotkeys: Windows only. Type in chat instead:"),
+        line(lambda f: nb.Label(f, text="Hotkeys: not working here (no X11 grab). Type in chat instead:"),
              pady=(6, 2))
         for key_id, name, _, _ in hotkey.ACTIONS:
             line(lambda f, name=name: nb.Label(f, text=name),
@@ -794,6 +794,10 @@ def prefs(parent, worth=()):
             return box
 
         line(lambda f, name=name: nb.Label(f, text=name), keys)
+    if hotkey.available() and not overlay.win32():
+        line(lambda f: nb.Label(f, text="Linux: keys work while Elite has the focus. Also in chat: "
+                                        + ", ".join(hotkey.chat_command(k) for k in hotkey.CHAT)),
+             pady=(4, 2))
     # Settings closed, by OK or the window's X, while placing: locked where it is.
     frame.bind("<Destroy>", lambda event: _lock(), add="+")
     return frame
