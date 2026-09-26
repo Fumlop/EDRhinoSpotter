@@ -27,6 +27,11 @@ import tkinter as tk
 from rs_core import arrow, guide, palette, spotmark
 from rs_core.logging import logger
 
+try:
+    from config import config
+except ImportError:      # running outside EDMC
+    config = None
+
 # The colour the window is filled with and then told to make a hole of. Not a
 # palette colour: anything drawn in it would be a hole too. rs_core.arrow
 # renders onto the same one, and keeps its faces clear of it.
@@ -55,6 +60,10 @@ HERE_MS = 10000
 GAME_TITLE = "Elite - Dangerous (CLIENT)"
 GAME_TITLE_PREFIX = "Elite - Dangerous"
 
+# Off Windows: where the arrow was dragged, "x,y" screen pixels of its top left.
+# No game window to find there, and the screen centre of two monitors is the seam.
+POS_KEY = "rhinospotter_arrow_xy"
+
 FG = palette.FG
 DIM = palette.MUTED
 ACCENT = palette.ACCENT
@@ -75,6 +84,7 @@ _frames = {}             # (bucket, colour) -> PhotoImage, built as angles come 
 _typed_user32 = None     # own WinDLL: argtypes set here stay off EDMC's ctypes.windll.user32
 _topmost_errors = {}     # handle -> last SetWindowPos error, logged when it changes
 _topmost_sent = {}       # handle -> ((x, y, width, height), monotonic s) of the last send
+_grab = None             # (pointer x, pointer y, window x, window y) while dragging, off Windows
 
 
 def _key(record):
@@ -133,6 +143,12 @@ def start(parent, record, on_stop=None):
         _placed = None
         _window.update_idletasks()
         _click_through(_window)
+        if not win32():
+            # Left drag moves it, right click back to the screen's top middle.
+            _canvas.bind("<ButtonPress-1>", _take)
+            _canvas.bind("<B1-Motion>", _drag)
+            _canvas.bind("<ButtonRelease-1>", _drop)
+            _canvas.bind("<ButtonPress-3>", _reset)
     except tk.TclError as err:
         # Whatever the reason - no window manager that will take it, a display
         # that will not have it on top - it is not worth a traceback out of a
@@ -160,8 +176,9 @@ def _cancel():
 def stop():
     """Take it down. Safe to call when nothing is up."""
     global _window, _canvas, _target, _after, _placed, _on_stop, _since, _pointed, _hidden, _here
+    global _grab
     _cancel()
-    _here = None
+    _here = _grab = None
     _pointed = _hidden = False
     if _window is not None and _window.winfo_exists():
         _window.destroy()
@@ -235,11 +252,18 @@ def _place():
     and an arrow left behind on the desktop is worse than one that follows.
     """
     global _placed
+    if _grab is not None:
+        return                   # being dragged: the pointer places it
     rect = _game_rect()
+    dragged = position() if not win32() else None
     if rect:
         left, top, right, bottom = rect
         x = left + (right - left - WIDTH) // 2
         y = top + max(24, int((bottom - top) * 0.04))
+    elif dragged:
+        # Clamped to the whole screen: a monitor unplugged since.
+        x = min(max(0, dragged[0]), max(0, _window.winfo_screenwidth() - WIDTH))
+        y = min(max(0, dragged[1]), max(0, _window.winfo_screenheight() - HEIGHT))
     else:
         x = (_window.winfo_screenwidth() - WIDTH) // 2
         y = 40
@@ -256,6 +280,59 @@ def _place():
         set_topmost(user32.GetParent(_window.winfo_id()) or _window.winfo_id(), x, y, WIDTH, HEIGHT)
     except (ImportError, AttributeError, OSError):
         pass
+
+
+def win32():
+    """Whether the Win32 calls exist here."""
+    try:
+        import ctypes
+        ctypes.windll.user32
+    except (ImportError, AttributeError, OSError):
+        return False
+    return True
+
+
+def position(key=POS_KEY):
+    """(x, y) stored as "x,y" under config `key`, or None. Unreadable is None."""
+    if config is None:
+        return None
+    try:
+        x, y = config.get_str(key, default="").split(",")
+        return int(x), int(y)
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def _take(event):
+    global _grab
+    _grab = (event.x_root, event.y_root, _window.winfo_x(), _window.winfo_y())
+
+
+def _drag(event):
+    if _grab is None:
+        return
+    px, py, wx, wy = _grab
+    _window.geometry(f"+{wx + event.x_root - px}+{wy + event.y_root - py}")
+
+
+def _drop(event):
+    """Store where it was dropped. A click without a move stores nothing."""
+    global _grab, _placed
+    moved = _grab is not None and (_window.winfo_x(), _window.winfo_y()) != _grab[2:]
+    _grab = None
+    if moved and config is not None:
+        config.set(POS_KEY, f"{_window.winfo_x()},{_window.winfo_y()}")
+        logger.info(f"overlay: arrow moved to {_window.winfo_x()},{_window.winfo_y()}")
+    _placed = None
+
+
+def _reset(event=None):
+    """Forget the dragged position: top middle of the screen again."""
+    global _placed
+    if config is not None:
+        config.set(POS_KEY, "")
+    _placed = None
+    _place()
 
 
 def foreground_title():

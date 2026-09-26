@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+**Added**
+
+- Settings: **Materials in the lists: Select...** picks which of the 38
+  materials the Material dropdown and RhinoData offer (issue #10). Default the
+  18 over 50,000 Cr/t; replaces the "Show materials under 50,000 Cr/t" switch,
+  which seeds the pick until one is made. Bookmarked materials stay listed.
+- Linux: chat commands `!rs center`, `!rs border`, `!rs zoom`, `!rs data`, read
+  from the journal's SendText, do what the hotkeys do on Windows (issue #12).
+  Settings shows them in place of the hotkey rows. The text is sent as chat on
+  the selected channel. Windows unchanged.
+
+**Fixed**
+
+- Linux: the guide arrow sat on the seam of two monitors (screen centre of the
+  whole desktop, issue #11). It can now be dragged; the position is kept in
+  `rhinospotter_arrow_xy`, right-click resets it. Windows unchanged.
+
 ## 5.7.13-beta.1
 
 **Fixed**

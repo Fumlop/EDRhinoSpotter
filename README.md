@@ -82,6 +82,7 @@ Rates are where to prospect, not what a location holds - no journal says that.
 </p>
 
 Arrow top middle over the game with distance to the bookmark. Borderless or windowed only.
+Linux: top middle of the screen; drag it where you want it, right-click puts it back.
 
 ## Minimap
 
@@ -130,8 +131,11 @@ the same groups, most rigs first.
 
 - Minimap on/off, keep it up when alt-tabbed, corner, or **Free move** (drag it anywhere, any monitor).
 - **Golden circle radius:** 500-2500 m in 250 m steps, default 1250. Also sets how RhinoData groups a location's bookmarks.
-- **Show materials under 50,000 Cr/t:** off = 18 materials, on = all 38.
-- Hotkeys: modifier + key for each of the four.
+- **Materials in the lists: Select...** tick the materials the dropdowns offer, any of 38.
+  Default: the 18 over 50,000 Cr/t. Bookmarked materials stay in the list either way.
+- Hotkeys: modifier + key for each of the four. Windows only; on Linux type
+  `!rs center`, `!rs border`, `!rs zoom` or `!rs data` in chat. It is sent as chat:
+  others on that channel see it.
 
 ## Data
 

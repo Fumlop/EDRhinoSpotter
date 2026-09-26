@@ -229,7 +229,9 @@ Everything in here imports tkinter.
   loop, since the game holds the focus while you drive. A press is bounced to
   Tk and sets the map's center or border, steps its size, or opens the
   RhinoData window. A combination already held elsewhere is a logged warning;
-  the others still register.
+  the others still register. Off Windows no RegisterHotKey: `chat()` fires the
+  same callbacks from the journal's SendText `!rs center|border|zoom|data`, and
+  `label()` names the chat command.
 - **[rhino.py](rs_ui/rhino.py)** - the easter egg. `docs/running.png` placed
   over the window and moved across it, flattened onto the window's background
   first because Tk composites a half-transparent edge against something else.
@@ -251,6 +253,9 @@ Everything in here imports tkinter.
   rather than PIL's ImageTk, which is the one part of PIL that EDMC's build
   cannot be relied on to carry. A window it cannot build is logged and
   skipped - the bookmark list works without an arrow over the game.
+  Off Windows there is no game window to find: top middle of the screen, or
+  where it was dragged (`rhinospotter_arrow_xy`, clamped to the screen),
+  right-click resets.
 - **[clipboard.py](rs_ui/clipboard.py)** - text onto the clipboard with
   Win32 `SetClipboardData`: Tk's clipboard text is gone once EDMC exits.
 - **[scan.py](rs_ui/scan.py)** - the RhinoData window: three panes side by
@@ -274,7 +279,8 @@ Everything in here imports tkinter.
   sized from the game window's height and parked in the corner picked under
   EDMC Settings (`rhinospotter_minimap_enabled`, `rhinospotter_minimap_keep`,
   `rhinospotter_minimap_corner`). The tab it draws is the whole plugin's, not
-  the map's: `rhinospotter_low_value` and `low_value_shown()` are a materials
+  the map's: `rhinospotter_materials` and `materials_shown()` (the Select...
+  dialog; `rhinospotter_low_value` only seeds its default) are a materials
   setting that lives here because this is the file with the tab in it.
   Built once, hidden, and made click-through and no-activate before it is
   first shown; then shown, moved and hidden with Win32 calls that do not take

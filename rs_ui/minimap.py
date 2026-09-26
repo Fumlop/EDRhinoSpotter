@@ -49,8 +49,10 @@ FREE_KEY = "rhinospotter_minimap_free"
 POS_KEY = "rhinospotter_minimap_xy"
 ZOOM_KEY = "rhinospotter_minimap_zoom"
 SRV_KEY = "rhinospotter_srv_type"
-# Whether the material lists carry the cheap half. Not a minimap setting - it
-# lives here because this is the file that draws the settings tab.
+# The materials the lists offer, picked on the settings tab. Not a minimap
+# setting - it lives here because this is the file that draws the settings tab.
+MATERIALS_KEY = "rhinospotter_materials"
+# Up to 5.7.13: on = all 38 materials. Read only to seed MATERIALS_KEY's default.
 LOW_VALUE_KEY = "rhinospotter_low_value"
 # Golden circle radius, m: coverage.golden_m.
 GOLDEN_KEY = "rhinospotter_golden_m"
@@ -103,7 +105,7 @@ _corner = None           # tk.StringVar on the settings tab
 _keep = None             # tk.BooleanVar on the settings tab
 _hotkeys = {}            # hotkey id -> (modifier StringVar, key StringVar) on the settings tab
 _free = None             # tk.BooleanVar on the settings tab
-_low_value = None        # tk.BooleanVar on the settings tab
+_picked = None           # [material] from the Select dialog, saved on Settings OK; None: untouched
 _golden = None           # tk.StringVar on the settings tab, metres
 _placing = False         # in place-the-map mode: click-through off, drag to move
 _grab = None             # (pointer x, pointer y, window x, window y) while dragging
@@ -133,13 +135,51 @@ def free_move():
     return config.get_bool(FREE_KEY, default=False) if config is not None else False
 
 
-def low_value_shown():
-    """Whether the material lists offer the ones under grounds.HIGH_VALUE_MIN.
+def materials_shown(worth):
+    """The materials the lists offer, in spotmark.MATERIALS order.
 
-    Off by default. Price is measured on Sheet.values(): the median, best
-    across grounds.
+    Picked on the settings tab (MATERIALS_KEY). Never picked: `worth` (the
+    ones over grounds.HIGH_VALUE_MIN), or all 38 when LOW_VALUE_KEY was on.
     """
-    return config.get_bool(LOW_VALUE_KEY, default=False) if config is not None else False
+    chosen = config.get_list(MATERIALS_KEY, default=None) if config is not None else None
+    if chosen is not None:
+        return tuple(name for name in spotmark.MATERIALS if name in chosen)
+    if config is not None and config.get_bool(LOW_VALUE_KEY, default=False):
+        return tuple(spotmark.MATERIALS)
+    return tuple(name for name in spotmark.MATERIALS if name in set(worth))
+
+
+def _select_materials(parent, worth):
+    """Checkbox per material; OK keeps the ticks in _picked for prefs_changed."""
+    global _picked
+    shown = set(_picked if _picked is not None else materials_shown(worth))
+    box = tk.Toplevel(parent)
+    box.title("RhinoSpotter materials")
+    box.transient(parent)
+    ticks = {name: tk.BooleanVar(value=name in shown) for name in spotmark.MATERIALS}
+    rows = (len(spotmark.MATERIALS) + 2) // 3
+    for i, name in enumerate(spotmark.MATERIALS):
+        tk.Checkbutton(box, text=name, variable=ticks[name], anchor="w").grid(
+            row=i % rows, column=i // rows, sticky="w", padx=8)
+
+    def set_all(names):
+        for name, var in ticks.items():
+            var.set(name in names)
+
+    def ok():
+        global _picked
+        _picked = [name for name, var in ticks.items() if var.get()]
+        box.destroy()
+
+    buttons = tk.Frame(box)
+    buttons.grid(row=rows, column=0, columnspan=3, sticky="w", padx=8, pady=8)
+    tk.Button(buttons, text="All", command=lambda: set_all(spotmark.MATERIALS)).pack(side="left")
+    tk.Button(buttons, text=f"Over {grounds.HIGH_VALUE_MIN:,} Cr/t",
+              command=lambda: set_all(set(worth))).pack(side="left", padx=4)
+    tk.Button(buttons, text="None", command=lambda: set_all(())).pack(side="left")
+    tk.Button(buttons, text="OK", width=8, command=ok).pack(side="left", padx=(16, 0))
+    box.grab_set()
+    return box
 
 
 def golden():
@@ -163,13 +203,7 @@ def position():
     Stored as text because EDMC's config holds strings and ints, and a pair
     of them is neither. Anything unreadable is no position at all, which puts
     the map back in its corner rather than at 0,0."""
-    if config is None:
-        return None
-    try:
-        x, y = config.get_str(POS_KEY, default="").split(",")
-        return int(x), int(y)
-    except (AttributeError, TypeError, ValueError):
-        return None
+    return overlay.position(POS_KEY)
 
 
 def free_xy(bounds, width, height, where):
@@ -644,22 +678,22 @@ def stop():
 
 # ---------------------------------------------------------------- settings
 
-def prefs(parent):
+def prefs(parent, worth=()):
     """The settings tab: the map on or off, whether it stays up through an
-    alt-tab, which corner it sits in, the saved maps, the materials switch and
-    the hotkeys.
+    alt-tab, which corner it sits in, the saved maps, the materials picker and
+    the hotkeys. `worth`: the materials over grounds.HIGH_VALUE_MIN.
 
     Rows come from `place_at`, not from numbers written here: hand-numbered
     rows put two widgets in row 9 the last time one was inserted.
     """
-    global _enabled, _corner, _keep, _free, _low_value, _golden
+    global _enabled, _corner, _keep, _free, _golden, _picked
     frame = nb.Frame(parent)
     _golden = tk.StringVar(value=str(golden()))
     _enabled = tk.BooleanVar(value=enabled())
     _corner = tk.StringVar(value=corner())
     _keep = tk.BooleanVar(value=keep_up())
     _free = tk.BooleanVar(value=free_move())
-    _low_value = tk.BooleanVar(value=low_value_shown())
+    _picked = None
 
     rows = itertools.count()
 
@@ -714,16 +748,23 @@ def prefs(parent):
     # cheap half is left out of both and out of the rates line under a body -
     # never out of a bookmark that already names one, nor out of a material
     # being mined right now. See rs_ui/main._materials.
-    line(lambda f: nb.Label(f, text="Materials"), pady=(6, 2))
-    line(lambda f: nb.Checkbutton(f, text="Show materials under "
-                                          f"{grounds.HIGH_VALUE_MIN:,} Cr/t",
-                                  variable=_low_value), pady=(2, 10))
+    line(lambda f: nb.Label(f, text="Materials in the lists"),
+         lambda f: nb.Button(f, text="Select...",
+                             command=lambda: _select_materials(frame.winfo_toplevel(), worth)),
+         pady=(6, 10))
 
     # The hotkeys: a modifier set and a key each. Taken on OK and registered
     # again at once; the rows under the map name them from the next frame.
-    line(lambda f: nb.Label(f, text="Hotkeys"), pady=(6, 2))
     _hotkeys.clear()
-    for key_id, name, _, _ in hotkey.ACTIONS:
+    if not hotkey.available():
+        line(lambda f: nb.Label(f, text="Hotkeys: Windows only. Type in chat instead:"),
+             pady=(6, 2))
+        for key_id, name, _, _ in hotkey.ACTIONS:
+            line(lambda f, name=name: nb.Label(f, text=name),
+                 lambda f, key_id=key_id: nb.Label(f, text=hotkey.chat_command(key_id)))
+    else:
+        line(lambda f: nb.Label(f, text="Hotkeys"), pady=(6, 2))
+    for key_id, name, _, _ in (hotkey.ACTIONS if hotkey.available() else ()):
         mods, key = hotkey.label(key_id).rsplit("+", 1)
         mod_var, key_var = tk.StringVar(value=mods), tk.StringVar(value=key)
         _hotkeys[key_id] = (mod_var, key_var)
@@ -921,8 +962,8 @@ def prefs_changed():
             config.set(KEEP_KEY, bool(_keep.get()))
         if _free is not None:
             config.set(FREE_KEY, bool(_free.get()))
-        if _low_value is not None:
-            config.set(LOW_VALUE_KEY, bool(_low_value.get()))
+        if _picked is not None:
+            config.set(MATERIALS_KEY, list(_picked))
         if _golden is not None:
             config.set(GOLDEN_KEY, int(_golden.get()))
             apply_golden()

@@ -34,6 +34,7 @@ _card_token = 0          # only the newest render may write to the status line
 _writes = store.Debounced()
 _register = bodies.Register(on_change=_writes, on_arrive=store.load)
 _sheet = None            # rs_core.grounds.Sheet, read once at startup
+_worth_names = None     # _worth(), from _sheet
 # SystemAddress -> this session's Spansh state: "undiscovered", "asking" or
 # "answered". Any entry means Spansh is not asked again this session.
 _spansh = {}
@@ -415,9 +416,9 @@ def stop():
 def _materials():
     """What the Material dropdown and the RhinoData picker offer.
 
-    The whole list when the settings tab says so. Otherwise the ones worth the
-    trip - grounds.HIGH_VALUE_MIN - plus two kinds of exception that have to
-    stay pickable however little they pay:
+    The ones picked on the settings tab (minimap.materials_shown; default the
+    ones over grounds.HIGH_VALUE_MIN), plus two kinds of exception that have
+    to stay pickable whether picked or not:
 
       every material already bookmarked, because cards.nearby() matches a
       second mark to the first one on the material's name. Drop the name and
@@ -428,23 +429,28 @@ def _materials():
       material in the box when it is being mined, and a value with no menu
       entry behind it cannot be chosen again once it is left.
 
-    Kept until the bookmarks change, the switch moves or either control does:
+    Kept until the bookmarks change, the pick changes or either control does:
     this reads the database, and the scan window asks on every redraw.
     """
     global _offered
     held = tuple(var.get() for var in (_material, _filter) if var is not None)
-    key = (minimap.low_value_shown(), database.revision(), held)
+    key = (minimap.materials_shown(_worth()), database.revision(), held)
     if _offered is not None and _offered[0] == key:
         return _offered[1]
-    if key[0]:
-        names = tuple(spotmark.MATERIALS)
-    else:
-        kept = set(_sheet.worth(spotmark.MATERIALS))
-        marked = cards.materials_marked()
-        names = tuple(name for name in spotmark.MATERIALS
-                      if name in kept or name.lower() in marked or name in held)
+    kept = set(key[0])
+    marked = cards.materials_marked()
+    names = tuple(name for name in spotmark.MATERIALS
+                  if name in kept or name.lower() in marked or name in held)
     _offered = (key, names)
     return names
+
+
+def _worth():
+    """The materials over grounds.HIGH_VALUE_MIN. Once: the sheet is read once."""
+    global _worth_names
+    if _worth_names is None:
+        _worth_names = tuple(_sheet.worth(spotmark.MATERIALS))
+    return _worth_names
 
 
 def _fill_menu():
@@ -464,12 +470,12 @@ def _fill_menu():
 
 
 def prefs(parent):
-    return minimap.prefs(parent)
+    return minimap.prefs(parent, worth=_worth())
 
 
 def prefs_changed():
     minimap.prefs_changed()
-    # The switch may have taken materials out of the list or put them back, and
+    # The pick may have taken materials out of the list or put them back, and
     # _on_material_changed only fires when the picked one moves.
     _fill_menu()
     if _frame is not None and scan.is_open():
@@ -491,6 +497,7 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
         _cmdr = cmdr
 
     minimap.srv_event(entry)
+    hotkey.chat(entry)
 
     # Landing or dropping the SRV fills Loc in. The nearest bookmark within 10 km
     # on this body says which location this is, and it was checked when it was made;

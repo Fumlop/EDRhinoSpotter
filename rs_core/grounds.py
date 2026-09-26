@@ -71,8 +71,8 @@ MAGMA_SPLIT = ('rock 80%+ [metallic magma]', 'rock 80%+ [rocky magma]')
 UNSHEETED = {'bromellite': 33396}
 
 # Low-value threshold in Cr/t, measured against values() (median, best across
-# grounds). Sheet.worth() drops everything below it. Disabled by the
-# rhinospotter_low_value setting.
+# grounds). Sheet.worth() drops everything below it. The default of the
+# rhinospotter_materials setting.
 HIGH_VALUE_MIN = 50000
 
 
