@@ -52,7 +52,7 @@ SRV_KEY = "rhinospotter_srv_type"
 # The materials the lists offer, picked on the settings tab. Not a minimap
 # setting - it lives here because this is the file that draws the settings tab.
 MATERIALS_KEY = "rhinospotter_materials"
-# Up to 5.7.13: on = all 38 materials. Read only to seed MATERIALS_KEY's default.
+# Up to 5.7.12: on = all 38 materials. Read only to seed MATERIALS_KEY's default.
 LOW_VALUE_KEY = "rhinospotter_low_value"
 # Golden circle radius, m: coverage.golden_m.
 GOLDEN_KEY = "rhinospotter_golden_m"
@@ -138,15 +138,30 @@ def free_move():
 def materials_shown(worth):
     """The materials the lists offer, in spotmark.MATERIALS order.
 
-    Picked on the settings tab (MATERIALS_KEY). Never picked: `worth` (the
-    ones over grounds.HIGH_VALUE_MIN), or all 38 when LOW_VALUE_KEY was on.
+    Picked on the settings tab (MATERIALS_KEY). Never picked, or picked
+    empty: `worth` (the ones over grounds.HIGH_VALUE_MIN), or all 38 when
+    LOW_VALUE_KEY was on. Empty is never picked: EDMC's get_list returns []
+    for a missing key.
     """
-    chosen = config.get_list(MATERIALS_KEY, default=None) if config is not None else None
-    if chosen is not None:
+    chosen = config.get_list(MATERIALS_KEY) if config is not None else None
+    if chosen:
         return tuple(name for name in spotmark.MATERIALS if name in chosen)
     if config is not None and config.get_bool(LOW_VALUE_KEY, default=False):
         return tuple(spotmark.MATERIALS)
     return tuple(name for name in spotmark.MATERIALS if name in set(worth))
+
+
+def seed_materials(worth, marked):
+    """Once, while MATERIALS_KEY is empty: store materials_shown(worth) plus
+    every bookmarked material (`marked`, lowercased), so an update to the
+    picker drops no material a bookmark was made for. The stored list, or None."""
+    if config is None or config.get_list(MATERIALS_KEY):
+        return None
+    seeded = [name for name in spotmark.MATERIALS
+              if name in materials_shown(worth) or name.lower() in marked]
+    config.set(MATERIALS_KEY, seeded)
+    logger.info(f"materials: seeded {len(seeded)}: {', '.join(seeded)}")
+    return seeded
 
 
 def _select_materials(parent, worth):
@@ -962,8 +977,10 @@ def prefs_changed():
             config.set(KEEP_KEY, bool(_keep.get()))
         if _free is not None:
             config.set(FREE_KEY, bool(_free.get()))
-        if _picked is not None:
+        if _picked:
             config.set(MATERIALS_KEY, list(_picked))
+        elif _picked is not None:
+            config.delete(MATERIALS_KEY, suppress=True)       # none ticked: the default
         if _golden is not None:
             config.set(GOLDEN_KEY, int(_golden.get()))
             apply_golden()

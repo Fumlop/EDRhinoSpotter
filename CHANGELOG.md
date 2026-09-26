@@ -1,38 +1,17 @@
 # Changelog
 
-## Unreleased
+## 5.8.0
 
 **Added**
 
-- Settings: **Materials in the lists: Select...** picks which of the 38
-  materials the Material dropdown and RhinoData offer (issue #10). Default the
-  18 over 50,000 Cr/t; replaces the "Show materials under 50,000 Cr/t" switch,
-  which seeds the pick until one is made. Bookmarked materials stay listed.
-- Linux: chat commands `!rs center`, `!rs border`, `!rs zoom`, `!rs data`, read
-  from the journal's SendText, do what the hotkeys do on Windows (issue #12).
-  Settings shows them in place of the hotkey rows. The text is sent as chat on
-  the selected channel. Windows unchanged.
+- Settings: pick which materials the lists show (Materials in the lists > Select...). #10
+- Linux: chat commands `!rs center`, `!rs border`, `!rs zoom`, `!rs data` instead of hotkeys. #12
 
 **Fixed**
 
-- Linux: the guide arrow sat on the seam of two monitors (screen centre of the
-  whole desktop, issue #11). It can now be dragged; the position is kept in
-  `rhinospotter_arrow_xy`, right-click resets it. Windows unchanged.
-
-## 5.7.13-beta.1
-
-**Fixed**
-
-- Linux: data moved from `~/RhinoSpotter` to `$XDG_DATA_HOME/RhinoSpotter`
-  (`~/.local/share`; Flatpak EDMC `~/.var/app/io.edcd.EDMarketConnector/data`).
-  In the Flatpak, bookmarks written to `~/RhinoSpotter` did not survive a restart
-  (issue #9). An existing `~/RhinoSpotter` is copied once on the first start and
-  left in place. Windows unchanged.
-- Linux: the minimap's "open folder" opens the coverage folder through the
-  desktop (`webbrowser` -> `xdg-open`) instead of logging
-  `module 'os' has no attribute 'startfile'`.
-- Linux: no more `overlay: not click-through here: ... windll` warning on every
-  overlay build. Click-through is still Win32-only.
+- Linux: guide arrow no longer sits between two monitors; drag it, right-click resets. #11
+- Linux: bookmarks survive a restart in Flatpak EDMC. #9
+- Linux: "open folder" works.
 
 ## 5.7.12
 

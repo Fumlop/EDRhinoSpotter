@@ -4,6 +4,7 @@ Harness: `rs_e2etest/linux_e2e.py`. Runs on Windows with the Win32 paths
 switched off in-process (`hotkey.available`, `overlay.win32` -> False,
 `overlay._game_rect` -> None). Drives the real `main.journal_entry`,
 `minimap.prefs`, `overlay.start` / `_tick` and the arrow's Tk drag bindings.
+Seeded from a read-only copy of the live db (real bookmarks).
 Output: `rs_e2etest/out/<timestamp>/report.txt`. No screenshot: the arrow's
 transparent colour shows the desktop behind it (screenshot rule).
 
@@ -35,14 +36,25 @@ Arrow position (#11):
 
 Material pick (#10):
 
-15. Never picked: the list is not the old default (worth, 5.7.13 switch off).
+15. Never picked: the list is not the old default (worth, 5.7.12 switch off).
 16. Old switch `rhinospotter_low_value` on: not all 38.
 17. Select dialog opens with ticks not matching what the list shows.
 18. OK in the dialog writes config before Settings OK (Settings Cancel must drop it).
 19. Settings OK does not store the pick, or the dropdown is not refilled from it.
-20. A bookmarked material or the one in the box drops out when unpicked.
+20. The pick is not exact: a bookmarked but unticked material still listed
+    (seen on the owner's db: 16 bookmarked materials kept), or the material
+    in the box dropped (it must stay).
+    Unticking must only hide: every bookmark row stays as it was.
 21. Dialog closed with X counts as a pick.
-22. Nothing picked: empty list read back as "never picked" (default again).
+22. Never picked read as "picked nothing": EDMC's `get_list` returns [] for a
+    missing key (seen in 5.8.0 pre-release: the dialog opened all unticked).
+    None ticked on OK: key removed, default again.
+23. A list that still comes out empty (broken config) gives a dropdown with
+    nothing in it and no word on why: needs the disabled
+    `scan.NO_MATERIALS` hint in the panel and the RhinoData picker.
+24. The update drops bookmarked materials from the lists: the first start
+    with an empty `rhinospotter_materials` must store the 18 over 50,000
+    Cr/t plus every bookmarked material, once; never over a stored pick.
 
 ## What the harness replaces, and what that hides
 
@@ -53,6 +65,6 @@ Material pick (#10):
 | EDMC config | dict with `get_str`/`set` | EDMC type coercion |
 | mouse drag | `event_generate` on the canvas | real pointer grab under a WM |
 | EDMC Settings dialog | `main.prefs(root)` in a Tk frame, `main.prefs_changed()` for OK | EDMC Cancel path; myNotebook styling; EDMC's own grab fighting the dialog's `grab_set` |
-| EDMC `config.get_list` / `set(list)` | dict | Windows registry REG_MULTI_SZ with an empty list coming back as None or `['']` |
+| EDMC `config.get_list` / `set(list)` | dict; `get_list` copies EDMC 6.1's missing-key rule (bytecode of `config/__init__.pyc`) | registry REG_MULTI_SZ round-trip of the stored list |
 
 Acceptance for the hidden rows: the reporter on #11 / #12.

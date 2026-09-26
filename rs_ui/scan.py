@@ -691,6 +691,15 @@ def _rail_body(parent, entry, chosen):
     _clickable(row, lambda: _pick_body(entry["name"]))
 
 
+NO_MATERIALS = "No materials - pick them: File > Settings > RhinoSpotter > Select..."
+
+
+def no_materials_hint(option_menu):
+    """A disabled NO_MATERIALS entry at the end of the menu. For a menu that
+    offers no material: a broken or empty rhinospotter_materials pick."""
+    option_menu["menu"].add_command(label=NO_MATERIALS, state="disabled")
+
+
 def letter_jump(option_menu, skip=()):
     """First letter of each entry as its Windows menu mnemonic: with the menu
     open, a letter highlights the first entry starting with it (Enter picks
@@ -728,6 +737,8 @@ def _picker(parent, variable, materials, focus):
                           activeborderwidth=0, tearoff=False,
                           font=("Segoe UI", 9))
     letter_jump(picker)
+    if len(materials) < 2:          # ALL_MATERIALS only
+        no_materials_hint(picker)
     picker.pack(fill="x", pady=(4, 0))
     tk.Label(box, text=f"Only {_short(focus)}, everywhere." if focus
                        else "The rail counts and the list follow it.",

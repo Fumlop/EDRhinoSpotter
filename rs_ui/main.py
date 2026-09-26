@@ -84,7 +84,6 @@ _density = None          # tk.StringVar - the deposit's HUD Density, or NOT_READ
 _amount = None           # tk.StringVar - the deposit's HUD Amount, or NOT_READ
 _search = None           # tk.StringVar - bookmark search text, not used yet
 _menu = None             # the Material OptionMenu, refilled when the settings change
-_offered = None          # (key, materials) - see _materials
 SEARCH_SHOWN = False     # the Search row under Bookmark, off until search works
 # Density and Amount before anything is picked. Not required: a bookmark without
 # them is still a bookmark, it just cannot say how many tons are left.
@@ -109,6 +108,7 @@ def start(plugin_dir):
     _sheet = grounds.Sheet()
     if not _sheet.loaded:
         logger.warning(f"no mining_sheet.json: {_sheet.error}")
+    minimap.seed_materials(_worth(), cards.materials_marked())
     return "RhinoSpotter"
 
 
@@ -152,6 +152,8 @@ def build(parent):
     _menu = tk.OptionMenu(_frame, _material, NO_MATERIAL, *_materials())
     _style_menu(_menu)
     scan.letter_jump(_menu, skip=(NO_MATERIAL,))
+    if not _materials():
+        scan.no_materials_hint(_menu)
     _menu.grid(row=2, column=1, columnspan=3, sticky="we", padx=2)
 
     # What the HUD says about the targeted deposit. Neither is in the journal.
@@ -416,33 +418,16 @@ def stop():
 def _materials():
     """What the Material dropdown and the RhinoData picker offer.
 
-    The ones picked on the settings tab (minimap.materials_shown; default the
-    ones over grounds.HIGH_VALUE_MIN), plus two kinds of exception that have
-    to stay pickable whether picked or not:
-
-      every material already bookmarked, because cards.nearby() matches a
-      second mark to the first one on the material's name. Drop the name and
-      that bookmark can never be marked again: the re-mark lands beside it as
-      a duplicate instead of refreshing its Amount and Density.
-
-      whatever either control holds right now - _prefill_material puts a
-      material in the box when it is being mined, and a value with no menu
-      entry behind it cannot be chosen again once it is left.
-
-    Kept until the bookmarks change, the pick changes or either control does:
-    this reads the database, and the scan window asks on every redraw.
+    Exactly the ones picked on the settings tab (minimap.materials_shown;
+    default the ones over grounds.HIGH_VALUE_MIN), plus whatever either
+    control holds right now - _prefill_material puts a material in the box
+    when it is being mined, and a value with no menu entry behind it cannot
+    be chosen again once it is left. A bookmarked material that is not
+    picked is not offered: re-marking it needs it picked again.
     """
-    global _offered
     held = tuple(var.get() for var in (_material, _filter) if var is not None)
-    key = (minimap.materials_shown(_worth()), database.revision(), held)
-    if _offered is not None and _offered[0] == key:
-        return _offered[1]
-    kept = set(key[0])
-    marked = cards.materials_marked()
-    names = tuple(name for name in spotmark.MATERIALS
-                  if name in kept or name.lower() in marked or name in held)
-    _offered = (key, names)
-    return names
+    kept = set(minimap.materials_shown(_worth()))
+    return tuple(name for name in spotmark.MATERIALS if name in kept or name in held)
 
 
 def _worth():
@@ -467,6 +452,8 @@ def _fill_menu():
     for name in (NO_MATERIAL,) + _materials():
         inner.add_command(label=name, command=lambda pick=name: _material.set(pick))
     scan.letter_jump(_menu, skip=(NO_MATERIAL,))
+    if not _materials():
+        scan.no_materials_hint(_menu)
 
 
 def prefs(parent):

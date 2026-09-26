@@ -19,11 +19,22 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN = os.path.dirname(HERE)
 OUT = os.path.join(HERE, "out", time.strftime("%Y%m%d-%H%M%S") + "-linux")
 DATA = os.path.join(OUT, "localappdata")
+LIVE_DB = os.path.join(os.environ["LOCALAPPDATA"], "RhinoSpotter", "db", "rhinospotter.db")
 os.makedirs(DATA)
 os.environ["LOCALAPPDATA"] = DATA
 sys.path.insert(0, PLUGIN)
 
+import sqlite3                                           # noqa: E402
 import tkinter as tk                                     # noqa: E402
+
+# A copy of the live db, read through sqlite's backup API (WAL-safe): the
+# commander's real bookmarks, so the material lists meet real data.
+live_before = os.stat(LIVE_DB) if os.path.exists(LIVE_DB) else None
+if live_before:
+    TEST_DB = os.path.join(DATA, "RhinoSpotter", "db", "rhinospotter.db")
+    os.makedirs(os.path.dirname(TEST_DB))
+    with sqlite3.connect(f"file:{LIVE_DB}?mode=ro", uri=True) as src,             sqlite3.connect(TEST_DB) as dst:
+        src.backup(dst)
 
 
 class Config:
@@ -42,7 +53,10 @@ class Config:
         return self.values.get(key, default)
 
     def get_list(self, key, default=None):
-        return list(self.values[key]) if key in self.values else default
+        # As EDMC 6.1 config.Config.get_list: a missing key is `default`, or [] for None.
+        if key in self.values:
+            return list(self.values[key])
+        return default if default is not None else []
 
     def set(self, key, value):
         self.values[key] = value
@@ -110,6 +124,7 @@ def recorder(name):
 minimap.center_here = recorder("center")
 minimap.border_here = recorder("border")
 minimap.bigger = recorder("zoom")
+real_open_scan = main.open_scan
 main.open_scan = recorder("data")
 
 
@@ -167,68 +182,147 @@ try:
 
     # ------------------------------------------------------------ #10
     out("#10 material pick")
+    marked_names = main.cards.materials_marked()
+    want_seed = [n for n in main.spotmark.MATERIALS
+                 if n in set(main._worth()) or n.lower() in marked_names]
+    check("24 start seeded worth + bookmarked", before.get(minimap.MATERIALS_KEY) == want_seed,
+          f"{len(before.get(minimap.MATERIALS_KEY) or [])} vs {len(want_seed)}: "
+          f"{before.get(minimap.MATERIALS_KEY)}")
+    config.set(minimap.MATERIALS_KEY, ["Monazite"])
+    check("24 no second seed over a pick",
+          minimap.seed_materials(main._worth(), marked_names) is None
+          and config.values[minimap.MATERIALS_KEY] == ["Monazite"],
+          config.values[minimap.MATERIALS_KEY])
     config.values = {k: v for k, v in before.items() if k not in (minimap.MATERIALS_KEY,
                                                                     minimap.LOW_VALUE_KEY)}
-    main._offered = None
+    main._material.set(main.NO_MATERIAL)
+    main._filter.set(main.ALL_MATERIALS)
     worth = main._worth()
-    check("15 never picked: worth list", main._materials() == worth,
-          f"{len(main._materials())} vs {len(worth)}")
+    marked = sorted(main.cards.materials_marked())
+    out(f"    live db copy: {len(marked)} bookmarked materials: {', '.join(marked)}")
     out(f"    worth: {len(worth)} of {len(main.spotmark.MATERIALS)}")
-    config.set(minimap.LOW_VALUE_KEY, True)
-    check("16 old switch on: all 38", len(main._materials()) == len(main.spotmark.MATERIALS),
-          len(main._materials()))
-    config.values.pop(minimap.LOW_VALUE_KEY)
 
-    frame = main.prefs(root)
-    button = next(w for w in widgets(frame) if isinstance(w, tk.Button)
-                  and w.cget("text") == "Select...")
-    button.invoke()
-    box = next(w for w in root.winfo_children() if isinstance(w, tk.Toplevel)
-               and w.title() == "RhinoSpotter materials")
-    boxes = [w for w in widgets(box) if isinstance(w, tk.Checkbutton)]
-    ticked = {str(w.cget("text")) for w in boxes if root.getvar(w.cget("variable"))}
+    def panel():
+        menu = main._menu["menu"]
+        return [str(menu.entrycget(i, "label")) for i in range(menu.index("end") + 1)]
+
+    def rhinodata():
+        """The RhinoData window opened the way the panel's button opens it;
+        the entries of its MATERIAL FILTER menu."""
+        real_open_scan()
+        root.update()
+        window = main.scan._window
+        pickers = [w for w in widgets(window) if isinstance(w, tk.Menubutton)
+                   and main.ALL_MATERIALS in [str(w["menu"].entrycget(i, "label"))
+                                              for i in range(w["menu"].index("end") + 1)]]
+        menu = pickers[0]["menu"]
+        labels = [str(menu.entrycget(i, "label")) for i in range(menu.index("end") + 1)]
+        window.destroy()
+        root.update()
+        return labels
+
+    def dialog():
+        """Settings opened, Select... pressed: (frame, dialog, {name: checkbox}, {text: button})."""
+        frame = main.prefs(root)
+        next(w for w in widgets(frame) if isinstance(w, tk.Button)
+             and w.cget("text") == "Select...").invoke()
+        box = next(w for w in root.winfo_children() if isinstance(w, tk.Toplevel)
+                   and w.title() == "RhinoSpotter materials")
+        boxes = {str(w.cget("text")): w for w in widgets(box) if isinstance(w, tk.Checkbutton)}
+        buttons = {str(w.cget("text")): w for w in widgets(box) if isinstance(w, tk.Button)}
+        return frame, box, boxes, buttons
+
+    def ticked(boxes):
+        return {name for name, w in boxes.items() if root.getvar(w.cget("variable"))}
+
+    main._fill_menu()
+    check("15 never picked: panel = the worth list", panel()[1:] == list(worth),
+          f"{len(panel()) - 1} entries")
+    config.set(minimap.LOW_VALUE_KEY, True)
+    main._fill_menu()
+    check("16 old switch on: all 38", len(panel()) - 1 == 38, len(panel()) - 1)
+    config.values.pop(minimap.LOW_VALUE_KEY)
+    main._fill_menu()
+
+    def bookmark_rows():
+        with database.connect() as conn:
+            return conn.execute("SELECT id, commodity, data FROM bookmarks ORDER BY id").fetchall()
+
+    rows_before = bookmark_rows()
+
+    # The commander's run: None, tick Monazite, OK, Settings OK.
+    frame, box, boxes, buttons = dialog()
     check("17 dialog: 38 boxes", len(boxes) == 38, len(boxes))
-    check("17 dialog ticks = list", ticked == set(worth), sorted(ticked ^ set(worth)))
-    buttons = {str(w.cget("text")): w for w in widgets(box) if isinstance(w, tk.Button)}
+    check("17 dialog opens with the list's ticks", ticked(boxes) == set(worth),
+          sorted(ticked(boxes) ^ set(worth)))
     buttons["None"].invoke()
-    deut = next(w for w in boxes if w.cget("text") == "Deuterium")
-    deut.invoke()
+    check("17 None unticks all", ticked(boxes) == set(), sorted(ticked(boxes)))
+    boxes["Monazite"].invoke()
     buttons["OK"].invoke()
     check("18 dialog OK stores nothing yet", minimap.MATERIALS_KEY not in config.values)
-    check("18 dialog OK keeps the pick", minimap._picked == ["Deuterium"], minimap._picked)
     main.prefs_changed()
-    check("19 Settings OK stores the pick",
-          config.values.get(minimap.MATERIALS_KEY) == ["Deuterium"],
-          config.values.get(minimap.MATERIALS_KEY))
-    menu = main._menu["menu"]
-    labels = [str(menu.entrycget(i, "label")) for i in range(menu.index("end") + 1)]
-    check("19 dropdown refilled", labels == [main.NO_MATERIAL, "Deuterium"], labels)
     frame.destroy()
+    check("19 Settings OK stores ['Monazite']",
+          config.values.get(minimap.MATERIALS_KEY) == ["Monazite"],
+          config.values.get(minimap.MATERIALS_KEY))
+    check("19+20 panel: Monazite only, bookmarked ones gone",
+          panel() == [main.NO_MATERIAL, "Monazite"], panel())
+    got = rhinodata()
+    check("19+20 RhinoData filter: Monazite only",
+          got == [main.ALL_MATERIALS, "Monazite"], got)
+    rows_after = bookmark_rows()
+    check("20 bookmarks kept: every row unchanged", rows_after == rows_before,
+          f"{len(rows_before)} -> {len(rows_after)} rows")
 
-    main._material.set("Gold")
-    check("20 held material stays", "Gold" in main._materials(), main._materials())
-    main._material.set(main.NO_MATERIAL)
-    with database.connect() as conn:
-        database.write_bookmark(conn, {"planet_name": "Test 1", "commodity": "Platinum",
-                                       "system": "Test"})
-    database.changed()
-    check("20 bookmarked material stays", "Platinum" in main._materials(), main._materials())
-
-    frame = main.prefs(root)
-    next(w for w in widgets(frame) if isinstance(w, tk.Button)
-         and w.cget("text") == "Select...").invoke()
-    box = next(w for w in root.winfo_children() if isinstance(w, tk.Toplevel)
-               and w.title() == "RhinoSpotter materials")
+    frame, box, boxes, buttons = dialog()
+    check("17 reopened dialog: Monazite only ticked", ticked(boxes) == {"Monazite"},
+          sorted(ticked(boxes)))
     box.destroy()
     check("21 dialog closed with X: no pick", minimap._picked is None, minimap._picked)
     main.prefs_changed()
-    check("21 stored pick unchanged",
-          config.values.get(minimap.MATERIALS_KEY) == ["Deuterium"])
     frame.destroy()
+    check("21 stored pick unchanged",
+          config.values.get(minimap.MATERIALS_KEY) == ["Monazite"])
 
-    config.set(minimap.MATERIALS_KEY, [])
-    got = main._materials()
-    check("22 empty pick: only the bookmarked one", got == ("Platinum",), got)
+    main._material.set("Gold")
+    main._fill_menu()
+    check("20 the material in the box stays", panel() == [main.NO_MATERIAL, "Gold", "Monazite"],
+          panel())
+    main._material.set(main.NO_MATERIAL)
+    main._fill_menu()
+
+    frame, box, boxes, buttons = dialog()
+    buttons["None"].invoke()
+    buttons["OK"].invoke()
+    main.prefs_changed()
+    frame.destroy()
+    check("22 none ticked: key removed", minimap.MATERIALS_KEY not in config.values,
+          config.values.get(minimap.MATERIALS_KEY))
+    check("22 none ticked: panel = the worth list", panel()[1:] == list(worth), panel())
+
+    # Safety net: a list that comes out empty says where to pick materials.
+    real_shown = minimap.materials_shown
+    minimap.materials_shown = lambda worth: ()
+    main._fill_menu()
+    menu = main._menu["menu"]
+    last = menu.index("end")
+    check("23 panel: empty list shows the Settings hint",
+          menu.entrycget(last, "label") == main.scan.NO_MATERIALS
+          and menu.entrycget(last, "state") == "disabled",
+          menu.entrycget(last, "label"))
+    variable = tk.StringVar(value=main.ALL_MATERIALS)
+    holder = tk.Frame(root)
+    main.scan._picker(holder, variable, (main.ALL_MATERIALS,) + main._materials(), None)
+    picker = next(w for w in widgets(holder) if isinstance(w, tk.Menubutton))
+    pmenu = picker["menu"]
+    check("23 RhinoData: empty list shows the Settings hint",
+          pmenu.entrycget(pmenu.index("end"), "label") == main.scan.NO_MATERIALS)
+    holder.destroy()
+    minimap.materials_shown = real_shown
+    main._fill_menu()
+    menu = main._menu["menu"]
+    check("23 hint gone once materials are back",
+          menu.entrycget(menu.index("end"), "label") != main.scan.NO_MATERIALS)
 
     # ------------------------------------------------------------ #11
     out("#11 arrow position")
@@ -308,6 +402,11 @@ except Exception:
 finally:
     hotkey.stop()
     root.destroy()
+
+if live_before:
+    after = os.stat(LIVE_DB)
+    check("live db untouched (size, mtime)",
+          (after.st_size, after.st_mtime) == (live_before.st_size, live_before.st_mtime))
 
 out(f"\n{len(fails)} failed" + (": " + ", ".join(fails) if fails else ""))
 with open(os.path.join(OUT, "report.txt"), "w", encoding="utf-8") as f:

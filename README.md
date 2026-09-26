@@ -126,13 +126,15 @@ the same groups, most rigs first.
 ## Settings
 
 <p align="center">
-  <img src="docs/settings.png?v=5.7.3" width="480" alt="The RhinoSpotter settings tab">
+  <img src="docs/settings.png?v=5.8.0" width="480" alt="The RhinoSpotter settings tab">
 </p>
 
 - Minimap on/off, keep it up when alt-tabbed, corner, or **Free move** (drag it anywhere, any monitor).
 - **Golden circle radius:** 500-2500 m in 250 m steps, default 1250. Also sets how RhinoData groups a location's bookmarks.
 - **Materials in the lists: Select...** tick the materials the dropdowns offer, any of 38.
-  Default: the 18 over 50,000 Cr/t. Bookmarked materials stay in the list either way.
+  First start: the 18 over 50,000 Cr/t plus every material you have a bookmark for;
+  none ticked: the 18. Exactly the ticked ones are listed;
+  to re-mark a bookmark of an unticked material, tick it again.
 - Hotkeys: modifier + key for each of the four. Windows only; on Linux type
   `!rs center`, `!rs border`, `!rs zoom` or `!rs data` in chat. It is sent as chat:
   others on that channel see it.
