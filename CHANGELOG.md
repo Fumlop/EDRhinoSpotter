@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.9.0-beta.1
+
+**Added**
+
+- Linux: hotkeys work while Elite has the focus (X11/XWayland). Chat commands stay as fallback. #12
+- Log says what it runs on (Windows / Linux, Wayland/X11, Flatpak).
+
 ## 5.8.0
 
 **Added**

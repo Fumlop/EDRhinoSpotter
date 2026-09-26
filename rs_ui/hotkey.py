@@ -149,11 +149,11 @@ def start(callbacks):
     if _thread is not None and _thread.is_alive():
         return
     if not overlay.win32():
-        chat = ", ".join(chat_command(key_id) for key_id in CHAT)
+        commands = ", ".join(chat_command(key_id) for key_id in CHAT)
         if system.LINUX:
             hotkey_x11.start({key_id: _combo(key_id) for key_id in _callbacks}, _callbacks)
         if not hotkey_x11.grabbed():
-            logger.info(f"hotkey: no hotkeys here; type in chat: {chat}")
+            logger.info(f"hotkey: no hotkeys here; type in chat: {commands}")
         return
     ready = threading.Event()
     _thread = threading.Thread(target=_listen, args=(dict(callbacks), ready),

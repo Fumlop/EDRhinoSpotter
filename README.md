@@ -135,9 +135,9 @@ the same groups, most rigs first.
   First start: the 18 over 50,000 Cr/t plus every material you have a bookmark for;
   none ticked: the 18. Exactly the ticked ones are listed;
   to re-mark a bookmark of an unticked material, tick it again.
-- Hotkeys: modifier + key for each of the four. Windows only; on Linux type
-  `!rs center`, `!rs border`, `!rs zoom` or `!rs data` in chat. It is sent as chat:
-  others on that channel see it.
+- Hotkeys: modifier + key for each of the four. Linux (beta): they work while Elite has the
+  focus (X11/XWayland). Fallback on Linux: type `!rs center`, `!rs border`, `!rs zoom` or
+  `!rs data` in chat. It is sent as chat: others on that channel see it.
 
 ## Data
 
