@@ -1,0 +1,69 @@
+name: Bug
+description: Something RhinoSpotter does wrong, or a crash.
+labels: [bug]
+body:
+  - type: dropdown
+    id: which
+    attributes:
+      label: Which RhinoSpotter
+      options:
+        - EDMC plugin
+        - Standalone (Setup.exe)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: RhinoSpotter version
+      description: The release you installed, e.g. 6.1.0.
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: System
+      options:
+        - Windows
+        - Linux
+        - Linux, EDMC as Flatpak
+    validations:
+      required: true
+  - type: input
+    id: edmc
+    attributes:
+      label: EDMC version
+      description: Plugin only. EDMC's title bar or Help > About.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw. Numbers where there are any (tons, metres, seconds).
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: Where you were (in the ship, SRV, on foot), what you pressed, in order.
+      placeholder: |
+        1. Landed on ... at location ...
+        2. Pressed Bookmark
+        3. ...
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        The lines around the problem.
+        EDMC plugin (Windows): %TEMP%\EDMarketConnector\EDMarketConnector-debug.log
+        Standalone: %LOCALAPPDATA%\RhinoSpotter\log\rhinospotter.log
+      render: text
+  - type: textarea
+    id: pictures
+    attributes:
+      label: Screenshots
+      description: Drag images here. Only the RhinoSpotter window, please.
