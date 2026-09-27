@@ -187,6 +187,9 @@ def child():
 
         get_str = get_int = get_bool
 
+        def get_list(self, key, default=None):
+            return self.values.get(key, default if default is not None else [])
+
         def set(self, key, value):
             self.values[key] = value
 

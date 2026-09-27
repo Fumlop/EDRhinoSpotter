@@ -198,7 +198,7 @@ root = tk.Tk()
 root.withdraw()
 root.report_callback_exception = lambda *exc: errors.append("".join(traceback.format_exception(*exc)))
 minimap.nb = Notebook
-minimap.config = hotkey.config = Config(**{minimap.KEEP_KEY: True, minimap.CORNER_KEY: "top right"})
+minimap.config = hotkey.config = overlay.config = Config(**{minimap.KEEP_KEY: True, minimap.CORNER_KEY: "top right"})
 elite = u.FindWindowW(None, overlay.GAME_TITLE)
 stand_in = None
 if not elite:
