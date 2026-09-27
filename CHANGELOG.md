@@ -10,6 +10,7 @@
 
 **Added**
 
+- RhinoData: the panel (Location, Rigs, Material, Amount, Density, Bookmark) above the bookmark list, so the RhinoData hotkey is enough to bookmark (Settings, on by default). Same values as the EDMC panel; no version, landable count or RhinoData button in the copy.
 - One RhinoSpotter per data folder: the plugin takes a lock at start and stays off, naming the holder, while the standalone runs on the same data (waits up to 5 s for an EDMC still closing).
 
 ## 6.1.0
