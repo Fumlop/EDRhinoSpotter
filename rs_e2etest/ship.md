@@ -3,8 +3,7 @@
 Harness: `rs_e2etest/ship_e2e.py`. One process, LOCALAPPDATA at
 `out/<timestamp>/`, the real `minimap.update` fed Status.json dicts, a
 stand-in game window as in minimap_e2e (Elite in front). Output:
-`report.txt`, `ship.png` (a grab of the minimap box, checked for foreign
-windows before it is kept).
+`report.txt`. No grabs: visibility is read with IsWindowVisible.
 
 Asked 2026-09-27 (issue #16): a Settings switch, off by default. In the ship,
 under 2 km altitude, the map of the location is shown with the ship's
