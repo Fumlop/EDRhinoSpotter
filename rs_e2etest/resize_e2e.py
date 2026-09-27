@@ -104,6 +104,9 @@ try:
     check("2 wider x1.6: card and map grown, rail unchanged",
           rail == scan.RAIL_WIDTH and abs(card - want_card) <= 2 and abs(px - want_px) <= 2,
           f"rail {rail}, card {card} vs {want_card}, map {px} vs {want_px}")
+    photo = scan._map_picture[1]
+    check("2 the cached map picture itself is the grown size, not the 240 px one",
+          (photo.width(), photo.height()) == (px, px), f"{photo.width()}x{photo.height()} vs {px}")
     d1 = diamond()
     k = px / scan.MAP_PX
     want_d = (d0[0] * k, d0[1] * k)

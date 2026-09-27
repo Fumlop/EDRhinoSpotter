@@ -33,6 +33,7 @@ changes.
 
 1. Default size: rail RAIL_WIDTH, card CARD_WIDTH, map canvas MAP_PX.
 2. Width x 1.6: card and map x 1.6 (+-2 px), rail unchanged.
+   The cached PhotoImage (`scan._map_picture`) is that size too.
 3. Diamond on the wide map at the bookmark's scaled position (+-2 px).
 4. Ten geometry steps in one burst: one `_draw`, not ten.
 5. A height-only change: no `_draw`.
