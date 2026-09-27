@@ -1052,7 +1052,7 @@ def _bookmark_row(parent, body, record, picked, maps):
     rigs = record.get("rigs")
     left = deposit.describe(rigs, record.get("amount"), record.get("density"))
     if record.get("depleted_at"):
-        left = "depleted"
+        left = _spent(record, "depleted")
     # Two labels rather than one line: the material is the accent colour and
     # what is left of the deposit is a verdict, and a label carries one colour.
     material = _short(record.get("commodity"))
@@ -1077,6 +1077,12 @@ def _bookmark_row(parent, body, record, picked, maps):
              font=("Consolas", 9)).pack(side="left")
 
     _clickable(row, lambda: _pick_record(record), skip_buttons=True)
+
+
+def _spent(record, word):
+    """`word`, with the tons the depleted cycle gave: 'depleted (612 t)'."""
+    tons = yields.depleted_tons(record)
+    return f"{word} ({tons:,} t)" if tons else word
 
 
 def _worked_out(record):
@@ -1279,7 +1285,7 @@ def _bookmark_card(box, register, sheet, body, record, maps):
     tk.Label(box, text=read or "no HUD readings", bg=PANEL, fg=FG, anchor="w",
              font=("Consolas", 9)).pack(fill="x", padx=13)
     left = deposit.describe(rigs, amount, density)
-    tk.Label(box, text="worked out" if dead else (left or "tons left unknown"),
+    tk.Label(box, text=_spent(record, "worked out") if dead else (left or "tons left unknown"),
              bg=PANEL, fg=ALERT if dead else WARN, anchor="w",
              font=("Consolas", 9)).pack(fill="x", padx=13, pady=(2, 0))
     # Counted from MiningRefined within yields.ATTRIBUTE_M.

@@ -172,6 +172,12 @@ def child():
     check("6 leftovers in the closed cycle", late[0]["tons"], {"Diamond": 139})
     check("6 Mined column stays empty", yields.short(row(diamond)), "")
     check("6 the deposit measures 139 t", yields.capacity(row(diamond)), (139, 139, 1))
+    from rs_ui import scan
+    check("6 Est. left on the depleted row", scan._spent(row(diamond), "depleted"), "depleted (139 t)")
+    check("6 card on the depleted bookmark", scan._spent(row(diamond), "worked out"),
+          "worked out (139 t)")
+    check("6 depleted with no cycle: plain word",
+          scan._spent({"depleted_at": _stamp(0)}, "depleted"), "depleted")
     old = dict(row(diamond), depleted_at=_stamp(-15 * 86400))
     yields.add(old, {"Diamond": 1}, _stamp(0))
     check("6 mark 15 d old: a new cycle", [c.get("ended") for c in yields.cycles(old)],
@@ -179,6 +185,7 @@ def child():
 
     # 6a. Mark taken off, mined again: a second cycle, the closed one untouched.
     check("6a mark taken off", cards.set_depleted(dict(row(diamond), id=diamond), False), True)
+    check("6a mark off: no depleted tons", yields.depleted_tons(row(diamond)), None)
     feed(_restamp([{"event": "MiningRefined", "Type": "$diamond_name;"}] * 4))
     again = yields.cycles(row(diamond))
     check("a second cycle", len(again), 2)

@@ -23,6 +23,10 @@ coordinates.
 - Tons refined while the Depleted mark is on (leftovers) go into the closed
   cycle; the Mined column stays empty. A mark 15 d old: a new cycle.
 - Mark taken off, mined again: a second cycle; the closed one does not move.
+- RhinoData's Est. left on a depleted row reads `depleted (139 t)` and the
+  card `worked out (139 t)`: the tons of the cycle the mark closed, leftovers
+  in. No tons in that cycle, or no cycle: plain `depleted` / `worked out`.
+  Mark taken off: the estimate again.
 - `capacity()` after one measured cycle; `regenerated()` at 0 and 15 days.
 - `python -m rs_core.yields` prints t/rig for the measured cycle.
 - The Mined column: the current cycle; the card: this cycle and what the
