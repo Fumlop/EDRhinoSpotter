@@ -42,6 +42,13 @@ except ImportError:      # running outside EDMC
 ENABLED_KEY = "rhinospotter_minimap_enabled"
 CORNER_KEY = "rhinospotter_minimap_corner"
 KEEP_KEY = "rhinospotter_minimap_keep"
+# The map in the ship over a saved map, not painted (#16).
+SHIP_KEY = "rhinospotter_minimap_ship"
+# Shown in the ship up to this Status.json Altitude, m.
+SHIP_CEILING_M = 2000.0
+# Status.json Flags InMainShip | InFighter; Flags2 OnFoot.
+IN_SHIP = 0x01000000 | 0x02000000
+ON_FOOT = 0x1
 FREE_KEY = "rhinospotter_minimap_free"
 # Where the commander dragged it, as "x,y" screen pixels of its top left -
 # any monitor, and it stays there when the game window moves. Not
@@ -103,6 +110,7 @@ _fresh = []              # [(system, body, lat, lon, code, when)] bookmarked, ma
 _enabled = None          # tk.BooleanVar on the settings tab
 _corner = None           # tk.StringVar on the settings tab
 _keep = None             # tk.BooleanVar on the settings tab
+_ship = None             # tk.BooleanVar on the settings tab
 _hotkeys = {}            # hotkey id -> (modifier StringVar, key StringVar) on the settings tab
 _free = None             # tk.BooleanVar on the settings tab
 _picked = None           # [material] from the Select dialog, saved on Settings OK; None: untouched
@@ -123,6 +131,24 @@ def keep_up():
     Off unless asked for: over the desktop the map is on top of whatever is in
     that corner, and nobody should find that out by surprise."""
     return config.get_bool(KEEP_KEY, default=False) if config is not None else False
+
+
+def ship_view():
+    """Whether the map shows in the ship (SHIP_KEY). Off unless asked for."""
+    return config.get_bool(SHIP_KEY, default=False) if config is not None else False
+
+
+def ship_fix(status):
+    """(body, lat, lon, radius, heading) in the ship or fighter at or under
+    SHIP_CEILING_M, else None. Not on foot."""
+    if not int(status.get("Flags") or 0) & IN_SHIP or int(status.get("Flags2") or 0) & ON_FOOT:
+        return None
+    body, lat, lon = status.get("BodyName"), status.get("Latitude"), status.get("Longitude")
+    radius, altitude = status.get("PlanetRadius"), status.get("Altitude")
+    if (not body or lat is None or lon is None or not radius or altitude is None
+            or altitude > SHIP_CEILING_M):
+        return None
+    return body, lat, lon, radius, status.get("Heading")
 
 
 def corner():
@@ -339,6 +365,8 @@ def update(root, status, system=None, ids=None, ground=None):
             if _in_srv:
                 _docked(system)
             _in_srv = _failed = False
+            if ship_view() and _over_map(root, status, system, ids):
+                return
             _down("not in the SRV" if not int(status.get("Flags") or 0) & coverage.IN_SRV
                   else "in the SRV, but Status.json has no body or coordinates")
             return
@@ -379,6 +407,27 @@ def update(root, status, system=None, ids=None, ground=None):
         _failed = True
         _lock()                       # a hidden map must not keep Settings' grab
         hide()
+
+
+def _over_map(root, status, system, ids):
+    """In the ship: the map in memory, or the body's saved map, that reaches the
+    ship, shown with the ship on it. Nothing painted or saved; no map created.
+    True when shown. A miss reads coverstore.maps, ~7 ms for 3 maps."""
+    global _coverage
+    fix = ship_fix(status)
+    if fix is None:
+        return False
+    body, lat, lon, _, heading = fix
+    address = ids(system, body)[0] if ids else None
+    same = (_coverage is not None and _coverage.body == body
+            and (None in (_coverage.system_address, address) or _coverage.system_address == address))
+    if not (same and _coverage.reaches(lat, lon)):
+        loaded = coverage._pick_saved(coverstore.maps(body, system_address=address), body, lat, lon)
+        if loaded is None:
+            return False
+        _coverage = loaded
+    _show_map(root, status, system, lat, lon, heading, True, body)
+    return True
 
 
 def _show_map(root, status, system, lat, lon, heading, in_reach, body):
@@ -701,12 +750,13 @@ def prefs(parent, worth=()):
     Rows come from `place_at`, not from numbers written here: hand-numbered
     rows put two widgets in row 9 the last time one was inserted.
     """
-    global _enabled, _corner, _keep, _free, _golden, _picked
+    global _enabled, _corner, _keep, _ship, _free, _golden, _picked
     frame = nb.Frame(parent)
     _golden = tk.StringVar(value=str(golden()))
     _enabled = tk.BooleanVar(value=enabled())
     _corner = tk.StringVar(value=corner())
     _keep = tk.BooleanVar(value=keep_up())
+    _ship = tk.BooleanVar(value=ship_view())
     _free = tk.BooleanVar(value=free_move())
     _picked = None
 
@@ -730,6 +780,9 @@ def prefs(parent, worth=()):
         variable=_enabled), pady=(10, 2))
     line(lambda f: nb.Checkbutton(
         f, text="Keep it up when you alt-tab out of the game", variable=_keep))
+    line(lambda f: nb.Checkbutton(
+        f, text=f"Show it in the ship under {SHIP_CEILING_M / 1000:.0f} km over a saved map - not painted",
+        variable=_ship))
     line(lambda f: nb.Label(f, text="Corner"),
          lambda f: nb.OptionMenu(f, _corner, _corner.get(), *CORNERS))
     line(lambda f: nb.Checkbutton(
@@ -979,6 +1032,8 @@ def prefs_changed():
             config.set(CORNER_KEY, _corner.get())
         if _keep is not None:
             config.set(KEEP_KEY, bool(_keep.get()))
+        if _ship is not None:
+            config.set(SHIP_KEY, bool(_ship.get()))
         if _free is not None:
             config.set(FREE_KEY, bool(_free.get()))
         if _picked:

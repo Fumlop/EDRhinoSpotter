@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+**Added**
+
+- Minimap in the ship (Settings, off by default): under 2 km over a saved map it stays up with the ship on it, e.g. after picking up the Rhino. Nothing is painted from the ship. #16
+
 **Changed**
 
 - Map bookmarks: a pale dot, a hollow grey ring once depleted (was green/red, hard for red-green blind). The letter beside it is white and no longer touches the dot.
