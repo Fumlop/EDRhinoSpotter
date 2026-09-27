@@ -26,10 +26,12 @@ position; nothing is painted or saved. Above 2 km or off the map it goes away.
   about): the SRV's map must stay up in the ship.
 - After a restart (no map in memory) the saved map of the body is not found
   when it has a centre.
-- A map with neither a centre nor a droppoint known shown: its grid would sit
-  on a made-up point (`from_dict` sets `drop` to the map's first fix). Shown
-  only with a centre (grid on it) or a drop this session (grid on the drop);
-  the centre wins when both are known.
+- A map with neither a centre nor a droppoint shown: its grid would sit on a
+  made-up point (a file without "drop" gets the map's origin). Shown only with
+  a centre (grid on it) or a saved or live drop (grid on the drop); the centre
+  wins when both are known.
+- The latest drop not written to the map file, or not read back (a launch that
+  paints nothing new must still write the new drop).
 - The switch not stored by Settings OK (`prefs_changed`).
 - The marker not moving with the ship (the map drawn once and frozen).
 
@@ -55,9 +57,12 @@ second way into it once the switch is on.
 5. Ship at 2100 m: down. Back at 1900 m: up. No Altitude: down. 500 m with
    AltitudeFromAverageRadius: down.
 6. Ship 12 km off the map: down.
-7. Fresh process state (`_coverage` None), ship over the saved map without a
-   centre: not shown. Centre set on the saved map: shown, grid anchor (0, 0);
-   no new map file written.
+7. Fresh process state (`_coverage` None), ship over the saved map, no centre:
+   shown, grid on the saved drop. The same map read back without "drop" (an
+   older file): not shown. Centre set on the saved map: shown, grid anchor
+   (0, 0); no new map file written.
+13. Relaunch onto the same painted spot (no new ground): the new drop is in
+    the file.
 12. Docked with no centre: anchor is the drop point; with a centre set in the
     SRV before docking: anchor is (0, 0).
 8. Ship over a body with no saved map: not shown, no map file created.

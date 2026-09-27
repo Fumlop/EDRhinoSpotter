@@ -4,7 +4,7 @@
 
 **Added**
 
-- Minimap in the ship (Settings, off by default): under 2 km above ground (radar range), over a map with a centre or where the Rhino was dropped this session, it stays up with the ship on it. The grid sits on the centre, else the drop. Nothing is painted from the ship. #16
+- Minimap in the ship (Settings, off by default): under 2 km above ground (radar range), over a map with a centre or a droppoint, it stays up with the ship on it. The grid sits on the centre, else the drop. The latest droppoint is saved with the map again; older maps without one show once a centre is set or the Rhino drops there. Nothing is painted from the ship. #16
 
 **Changed**
 

@@ -178,16 +178,24 @@ try:
 
     # 7. fresh state: the saved map is found
     check("setup: no map written by the ship", saved_maps() == maps_before, f"{saved_maps()}")
-    minimap._coverage = minimap._driven = None
+    minimap._coverage = None
     tick(ship(north(300)))
-    check("7 nothing in memory, saved map without a centre: not shown", not shown())
+    ax, ay = minimap._coverage.anchor() if minimap._coverage is not None else (None, None)
+    check("7 nothing in memory, saved map with a drop: shown, grid on the saved drop (~200 m north)",
+          shown() and not minimap._coverage.centered and abs(ax) < 5 and abs(ay - 200) < 5,
+          f"shown {shown()}, anchor {(ax, ay)}")
+    data = dict(coverstore.maps(BODY)[0][1])
+    data.pop("drop")
+    minimap._coverage = coverage.Coverage.from_dict(BODY, data, "map 1")
+    tick(ship(north(300)))
+    check("7 an older file without \"drop\" and no centre: not shown", not shown())
     tick(srv(north(300)))
     minimap.center_here()
     tick(ship(north(300)))
     check("12 docked with a centre: grid on the centre", minimap._coverage.anchor() == (0.0, 0.0),
           f"{minimap._coverage.anchor()}")
     maps_before = saved_maps()
-    minimap._coverage = minimap._driven = None
+    minimap._coverage = None
     tick(ship(north(300)))
     check("7 nothing in memory, saved map with a centre: shown, grid on the centre",
           shown() and minimap._coverage is not None and minimap._coverage.name in maps_before
@@ -209,6 +217,14 @@ try:
     v = minimap._coverage.version
     tick(srv(north(700)))
     check("10 SRV after the ship: paints", minimap._coverage.version > v, f"{v} -> {minimap._coverage.version}")
+
+    # 13. a relaunch onto painted ground (no new stamp) still writes the new drop
+    tick(ship(north(700)))
+    tick(srv(north(100)))
+    saved = dict(coverstore.maps(BODY)[0][1]) if saved_maps() else {}
+    want = [round(north(100), 6), round(LON, 6)]
+    check("13 relaunch on painted ground: the new drop is in the file", saved.get("drop") == want,
+          f"{saved.get('drop')} vs {want}")
 
     # 11. control: without ship_fix the docked case is not shown
     real = minimap.ship_fix

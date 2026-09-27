@@ -167,8 +167,10 @@ class Coverage:
         # border_m on recenter(). Nothing is clipped while it waits.
         self.border_at = None
         # Where the SRV last came out of the ship, (lat, lon). The rings and
-        # the footer use it until a centre is set. Kept in memory only.
+        # the footer use it until a centre is set. `dropped`: a real drop, not
+        # the origin of a file saved without one; saved as "drop".
         self.drop = (lat, lon)
+        self.dropped = True
         # The file this map is saved as - coverstore's 'map N' - once it is.
         self.name = None
         # The mining location last targeted on this map. A label, not a key.
@@ -191,6 +193,8 @@ class Coverage:
                 "location": self.location, "stamps": points(self.stamps)}
         if self.centered:
             data["center"] = points([self.origin])[0]
+        if self.dropped:
+            data["drop"] = points([self.drop])[0]
         if self.border_m is not None:
             data["border_m"] = round(self.border_m)
         if self.border_at is not None:
@@ -204,7 +208,7 @@ class Coverage:
     @classmethod
     def from_dict(cls, body, data, name=None):
         """A map back from disk, repainted from its points. None when the data
-        is not a map. Droppoints in older files are ignored."""
+        is not a map. The "drops" list of older files is ignored; "drop" is read."""
         try:
             lat, lon = data.get("center") or data["origin"]
             cover = cls(body, float(lat), float(lon), float(data["radius"]))
@@ -214,6 +218,10 @@ class Coverage:
             at = data.get("border_at")
             cover.border_at = (float(at[0]), float(at[1])) if at and not cover.centered else None
             cover._repaint([(float(lat), float(lon)) for lat, lon in data["stamps"]])
+            drop = data.get("drop")
+            cover.dropped = bool(drop)
+            if drop:
+                cover.drop = (float(drop[0]), float(drop[1]))
         except (KeyError, TypeError, ValueError):
             return None
         cover.name = name
@@ -312,6 +320,7 @@ class Coverage:
         painted rather than measured against where the last launch ended - the
         ship flew between them and painted nothing."""
         self.drop = (lat, lon)
+        self.dropped = True
         self._last = None
 
     def add(self, lat, lon):

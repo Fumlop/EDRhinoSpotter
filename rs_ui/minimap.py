@@ -113,7 +113,6 @@ _enabled = None          # tk.BooleanVar on the settings tab
 _corner = None           # tk.StringVar on the settings tab
 _keep = None             # tk.BooleanVar on the settings tab
 _ship = None             # tk.BooleanVar on the settings tab
-_driven = None           # the Coverage the SRV was on this session: its drop is known
 _hotkeys = {}            # hotkey id -> (modifier StringVar, key StringVar) on the settings tab
 _free = None             # tk.BooleanVar on the settings tab
 _picked = None           # [material] from the Select dialog, saved on Settings OK; None: untouched
@@ -354,7 +353,7 @@ def update(root, status, system=None, ids=None, ground=None):
     Nothing raises out of here: the caller is the panel's poll, and a raise
     would stop it rescheduling - Bookmark would stop greying out with it.
     """
-    global _coverage, _in_srv, _failed, _here, _driven
+    global _coverage, _in_srv, _failed, _here
     if not status:
         # A read that landed mid-write. Not a reason to take the map down and
         # count the next fix as a fresh launch.
@@ -397,7 +396,6 @@ def update(root, status, system=None, ids=None, ground=None):
             # done with. Off the Tk thread - see Debounced.flush_later.
             _writes.flush_later()
         _in_srv = True
-        _driven = _coverage
         body, lat, lon, _, heading = fix
         _here = (lat, lon)
         in_reach = _coverage.add(lat, lon)
@@ -418,8 +416,8 @@ def update(root, status, system=None, ids=None, ground=None):
 
 def _over_map(root, status, system, ids):
     """In the ship: the map in memory, or the body's saved map, that reaches the
-    ship, shown with the ship on it - only with a centre, or a drop this session
-    (_driven); the grid sits on the centre, else the drop (Coverage.anchor).
+    ship, shown with the ship on it - only with a centre or a drop (saved or
+    live); the grid sits on the centre, else the drop (Coverage.anchor).
     Nothing painted or saved; no map created. True when shown. A miss reads
     coverstore.maps, ~7 ms for 3 maps."""
     global _coverage
@@ -430,7 +428,7 @@ def _over_map(root, status, system, ids):
     address = ids(system, body)[0] if ids else None
     found = coverage.over(_coverage, body, lat, lon, system_address=address,
                           saved=lambda name: coverstore.maps(name, system_address=address))
-    if found is None or not (found.centered or found is _driven):
+    if found is None or not (found.centered or found.dropped):
         return False
     if found.system_address is None:
         found.system_address = address
@@ -511,7 +509,7 @@ def border_here():
 def _remember():
     """Hand the map to the two-second writer when it has changed."""
     global _saved
-    state = (_coverage, _coverage.version, _coverage.centered, _coverage.border_m,
+    state = (_coverage, _coverage.version, _coverage.drop, _coverage.centered, _coverage.border_m,
              _coverage.border_at, _coverage.location, _coverage.system_address,
              _coverage.body_id)
     if state == _saved:

@@ -139,7 +139,9 @@ No tkinter anywhere in here.
   `recenter()` moves the anchor to where the player pressed the hotkey and
   repaints the mask from the saved points. `follow()` decides when a launch is
   the same map (same body, inside the mask) and moves the droppoint, and when
-  it is a new map. A disc that paints nothing new does not move `version`, and
+  it is a new map. The latest droppoint is saved as "drop" (`dropped`: a real
+  one, not the origin of an older file); `over()` finds a map for the ship
+  without painting. A disc that paints nothing new does not move `version`, and
   the drawn layer is only rebuilt when `version` or the ring centre changes -
   a tick is a crop of that layer and
   a cached chevron. Longitude is wrapped, so a body across the 180th meridian
@@ -280,8 +282,8 @@ Everything in here imports tkinter.
   tab. No timer of its own: `main._poll_landed` hands it the Status.json it
   already read, and nothing raises back into that poll. Shown while the InSRV
   flag is set; with `rhinospotter_minimap_ship` also in the ship under
-  `SHIP_CEILING_M` over a saved map (`_over_map`, never painted); hidden
-  otherwise and while the game is minimised - and while
+  `SHIP_CEILING_M` (radar range) over a map with a centre or a drop
+  (`_over_map`, never painted); hidden otherwise and while the game is minimised - and while
   it is not in front, unless the setting keeps it up through an alt-tab -
   sized from the game window's height and parked in the corner picked under
   EDMC Settings (`rhinospotter_minimap_enabled`, `rhinospotter_minimap_keep`,
