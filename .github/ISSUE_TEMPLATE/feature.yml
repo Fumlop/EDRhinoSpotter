@@ -1,0 +1,32 @@
+name: Feature
+description: Something RhinoSpotter should do.
+labels: [enhancement]
+body:
+  - type: dropdown
+    id: part
+    attributes:
+      label: Part
+      options:
+        - RhinoData (bodies, rates)
+        - Bookmarks
+        - Guide arrow
+        - Minimap
+        - Tons mined
+        - Settings
+        - Standalone
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What it should do
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: The situation in the game
+      description: Where you are and what you are trying to do when you miss it.
+    validations:
+      required: true

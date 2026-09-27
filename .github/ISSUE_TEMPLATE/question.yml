@@ -1,0 +1,15 @@
+name: Question
+description: How something works, after reading the README.
+labels: [question]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+    validations:
+      required: true
+  - type: input
+    id: readme
+    attributes:
+      label: README section you read
+      description: e.g. "Minimap", "Guide".

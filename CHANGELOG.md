@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+**Changed**
+
+- Map grid in dim yellow: the old grey did not show on the driven area.
+- Panel: Amount starts at High (a deposit is High when first found); `-` is still in the menu.
+
 **Added**
 
 - One RhinoSpotter per data folder: the plugin takes a lock at start and stays off, naming the holder, while the standalone runs on the same data (waits up to 5 s for an EDMC still closing).
