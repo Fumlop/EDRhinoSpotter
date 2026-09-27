@@ -152,6 +152,9 @@ try:
     check("3 docked: shown in the ship, same map", shown() and minimap._coverage is cover,
           f"shown {shown()}, same {minimap._coverage is cover}")
     check("3 not painted: version, drop, mask unchanged after 5 ship fixes", painted() == before)
+    ax, ay = minimap._coverage.anchor()
+    check("12 docked, no centre: grid on the drop (~200 m north)",
+          not minimap._coverage.centered and abs(ax) < 5 and abs(ay - 200) < 5, f"{(ax, ay)}")
 
     # 4. the marker moves with the ship
     drawn = minimap._drawn
@@ -175,10 +178,20 @@ try:
 
     # 7. fresh state: the saved map is found
     check("setup: no map written by the ship", saved_maps() == maps_before, f"{saved_maps()}")
-    minimap._coverage = None
+    minimap._coverage = minimap._driven = None
     tick(ship(north(300)))
-    check("7 nothing in memory: the saved map shown", shown() and minimap._coverage is not None
-          and minimap._coverage.name in maps_before,
+    check("7 nothing in memory, saved map without a centre: not shown", not shown())
+    tick(srv(north(300)))
+    minimap.center_here()
+    tick(ship(north(300)))
+    check("12 docked with a centre: grid on the centre", minimap._coverage.anchor() == (0.0, 0.0),
+          f"{minimap._coverage.anchor()}")
+    maps_before = saved_maps()
+    minimap._coverage = minimap._driven = None
+    tick(ship(north(300)))
+    check("7 nothing in memory, saved map with a centre: shown, grid on the centre",
+          shown() and minimap._coverage is not None and minimap._coverage.name in maps_before
+          and minimap._coverage.anchor() == (0.0, 0.0),
           f"shown {shown()}, map {getattr(minimap._coverage, 'name', None)}")
     check("7 and no new map written", saved_maps() == maps_before, f"{saved_maps()}")
 

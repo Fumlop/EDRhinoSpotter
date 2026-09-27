@@ -24,7 +24,12 @@ position; nothing is painted or saved. Above 2 km or off the map it goes away.
   still paint).
 - Right after docking the SRV, the map goes down (the case the request is
   about): the SRV's map must stay up in the ship.
-- After a restart (no map in memory) the saved map of the body is not found.
+- After a restart (no map in memory) the saved map of the body is not found
+  when it has a centre.
+- A map with neither a centre nor a droppoint known shown: its grid would sit
+  on a made-up point (`from_dict` sets `drop` to the map's first fix). Shown
+  only with a centre (grid on it) or a drop this session (grid on the drop);
+  the centre wins when both are known.
 - The switch not stored by Settings OK (`prefs_changed`).
 - The marker not moving with the ship (the map drawn once and frozen).
 
@@ -50,8 +55,11 @@ second way into it once the switch is on.
 5. Ship at 2100 m: down. Back at 1900 m: up. No Altitude: down. 500 m with
    AltitudeFromAverageRadius: down.
 6. Ship 12 km off the map: down.
-7. Fresh process state (`_coverage` None), ship over the saved map: shown, from
-   the saved file; no new map file written.
+7. Fresh process state (`_coverage` None), ship over the saved map without a
+   centre: not shown. Centre set on the saved map: shown, grid anchor (0, 0);
+   no new map file written.
+12. Docked with no centre: anchor is the drop point; with a centre set in the
+    SRV before docking: anchor is (0, 0).
 8. Ship over a body with no saved map: not shown, no map file created.
 9. On foot (Flags2 OnFoot) at the spot: not shown.
 10. SRV again after the ship: paints (`version` moves).
