@@ -6,6 +6,7 @@
 
 - Map bookmarks: a pale dot, a hollow grey ring once depleted (was green/red, hard for red-green blind). The letter beside it is white and no longer touches the dot.
 - Share map: the credits label over a golden circle is gone; the circle stays.
+- RhinoData: made wider than it opens, the card pane and its map grow with it; the body list keeps its width.
 
 **Fixed**
 

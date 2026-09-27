@@ -83,6 +83,8 @@ CARD_WIDTH = 310
 MAP_PX = 240
 # Half the picked bookmark's diamond on that map, px: over a dot (~4 px at 240).
 DIAMOND_PX = 6
+# ms a resize has to settle before the card pane is redrawn at its new width.
+RESIZE_MS = 150
 
 # Material names that do not fit a MATERIAL_W column or a one-line sentence.
 SHORT_NAMES = {
@@ -99,6 +101,8 @@ HINT = ("A location folds. The arrow the card starts draws over the game, top "
 _window = None           # only ever one, so the button cannot bury the panel
 _scan = None             # (register, sheet, focus, variable, materials)
 _status_label = None     # the middle pane's status line, rebuilt by every _draw()
+_base_width = None       # the window width _size() set, px: the card grows past it
+_resize_job = None       # the pending after() of _on_resize
 _canvases = {}           # the scrolling canvases of the draw on screen
 _scroll = {}             # how far each of them had been scrolled, by name
 
@@ -209,6 +213,7 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
     _window.bind("<Activate>", _on_front, add="+")
     _window.focus_force()
     _size(_window)
+    _window.bind("<Configure>", _on_resize, add="+")
 
     _state["view"] = "bookmarks"
     _state["selected"] = None
@@ -305,8 +310,32 @@ def _size(window):
     width = max(MIN_WIDTH, int(window.winfo_screenwidth() * SCREEN_SHARE))
     height = max(MIN_HEIGHT, int(window.winfo_screenheight() * SCREEN_SHARE))
     logger.debug(f"scan: {width}x{height}, {SCREEN_SHARE:.0%} of the screen")
+    global _base_width
     window.geometry(f"{width}x{height}")
     window.minsize(MIN_WIDTH, MIN_HEIGHT)
+    _base_width = width
+
+
+def _grown(px):
+    """`px` scaled by how far the window is wider than _size() made it; never below `px`."""
+    width = _window.winfo_width() if _window is not None and _window.winfo_exists() else 0
+    return round(px * max(1.0, width / _base_width)) if _base_width else px
+
+
+def _on_resize(event):
+    """<Configure>: once the size has held RESIZE_MS, one _draw if the card width changed."""
+    global _resize_job
+    if event.widget is not _window:
+        return
+    if _resize_job is not None:
+        _window.after_cancel(_resize_job)
+
+    def settle():
+        global _resize_job
+        _resize_job = None
+        if _panes.get("card_px") != _grown(CARD_WIDTH):
+            _draw()
+    _resize_job = _window.after(RESIZE_MS, settle)
 
 
 def _drop_topmost(event):
@@ -389,7 +418,7 @@ def _draw():
     _rail(rail, register, sheet, focus, variable, materials, listed, body, live)
     _panes["rail"] = rail
 
-    card = tk.Frame(outer, bg=BG, width=CARD_WIDTH)
+    card = tk.Frame(outer, bg=BG, width=_grown(CARD_WIDTH))
     card.pack(side="right", fill="y")
     card.pack_propagate(False)
 
@@ -398,7 +427,8 @@ def _draw():
     picked = _middle(middle, register, sheet, focus, body, records, groups, maps, materials)
 
     _card(card, register, sheet, body, picked, maps)
-    _panes.update(card=card, register=register, sheet=sheet, body=body, maps=maps)
+    _panes.update(card=card, register=register, sheet=sheet, body=body, maps=maps,
+                  card_px=_grown(CARD_WIDTH))
 
 
 def _bodies(register, sheet, focus):
@@ -1343,13 +1373,14 @@ def _location_map(parent, sheet, body, record, maps):
         return
     if not name:
         return
-    key = (body["name"], name, _marks_key(body), coverage.golden_m)
+    px = _grown(MAP_PX)
+    key = (body["name"], name, _marks_key(body), coverage.golden_m, px)
     if _map_picture is None or _map_picture[0] != key:
-        photo = _draw_location_map(parent, sheet, body, name, dict(maps)[name])
+        photo = _draw_location_map(parent, sheet, body, name, dict(maps)[name], px)
         if photo is None:
             return
         _map_picture = (key, photo)
-    canvas = tk.Canvas(parent, width=MAP_PX, height=MAP_PX, bg=BG,
+    canvas = tk.Canvas(parent, width=px, height=px, bg=BG,
                        borderwidth=0, highlightthickness=0)
     canvas.create_image(0, 0, image=_map_picture[1], anchor="nw")
     canvas.image = _map_picture[1]
@@ -1364,9 +1395,9 @@ def _location_map(parent, sheet, body, record, maps):
     except (KeyError, IndexError, TypeError, ValueError):
         mx = my = None
     if mx is not None:
-        per_m = MAP_PX / (2 * coverage.REACH_M)
-        x, y, r = MAP_PX / 2 + mx * per_m, MAP_PX / 2 - my * per_m, DIAMOND_PX
-        if 0 <= x <= MAP_PX and 0 <= y <= MAP_PX:
+        per_m = px / (2 * coverage.REACH_M)
+        x, y, r = px / 2 + mx * per_m, px / 2 - my * per_m, DIAMOND_PX
+        if 0 <= x <= px and 0 <= y <= px:
             canvas.create_polygon(x, y - r, x + r, y, x, y + r, x - r, y,
                                   fill=ACCENT, outline=BG, width=2, tags="picked")
     canvas.pack(padx=(0, 14), pady=(14, 0))
@@ -1384,7 +1415,7 @@ def _marks_key(body):
                   mark.get("rigs")) for mark in body["marks"])
 
 
-def _draw_location_map(parent, sheet, body, name, data):
+def _draw_location_map(parent, sheet, body, name, data, px=MAP_PX):
     """That map repainted from its points, the bookmarks it reaches on it.
 
     Only those the map reaches, as _map_marks for Share map: golden_groups'
@@ -1413,7 +1444,7 @@ def _draw_location_map(parent, sheet, body, name, data):
                   coverage.golden_best(coverage.golden_groups(spots), spots)]
         image = coverage.picture(cover.mask, marks, (), (), cover.border_m, golden)
         out = io.BytesIO()
-        image.resize((MAP_PX, MAP_PX), Image.LANCZOS).save(out, format="PNG")
+        image.resize((px, px), Image.LANCZOS).save(out, format="PNG")
         return tk.PhotoImage(master=parent, data=out.getvalue())
     except Exception:
         logger.exception(f"scan: could not draw {name} on {body['name']}")
