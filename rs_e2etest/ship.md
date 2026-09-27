@@ -61,11 +61,11 @@ second way into it once the switch is on.
    shown, grid on the saved drop. The same map read back without "drop" (an
    older file): not shown. Centre set on the saved map: shown, grid anchor
    (0, 0); no new map file written.
-13. Relaunch onto the same painted spot (no new ground): the new drop is in
-    the file.
-12. Docked with no centre: anchor is the drop point; with a centre set in the
-    SRV before docking: anchor is (0, 0).
 8. Ship over a body with no saved map: not shown, no map file created.
 9. On foot (Flags2 OnFoot) at the spot: not shown.
 10. SRV again after the ship: paints (`version` moves).
 11. Control: with `ship_fix` returning None, check 3 fails.
+12. Docked with no centre: anchor is the drop point; with a centre set in the
+    SRV before docking: anchor is (0, 0).
+13. Relaunch onto the same painted spot (no new ground): the new drop is in
+    the file.

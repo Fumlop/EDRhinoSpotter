@@ -283,8 +283,9 @@ Everything in here imports tkinter.
   already read, and nothing raises back into that poll. Shown while the InSRV
   flag is set; with `rhinospotter_minimap_ship` also in the ship under
   `SHIP_CEILING_M` (radar range) over a map with a centre or a drop
-  (`_over_map`, never painted); hidden otherwise and while the game is minimised - and while
-  it is not in front, unless the setting keeps it up through an alt-tab -
+  (`_over_map`, never painted); hidden otherwise and while the game is
+  minimised - and while it is not in front, unless the setting keeps it up
+  through an alt-tab -
   sized from the game window's height and parked in the corner picked under
   EDMC Settings (`rhinospotter_minimap_enabled`, `rhinospotter_minimap_keep`,
   `rhinospotter_minimap_corner`). The tab it draws is the whole plugin's, not
