@@ -13,6 +13,7 @@ Check numbers are the prefixes in `report.txt`. Last run: 46/46,
 | TestIsNewer.test_newer | 2 "check_async with RUNNING older reports the release as new" |
 | TestIsNewer.test_equal_is_not_an_update | 2 "the same tag against VERSION is not an update" |
 | TestIsNewer.test_a_local_build_ahead_is_not_told_to_downgrade | 2 "a local build ahead is not told to downgrade" |
+| (no unit test) pre-releases of one version in order, under their final | 2 "pre-release order: beta.1 < beta.2 < final" |
 | TestIsNewer.test_defaults_to_the_running_version | 2 check_async (calls `is_newer(tag)` with the default) |
 | TestIsNewer.test_the_override_makes_the_current_release_look_new | 1 "RHINOSPOTTER_VERSION read at import" + 2 check_async |
 | TestFetch.test_reads_the_tag_off_the_redirect | 2 "fetch_latest = newest release (API) = newest local tag" |

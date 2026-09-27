@@ -74,11 +74,16 @@ def parse(version):
 def is_newer(latest, current=None):
     """Strictly newer. Equal is not an update, and neither is older - a local
     build ahead of the release must not be told to downgrade. A pre-release
-    ('5.7.0-beta.1') sorts under its final ('5.7.0'), so a beta is offered it."""
+    ('5.7.0-beta.1') sorts under its final ('5.7.0'), so a beta is offered it;
+    pre-releases of one version by the numbers after the '-' (beta.2 > beta.1)."""
     current = current if current is not None else RUNNING
 
     def rank(version):
-        return (*parse(version), 0 if "-" in (version or "") else 1)
+        version = version or ""
+        if "-" not in version:
+            return (*parse(version), 1, ())
+        suffix = version.split("-", 1)[1]
+        return (*parse(version), 0, tuple(int(n) for n in re.findall(r"\d+", suffix)))
     return rank(latest) > rank(current)
 
 

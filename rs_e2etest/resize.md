@@ -36,8 +36,6 @@ changes.
    The cached PhotoImage (`scan._map_picture`) is that size too.
 3. Diamond on the wide map at the bookmark's scaled position (+-2 px).
 4. Ten geometry steps in one burst: one `_draw`, not ten.
-   Timing-bound: a step over RESIZE_MS (150 ms) on a loaded machine gives a
-   second draw (seen once in a batch run of every harness; 8/8 alone).
 5. A height-only change: no `_draw`.
 6. Back to default: 310 / 240 again.
 7. Narrower than default (MIN_WIDTH): card CARD_WIDTH, map MAP_PX.

@@ -15,13 +15,10 @@ bare interpreter, with no EDMC, no display and no game.
 ```
 RhinoSpotter/
 ├── load.py              EDMC lifecycle hooks, and nothing else
-├── standalone.py        the same plugin without EDMC
-├── rs_standalone/       what EDMC provides, for standalone.py
 ├── rs_core/             everything that is not a widget
 ├── rs_ui/               everything that is
 ├── rs_tests/            pytest suite
 ├── rs_e2etest/          end-to-end harnesses
-├── installer/           standalone Setup.exe: build.py (PyInstaller + Inno Setup), RhinoSpotter.iss
 ├── mining_sheet.json    the mining sheet, frozen when the plugin was packaged
 ├── cards/               rendered cards (gitignored)
 ├── data/                screenshots and sidecars (gitignored)
@@ -39,28 +36,6 @@ RhinoSpotter/
   `journal_entry`, each forwarding to `rs_ui.main`. Kept this thin on purpose:
   EDMC reloads this file, and a file that only forwards cannot break in a way
   that needs EDMC restarted to diagnose.
-
-- **[standalone.py](standalone.py)** - the non-EDMC entry. Puts
-  `rs_standalone/config.py` in `sys.modules["config"]` and tkinter in
-  `sys.modules["myNotebook"]` before rs_ui loads, so rs_ui runs unchanged.
-  The Tk root is the RhinoData window (`scan.host`); the panel `main.build`
-  makes is packed on its Bookmarks tab with a Settings button (a Toplevel
-  with `main.prefs`, OK is `main.prefs_changed`). Redraws the window when
-  `len(register)`, `register.system` or `database.revision()` move (1 s).
-  No update check. Log: `%LOCALAPPDATA%\RhinoSpotter\log\rhinospotter.log`.
-
-## Standalone (`rs_standalone/`)
-
-No tkinter.
-
-- **[config.py](rs_standalone/config.py)** - EDMC's `config` interface
-  (get_str/get_bool/get_int/set) over `%LOCALAPPDATA%\RhinoSpotter\standalone.json`,
-  rewritten through `atomic` on every set. Also `journaldir`, read by `paths`.
-- **[journal.py](rs_standalone/journal.py)** - the journal_entry feed:
-  newest `Journal.*.log` by ctime, caught up at start without delivering,
-  then a synthesised `StartUp` unless the file ends in `Shutdown`; polled every
-  1 s, a new file read after the old one is drained. cmdr, system, station
-  and the state dict as EDMC 6.1.2 monitor.py builds them.
 
 ## Core (`rs_core/`)
 
@@ -242,10 +217,11 @@ No tkinter anywhere in here.
 - **[instance.py](rs_core/instance.py)** - one RhinoSpotter per data folder.
   `main.start` takes `%LOCALAPPDATA%\RhinoSpotter\db\instance.lock` (msvcrt
   byte lock at 1 MiB, released by Windows when the process dies) before
-  anything else; the file text names the holder. Refused: the plugin shows the
-  holder in its panel and Settings tab and does nothing else, standalone.py
-  shows a dialog and exits 1. A file rather than a named mutex: scoped to the
-  data folder, so E2E runs under a scratch `LOCALAPPDATA` do not collide.
+  anything else; the file text names the holder. An older plugin still exiting
+  is waited for up to `main.LOCK_WAIT_S`; any other holder refuses at once.
+  Refused, the plugin shows the holder in its panel and Settings tab and does
+  nothing else. The standalone (branch `standalone`) takes the same lock and
+  draws RhinoData into its own root through `scan.host()`.
 - **[system.py](rs_core/system.py)** - what it runs on, read once: `WINDOWS`,
   `LINUX`, `FLATPAK`, `SESSION` (wayland/x11). `main.start` logs `describe()`.
   `overlay.win32()` and `hotkey.available()` read it.
@@ -404,16 +380,8 @@ mapping the unit tests it replaced.
   process, restart and stop.
 - **update_e2e.py** - the real GitHub release installed into a copy of the
   plugin; corrupt, foreign and unreachable downloads refused.
-- **standalone_e2e.py** - standalone.py on a fake Saved Games folder:
-  catch-up and StartUp, appended lines, a half line, rotation, Status.json,
-  Bookmark, SRV map, hotkeys, Settings, the docked panel; the lock between
-  two standalones, a killed one, and the EDMC hooks.
 - **data_e2e.py** - migrate, replay (`--rebuild`, `--testmode`, a locked db)
   and `rs_api` against copies of the db and the journals.
-- **installer_e2e.py** - the built Setup.exe installed silently into the run
-  folder, the installed exe run on test data, uninstalled.
-- **paths_e2e.py** - the journal folder found after a move, before and after
-  EDMC's monitor starts.
 - **share_e2e.py** - Share bookmark in one install, the clipboard import in a
   second: no personal fields, no re-import of one's own code, no duplicates,
   mangled codes refused, the four card buttons one width, poll cost.

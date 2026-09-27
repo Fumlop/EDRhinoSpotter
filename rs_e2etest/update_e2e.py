@@ -215,6 +215,10 @@ try:
     check("2 check_async with RUNNING older reports the release as new", seen == [(tag, True)], str(seen))
     check("2 the same tag against VERSION is not an update", tag and not update.is_newer(tag, update.VERSION))
     check("2 a local build ahead is not told to downgrade", tag and not update.is_newer(tag, "99.0.0"))
+    order = ["5.7.0-beta.1", "5.7.0-beta.2", "5.7.0", "5.7.1-beta.1"]
+    check("2 pre-release order: beta.1 < beta.2 < final",
+          all(update.is_newer(b, a) and not update.is_newer(a, b) for a, b in zip(order, order[1:]))
+          and not update.is_newer("5.7.0-beta.1", "5.7.0-beta.1"), order)
     check("2 unparsable tags never count as newer",
           not any(update.is_newer(t, "0.0.1") for t in ("", None, "latest", "nightly")))
 
@@ -235,7 +239,19 @@ try:
     for line in git("ls-tree", "-r", tag).decode().splitlines():
         meta, path = line.split("\t", 1)
         tree[path] = meta.split()[2]
-    mismatched = sorted(p for p in tree if p not in entries or blob_sha(entries[p]) != tree[p])
+    # export-ignore paths (.gitattributes: .github, itself) are left out of
+    # GitHub's source zip by design.
+    # check-attr does not pass a directory's attribute on to the files in it.
+    parents = {"/".join(p.split("/")[:i]) for p in tree for i in range(1, p.count("/") + 1)}
+    ignored = set()
+    for line in git("check-attr", "export-ignore", "--", *tree, *parents).decode().splitlines():
+        path, _, value = line.rsplit(": ", 2)
+        if value == "set":
+            ignored.add(path)
+    for path in list(tree):
+        if any(path == i or path.startswith(i + "/") for i in ignored):
+            tree.pop(path)
+    mismatched =sorted(p for p in tree if p not in entries or blob_sha(entries[p]) != tree[p])
     extra = sorted(set(entries) - set(tree))
     check(f"3 zip = git tree of {tag}, blob for blob", not mismatched and not extra,
           f"{len(tree)} blobs, mismatched {mismatched[:5]}, extra {extra[:5]}")

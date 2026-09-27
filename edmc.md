@@ -182,7 +182,7 @@ to exist first.
    python - <<'EOF'
    import os, subprocess, tempfile, zipfile, hashlib
    from rs_core.update import VERSION
-   out = os.path.join(tempfile.gettempdir(), f"RhinoSpotter-{VERSION}.zip")
+   out = os.path.join(tempfile.gettempdir(), f"EDMC_RhinoSpotter-{VERSION}.zip")
    tracked = subprocess.run(["git", "ls-files"], capture_output=True,
                             text=True).stdout.split()
    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
@@ -192,12 +192,19 @@ to exist first.
    EOF
    ```
 
-   Upload it with `gh release create vX.Y.Z "$TEMP/RhinoSpotter-X.Y.Z.zip" ...`,
+   Upload it with `gh release create vX.Y.Z "$TEMP/EDMC_RhinoSpotter-X.Y.Z.zip" ...`,
    check the hash of the zip as GitHub serves it (step 6), then delete the
    local one.
 
    Unpack it once and check `load.py` sits directly inside a folder called
    `RhinoSpotter`. That is the whole contract with EDMC.
+
+   The standalone Setup.exe goes on the same release, never on one of its
+   own: the plugin's updater follows `releases/latest` and downloads that
+   tag's source, so a standalone release marked latest would be installed as
+   the plugin. Built on the standalone branch from `installer/.venv`
+   (`python installer/build.py`), checked with `rs_e2etest/installer_e2e.py`,
+   uploaded as `Standalone_RhinoSpotter-X.Y.Z-Setup.exe`.
 6. **Update the registry entry.** Edit the same JSON: `pluginVer`,
    `pluginZip`, `pluginHash`, `pluginLastUpdate`, and `pluginLastTestedEDMC`
    if EDMC moved. One more PR, same rules.

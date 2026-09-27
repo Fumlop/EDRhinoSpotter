@@ -2,7 +2,8 @@
   <img src="docs/logo.png" width="300" alt="RhinoSpotter, EDMC Plugin - a rhino seen through binoculars">
 </h1>
 
-EDMC plugin for Elite Dangerous surface mining with the Rhino.
+EDMC plugin for Elite Dangerous surface mining with the Rhino - also as a
+standalone app, without EDMC.
 
 | | |
 |---|---|
@@ -14,39 +15,27 @@ EDMC plugin for Elite Dangerous surface mining with the Rhino.
 
 ## Install
 
-Unpack into `%LOCALAPPDATA%\EDMarketConnector\plugins\RhinoSpotter\` (`load.py`
-directly inside), restart EDMC. Details: [INSTALL.md](INSTALL.md).
+Two downloads on each [release](https://github.com/Fumlop/EDRhinoSpotter/releases/latest):
 
-Updates: when a release is out, **Bookmark** reads **Update**. Press it, restart
-EDMC. Your data lives outside the plugin folder.
-
-## Without EDMC
-
-Beta. `RhinoSpotter-<version>-Setup.exe` from a pre-release on GitHub:
-per-user install, no admin, no Python needed. Unsigned, so Windows
-SmartScreen warns on first start (More info -> Run anyway). Or from source:
-
-    pip install pillow requests
-    python standalone.py
-
-Tested with Python 3.13 on Windows. One window: RhinoData, with the panel EDMC shows (Location, Rigs,
-Material, Amount, Density, Bookmark) on its Bookmarks tab, and a **Settings**
-button under it. It reads the newest journal in
-`Saved Games\Frontier Developments\Elite Dangerous` (wherever Windows has
-Saved Games) and
-Status.json beside it; a different folder goes in `standalone.json` as
-`"journaldir"`.
-
-Same data as the plugin. The plugin and `standalone.py` never run together:
-the second one to start says which one holds the data and stays off (plugin)
-or exits (standalone). No update check: install the next Setup.exe over it,
-or pull the repo. Uninstalling leaves the data.
-
-| What | Where |
+| File | For |
 |---|---|
-| Settings | `%LOCALAPPDATA%\RhinoSpotter\standalone.json` (EDMC's are not read) |
-| Log | `%LOCALAPPDATA%\RhinoSpotter\log\rhinospotter.log` |
-| Lock | `%LOCALAPPDATA%\RhinoSpotter\db\instance.lock` |
+| `EDMC_RhinoSpotter-<version>.zip` | the EDMC plugin |
+| `Standalone_RhinoSpotter-<version>-Setup.exe` | without EDMC |
+
+**EDMC plugin:** unpack into `%LOCALAPPDATA%\EDMarketConnector\plugins\RhinoSpotter\`
+(`load.py` directly inside), restart EDMC. Details: [INSTALL.md](INSTALL.md).
+Updates: when a release is out, **Bookmark** reads **Update**. Press it, restart
+EDMC.
+
+**Standalone:** run the Setup.exe. Per-user install, no admin, no Python.
+Unsigned, so Windows SmartScreen warns on first start (More info -> Run
+anyway). One window: RhinoData with the panel and a **Settings** button; the
+journal folder is set there. No update button: install the next Setup.exe over
+it.
+
+Both read and write the same data in `%LOCALAPPDATA%\RhinoSpotter\`, and never
+run at the same time: the second one to start says which one holds the data
+and stays off.
 
 ## The panel
 

@@ -1,18 +1,10 @@
 # Changelog
 
-## Unreleased (standalone)
+## Unreleased
 
 **Added**
 
-- Standalone Settings: Journal folder (Browse..., Default); the tail moves to it on OK, no restart.
-
-**Fixed**
-
-- Standalone crashed at start on 5.8.0+: its config had no get_list/delete.
-
-**Changed**
-
-- Standalone journal feed keeps only what the plugin reads (cmdr, system, body ids).
+- One RhinoSpotter per data folder: the plugin takes a lock at start and stays off, naming the holder, while the standalone runs on the same data (waits up to 5 s for an EDMC still closing).
 
 ## 6.1.0
 
@@ -299,17 +291,6 @@
 **Fixed**
 
 - The map on the Bookmarks page circled every golden group; it shows the best 3 by Cr/h now, as Share map and the minimap do.
-
-## 5.7.0-beta.1
-
-**Added**
-
-- Standalone, no EDMC: `standalone.py`, or `RhinoSpotter-5.7.0-beta.1-Setup.exe` (per-user, no admin, Python bundled). RhinoData is the main window; the EDMC panel sits on its Bookmarks tab with a Settings button. Same data as the plugin; `db\instance.lock` keeps the two from running at once. Settings in `standalone.json`, log in `log\rhinospotter.log`. No update check.
-- `installer/build.py`: PyInstaller + Inno Setup. E2E: `rs_e2etest/standalone_e2e.py`, `rs_e2etest/installer_e2e.py`.
-
-**Changed**
-
-- The EDMC plugin takes the same lock at start; while the standalone holds it, the panel says so and does nothing else.
 
 ## 5.6.4
 

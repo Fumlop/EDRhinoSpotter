@@ -23,7 +23,7 @@ plan/
 CLAUDE.md
 rs_e2etest/out/
 
-# Standalone installer build output.
+# Standalone installer build output (branch standalone).
 installer/build/
 installer/dist/
 installer/.venv/
