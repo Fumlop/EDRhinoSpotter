@@ -209,6 +209,15 @@ def short(record, now=None):
     return f"{tons:,} t" if tons else ""
 
 
+def depleted_tons(record):
+    """Tons of the cycle the Depleted mark closed, or None: no mark, no such
+    cycle, or no tons in it."""
+    found = cycles(record)
+    if not record.get("depleted_at") or not found or found[-1].get("ended") != "depleted":
+        return None
+    return cycle_tons(found[-1]) or None
+
+
 def describe(record, now=None):
     """The card line: '40 t this cycle · held 1,150-1,190 t (2 cycles)', or ''."""
     parts = []
