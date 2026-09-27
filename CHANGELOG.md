@@ -1,11 +1,17 @@
 # Changelog
 
-## 5.9.0-beta.1
+## 6.0.0
 
 **Added**
 
 - Linux: hotkeys work while Elite has the focus (X11/XWayland). Chat commands stay as fallback. #12
 - Log says what it runs on (Windows / Linux, Wayland/X11, Flatpak).
+
+**Changed**
+
+- RhinoData: body types in the left list fold, one open at a time. On open it is the type of the body you are at (in space: the picked one); click a type to open it and close the others.
+- A body found by Spansh in a closed type only raises that type's count; the list does not open it.
+- RhinoData: with a material picked, the type with the highest % of it is on top, and each type shows its %.
 
 ## 5.8.0
 
