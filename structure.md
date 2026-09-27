@@ -237,6 +237,10 @@ Everything in here imports tkinter.
   widen the panel on the one day it matters, and a permanent one every day. The bookmark write and the update check run off the UI thread and come
   back through `_frame.after`, because Tk is not thread-safe and a widget
   written from a worker fails minutes later somewhere unrelated.
+  `_panel()` builds the widgets; `_dock_panel()` builds a second copy (no
+  version, landable count or RhinoData button) above RhinoData's Bookmarks list while
+  `rhinospotter_scan_panel` is on (default), on the same variables;
+  `_mirror()` keeps button, status and hint alike.
 - **[hotkey.py](rs_ui/hotkey.py)** - Ctrl+Alt+Z, Ctrl+Alt+B, Ctrl+Alt+M and
   Ctrl+Alt+D, registered with RegisterHotKey on a thread with its own message
   loop, since the game holds the focus while you drive. A press is bounced to

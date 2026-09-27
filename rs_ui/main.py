@@ -92,6 +92,7 @@ _density = None          # tk.StringVar - the deposit's HUD Density, or NOT_READ
 _amount = None           # tk.StringVar - the deposit's HUD Amount (starts High), or NOT_READ
 _search = None           # tk.StringVar - bookmark search text, not used yet
 _menu = None             # the Material OptionMenu, refilled when the settings change
+_docked = {}             # the panel copy in RhinoData (_panel's dict) while that window has one
 SEARCH_SHOWN = False     # the Search row under Bookmark, off until search works
 # Density and Amount before anything is picked. Not required: a bookmark without
 # them is still a bookmark, it just cannot say how many tons are left.
@@ -146,8 +147,9 @@ def refused():
     return f"RhinoSpotter off: {_refused} is running on the same data. Close it and restart."
 
 
-def build(parent, updates=True):
-    """The panel. `updates`: look for a release once, at start; standalone.py passes False."""
+def build(parent, updates=True, docked=False):
+    """The panel. `updates`: look for a release once, at start; standalone.py passes False.
+    `docked`: standalone.py, the panel inside RhinoData: no version, count or RhinoData button."""
     global _frame, _status, _scan_count, _card_button, _landed_after, _hint
     global _loc, _rigs, _material, _density, _amount, _search, _menu, _filter
 
@@ -157,88 +159,21 @@ def build(parent, updates=True):
                  fg=palette.ALERT).grid(row=0, column=0, sticky="w", padx=2, pady=4)
         return frame
 
-    _frame = tk.Frame(parent)
-    _frame.columnconfigure(1, weight=1)
-
-    tk.Label(_frame, text=f"RhinoSpotter {update.RUNNING}", anchor="w").grid(
-        row=0, column=0, sticky="w", padx=2, pady=(4, 2))
-
-    # Up here with the system-level things, not down beside the button. How
-    # many bodies are in this system is true before anyone presses anything,
-    # and it was the only line in the panel that moved on its own.
-    _scan_count = tk.Label(_frame, text="", anchor="e", fg=palette.MUTED)
-    _scan_count.grid(row=0, column=2, columnspan=2, sticky="e", padx=2, pady=(4, 2))
-
-    # Location and Rigs are both four characters wide, so they share a row and
-    # set how far the panel runs. Material goes underneath and stretches to the
-    # same right edge - the names are long enough that a narrow dropdown cut
-    # "Low Temp Diamonds" in half.
     _loc = tk.StringVar(value="")
     _rigs = tk.StringVar(value="")
-    tk.Label(_frame, text="Location", anchor="w").grid(row=1, column=0, sticky="w", padx=2)
-    tk.Entry(_frame, textvariable=_loc, width=4).grid(row=1, column=1, sticky="w", padx=2)
-    tk.Label(_frame, text="Rigs", anchor="w").grid(row=1, column=2, sticky="e", padx=2)
-    # Ten is what a deposit can hold; the box used to go to twelve, which was
-    # a number nobody can enter in the game.
-    tk.Spinbox(_frame, from_=0, to=deposit.MAX_RIGS, textvariable=_rigs, width=4).grid(
-        row=1, column=3, sticky="w", padx=2)
-
     _material = tk.StringVar(value=NO_MATERIAL)
     # The window's filter, not the panel's material. Separate variables: naming
     # the deposit under the ship and narrowing the system list are two
     # questions, and one control answering both meant mining gold refiltered
     # RhinoData to gold.
     _filter = tk.StringVar(value=ALL_MATERIALS)
-    tk.Label(_frame, text="Material", anchor="w").grid(row=2, column=0, sticky="w", padx=2)
-    _menu = tk.OptionMenu(_frame, _material, NO_MATERIAL, *_materials())
-    _style_menu(_menu)
-    scan.letter_jump(_menu, skip=(NO_MATERIAL,))
-    if not _materials():
-        scan.no_materials_hint(_menu)
-    _menu.grid(row=2, column=1, columnspan=3, sticky="we", padx=2)
-
-    # What the HUD says about the targeted deposit. Neither is in the journal.
-    # Rigs, Amount and Density give the bookmark a range of tons left: Density
-    # sets how much a rig holds, Amount how much of it is still there - see
-    # rs_core/deposit.py.
-    # A row each, Amount over Density: the order the HUD lists them, top to
-    # bottom. Side by side they were picked into each other's box, and each
-    # label then sat against the far edge of the panel from its own menu.
     _density = tk.StringVar(value=NOT_READ)
     _amount = tk.StringVar(value="High")         # a deposit is High when first found
-    tk.Label(_frame, text="Amount", anchor="w").grid(row=3, column=0, sticky="w", padx=2)
-    amount_menu = tk.OptionMenu(_frame, _amount, NOT_READ, *deposit.AMOUNTS)
-    _style_menu(amount_menu)
-    amount_menu.grid(row=3, column=1, sticky="we", padx=2)
-    tk.Label(_frame, text="Density", anchor="w").grid(row=4, column=0, sticky="w", padx=2)
-    density_menu = tk.OptionMenu(_frame, _density, NOT_READ, *deposit.DENSITIES)
-    _style_menu(density_menu)
-    density_menu.grid(row=4, column=1, sticky="we", padx=2)
+    _search = tk.StringVar(value="")
 
-    # Own frame: column 1 stretches, and the buttons have to sit against each
-    # other rather than spread to the far edge of the panel. Both are one
-    # press with no confirmation, so they get a gap between them.
-    row = tk.Frame(_frame)
-    row.grid(row=5, column=0, columnspan=4, sticky="w", padx=2, pady=(4, 2))
-    _card_button = tk.Button(row, text=CARD_TEXT, width=13, command=make_card)
-    _card_button.pack(side="left")
-    tk.Button(row, text="RhinoData", width=13, command=open_scan).pack(side="left", padx=(8, 0))
-
-    # The place the bookmark search goes. Hidden until it does something.
-    if SEARCH_SHOWN:
-        _search = tk.StringVar(value="")
-        tk.Label(_frame, text="Search", anchor="w").grid(row=6, column=0, sticky="w", padx=2)
-        tk.Entry(_frame, textvariable=_search).grid(row=6, column=1, columnspan=3,
-                                                    sticky="we", padx=2, pady=(0, 2))
-
-    # What to do when the list is empty, said before you press the button and
-    # wonder. The honk asks Spansh; only when that brings nothing does the FSS
-    # have to describe the bodies. See _refresh_hint.
-    _hint = tk.Label(_frame, text="", anchor="w", fg=palette.MUTED)
-    _hint.grid(row=7, column=0, columnspan=4, sticky="w", padx=2, pady=(0, 2))
-
-    _status = tk.Label(_frame, text="", anchor="w", wraplength=320, justify="left")
-    _status.grid(row=8, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
+    widgets = _panel(parent, docked=docked)
+    _frame, _status, _scan_count = widgets["frame"], widgets["status"], widgets["count"]
+    _card_button, _hint, _menu = widgets["card"], widgets["hint"], widgets["menu"]
 
     if theme:
         theme.update(_frame)
@@ -267,7 +202,132 @@ def build(parent, updates=True):
                   # reached without leaving the game: alt-tab, find EDMC,
                   # press the button. The key opens it where you are.
                   hotkey.SCAN: lambda: _on_ui(open_scan)})
+    scan.dock_with(_dock_panel)
     return _frame
+
+
+def _panel(parent, docked=False):
+    """The panel's widgets in a new frame under `parent`, on build()'s variables.
+    `docked`: the copy inside RhinoData, without the version, landable count
+    and RhinoData button.
+
+    Returns {"frame", "status", "count", "card", "hint", "menu"} ("count" None
+    when docked): the widgets that change after the build. Called by build()
+    and by _dock_panel().
+    """
+    frame = tk.Frame(parent)
+    frame.columnconfigure(1, weight=1)
+
+    count = None
+    if not docked:
+        tk.Label(frame, text=f"RhinoSpotter {update.RUNNING}", anchor="w").grid(
+            row=0, column=0, sticky="w", padx=2, pady=(4, 2))
+
+        # Up here with the system-level things, not down beside the button. How
+        # many bodies are in this system is true before anyone presses anything,
+        # and it was the only line in the panel that moved on its own.
+        count = tk.Label(frame, text="", anchor="e", fg=palette.MUTED)
+        count.grid(row=0, column=2, columnspan=2, sticky="e", padx=2, pady=(4, 2))
+
+    # Location and Rigs are both four characters wide, so they share a row and
+    # set how far the panel runs. Material goes underneath and stretches to the
+    # same right edge - the names are long enough that a narrow dropdown cut
+    # "Low Temp Diamonds" in half.
+    tk.Label(frame, text="Location", anchor="w").grid(row=1, column=0, sticky="w", padx=2)
+    tk.Entry(frame, textvariable=_loc, width=4).grid(row=1, column=1, sticky="w", padx=2)
+    tk.Label(frame, text="Rigs", anchor="w").grid(row=1, column=2, sticky="e", padx=2)
+    # Ten is what a deposit can hold; the box used to go to twelve, which was
+    # a number nobody can enter in the game.
+    tk.Spinbox(frame, from_=0, to=deposit.MAX_RIGS, textvariable=_rigs, width=4).grid(
+        row=1, column=3, sticky="w", padx=2)
+
+    tk.Label(frame, text="Material", anchor="w").grid(row=2, column=0, sticky="w", padx=2)
+    menu = tk.OptionMenu(frame, _material, NO_MATERIAL, *_materials())
+    _style_menu(menu)
+    scan.letter_jump(menu, skip=(NO_MATERIAL,))
+    if not _materials():
+        scan.no_materials_hint(menu)
+    menu.grid(row=2, column=1, columnspan=3, sticky="we", padx=2)
+
+    # What the HUD says about the targeted deposit. Neither is in the journal.
+    # Rigs, Amount and Density give the bookmark a range of tons left: Density
+    # sets how much a rig holds, Amount how much of it is still there - see
+    # rs_core/deposit.py.
+    # A row each, Amount over Density: the order the HUD lists them, top to
+    # bottom. Side by side they were picked into each other's box, and each
+    # label then sat against the far edge of the panel from its own menu.
+    tk.Label(frame, text="Amount", anchor="w").grid(row=3, column=0, sticky="w", padx=2)
+    amount_menu = tk.OptionMenu(frame, _amount, NOT_READ, *deposit.AMOUNTS)
+    _style_menu(amount_menu)
+    amount_menu.grid(row=3, column=1, sticky="we", padx=2)
+    tk.Label(frame, text="Density", anchor="w").grid(row=4, column=0, sticky="w", padx=2)
+    density_menu = tk.OptionMenu(frame, _density, NOT_READ, *deposit.DENSITIES)
+    _style_menu(density_menu)
+    density_menu.grid(row=4, column=1, sticky="we", padx=2)
+
+    # Own frame: column 1 stretches, and the buttons have to sit against each
+    # other rather than spread to the far edge of the panel. Both are one
+    # press with no confirmation, so they get a gap between them.
+    row = tk.Frame(frame)
+    row.grid(row=5, column=0, columnspan=4, sticky="w", padx=2, pady=(4, 2))
+    card = tk.Button(row, text=CARD_TEXT, width=13, command=make_card)
+    card.pack(side="left")
+    if not docked:
+        tk.Button(row, text="RhinoData", width=13, command=open_scan).pack(side="left", padx=(8, 0))
+
+    # The place the bookmark search goes. Hidden until it does something.
+    if SEARCH_SHOWN:
+        tk.Label(frame, text="Search", anchor="w").grid(row=6, column=0, sticky="w", padx=2)
+        tk.Entry(frame, textvariable=_search).grid(row=6, column=1, columnspan=3,
+                                                   sticky="we", padx=2, pady=(0, 2))
+
+    # What to do when the list is empty, said before you press the button and
+    # wonder. The honk asks Spansh; only when that brings nothing does the FSS
+    # have to describe the bodies. See _refresh_hint.
+    hint = tk.Label(frame, text="", anchor="w", fg=palette.MUTED)
+    hint.grid(row=7, column=0, columnspan=4, sticky="w", padx=2, pady=(0, 2))
+
+    status = tk.Label(frame, text="", anchor="w", wraplength=320, justify="left")
+    status.grid(row=8, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
+
+    return {"frame": frame, "status": status, "count": count, "card": card,
+            "hint": hint, "menu": menu}
+
+
+def _dock_panel(window):
+    """scan.dock_with's builder: a _panel() under `window` in the RhinoData
+    colours, one per window, or None with minimap.PANEL_KEY off.
+
+    The copy starts with the EDMC panel's texts and Bookmark state and command,
+    plus its colour while it is an update button (EDMC's theme colour otherwise);
+    _mirror() keeps them alike from then on.
+    """
+    global _docked
+    frame = _docked.get("frame")
+    alive = frame is not None and bool(frame.winfo_exists())
+    if not minimap.panel_in_scan():
+        if alive:
+            frame.destroy()
+        _docked = {}
+        return None
+    if alive:
+        return frame
+    _docked = _panel(window, docked=True)
+    for name, primary in (("status", _status), ("hint", _hint)):
+        _docked[name].config(text=primary.cget("text"))
+    text = str(_card_button.cget("text"))
+    options = ("text", "state", "command") + (() if text in (CARD_TEXT, DONE_TEXT) else ("fg",))
+    _docked["card"].config(**{option: _card_button.cget(option) for option in options})
+    scan.restyle(_docked["frame"])
+    return _docked["frame"]
+
+
+def _mirror(name, primary, **options):
+    """`primary`, and its copy in RhinoData (_docked[name]) while it exists,
+    configured with `options`."""
+    for widget in (primary, _docked.get(name)):
+        if widget is not None and widget.winfo_exists():
+            widget.config(**options)
 
 
 def _style_menu(menu):
@@ -371,7 +431,7 @@ def _poll_landed():
         status = spotmark.read_status()
         if str(_card_button.cget("text")) == CARD_TEXT:
             ready = spotmark.on_ground(status)
-            _card_button.config(state="normal" if ready else "disabled")
+            _mirror("card", _card_button, state="normal" if ready else "disabled")
         # The same reading, so the minimap costs no second parse.
         minimap.update(_frame.winfo_toplevel(), status, _system, ids=_register.ids,
                        ground=_register.ground)
@@ -490,15 +550,16 @@ def _fill_menu():
     so the pick survives a change of the switch rather than being thrown back
     to All by a settings dialog opened for some unrelated reason.
     """
-    if _menu is None:
-        return
-    inner = _menu["menu"]
-    inner.delete(0, "end")
-    for name in (NO_MATERIAL,) + _materials():
-        inner.add_command(label=name, command=lambda pick=name: _material.set(pick))
-    scan.letter_jump(_menu, skip=(NO_MATERIAL,))
-    if not _materials():
-        scan.no_materials_hint(_menu)
+    for menu in (_menu, _docked.get("menu")):
+        if menu is None or not menu.winfo_exists():
+            continue
+        inner = menu["menu"]
+        inner.delete(0, "end")
+        for name in (NO_MATERIAL,) + _materials():
+            inner.add_command(label=name, command=lambda pick=name: _material.set(pick))
+        scan.letter_jump(menu, skip=(NO_MATERIAL,))
+        if not _materials():
+            scan.no_materials_hint(menu)
 
 
 def prefs(parent):
@@ -507,7 +568,7 @@ def prefs(parent):
         frame = nb.Frame(parent)
         nb.Label(frame, text=refused()).grid(row=0, column=0, sticky="w", padx=10, pady=10)
         return frame
-    return minimap.prefs(parent, worth=_worth())
+    return minimap.prefs(parent, worth=_worth(), panel=not scan.hosted())
 
 
 def prefs_changed():
@@ -794,7 +855,8 @@ def _show_update(tag, newer):
     # Enabled: the button starts disabled and only the landed poll turns it on,
     # and that poll leaves anything not reading "Bookmark" alone - so starting
     # EDMC docked gave a grey Update nobody could press.
-    _card_button.config(text="Update", fg=palette.WARN, command=_install_update, state="normal")
+    _mirror("card", _card_button, text="Update", fg=palette.WARN, command=_install_update,
+            state="normal")
     _set_status(f"{tag} is out - press Update")
 
 
@@ -803,7 +865,7 @@ def _install_update():
     only thing it can cost is a restart."""
     if not _card_button:
         return
-    _card_button.config(text="Updating...", state="disabled")
+    _mirror("card", _card_button, text="Updating...", state="disabled")
     _set_status(f"downloading from {update.RELEASES_PAGE}")
     update.install_async(_on_update_installed)
 
@@ -820,17 +882,15 @@ def _report_update(ok, message):
     if ok:
         # The new code is on disk and the old code is what is running. Nothing
         # this button could do now would be the thing the commander expects.
-        _card_button.config(text="Restart EDMC", state="disabled", fg=palette.GOOD)
+        _mirror("card", _card_button, text="Restart EDMC", state="disabled", fg=palette.GOOD)
     else:
         # Left pressable on purpose: a failed download is usually a retry.
-        _card_button.config(text="Retry update", state="normal", fg=palette.ALERT)
+        _mirror("card", _card_button, text="Retry update", state="normal", fg=palette.ALERT)
 
 
 def _refresh_scan_count():
-    if not _scan_count:
-        return
     count = len(_register)
-    _scan_count.config(text=f"{count} landable" if count else "")
+    _mirror("count", _scan_count, text=f"{count} landable" if count else "")
     _refresh_hint()
 
 
@@ -857,12 +917,12 @@ def _refresh_hint():
         text = "No Spansh bodies - FSS planets"
     else:
         text = "Honk on missing data"
-    _hint.config(text=text)
+    _mirror("hint", _hint, text=text)
 
 
 def _set_status(text):
     if _status:
-        _status.config(text=text)
+        _mirror("status", _status, text=text)
 
 
 # How long a passing note stays on the status line. Errors and updates stay
@@ -895,7 +955,7 @@ def _set_done(text):
         return
     _done_after = _cancel_done()
     if text:
-        _card_button.config(text=text)
+        _mirror("card", _card_button, text=text)
         _done_after = _frame.after(DONE_MS, _restore_card_button)
     else:
         _restore_card_button()
@@ -907,7 +967,7 @@ def _restore_card_button():
     global _done_after
     _done_after = None
     if _card_button and str(_card_button.cget("text")) == DONE_TEXT:
-        _card_button.config(text=CARD_TEXT)
+        _mirror("card", _card_button, text=CARD_TEXT)
 
 
 def _cancel_done():

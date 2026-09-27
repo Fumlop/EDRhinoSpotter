@@ -63,6 +63,8 @@ SRV_KEY = "rhinospotter_srv_type"
 MATERIALS_KEY = "rhinospotter_materials"
 # Up to 5.7.12: on = all 38 materials. Read only to seed MATERIALS_KEY's default.
 LOW_VALUE_KEY = "rhinospotter_low_value"
+# The panel copied above RhinoData's Bookmarks list (main._dock_panel). Plugin only.
+PANEL_KEY = "rhinospotter_scan_panel"
 # Golden circle radius, m: coverage.golden_m.
 GOLDEN_KEY = "rhinospotter_golden_m"
 GOLDEN_STEPS = tuple(range(500, 2501, 250))
@@ -117,6 +119,7 @@ _hotkeys = {}            # hotkey id -> (modifier StringVar, key StringVar) on t
 _free = None             # tk.BooleanVar on the settings tab
 _picked = None           # [material] from the Select dialog, saved on Settings OK; None: untouched
 _golden = None           # tk.StringVar on the settings tab, metres
+_in_scan = None          # tk.BooleanVar on the settings tab; None: row not shown
 _placing = False         # in place-the-map mode: click-through off, drag to move
 _grab = None             # (pointer x, pointer y, window x, window y) while dragging
 _held = None             # the widget whose Tk grab place() took - EDMC's Settings dialog
@@ -133,6 +136,11 @@ def keep_up():
     Off unless asked for: over the desktop the map is on top of whatever is in
     that corner, and nobody should find that out by surprise."""
     return config.get_bool(KEEP_KEY, default=False) if config is not None else False
+
+
+def panel_in_scan():
+    """Whether RhinoData shows the panel above its Bookmarks list (PANEL_KEY). On by default."""
+    return config.get_bool(PANEL_KEY, default=True) if config is not None else True
 
 
 def ship_view():
@@ -749,15 +757,16 @@ def stop():
 
 # ---------------------------------------------------------------- settings
 
-def prefs(parent, worth=()):
+def prefs(parent, worth=(), panel=True):
     """The settings tab: the map on or off, whether it stays up through an
     alt-tab, which corner it sits in, the saved maps, the materials picker and
     the hotkeys. `worth`: the materials over grounds.HIGH_VALUE_MIN.
+    `panel`: show the PANEL_KEY row; False in standalone.py, where it is always docked.
 
     Rows come from `place_at`, not from numbers written here: hand-numbered
     rows put two widgets in row 9 the last time one was inserted.
     """
-    global _enabled, _corner, _keep, _ship, _free, _golden, _picked
+    global _enabled, _corner, _keep, _ship, _free, _golden, _picked, _in_scan
     frame = nb.Frame(parent)
     _golden = tk.StringVar(value=str(golden()))
     _enabled = tk.BooleanVar(value=enabled())
@@ -766,6 +775,7 @@ def prefs(parent, worth=()):
     _ship = tk.BooleanVar(value=ship_view())
     _free = tk.BooleanVar(value=free_move())
     _picked = None
+    _in_scan = tk.BooleanVar(value=panel_in_scan()) if panel else None
 
     rows = itertools.count()
 
@@ -818,6 +828,10 @@ def prefs(parent, worth=()):
     line(lambda f: nb.Button(f, text="Delete migrated JSON",
                              command=lambda: _delete_migrated(frame, result)),
          lambda f: result, pady=(2, 10))
+
+    if _in_scan is not None:
+        line(lambda f: nb.Checkbutton(
+            f, text="Show this panel above the RhinoData bookmark list", variable=_in_scan))
 
     # What the Material dropdown and the picker in RhinoData offer. Off, the
     # cheap half is left out of both and out of the rates line under a body -
@@ -1043,6 +1057,8 @@ def prefs_changed():
             config.set(SHIP_KEY, bool(_ship.get()))
         if _free is not None:
             config.set(FREE_KEY, bool(_free.get()))
+        if _in_scan is not None:
+            config.set(PANEL_KEY, bool(_in_scan.get()))
         if _picked:
             config.set(MATERIALS_KEY, list(_picked))
         elif _picked is not None:

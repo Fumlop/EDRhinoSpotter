@@ -100,7 +100,8 @@ HINT = ("A location folds. The arrow the card starts draws over the game, top "
 
 _window = None           # only ever one, so the button cannot bury the panel
 _host = None             # standalone.py: the root drawn into instead of a Toplevel
-_dock = None             # standalone.py: the panel frame, a child of _host, kept across draws
+_dock = None             # the panel frame, a child of the window, kept across draws
+_docking = None          # plugin: main._dock_panel, called with the window before each draw
 _scan = None             # (register, sheet, focus, variable, materials)
 _status_label = None     # the middle pane's status line, rebuilt by every _draw()
 _base_width = None       # the window width _size() set, px: the card grows past it
@@ -170,6 +171,36 @@ def hosted():
     return _host is not None
 
 
+def dock_with(build):
+    """Plugin: `build(window)` returns the panel frame for the Bookmarks tab, a
+    child of `window`, or None. Called before each draw; ignored under host()."""
+    global _docking
+    _docking = build
+
+
+def _fetch_dock():
+    global _dock
+    if _host is None and _docking is not None:
+        _dock = _docking(_window)
+
+
+def restyle(widget):
+    """`widget` and its children in the RhinoData colours. A foreground left at
+    the system default becomes FG."""
+    for child in widget.winfo_children():
+        restyle(child)
+    if isinstance(widget, (tk.Entry, tk.Spinbox, tk.Menubutton)):
+        _style_field(widget)
+        return
+    options = widget.keys()
+    widget.config(bg=BG)
+    if "fg" in options and str(widget.cget("fg")).startswith("System"):
+        widget.config(fg=FG)
+    if isinstance(widget, tk.Button):
+        widget.config(bg=PANEL, activebackground=PANEL, activeforeground=ACCENT,
+                      relief="solid", borderwidth=1)
+
+
 def show(parent, register, sheet, focus=None, variable=None, materials=(), here=None,
          location=None):
     """Open the window, or raise the one already open.
@@ -201,6 +232,7 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
         # The material changed under us, so whatever the last press said is
         # about a list that is being rebuilt.
         _state["status"] = ""
+        _fetch_dock()
         _unfold_near()
         _mark_here()
         _draw()
@@ -244,6 +276,7 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
     if here:
         _state["body"] = here
     _state["here"] = _state["here_picked"] = None
+    _fetch_dock()
     _unfold_near()
     _mark_here()
     _draw()
@@ -389,11 +422,12 @@ def _clear(window):
 
 
 def _pack_dock(parent):
-    """The standalone panel into `parent`, where the next pack call puts it.
+    """The panel into `parent`, where the next pack call puts it.
     Unpacked again when `parent` is destroyed by the next draw."""
     if _dock is None:
         return
-    _dock.pack(in_=parent, fill="x", padx=16, pady=(10, 0))
+    # Natural width, left: filled, column 1 stretched Rigs and the menus to the pane's right edge.
+    _dock.pack(in_=parent, anchor="w", padx=16, pady=(10, 0))
     # Older than the pane frames in stacking order: without lift() they cover it.
     _dock.lift()
 
