@@ -22,3 +22,8 @@ plan/
 # Instructions for Claude Code, not part of the plugin.
 CLAUDE.md
 rs_e2etest/out/
+
+# Standalone installer build output (branch standalone).
+installer/build/
+installer/dist/
+installer/.venv/
