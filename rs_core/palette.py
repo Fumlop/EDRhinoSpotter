@@ -30,6 +30,9 @@ ALERT = "#ff8080"
 # Bookmark groups from coverage.golden_groups.
 GOLD = "#f5c542"
 
+# The ring of a depleted bookmark.
+SPENT = "#8a96a3"
+
 
 def rgb(colour):
     """'#87ceeb' -> (135, 206, 235). Raises ValueError on anything else.

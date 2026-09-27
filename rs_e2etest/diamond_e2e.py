@@ -39,7 +39,7 @@ def child():
     sheet = grounds.Sheet()
     root = tk.Tk()
     root.withdraw()
-    dots = [palette.rgb(palette.GOOD), coverage.MARK_DEPLETED]
+    dots = [coverage.MARK, coverage.MARK_DEPLETED]
 
     def near_dot(photo, x, y):
         """Some pixel within 2 px of (x, y) is a dot colour, within 40 a channel."""

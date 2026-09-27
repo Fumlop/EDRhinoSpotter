@@ -504,7 +504,7 @@ def picture(mask, marks=(), title=(), legend=(), border_m=None, golden=(), groun
     `title` is lines of text above the map, the first one larger; `legend` is
     (code, text) or (code, text, depleted) rows below it, one per bookmark. Both optional - without them
     the picture is the bare map. `golden` is golden_best() output, circled in
-    gold and labelled with its credits. `ground` is the body's ground key,
+    gold. `ground` is the body's ground key,
     drawn under the painted area as on the live map; None is the plain
     background.
     """
@@ -652,27 +652,14 @@ def golden_best(groups, spots, most=GOLDEN_SHOWN):
     return [(*group, credits) for _, credits, group in ranked[:most]]
 
 
-def _money(credits):
-    """Credits as 970k or 1.4M, for a label on the map."""
-    if credits >= 1e6:
-        return f"{credits / 1e6:.1f}M"
-    return f"{credits / 1e3:.0f}k"
-
-
 def _golden(image, groups, scale, side):
-    """A gold circle round each golden group, under the dots, labelled with
-    the credits a trip takes when the group carries them."""
+    """A gold circle round each golden group, under the dots. No label."""
     draw = ImageDraw.Draw(image)
     pad = _mark_radius(side) + 5
-    font = spotcard._font("consolab.ttf", max(11, side // 40))
-    for mx, my, radius, _, *credits in groups:
+    for mx, my, radius, *_ in groups:
         cx, cy = image.width / 2 + mx * scale, image.height / 2 - my * scale
         r = radius * scale + pad
         draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=GOLD, width=2)
-        if credits and credits[0]:
-            text = _money(credits[0])
-            draw.text((cx - font.getlength(text) / 2, cy - r - font.size - 2), text,
-                      font=font, fill=GOLD)
 
 
 def bearing(x, y, to_x, to_y):
@@ -692,10 +679,10 @@ FILL = _mix(palette.BG, palette.ACCENT, 0.22)
 EDGE = _mix(palette.BG, palette.ACCENT, 0.85)
 RING = _mix(palette.BG, palette.GOOD, 0.4)
 BORDER = palette.rgb(palette.FG_SOFT)      # not WARN: that is the mask edge
-# Bookmarks: a colour nothing else on the map uses.
-# Bookmarks: green while the patch still has something, red once depleted.
-MARK = palette.rgb(palette.GOOD)
-MARK_DEPLETED = palette.rgb(palette.ALERT)
+# Bookmarks: a pale dot, a hollow grey ring once depleted. Told apart by
+# shape, not red against green.
+MARK = palette.rgb(palette.FG_SOFT)
+MARK_DEPLETED = palette.rgb(palette.SPENT)
 
 # The centre the player set. Blue is the accent and nothing else on the map
 # wears it, so the eye finds the centre first. It is a mark and not a hub: the
@@ -730,9 +717,10 @@ def _mark_font(side):
 
 
 def _code_at(cx, cy, side):
-    """Where a bookmark's code is written: just right of its dot. _distances
-    keeps its numbers out of this box, so the two have to agree on it."""
-    return cx + _mark_radius(side) + 1, cy
+    """Where a bookmark's code is written: right of its dot, 3 px clear so the
+    code's 2 px BG stroke stays off the dot. _distances keeps its numbers out
+    of this box, so the two have to agree on it."""
+    return cx + _mark_radius(side) + 3, cy
 
 
 def _on_map(image, cx, cy, r):
@@ -744,20 +732,24 @@ def _bookmarks(image, points, side):
     """A dot per bookmark at these pixel positions, its material's code beside it.
 
     `points` are (x, y), (x, y, code) or (x, y, code, depleted) - grounds.Sheet.codes
-    gives the code. A depleted bookmark is red, any other green.
+    gives the code. A depleted bookmark is a ring, any other a dot.
     """
     r = _mark_radius(side)
     draw = ImageDraw.Draw(image)
     font = _mark_font(side)
     for cx, cy, *rest in points:
         if _on_map(image, cx, cy, r):
-            colour = MARK_DEPLETED if len(rest) > 1 and rest[1] else MARK
-            draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=colour,
-                         outline=palette.rgb(palette.BG))
+            if len(rest) > 1 and rest[1]:
+                # Ring 2 px at the 240 px card map, 3 px at 480 px.
+                draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=MARK_DEPLETED,
+                             width=max(2, round(r * 0.35)))
+            else:
+                draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=MARK,
+                             outline=palette.rgb(palette.BG))
             if rest and rest[0]:
                 # Outlined in the background colour: readable over the painted
                 # area, the grid and the rings alike.
-                draw.text(_code_at(cx, cy, side), rest[0], fill=colour, font=font,
+                draw.text(_code_at(cx, cy, side), rest[0], fill=palette.rgb(palette.FG), font=font,
                           anchor="lm", stroke_width=2, stroke_fill=palette.rgb(palette.BG))
 
 

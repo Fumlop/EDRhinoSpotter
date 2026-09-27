@@ -465,7 +465,7 @@ class TestRender:
         def red(marks):
             image = coverage.render(fresh(), 0, 0, None, side, marks=marks)
             return sum(1 for i in range(side // 2, side) for j in range(side // 2 - 20, side // 2 + 20)
-                       if image.getpixel((i, j)) == coverage.MARK)
+                       if image.getpixel((i, j)) == palette.rgb(palette.FG))
         assert red([(1500, 0, "T")]) > red([(1500, 0)]) + 10
 
     def test_the_srv_marker_keeps_its_1x_size_when_zoomed(self):
@@ -548,13 +548,19 @@ class TestRender:
                                 title=["A 2  -  Col 285 Sector LS-P b7-1 with a much longer name"])
         assert long.width > bare.width
 
-    def test_a_depleted_bookmark_is_red_an_active_one_green(self):
+    def test_a_depleted_bookmark_is_a_ring_an_active_one_a_dot(self):
         side = 240
         per_m = side / (2 * coverage.VIEW_M)
         image = coverage.render(fresh(), 0, 0, None, side,
                                 marks=[(3000, -2000, "T", False), (-3000, -2000, "PL", True)])
         assert self.pixel(image, side / 2 + 3000 * per_m, side / 2 + 2000 * per_m) == coverage.MARK
-        assert self.pixel(image, side / 2 - 3000 * per_m, side / 2 + 2000 * per_m) == coverage.MARK_DEPLETED
+        ring_x, ring_y = side / 2 - 3000 * per_m, side / 2 + 2000 * per_m
+        r = coverage._mark_radius(side)
+        assert self.pixel(image, ring_x, ring_y) != coverage.MARK_DEPLETED
+        # Right edge too: the code's stroke must not cover it.
+        for sign in (-1, 1):
+            assert coverage.MARK_DEPLETED in [self.pixel(image, ring_x + sign * d, ring_y)
+                                              for d in range(int(r) - 3, int(r) + 1)]
 
     def test_a_legend_row_can_say_depleted(self):
         # The plugin writes (code, text, depleted) rows; the picture must take them.

@@ -1408,7 +1408,6 @@ def _draw_location_map(parent, sheet, body, name, data):
                           bool(mark.get("depleted_at")), values.get(material, 0),
                           mark.get("rigs")))
         # The best coverage.GOLDEN_SHOWN by Cr/h, as Share map and the minimap draw them.
-        # Circles only: the credit label, 11 px at 400 px, is ~7 px at MAP_PX.
         spots = [(x, y, rigs, value or 0) for x, y, _, spent, value, rigs in marks if not spent]
         golden = [group[:4] for group in
                   coverage.golden_best(coverage.golden_groups(spots), spots)]

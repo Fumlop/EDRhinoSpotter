@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+**Changed**
+
+- Map bookmarks: a pale dot, a hollow grey ring once depleted (was green/red, hard for red-green blind). The letter beside it is white and no longer touches the dot.
+- Share map: the credits label over a golden circle is gone; the circle stays.
+
 **Fixed**
 
 - Tons refined after Mark depleted (leftover fragments) opened a new cycle, so Mined showed "1 t". They now count into the depleted cycle.
