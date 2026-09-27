@@ -70,7 +70,8 @@ read from the user's Saved Games folder and copied; nothing is written there.
 1. Start: lock file holds "RhinoSpotter standalone"; log file under `log\`.
 2. Catch-up: nothing dispatched from the existing lines; one synthesised
    `StartUp`; `main._system` and the register name the file's last system; cmdr from the file.
-3. Appended `Scan` of a landable body: panel count label reads "N landable";
+3. Appended `Scan` of a landable body: the register holds it; the docked panel has no
+   version label, landable count or RhinoData button (`main.build(docked=True)`);
    the body row reaches the db after the 2 s debounce.
 4. A half line is not dispatched until its newline arrives.
 5. Rotation: a new journal with Fileheader, LoadGame, Location in another

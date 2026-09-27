@@ -35,7 +35,7 @@ from rs_standalone import config as _config        # noqa: E402
 sys.modules["config"] = _config
 sys.modules["myNotebook"] = tk
 
-from rs_core import database, palette, paths       # noqa: E402
+from rs_core import database, paths                # noqa: E402
 from rs_core.logging import logger                 # noqa: E402
 from rs_standalone.journal import POLL_MS, Journal, newest  # noqa: E402
 from rs_ui import main, scan                       # noqa: E402
@@ -52,23 +52,6 @@ def _log_to_file():
     logger.addHandler(handler)
 
 
-def _restyle(widget):
-    """The panel in the RhinoData colours, as EDMC's theme.update does for its
-    own. A foreground left at the system default becomes palette.FG."""
-    for child in widget.winfo_children():
-        _restyle(child)
-    if isinstance(widget, (tk.Entry, tk.Spinbox, tk.Menubutton)):
-        scan._style_field(widget)
-        return
-    options = widget.keys()
-    widget.config(bg=palette.BG)
-    if "fg" in options and str(widget.cget("fg")).startswith("System"):
-        widget.config(fg=palette.FG)
-    if isinstance(widget, tk.Button):
-        widget.config(bg=palette.PANEL, activebackground=palette.PANEL,
-                      activeforeground=palette.ACCENT, relief="solid", borderwidth=1)
-
-
 class App:
     """The root window, the panel docked in it, the journal and the Settings window."""
 
@@ -78,10 +61,10 @@ class App:
         self.redraw_key = None
         self.after_ids = {}
         self.dock = tk.Frame(root)
-        main.build(self.dock, updates=False).pack(fill="x")
+        main.build(self.dock, updates=False, docked=True).pack(fill="x")
         tk.Button(self.dock, text="Settings", width=13, command=self.open_settings).pack(
             anchor="w", padx=4, pady=(0, 6))
-        _restyle(self.dock)
+        scan.restyle(self.dock)
         scan.host(root, self.dock)
         root.protocol("WM_DELETE_WINDOW", self.close)
         self.journal = Journal(paths.journal_dir(), main.journal_entry)

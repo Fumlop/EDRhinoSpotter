@@ -306,9 +306,17 @@ def part_a():
 
     # 3. appended landable scans
     append("".join(SCANS))
-    counted = ui_wait(lambda: len(main._register) and main._scan_count.cget("text"), 5)
-    check("3 appended Scan: panel count label", counted and counted.endswith("landable")
-          and counted.startswith(str(ui(lambda: len(main._register)))), counted)
+    counted = ui_wait(lambda: len(main._register), 5)
+    check("3 appended Scan: bodies in the register", counted, counted)
+    version = f"RhinoSpotter {main.update.RUNNING}"
+    labels = ui(lambda: [str(w.cget("text")) for w in main._frame.winfo_children()
+                         if isinstance(w, main.tk.Label)])
+    buttons = ui(lambda: [str(b.cget("text")) for w in main._frame.winfo_children()
+                          if isinstance(w, main.tk.Frame) for b in w.winfo_children()])
+    check("3 docked panel: no version label, landable count or RhinoData button",
+          main._scan_count is None and version not in labels
+          and not any(t.endswith("landable") for t in labels) and "RhinoData" not in buttons,
+          f"{labels} {buttons}")
     stored = wait(lambda: rows("SELECT count(*) FROM bodies WHERE system = ?", SYSTEM)[0][0], 6)
     check("3 bodies reach the db after the debounce", stored > 0, f"{stored} rows")
     check("10a dock packed on the Bookmarks tab with bodies", ui_wait(dock_in_middle, 3),
