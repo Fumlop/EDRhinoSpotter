@@ -20,7 +20,9 @@ coordinates.
   skipped, counted in `main._replayed`, no tons added.
 - Depleted closes the cycle and takes the tons still pending at the press with
   it - `cards.set_depleted` flushes the tally first.
-- Mining after the close opens a second cycle; the closed one does not move.
+- Tons refined while the Depleted mark is on (leftovers) go into the closed
+  cycle; the Mined column stays empty. A mark 15 d old: a new cycle.
+- Mark taken off, mined again: a second cycle; the closed one does not move.
 - `capacity()` after one measured cycle; `regenerated()` at 0 and 15 days.
 - `python -m rs_core.yields` prints t/rig for the measured cycle.
 - The Mined column: the current cycle; the card: this cycle and what the

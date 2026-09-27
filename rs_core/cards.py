@@ -127,8 +127,9 @@ def set_depleted(record, depleted, when=None, db=None):
     back, the time is already there to count from. No mark, no key.
     The record in hand is updated to match.
 
-    Depleted also closes the open yield cycle; the next ton refined there opens
-    the next one.
+    Depleted also closes the open yield cycle; tons refined there while the mark
+    is on go into it (yields.add), the first after the mark comes off opens the
+    next one.
     """
     # Imported here: rs_core.yields reads bookmarks through this module.
     from rs_core import yields

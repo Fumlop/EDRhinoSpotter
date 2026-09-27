@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+**Fixed**
+
+- Tons refined after Mark depleted (leftover fragments) opened a new cycle, so Mined showed "1 t". They now count into the depleted cycle.
+
 ## 6.0.0
 
 **Added**

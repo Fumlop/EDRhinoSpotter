@@ -164,12 +164,25 @@ def child():
     check("the deposit measures 136 t", yields.capacity(row(diamond)), (136, 136, 1))
     yields.TALLY._writes.delay = 0.05
 
-    # 6. Mining it again after the regen opens a second cycle rather than
-    #    reopening the closed one.
+    # 6. Leftovers refined with the Depleted mark on go into the closed cycle;
+    #    the Mined column stays empty (it read "1 t", 2026-09-25, bookmark 122).
+    feed(_restamp([{"event": "MiningRefined", "Type": "$diamond_name;"}] * 3))
+    late = yields.cycles(row(diamond))
+    check("6 leftovers after the mark: still one cycle", len(late), 1)
+    check("6 leftovers in the closed cycle", late[0]["tons"], {"Diamond": 139})
+    check("6 Mined column stays empty", yields.short(row(diamond)), "")
+    check("6 the deposit measures 139 t", yields.capacity(row(diamond)), (139, 139, 1))
+    old = dict(row(diamond), depleted_at=_stamp(-15 * 86400))
+    yields.add(old, {"Diamond": 1}, _stamp(0))
+    check("6 mark 15 d old: a new cycle", [c.get("ended") for c in yields.cycles(old)],
+          ["depleted", None])
+
+    # 6a. Mark taken off, mined again: a second cycle, the closed one untouched.
+    check("6a mark taken off", cards.set_depleted(dict(row(diamond), id=diamond), False), True)
     feed(_restamp([{"event": "MiningRefined", "Type": "$diamond_name;"}] * 4))
     again = yields.cycles(row(diamond))
     check("a second cycle", len(again), 2)
-    check("the closed one untouched", again[0]["tons"], {"Diamond": 136})
+    check("the closed one untouched", again[0]["tons"], {"Diamond": 139})
     check("the new one has the 4 t", again[1]["tons"], {"Diamond": 4})
 
     # 6b. The Mined column is the current cycle; the card keeps the measured
@@ -177,7 +190,7 @@ def child():
     from rs_ui import scan
     check("Mined column reads the current cycle", yields.short(row(diamond)), "4 t")
     check("card: this cycle and what the deposit held",
-          yields.describe(row(diamond)), "4 t this cycle  ·  held 136 t")
+          yields.describe(row(diamond)), "4 t this cycle  ·  held 139 t")
     check("card before any measured cycle: the floor is the cycle, said once",
           yields.describe(row(alex)), "46 t this cycle")
     check("header and row line up",
@@ -230,7 +243,7 @@ def child():
     check("rigs do", scan._marks_key(body) != was, True)
 
     # 7. The regen assumption, on the mark just written and on an old one.
-    fresh = row(diamond)
+    fresh = dict(row(diamond), depleted_at=_stamp(0))   # 6a took the mark off
     check("fresh depletion is not regrown", yields.regenerated(fresh), False)
     old = dict(fresh, depleted_at=_stamp(-15 * 86400))
     check("15 days past is regrown", yields.regenerated(old), True)
@@ -258,6 +271,7 @@ def child():
 
     # 9. regrow(): a Depleted mark 15 days old comes off, Amount 'Depleted'
     #    becomes unread, the cycles stay; a fresh mark stays.
+    spotcard.save(dict(row(diamond), depleted_at=_stamp(0)), id=diamond)   # 6a took it off
     spotcard.save(dict(row(alex), depleted_at=_stamp(-15 * 86400), amount="Depleted"), id=alex)
     check("9 regrow takes off the old mark only", yields.regrow(), 1)
     check("9 old mark gone", row(alex).get("depleted_at"), None)

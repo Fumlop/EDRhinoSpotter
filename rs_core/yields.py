@@ -7,7 +7,9 @@ nothing else - no position, no body - so the ton is placed by the Status.json
 reading at that moment.
 
 Tons are kept as cycles: a run from the first ton to the Depleted mark, or to
-REGEN_DAYS after its first ton ("expired"). A cycle that opened at Amount High
+REGEN_DAYS after its first ton ("expired"). Tons refined while the Depleted
+mark is on and under REGEN_DAYS old go into the cycle it closed (leftover
+fragments). A cycle that opened at Amount High
 and ended depleted is the deposit's capacity; any other cycle bounds it from
 below. A Depleted mark older than REGEN_DAYS is taken off by regrow().
 
@@ -129,6 +131,10 @@ def add(record, tons, when=None):
     if cycle is not None and _expired(cycle, when):
         _expire(cycle)
         cycle = None
+    found = cycles(record)
+    if (cycle is None and regenerated(record, when) is False
+            and found and found[-1].get("ended") == "depleted"):
+        cycle = found[-1]       # leftovers after the Depleted mark: the cycle it closed
     if cycle is None:
         cycle = {"from": when, "tons": {}, "rigs": record.get("rigs"),
                  "density": record.get("density"),
