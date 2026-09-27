@@ -371,6 +371,23 @@ def child():
                                              label.cget("text").strip()), (True, "5 t"))
     check("10 same card tons widget, new text", (scan._card_tons["label"] is card,
                                                  card.cget("text").split(" t")[0]), (True, "5"))
+
+    # 11. Depleted marked, leftovers refined: row and card tons set in place.
+    cards.set_depleted(dict(row(fresh), id=fresh), True)
+    scan._draw()
+    spent_labels = {word: label for k, label, word in scan._spent_labels if k == key}
+    check("11 depleted row and card labels registered", sorted(spent_labels),
+          ["depleted", "worked out"])
+    draws.clear()
+    burst(2)
+    pump(0.6)
+    check("11 leftovers: no _draw", len(draws), 0)
+    check("11 row reads the leftovers in place",
+          spent_labels.get("depleted") and spent_labels["depleted"].cget("text").strip(),
+          "depleted (7 t)")
+    check("11 card reads the leftovers in place",
+          spent_labels.get("worked out") and spent_labels["worked out"].cget("text"),
+          "worked out (7 t)")
     scan._draw()
     print(f"     _draw {draws[-1] * 1000:.1f} ms, in place {spent[-1] * 1000:.1f} ms")
     load.journal_entry("E2E", False, SYSTEM, None,
@@ -385,7 +402,7 @@ def child():
         raised = repr(err)
     check("10 window closed: timer flushes, no raise",
           (raised, main._quiet, yields.cycles(row(fresh))[-1]["tons"]),
-          (None, None, {"Diamond": 6}))
+          (None, None, {"Diamond": 8}))       # the closed cycle: 5 + 2 leftovers (11) + 1
     root.destroy()
 
     for name, ok, detail in results:
