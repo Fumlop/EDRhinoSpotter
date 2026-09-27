@@ -215,6 +215,10 @@ try:
     check("2 check_async with RUNNING older reports the release as new", seen == [(tag, True)], str(seen))
     check("2 the same tag against VERSION is not an update", tag and not update.is_newer(tag, update.VERSION))
     check("2 a local build ahead is not told to downgrade", tag and not update.is_newer(tag, "99.0.0"))
+    order = ["5.7.0-beta.1", "5.7.0-beta.2", "5.7.0", "5.7.1-beta.1"]
+    check("2 pre-release order: beta.1 < beta.2 < final",
+          all(update.is_newer(b, a) and not update.is_newer(a, b) for a, b in zip(order, order[1:]))
+          and not update.is_newer("5.7.0-beta.1", "5.7.0-beta.1"), order)
     check("2 unparsable tags never count as newer",
           not any(update.is_newer(t, "0.0.1") for t in ("", None, "latest", "nightly")))
 
