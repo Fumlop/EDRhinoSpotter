@@ -110,6 +110,8 @@ _state = {
     "selected": None,     # _key() of the bookmark the card is showing
     "map": None,          # the map row the card is showing, by its own key
     "opened": set(),      # (body, location index) unfolded; every other one is folded
+    "ground": None,       # the one rail ground unfolded, or None; every other one is folded
+    "grounds_for": None,  # the body whose ground was last unfolded by _rail
     "status": "",
     "system": None,       # a system browsed from the search box, or None for the live one
     "search": "",         # what is typed in the search box
@@ -212,6 +214,8 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
     _state["selected"] = None
     _state["map"] = None
     _state["opened"] = {(here, location)} if here and location is not None else set()
+    _state["ground"] = None
+    _state["grounds_for"] = None
     _state["status"] = ""
     _scroll.clear()
     if here:
@@ -408,7 +412,12 @@ def _bodies(register, sheet, focus):
     marked = cards.by_body(register.system) if register.system else {}
     prefix = (register.system or "") + " "
     listed = []
-    for ground, found in register.by_ground():
+    by_ground = register.by_ground()
+    if focus:
+        # Highest sheet rate of `focus` first, no row last; GROUND_ORDER on ties.
+        by_ground.sort(key=lambda item: (sheet.rate(item[0], focus) is None,
+                                         -(sheet.rate(item[0], focus) or 0)))
+    for ground, found in by_ground:
         # The body under the ship stays listed whatever the filter says: it is
         # where the commander is, not one of the answers to a question.
         if focus and sheet.rate(ground, focus) is None \
@@ -511,13 +520,19 @@ def _rail(parent, register, sheet, focus, variable, materials, listed, body, liv
 
     _rail_footer(parent, sheet)
     listing = _scrollable(parent, "rail", bg=PANEL, padx=(0, 0))
+    # A newly picked body (open, here, jump, _mark_here) unfolds its ground and
+    # folds the rest, once; a fold by hand after that stays.
+    if body is not None and _state["grounds_for"] != body["name"]:
+        _state["grounds_for"] = body["name"]
+        _state["ground"] = body["ground"]
     ground = None
     for entry in listed:
         if entry["ground"] != ground:
             ground = entry["ground"]
-            tk.Label(listing, text=grounds.label(ground), bg=PANEL, fg=ACCENT, anchor="w",
-                     font=("Segoe UI", 9, "bold")).pack(fill="x", padx=13, pady=(8, 2))
-        _rail_body(listing, entry, body is not None and entry["name"] == body["name"])
+            _rail_ground(listing, sheet, focus, ground,
+                         [e for e in listed if e["ground"] == ground])
+        if ground == _state["ground"]:
+            _rail_body(listing, entry, body is not None and entry["name"] == body["name"])
     if not listed:
         tk.Label(listing, text="nothing listed here yet", bg=PANEL, fg=DIM, anchor="w",
                  font=("Segoe UI", 9)).pack(fill="x", padx=13, pady=(8, 0))
@@ -536,6 +551,8 @@ def arrived():
         _state["selected"] = None
         _state["map"] = None
         _state["opened"] = set()
+        _state["ground"] = None
+        _state["grounds_for"] = None
         _state["status"] = ""
     _draw()
 
@@ -626,6 +643,8 @@ def _browse(system):
         return
     _state["system"] = system
     _state["body"] = None
+    _state["ground"] = None
+    _state["grounds_for"] = None
     _state["selected"] = None
     _state["map"] = None
     _state["status"] = f"Showing {system}. Bookmark still marks where the ship is."
@@ -636,6 +655,8 @@ def _back_to_live():
     _state["system"] = None
     _state["search"] = ""
     _state["body"] = None
+    _state["ground"] = None
+    _state["grounds_for"] = None
     _state["selected"] = None
     _state["map"] = None
     _state["status"] = ""
@@ -658,6 +679,31 @@ def _rail_footer(parent, sheet):
     tk.Label(parent, text=text, bg=PANEL, fg=DIM, anchor="w", justify="left",
              font=("Segoe UI", 7), wraplength=RAIL_WIDTH - 26).pack(
         side="bottom", fill="x", padx=13, pady=(6, 8))
+
+
+def _rail_ground(parent, sheet, focus, ground, entries):
+    """A ground header in the rail: fold arrow, label, body count; with `focus`
+    its sheet rate; bookmark sum. The whole row folds it."""
+    row = tk.Frame(parent, bg=PANEL)
+    row.pack(fill="x", pady=(8, 2))
+    unfolded = ground == _state["ground"]
+    tk.Label(row, text="▼" if unfolded else "▶", bg=PANEL, fg=ACCENT, width=3,
+             font=("Segoe UI", 7)).pack(side="left", padx=(8, 0))
+    tk.Label(row, text=f"{grounds.label(ground)} ({len(entries)})", bg=PANEL, fg=ACCENT,
+             anchor="w", font=("Segoe UI", 9, "bold")).pack(side="left")
+    marks = sum(len(e["shown"]) for e in entries)
+    pct = sheet.rate(ground, focus) if focus else None
+    right = "  ".join(t for t in (f"{_pct(pct)}%" if pct is not None else "",
+                                  f"{marks} bm" if marks else "") if t)
+    tk.Label(row, text=right, bg=PANEL, fg=GOLD, anchor="e",
+             font=("Consolas", 9)).pack(side="right", padx=(0, 13))
+    _clickable(row, lambda: _toggle_ground(ground))
+
+
+def _toggle_ground(ground):
+    """Unfold one ground and fold the rest, or fold it if open; rebuilds the rail only."""
+    _state["ground"] = None if ground == _state["ground"] else ground
+    refresh_rail()
 
 
 def _rail_body(parent, entry, chosen):

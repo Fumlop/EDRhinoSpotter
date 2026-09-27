@@ -210,10 +210,12 @@ try:
         return opened
 
     def arrows(window):
-        """(unfolded, folded) location lines drawn."""
+        """(unfolded, folded) location lines drawn; the rail's ground arrows skipped."""
         found, stack = [], [window]
         while stack:
             widget = stack.pop()
+            if widget is scan._panes.get("rail"):
+                continue
             stack.extend(widget.winfo_children())
             if isinstance(widget, tk.Label) and widget.cget("text") in ("▼", "▶"):
                 found.append(widget.cget("text"))

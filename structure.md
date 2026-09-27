@@ -273,7 +273,9 @@ Everything in here imports tkinter.
   nothing. Given a material it lists only the ground that has ever carried it,
   and that material leads every group whatever its rate - the question has
   changed from "what is here" to "where is the jadeite", and a ground that
-  answers at 4% still answers.
+  answers at 4% still answers. The rail's grounds fold, one open at a
+  time (`_state["ground"]`): on open the ground of the picked body; with a material, grounds sorted
+  by its sheet rate, highest first, no row last.
 - **[minimap.py](rs_ui/minimap.py)** - the minimap window and its settings
   tab. No timer of its own: `main._poll_landed` hands it the Status.json it
   already read, and nothing raises back into that poll. Shown while the InSRV
