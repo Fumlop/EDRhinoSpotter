@@ -130,6 +130,8 @@ _state = {
 # (label None: no tons line): refresh_mined() sets their text without a redraw.
 _mined = {}
 _card_tons = {}
+# The drawn 'depleted (X t)' and 'worked out (X t)' labels: [(key, label, word)].
+_spent_labels = []
 # The drawn rows by _key(), and the card pane with what _card() was given:
 # _pick_record() relights two rows and rebuilds the card only.
 _rows = {}
@@ -456,6 +458,7 @@ def _draw():
     _clear(_window)
     _mined.clear()
     _card_tons.clear()
+    _spent_labels.clear()
     _rows.clear()
     _panes.clear()
 
@@ -1106,9 +1109,12 @@ def _bookmark_row(parent, body, record, picked, maps):
                      fg=GOOD if mined else DIM, anchor="e", font=("Consolas", 9))
     label.pack(side="left")
     _mined[_key(record)] = label
-    tk.Label(row, text=f"{left or '-':>{LEFT_W}}", bg=bg,
-             fg=ALERT if dead else (WARN if left else DIM), anchor="e",
-             font=("Consolas", 9)).pack(side="left")
+    left_label = tk.Label(row, text=f"{left or '-':>{LEFT_W}}", bg=bg,
+                          fg=ALERT if dead else (WARN if left else DIM), anchor="e",
+                          font=("Consolas", 9))
+    left_label.pack(side="left")
+    if record.get("depleted_at"):
+        _spent_labels.append((_key(record), left_label, "depleted"))
 
     _clickable(row, lambda: _pick_record(record), skip_buttons=True)
 
@@ -1319,9 +1325,12 @@ def _bookmark_card(box, register, sheet, body, record, maps):
     tk.Label(box, text=read or "no HUD readings", bg=PANEL, fg=FG, anchor="w",
              font=("Consolas", 9)).pack(fill="x", padx=13)
     left = deposit.describe(rigs, amount, density)
-    tk.Label(box, text=_spent(record, "worked out") if dead else (left or "tons left unknown"),
-             bg=PANEL, fg=ALERT if dead else WARN, anchor="w",
-             font=("Consolas", 9)).pack(fill="x", padx=13, pady=(2, 0))
+    left_label = tk.Label(box, text=_spent(record, "worked out") if dead else (left or "tons left unknown"),
+                          bg=PANEL, fg=ALERT if dead else WARN, anchor="w",
+                          font=("Consolas", 9))
+    left_label.pack(fill="x", padx=13, pady=(2, 0))
+    if dead:
+        _spent_labels.append((_key(record), left_label, "worked out"))
     # Counted from MiningRefined within yields.ATTRIBUTE_M.
     collected = yields.describe(record)
     label = None
@@ -2048,6 +2057,10 @@ def refresh_mined():
             _draw()
         elif label is not None:
             label.config(text=collected)
+    for key, label, word in _spent_labels:
+        if key in found and label.winfo_exists():
+            label.config(text=f"{_spent(found[key], word):>{LEFT_W}}" if word == "depleted"
+                         else _spent(found[key], word))
 
 
 def refresh():

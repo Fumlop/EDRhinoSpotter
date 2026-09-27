@@ -44,6 +44,9 @@ coordinates.
   tons are in the row by then (tally flushed first). A ton replayed from
   before the plugin start schedules nothing. Window closed: the quiet
   timer flushes, raises nothing.
+- Leftovers refined after the Depleted mark with RhinoData open (11): no
+  `_draw`; the row's `depleted (X t)` and the card's `worked out (X t)` are
+  set in place to the new tons (were stale until an unrelated redraw).
 - The burst end must not rebuild the window (it flickered): no `_draw`, the
   row's Mined label is the same widget with the new tons, the card's tons
   line likewise. A card that had no tons line yet (first ton of a cycle)
