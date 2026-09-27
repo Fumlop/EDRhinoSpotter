@@ -14,6 +14,7 @@ import http.server
 import io
 import logging
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -176,7 +177,8 @@ try:
         headings = [line.strip() for line in handle if line.startswith("## ")]
     check("1 changelog leads with update.VERSION", headings and headings[0] == f"## {update.VERSION}",
           f"{headings[0] if headings else None} vs {update.VERSION}")
-    check("1 VERSION is three numbers", len(update.VERSION.split(".")) == 3
+    check("1 VERSION is three numbers, a pre-release suffix allowed",
+          re.fullmatch(r"\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?", update.VERSION) is not None
           and update.parse(update.VERSION) != (0, 0, 0), update.VERSION)
     check("1 RHINOSPOTTER_VERSION read at import", update.RUNNING == OLDER, update.RUNNING)
     before = start_plugin()
@@ -233,7 +235,19 @@ try:
     for line in git("ls-tree", "-r", tag).decode().splitlines():
         meta, path = line.split("\t", 1)
         tree[path] = meta.split()[2]
-    mismatched = sorted(p for p in tree if p not in entries or blob_sha(entries[p]) != tree[p])
+    # export-ignore paths (.gitattributes: .github, itself) are left out of
+    # GitHub's source zip by design.
+    # check-attr does not pass a directory's attribute on to the files in it.
+    parents = {"/".join(p.split("/")[:i]) for p in tree for i in range(1, p.count("/") + 1)}
+    ignored = set()
+    for line in git("check-attr", "export-ignore", "--", *tree, *parents).decode().splitlines():
+        path, _, value = line.rsplit(": ", 2)
+        if value == "set":
+            ignored.add(path)
+    for path in list(tree):
+        if any(path == i or path.startswith(i + "/") for i in ignored):
+            tree.pop(path)
+    mismatched =sorted(p for p in tree if p not in entries or blob_sha(entries[p]) != tree[p])
     extra = sorted(set(entries) - set(tree))
     check(f"3 zip = git tree of {tag}, blob for blob", not mismatched and not extra,
           f"{len(tree)} blobs, mismatched {mismatched[:5]}, extra {extra[:5]}")
@@ -353,8 +367,12 @@ finally:
     silent.close()
 
 check("live plugin folder untouched", snapshot(PLUGIN, skip=("rs_e2etest",)) == live_plugin_before)
-check("live %LOCALAPPDATA%\\RhinoSpotter untouched",
-      (snapshot(LIVE_DATA) if os.path.isdir(LIVE_DATA) else {}) == live_data_before)
+live_data_after = snapshot(LIVE_DATA) if os.path.isdir(LIVE_DATA) else {}
+# A running EDMC writes there too (db, maps); the changed files are named so a
+# failure can be told apart from one this harness caused.
+check("live %LOCALAPPDATA%\\RhinoSpotter untouched", live_data_after == live_data_before,
+      sorted(k for k in set(live_data_before) | set(live_data_after)
+             if live_data_before.get(k) != live_data_after.get(k))[:6])
 
 failed = [r for r in results if not r[1]]
 with open(os.path.join(OUT, "report.txt"), "w", encoding="utf-8") as report:
