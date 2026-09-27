@@ -123,12 +123,13 @@ you two bookmarks, not one overwritten.
 ## Updating
 
 When a newer release is out, **Bookmark** reads **Update** instead and the
-status line names the version - checked at start and every hour after. Press
+status line names the version - checked once, when EDMC starts. Press
 it; the release is fetched and unpacked in place, and the button reads
 **Restart EDMC**.
 
 On 2.9.0 to 4.0.0 the button could stay grey when EDMC started docked. If you
-never saw a working Update there, download `RhinoSpotter-4.0.1.zip` (or newer)
+never saw a working Update there, download `EDMC_RhinoSpotter-<version>.zip`
+(`RhinoSpotter-<version>.zip` up to 6.0.0)
 from the releases page and unpack it over the plugin folder once.
 
 The mining sheet is replaced by every update. Kept: everything under
