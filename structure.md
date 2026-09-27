@@ -77,7 +77,9 @@ No tkinter anywhere in here.
   replacement) or, with `id`, replaces one; `CARDS_ROOT` is where 4.1 kept
   bookmarks and old card PNGs; `_font()` for the map picture's text.
 - **[database.py](rs_core/database.py)** - the one SQLite file,
-  `%LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db`. `connect()` is a
+  `%LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db` (Linux:
+  `$XDG_DATA_HOME/RhinoSpotter`, old `~/RhinoSpotter` copied once by
+  `adopt_legacy()`). `connect()` is a
   connection per piece of work, committed or rolled back and closed - three
   threads write, none share one. Tables `bodies`, `bookmarks`, `maps`: the
   columns a lookup needs plus the whole record as JSON (maps: gzipped).
@@ -149,7 +151,7 @@ No tkinter anywhere in here.
   is a newer release. `VERSION` here is the one source; the changelog repeats
   it as its top heading and a test fails if the two drift. Releases are tagged
   on GitHub, and the update check compares against the newest tag there - read
-  from the releases/latest redirect, not the API, and repeated hourly. Also
+  from the releases/latest redirect, not the API, once at start. Also
   puts a release in place, if there is one. The zipball is extracted to a temp folder inside the
   plugin and copied in a second pass, so a truncated download cannot leave
   half a plugin behind. `KEEP` names what an update may not overwrite. The
@@ -162,7 +164,9 @@ No tkinter anywhere in here.
   `recenter()` moves the anchor to where the player pressed the hotkey and
   repaints the mask from the saved points. `follow()` decides when a launch is
   the same map (same body, inside the mask) and moves the droppoint, and when
-  it is a new map. A disc that paints nothing new does not move `version`, and
+  it is a new map. The latest droppoint is saved as "drop" (`dropped`: a real
+  one, not the origin of an older file); `over()` finds a map for the ship
+  without painting. A disc that paints nothing new does not move `version`, and
   the drawn layer is only rebuilt when `version` or the ring centre changes -
   a tick is a crop of that layer and
   a cached chevron. Longitude is wrapped, so a body across the 180th meridian
@@ -189,6 +193,13 @@ No tkinter anywhere in here.
   370-400 t at Medium, the span of both at High or unread. The two measured
   deposits behind those are in the docstring. The panel's Density and Amount
   pickers write into the bookmark; the bookmarks list shows the range.
+- **[share.py](rs_core/share.py)** - a bookmark as `RhinoData:<code>`:
+  URL-safe base64 of zlib'd JSON of `FIELDS` (no commander, dates, tons).
+  `decode()` checks types, ranges and the material name, and inflates to 16 KB
+  at most. Codes shared here are kept as SHA-256 digests in `meta`
+  (`shared:<digest>`), and so are imported ones; `take()` skips those and
+  anything `cards.nearby` finds. main's 1 s landed poll reads the clipboard
+  when `GetClipboardSequenceNumber` moved and calls it once per new text.
 - **[yields.py](rs_core/yields.py)** - tons refined at a bookmark. One
   `MiningRefined` is 1 t, placed by the Status.json reading at that moment -
   the event carries no position. `ATTRIBUTE_M` is a 175 m radius,
@@ -198,11 +209,13 @@ No tkinter anywhere in here.
   writes every `FLUSH_S` (30 s) by re-reading the row and adding into its open
   cycle, so an Edit made meanwhile is not overwritten; `TALLY` is the one
   instance and `cards.set_depleted` flushes it before closing a cycle. A cycle
-  runs from the first ton to the Depleted mark and keeps the rigs, Density and
-  Amount it opened at. `measured()` is the cycles that opened at Amount High
-  and ended depleted - what the deposit held; anything else bounds it from
-  below. `REGEN_DAYS` (14) is an assumption, replaced by the gap between one
-  cycle's `ended_at` and the next cycle's `from` once there are two.
+  runs from the first ton to the Depleted mark, or expires `REGEN_DAYS` (14)
+  after its first ton, and keeps the rigs, Density and Amount it opened at.
+  `current()` is the open cycle under 14 d old - the Mined column. `regrow()`
+  takes Depleted marks 14 d old off, keeping the date in `regrown` (main: at
+  start and on each jump). `measured()` is the cycles that opened at Amount
+  High and ended depleted - what the deposit held; anything else bounds it
+  from below. `REGEN_DAYS` (14) is an assumption, not measured.
   `python -m rs_core.yields` prints t/rig per Density band against
   `deposit.TONS_PER_RIG`; it never edits it.
 - **[measure.py](rs_core/measure.py)** - area and rig count for a border
@@ -233,6 +246,9 @@ No tkinter anywhere in here.
   holder in its panel and Settings tab and does nothing else, standalone.py
   shows a dialog and exits 1. A file rather than a named mutex: scoped to the
   data folder, so E2E runs under a scratch `LOCALAPPDATA` do not collide.
+- **[system.py](rs_core/system.py)** - what it runs on, read once: `WINDOWS`,
+  `LINUX`, `FLATPAK`, `SESSION` (wayland/x11). `main.start` logs `describe()`.
+  `overlay.win32()` and `hotkey.available()` read it.
 
 ## UI (`rs_ui/`)
 
@@ -250,7 +266,9 @@ Everything in here imports tkinter.
   loop, since the game holds the focus while you drive. A press is bounced to
   Tk and sets the map's center or border, steps its size, or opens the
   RhinoData window. A combination already held elsewhere is a logged warning;
-  the others still register.
+  the others still register. Off Windows no RegisterHotKey: `chat()` fires the
+  same callbacks from the journal's SendText `!rs center|border|zoom|data`, and
+  `label()` names the chat command.
 - **[rhino.py](rs_ui/rhino.py)** - the easter egg. `docs/running.png` placed
   over the window and moved across it, flattened onto the window's background
   first because Tk composites a half-transparent edge against something else.
@@ -272,6 +290,11 @@ Everything in here imports tkinter.
   rather than PIL's ImageTk, which is the one part of PIL that EDMC's build
   cannot be relied on to carry. A window it cannot build is logged and
   skipped - the bookmark list works without an arrow over the game.
+  Off Windows there is no game window to find: top middle of the screen, or
+  where it was dragged (`rhinospotter_arrow_xy`, clamped to the screen),
+  right-click resets.
+- **[clipboard.py](rs_ui/clipboard.py)** - text onto the clipboard with
+  Win32 `SetClipboardData`: Tk's clipboard text is gone once EDMC exits.
 - **[scan.py](rs_ui/scan.py)** - the RhinoData window: three panes side by
   side, at 60% of the screen. The rail lists every landable body with its
   distance, locations and bookmark count; the middle holds the picked body's
@@ -284,16 +307,22 @@ Everything in here imports tkinter.
   nothing. Given a material it lists only the ground that has ever carried it,
   and that material leads every group whatever its rate - the question has
   changed from "what is here" to "where is the jadeite", and a ground that
-  answers at 4% still answers.
+  answers at 4% still answers. The rail's grounds fold, one open at a
+  time (`_state["ground"]`): on open the ground of the picked body; with a material, grounds sorted
+  by its sheet rate, highest first, no row last.
 - **[minimap.py](rs_ui/minimap.py)** - the minimap window and its settings
   tab. No timer of its own: `main._poll_landed` hands it the Status.json it
   already read, and nothing raises back into that poll. Shown while the InSRV
-  flag is set, hidden otherwise and while the game is minimised - and while
-  it is not in front, unless the setting keeps it up through an alt-tab -
+  flag is set; with `rhinospotter_minimap_ship` also in the ship under
+  `SHIP_CEILING_M` (radar range) over a map with a centre or a drop
+  (`_over_map`, never painted); hidden otherwise and while the game is
+  minimised - and while it is not in front, unless the setting keeps it up
+  through an alt-tab -
   sized from the game window's height and parked in the corner picked under
   EDMC Settings (`rhinospotter_minimap_enabled`, `rhinospotter_minimap_keep`,
   `rhinospotter_minimap_corner`). The tab it draws is the whole plugin's, not
-  the map's: `rhinospotter_low_value` and `low_value_shown()` are a materials
+  the map's: `rhinospotter_materials` and `materials_shown()` (the Select...
+  dialog; `rhinospotter_low_value` only seeds its default) are a materials
   setting that lives here because this is the file with the tab in it.
   Built once, hidden, and made click-through and no-activate before it is
   first shown; then shown, moved and hidden with Win32 calls that do not take
@@ -385,6 +414,9 @@ mapping the unit tests it replaced.
   folder, the installed exe run on test data, uninstalled.
 - **paths_e2e.py** - the journal folder found after a move, before and after
   EDMC's monitor starts.
+- **share_e2e.py** - Share bookmark in one install, the clipboard import in a
+  second: no personal fields, no re-import of one's own code, no duplicates,
+  mangled codes refused, the four card buttons one width, poll cost.
 - **yield_e2e.py** - the real journal's 171 MiningRefined lines through
   `load.journal_entry`: attribution, unplaced and unreadable tons, the replay
   skip, Depleted closing a cycle with the pending tons in it, a second cycle,

@@ -21,8 +21,8 @@ PATH = os.path.join(database.ROOT, "standalone.json")
 
 
 class Config:
-    """get_str/get_bool/get_int/set as EDMC's config has them. A stored value
-    of another type reads as `default`."""
+    """get_str/get_bool/get_int/get_list/set/delete as EDMC's config has them.
+    A stored value of another type reads as `default`."""
 
     def __init__(self, path=PATH):
         self.path = path
@@ -51,8 +51,24 @@ class Config:
         value = self.values.get(key)
         return value if isinstance(value, int) and not isinstance(value, bool) else default
 
+    def get_list(self, key, default=None):
+        """As EDMC 6.1: a missing key is `default`, or [] for None."""
+        value = self.values.get(key)
+        if isinstance(value, list):
+            return list(value)
+        return default if default is not None else []
+
     def set(self, key, value):
         self.values[key] = value
+        self._write()
+
+    def delete(self, key, suppress=False):
+        """The key gone from the file; a missing key is not an error (`suppress` as EDMC)."""
+        if key in self.values:
+            del self.values[key]
+            self._write()
+
+    def _write(self):
         try:
             os.makedirs(os.path.dirname(self.path), exist_ok=True)
             atomic.write_text(self.path, json.dumps(self.values, indent=2, sort_keys=True))

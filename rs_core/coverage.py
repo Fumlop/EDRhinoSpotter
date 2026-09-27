@@ -102,6 +102,9 @@ def view_m(zoom=1.0):
 # staircases.
 SS = 2
 
+# px drawn round a patch of the layer and cut off again (_draw_layer's box).
+LAYER_MARGIN = 4
+
 MASK_PX = int(2 * REACH_M / MASK_M_PER_PX)
 
 
@@ -160,9 +163,14 @@ class Coverage:
         # The location's border as the player drove it: metres from the centre,
         # or None. Only set once there is a centre to measure from.
         self.border_m = None
+        # (lat, lon) of a Ctrl+Alt+B pressed before any centre; becomes
+        # border_m on recenter(). Nothing is clipped while it waits.
+        self.border_at = None
         # Where the SRV last came out of the ship, (lat, lon). The rings and
-        # the footer use it until a centre is set. Kept in memory only.
+        # the footer use it until a centre is set. `dropped`: a real drop, not
+        # the origin of a file saved without one; saved as "drop".
         self.drop = (lat, lon)
+        self.dropped = True
         # The file this map is saved as - coverstore's 'map N' - once it is.
         self.name = None
         # The mining location last targeted on this map. A label, not a key.
@@ -170,6 +178,8 @@ class Coverage:
         self._last = None
         self._clip = None       # the border as a mask, while one is set
         self._layer = None      # (Coverage.layer's key, image)
+        # Mask boxes (px) painted since the layer was drawn; None: redraw it whole.
+        self._dirty = None
         # The body's ground key (rs_core.grounds), which picks the texture the
         # unpainted ground is drawn in. None: the plain background.
         self.ground = None
@@ -183,8 +193,12 @@ class Coverage:
                 "location": self.location, "stamps": points(self.stamps)}
         if self.centered:
             data["center"] = points([self.origin])[0]
+        if self.dropped:
+            data["drop"] = points([self.drop])[0]
         if self.border_m is not None:
             data["border_m"] = round(self.border_m)
+        if self.border_at is not None:
+            data["border_at"] = points([self.border_at])[0]
         if self.system_address is not None:
             data["system_address"] = self.system_address
         if self.body_id is not None:
@@ -194,14 +208,20 @@ class Coverage:
     @classmethod
     def from_dict(cls, body, data, name=None):
         """A map back from disk, repainted from its points. None when the data
-        is not a map. Droppoints in older files are ignored."""
+        is not a map. The "drops" list of older files is ignored; "drop" is read."""
         try:
             lat, lon = data.get("center") or data["origin"]
             cover = cls(body, float(lat), float(lon), float(data["radius"]))
             cover.centered = bool(data.get("center"))
             border = data.get("border_m")
             cover.border_m = float(border) if cover.centered and border else None
+            at = data.get("border_at")
+            cover.border_at = (float(at[0]), float(at[1])) if at and not cover.centered else None
             cover._repaint([(float(lat), float(lon)) for lat, lon in data["stamps"]])
+            drop = data.get("drop")
+            cover.dropped = bool(drop)
+            if drop:
+                cover.drop = (float(drop[0]), float(drop[1]))
         except (KeyError, TypeError, ValueError):
             return None
         cover.name = name
@@ -250,20 +270,27 @@ class Coverage:
             self.stamps.append((lat, lon))
         self.version += 1
         self._last = None
+        self._dirty = None
 
     def recenter(self, lat, lon):
         """The player says this is the middle of the location: the mask is
         rebuilt around it from the saved points, and the rings follow."""
         self.origin = (lat, lon)
         self.centered = True
+        # A kept border point becomes the border, measured from this centre.
+        if self.border_at is not None:
+            self.border_m = math.hypot(*self.xy(*self.border_at))
+            self.border_at = None
         # A border already set keeps its radius around the new centre, and
         # what falls outside it now is dropped.
         self._repaint(list(self.stamps))
 
     def set_border(self, lat, lon):
         """The player stands on the location's edge: its distance from the
-        centre is the border. False, and nothing set, without a centre."""
+        centre is the border. Without a centre the point is kept in border_at,
+        nothing clipped, and False."""
         if not self.centered:
+            self.border_at = (lat, lon)
             return False
         self.border_m = math.hypot(*self.xy(lat, lon))
         self._repaint(list(self.stamps))
@@ -293,6 +320,7 @@ class Coverage:
         painted rather than measured against where the last launch ended - the
         ship flew between them and painted nothing."""
         self.drop = (lat, lon)
+        self.dropped = True
         self._last = None
 
     def add(self, lat, lon):
@@ -327,6 +355,8 @@ class Coverage:
         if region.histogram()[255] > before:
             self.mask.paste(region, box[:2])
             self.version += 1
+            if self._dirty is not None:
+                self._dirty.append(box)
             return True
         return False
 
@@ -338,9 +368,24 @@ class Coverage:
         metres either side, kept until something new is painted."""
         ring_at = tuple(round(v) for v in self.anchor())
         key = (self.version, side, view, ring_at, self.border_m, self.ground)
-        if self._layer is None or self._layer[0] != key:
+        if self._layer is None or self._dirty is None or self._layer[0][1:] != key[1:]:
             self._layer = (key, _draw_layer(self.mask, side, ring_at, self.border_m, view=view,
                                             ground=self.ground))
+        elif self._layer[0] != key:
+            # Only discs painted since: redraw the layer around them, 4.5 x 4.5 km
+            # a disc of 20 x 20 km. Same pixels as a full draw (rs_e2etest/layer.md).
+            image = self._layer[1]
+            k = image.width / MASK_PX
+            x0 = min(b[0] for b in self._dirty) - 1
+            y0 = min(b[1] for b in self._dirty) - 1
+            x1 = max(b[2] for b in self._dirty) + 1
+            y1 = max(b[3] for b in self._dirty) + 1
+            box = (max(0, int(x0 * k)), max(0, int(y0 * k)),
+                   min(image.width, int(x1 * k) + 1), min(image.height, int(y1 * k) + 1))
+            image.paste(_draw_layer(self.mask, side, ring_at, self.border_m, view=view,
+                                    ground=self.ground, box=box), box[:2])
+            self._layer = (key, image)
+        self._dirty = []
         return self._layer[1]
 
 
@@ -357,9 +402,7 @@ def follow(coverage, fix, was_in_srv, saved=None, system_address=None):
     body.
     """
     body, lat, lon, radius, _ = fix
-    same = (coverage is not None and coverage.body == body
-            and (None in (coverage.system_address, system_address)
-                 or coverage.system_address == system_address))
+    same = _same(coverage, body, system_address)
     if not same or (not was_in_srv and not coverage.reaches(lat, lon)):
         loaded = _pick_saved(saved(body) if saved else [], body, lat, lon,
                                 skip=coverage.name if same else None)
@@ -370,6 +413,22 @@ def follow(coverage, fix, was_in_srv, saved=None, system_address=None):
     if not was_in_srv:
         coverage.launched(lat, lon)
     return coverage
+
+
+def _same(coverage, body, system_address):
+    """Whether `coverage` is of `body`: same name, and the same system when both
+    addresses are known."""
+    return (coverage is not None and coverage.body == body
+            and (None in (coverage.system_address, system_address)
+                 or coverage.system_address == system_address))
+
+
+def over(coverage, body, lat, lon, saved=None, system_address=None):
+    """The map in memory, else the saved map (`saved(body)`, as follow), that
+    reaches here; None when none does. Paints, launches and creates nothing."""
+    if _same(coverage, body, system_address) and coverage.reaches(lat, lon):
+        return coverage
+    return _pick_saved(saved(body) if saved else [], body, lat, lon)
 
 
 def _pick_saved(found, body, lat, lon, skip=None):
@@ -468,7 +527,7 @@ def picture(mask, marks=(), title=(), legend=(), border_m=None, golden=(), groun
     `title` is lines of text above the map, the first one larger; `legend` is
     (code, text) or (code, text, depleted) rows below it, one per bookmark. Both optional - without them
     the picture is the bare map. `golden` is golden_best() output, circled in
-    gold and labelled with its credits. `ground` is the body's ground key,
+    gold. `ground` is the body's ground key,
     drawn under the painted area as on the live map; None is the plain
     background.
     """
@@ -509,8 +568,13 @@ def picture(mask, marks=(), title=(), legend=(), border_m=None, golden=(), groun
 # A group of bookmarks the Rhino can work from one stop: at least GOLDEN_RIGS
 # rig positions, none depleted, all within GOLDEN_RADIUS_M of one point. The
 # Rhino carries six rigs; 2/2/1/1, 2/2/2, 2/3/1, 3/3, 1x6 and 2/1/1/1 all count.
-GOLDEN_RADIUS_M = 1500.0
+GOLDEN_RADIUS_M = 1250.0          # default; 1.5 km drove the ship out of sight
+# The radius in use: Settings, 500-2500 m in 250 m steps (minimap.apply_golden).
+# Also RhinoData's cluster order.
+golden_m = GOLDEN_RADIUS_M
 GOLDEN_RIGS = 5
+# Used instead when no cluster on the map reaches GOLDEN_RIGS.
+GOLDEN_RIGS_LOW = 4
 GOLD = palette.rgb(palette.GOLD)
 
 
@@ -533,37 +597,43 @@ def _golden_points(spots):
             for x, y, *rest in spots if rest and rest[0]]
 
 
+def clusters(points, radius=None):
+    """[[i, ...], ...] indexing `points` (x, y, rigs) in metres: the point with the
+    most rigs, then every point left within `radius` (default golden_m) of it by
+    rigs; repeated on what is left. Ties keep input order. O(n^2)."""
+    radius = radius or golden_m
+    left = sorted(range(len(points)), key=lambda i: -(points[i][2] or 0))
+    found = []
+    while left:
+        seed = left.pop(0)
+        sx, sy = points[seed][:2]
+        near = [i for i in left if math.hypot(points[i][0] - sx, points[i][1] - sy) <= radius]
+        found.append([seed] + near)
+        left = [i for i in left if i not in near]
+    return found
+
+
 def golden_groups(spots):
     """[(cx, cy, radius, members), ...] - metres - for the golden groups among
     `spots`, (x, y, rigs) or (x, y, rigs, Cr/t) in metres with depleted ones
     already left out. `members` index _golden_points(spots).
 
-    Candidate centres are every spot and every midpoint between two; the spots
-    within GOLDEN_RADIUS_M of one are a group when their rigs add up to
-    GOLDEN_RIGS. The circle drawn round a group sits on its members' centroid and
-    reaches the furthest of them; a group whose circle exceeds GOLDEN_RADIUS_M is
-    dropped, then a group inside a bigger kept one.
+    A cluster (clusters()) whose rigs add up to GOLDEN_RIGS, or GOLDEN_RIGS_LOW
+    when none does. The circle sits on the seed - the spot with the most rigs,
+    where the ship parks - and reaches the furthest member, at most
+    golden_m.
     """
     points = _golden_points(spots)
-    centres = [(x, y) for x, y, *_ in points]
-    centres += [((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
-                for i, a in enumerate(points) for b in points[i + 1:]]
-    found = set()
-    for cx, cy in centres:
-        members = frozenset(i for i, (x, y, *_) in enumerate(points)
-                            if math.hypot(x - cx, y - cy) <= GOLDEN_RADIUS_M)
-        if sum(points[i][2] for i in members) >= GOLDEN_RIGS:
-            found.add(members)
-    circles = {}
-    for members in found:
-        mx = sum(points[i][0] for i in members) / len(members)
-        my = sum(points[i][1] for i in members) / len(members)
-        radius = max(math.hypot(points[i][0] - mx, points[i][1] - my) for i in members)
-        if radius <= GOLDEN_RADIUS_M:
-            circles[members] = (mx, my, radius)
-    return [(*circles[members], sorted(members))
-            for members in sorted((g for g in circles if not any(g < h for h in circles)),
-                                  key=sorted)]
+    found = [(sum(points[i][2] for i in members), members)
+             for members in clusters([p[:3] for p in points])]
+    least = GOLDEN_RIGS if any(rigs >= GOLDEN_RIGS for rigs, _ in found) else GOLDEN_RIGS_LOW
+    groups = []
+    for rigs, members in found:
+        if rigs >= least:
+            sx, sy = points[members[0]][:2]
+            reach = max(math.hypot(points[i][0] - sx, points[i][1] - sy) for i in members)
+            groups.append((sx, sy, reach, sorted(members)))
+    return groups
 
 
 def _tour_m(members, points):
@@ -605,27 +675,14 @@ def golden_best(groups, spots, most=GOLDEN_SHOWN):
     return [(*group, credits) for _, credits, group in ranked[:most]]
 
 
-def _money(credits):
-    """Credits as 970k or 1.4M, for a label on the map."""
-    if credits >= 1e6:
-        return f"{credits / 1e6:.1f}M"
-    return f"{credits / 1e3:.0f}k"
-
-
 def _golden(image, groups, scale, side):
-    """A gold circle round each golden group, under the dots, labelled with
-    the credits a trip takes when the group carries them."""
+    """A gold circle round each golden group, under the dots. No label."""
     draw = ImageDraw.Draw(image)
     pad = _mark_radius(side) + 5
-    font = spotcard._font("consolab.ttf", max(11, side // 40))
-    for mx, my, radius, _, *credits in groups:
+    for mx, my, radius, *_ in groups:
         cx, cy = image.width / 2 + mx * scale, image.height / 2 - my * scale
         r = radius * scale + pad
         draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=GOLD, width=2)
-        if credits and credits[0]:
-            text = _money(credits[0])
-            draw.text((cx - font.getlength(text) / 2, cy - r - font.size - 2), text,
-                      font=font, fill=GOLD)
 
 
 def bearing(x, y, to_x, to_y):
@@ -645,10 +702,10 @@ FILL = _mix(palette.BG, palette.ACCENT, 0.22)
 EDGE = _mix(palette.BG, palette.ACCENT, 0.85)
 RING = _mix(palette.BG, palette.GOOD, 0.4)
 BORDER = palette.rgb(palette.FG_SOFT)      # not WARN: that is the mask edge
-# Bookmarks: a colour nothing else on the map uses.
-# Bookmarks: green while the patch still has something, red once depleted.
-MARK = palette.rgb(palette.GOOD)
-MARK_DEPLETED = palette.rgb(palette.ALERT)
+# Bookmarks: a pale dot, a hollow grey ring once depleted. Told apart by
+# shape, not red against green.
+MARK = palette.rgb(palette.FG_SOFT)
+MARK_DEPLETED = palette.rgb(palette.SPENT)
 
 # The centre the player set. Blue is the accent and nothing else on the map
 # wears it, so the eye finds the centre first. It is a mark and not a hub: the
@@ -683,9 +740,10 @@ def _mark_font(side):
 
 
 def _code_at(cx, cy, side):
-    """Where a bookmark's code is written: just right of its dot. _distances
-    keeps its numbers out of this box, so the two have to agree on it."""
-    return cx + _mark_radius(side) + 1, cy
+    """Where a bookmark's code is written: right of its dot, 3 px clear so the
+    code's 2 px BG stroke stays off the dot. _distances keeps its numbers out
+    of this box, so the two have to agree on it."""
+    return cx + _mark_radius(side) + 3, cy
 
 
 def _on_map(image, cx, cy, r):
@@ -697,20 +755,24 @@ def _bookmarks(image, points, side):
     """A dot per bookmark at these pixel positions, its material's code beside it.
 
     `points` are (x, y), (x, y, code) or (x, y, code, depleted) - grounds.Sheet.codes
-    gives the code. A depleted bookmark is red, any other green.
+    gives the code. A depleted bookmark is a ring, any other a dot.
     """
     r = _mark_radius(side)
     draw = ImageDraw.Draw(image)
     font = _mark_font(side)
     for cx, cy, *rest in points:
         if _on_map(image, cx, cy, r):
-            colour = MARK_DEPLETED if len(rest) > 1 and rest[1] else MARK
-            draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=colour,
-                         outline=palette.rgb(palette.BG))
+            if len(rest) > 1 and rest[1]:
+                # Ring 2 px at the 240 px card map, 3 px at 480 px.
+                draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=MARK_DEPLETED,
+                             width=max(2, round(r * 0.35)))
+            else:
+                draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=MARK,
+                             outline=palette.rgb(palette.BG))
             if rest and rest[0]:
                 # Outlined in the background colour: readable over the painted
                 # area, the grid and the rings alike.
-                draw.text(_code_at(cx, cy, side), rest[0], fill=colour, font=font,
+                draw.text(_code_at(cx, cy, side), rest[0], fill=palette.rgb(palette.FG), font=font,
                           anchor="lm", stroke_width=2, stroke_fill=palette.rgb(palette.BG))
 
 
@@ -939,20 +1001,47 @@ def _texture(ground, size):
     return _textures[key]
 
 
-def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True, view=VIEW_M, ground=None):
+def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True, view=VIEW_M, ground=None,
+                box=None):
     """Painted area, grid, the edge of the mask, the rings around `ring_at`
     (metres, or None for no rings) and the location's border around the centre
-    (metres, or None), over all of REACH_M, at `side` pixels to 2 * view."""
+    (metres, or None), over all of REACH_M, at `side` pixels to 2 * view.
+
+    `box`: (x0, y0, x1, y1) px of the finished layer; only that part is drawn
+    and returned, pixel for pixel as in the whole layer.
+    """
     size = int(round(side * REACH_M / view))
     big = size * SS
     scale = big / (2 * REACH_M)                   # pixels a metre
+    # Drawn with LAYER_MARGIN px round the box, cut off at the end: FIND_EDGES
+    # and wide lines differ in the outer 1-2 px of whatever is drawn.
+    x0, y0, x1, y1 = box or (0, 0, size, size)
+    inner = (x0, y0, x1, y1)
+    if box:
+        x0, y0 = max(0, x0 - LAYER_MARGIN), max(0, y0 - LAYER_MARGIN)
+        x1, y1 = min(size, x1 + LAYER_MARGIN), min(size, y1 + LAYER_MARGIN)
+    ox, oy, w, h = x0 * SS, y0 * SS, (x1 - x0) * SS, (y1 - y0) * SS
 
     def at(mx, my):
-        return big / 2 + mx * scale, big / 2 - my * scale
+        return big / 2 + mx * scale - ox, big / 2 - my * scale - oy
+
+    def circle(mx, my, r):
+        # Pillow truncates ellipse coords toward 0: floored in whole-layer px
+        # first, so a patch (negative coords) lands on the same pixels.
+        cx, cy = big / 2 + mx * scale, big / 2 - my * scale
+        return [math.floor(cx - r) - ox, math.floor(cy - r) - oy,
+                math.floor(cx + r) - ox, math.floor(cy + r) - oy]
 
     texture = _texture(ground, big)
-    image = texture.copy() if texture else Image.new("RGB", (big, big), palette.rgb(palette.BG))
+    if texture:
+        image = texture.crop((ox, oy, ox + w, oy + h))
+    else:
+        image = Image.new("RGB", (w, h), palette.rgb(palette.BG))
+    # Resized whole, then cropped: a resize of a sub-box rounds 1 in 255 off the
+    # whole-image result at scales like 600/400, flipping edge pixels.
     painted = mask.resize((big, big), Image.BILINEAR)
+    if box:
+        painted = painted.crop((ox, oy, ox + w, oy + h))
     image.paste(FILL, mask=painted)
     edge = painted.point(lambda v: 255 if v > 127 else 0).filter(ImageFilter.FIND_EDGES)
     image.paste(EDGE, mask=edge)
@@ -961,11 +1050,12 @@ def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True, view=VIEW_M
     steps = int(REACH_M // GRID_M)
     for k in range(-steps, steps + 1):
         gx, gy = at(k * GRID_M, k * GRID_M)
-        draw.line([(gx, 0), (gx, big)], fill=palette.rgb(palette.RULE), width=SS)
-        draw.line([(0, gy), (big, gy)], fill=palette.rgb(palette.RULE), width=SS)
+        draw.line([(gx, -oy), (gx, big - oy)], fill=palette.rgb(palette.RULE), width=SS)
+        draw.line([(-ox, gy), (big - ox, gy)], fill=palette.rgb(palette.RULE), width=SS)
 
     # Where the mask ends - past it nothing is painted.
-    draw.rectangle([0, 0, big - 1, big - 1], outline=palette.rgb(palette.WARN), width=SS)
+    draw.rectangle([-ox, -oy, big - 1 - ox, big - 1 - oy], outline=palette.rgb(palette.WARN),
+                   width=SS)
 
     # The circles to drive, ring_radii. A pixel wide after the reduce, and dim.
     # With a border they sit round the centre and run out to the border;
@@ -975,21 +1065,20 @@ def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True, view=VIEW_M
     else:
         radii = ring_radii()
     if ring_at is not None:
-        dx, dy = at(*ring_at)
         for radius_m in radii:
-            r = radius_m * scale
-            draw.ellipse([dx - r, dy - r, dx + r, dy + r], outline=RING, width=SS)
+            draw.ellipse(circle(*ring_at, radius_m * scale), outline=RING, width=SS)
 
     # The border the player drove to, bold: it is a claim about the location,
     # which the rings are not.
     if border_m:
-        cx, cy = at(0.0, 0.0)
-        r = border_m * scale
-        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=BORDER, width=3 * SS)
+        draw.ellipse(circle(0.0, 0.0, border_m * scale), outline=BORDER, width=3 * SS)
 
     # A box average is all two-times supersampling needs, and a tenth of what
     # LANCZOS costs.
-    return image.reduce(SS)
+    image = image.reduce(SS)
+    if box:
+        image = image.crop((inner[0] - x0, inner[1] - y0, inner[2] - x0, inner[3] - y0))
+    return image
 
 
 _markers = {}            # (frame or None, pixels) -> RGBA

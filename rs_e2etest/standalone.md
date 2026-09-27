@@ -35,7 +35,7 @@ read from the user's Saved Games folder and copied; nothing is written there.
 - `pythonw standalone.py` refused: the messagebox is the only trace besides
   the log file; no console.
 - The journal folder moved in EDMC Settings: standalone does not read EDMC's
-  `journaldir`; it needs `journaldir` in `standalone.json`.
+  `journaldir`; it has its own Journal folder row in its Settings.
 - Journal files larger than memory: catch-up reads the newest file line by
   line on the Tk thread at start; a 50 MB file blocks the window for that read.
 - The dock is unmapped and mapped again on every redraw: a redraw while
@@ -43,6 +43,27 @@ read from the user's Saved Games folder and copied; nothing is written there.
   The harness checks the dock is packed after redraws, not typing across one.
 - Spansh and the update check hit the network; the harness runs with the
   update check off (as standalone does) and does not honk.
+
+## Ways the merge with main (6.1.0) can break it
+
+- The config stand-in lacks a method main now calls: `get_list`
+  (`minimap.seed_materials` at start, `materials_shown`) or `delete` (Settings OK
+  with no material ticked) -> a crash at start or on OK.
+- `database.adopt_legacy()` after the lock: the lock file creates the data
+  folder, the legacy copy is then skipped (Linux).
+- Check 10's `rhinospotter_low_value` switch is gone (5.8.0 picker).
+- Trimmed journal state drops a field a consumer reads: `StartUp` must still
+  carry StarSystem, SystemAddress, Body, BodyID (bodies.ID_EVENTS); cmdr and
+  system still delivered.
+
+## Journal folder setting
+
+- Browse picks a folder, OK stores it as `journaldir` in standalone.json and
+  the tail moves to that folder's newest journal without a restart; Status.json
+  is read from it too (`paths.journal_dir`).
+- Cancel leaves `journaldir` and the tail as they were.
+- Default clears `journaldir`: the known Saved Games folder again.
+- A folder with no Journal.*.log: stored, and the row says so.
 
 ## Checks
 
@@ -63,9 +84,10 @@ read from the user's Saved Games folder and copied; nothing is written there.
 10a. Dock: the panel is packed inside the middle pane on the Bookmarks tab,
     with and without bodies; gone on the Mapped tab; the same widget objects
     after a redraw (not rebuilt).
-10. Settings: window opens with the minimap tab widgets; toggling the
-    materials switch and OK writes `rhinospotter_low_value` to standalone.json
-    and refills the Material menu.
+10. Settings: window opens with the minimap tab widgets; picking materials
+    (`minimap._picked`) and OK writes `rhinospotter_materials` to
+    standalone.json and the Material menu offers exactly those; none picked and
+    OK deletes the key (`config.delete`) without a raise.
 11. Stop: lock released, db backup written.
 12. Lock, standalone first: a second `standalone.py` exits 1 with the holder in
     its message and a visible dialog.
@@ -73,5 +95,9 @@ read from the user's Saved Games folder and copied; nothing is written there.
 14. Lock, plugin first: `load.plugin_start3` holds it; `standalone.py` refuses naming the plugin.
 15. Lock, standalone first: `load.plugin_start3` + `plugin_app` in a child
     show the refusal in the panel, take no hotkeys, write nothing.
+17. Journal folder: Browse (askdirectory stood in) to a second folder and OK:
+    `journaldir` stored, the next appended line there is delivered, Status.json
+    read from there; Cancel changes nothing; Default clears it.
+18. StartUp after the trim carries StarSystem, SystemAddress, Body, BodyID.
 16. Live data untouched: no `standalone.json` or `db\instance.lock` in the live folder, no
     `E2E Rotated System` row in the live db (size/mtime reported only: a running EDMC writes it).

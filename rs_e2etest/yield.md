@@ -20,15 +20,31 @@ coordinates.
   skipped, counted in `main._replayed`, no tons added.
 - Depleted closes the cycle and takes the tons still pending at the press with
   it - `cards.set_depleted` flushes the tally first.
-- Mining after the close opens a second cycle; the closed one does not move.
+- Tons refined while the Depleted mark is on (leftovers) go into the closed
+  cycle; the Mined column stays empty. A mark 15 d old: a new cycle.
+- Mark taken off, mined again: a second cycle; the closed one does not move.
 - `capacity()` after one measured cycle; `regenerated()` at 0 and 15 days.
 - `python -m rs_core.yields` prints t/rig for the measured cycle.
-- The Mined column: the measured cycle, the floor before one, header and row
-  the same width.
+- The Mined column: the current cycle; the card: this cycle and what the
+  deposit held; header and row the same width.
+- A cycle past 14 d: the Mined column empties, the next ton ends it `expired`,
+  Mark depleted on it ends it `expired` too; expired never measures.
+- `regrow()`: a 15 d old mark comes off with its date kept in `regrown`, a
+  16 d old HUD-read Amount Depleted too; a fresh mark stays.
 - Edit and re-mark (`cards.edited` / `cards.updated` -> `spotcard.save`) keep
   the cycles a dict and take the tons pending at the time with them.
 - Amount Depleted set through the Edit dialog closes the cycle and stamps
   depleted_at, as the Depleted button does.
+- RhinoData open while mining (`main.QUIET_S` = 5 s, 0.3 s here): no redraw
+  while tons keep coming, one redraw once no ton came for QUIET_S, and the
+  tons are in the row by then (tally flushed first). A ton replayed from
+  before the plugin start schedules nothing. Window closed: the quiet
+  timer flushes, raises nothing.
+- The burst end must not rebuild the window (it flickered): no `_draw`, the
+  row's Mined label is the same widget with the new tons, the card's tons
+  line likewise. A card that had no tons line yet (first ton of a cycle)
+  falls back to one `_draw`. Rows of folded locations are not drawn and not
+  looked at. Printed: `_draw` and in-place times.
 
 ## Not covered
 

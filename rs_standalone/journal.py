@@ -9,6 +9,10 @@ Follows EDMC 6.1.2 monitor.py (read from its bytecode):
   deliver(cmdr, is_beta, system, station, entry, state). A newer file: the old
   one read to its end first, then the new one from byte 0.
 
+State kept: what main.journal_entry and bodies.Register read - cmdr, the system,
+and the Body/BodyID/SystemAddress StartUp carries. is_beta and station are
+always False and None: nothing reads them.
+
 No tkinter.
 """
 
@@ -23,8 +27,7 @@ LOGFILE = re.compile(r"^Journal(Alpha|Beta)?\.[0-9]{2,4}(-)?[0-9]{2}(-)?[0-9]{2}
                      r"[0-9]{2}[0-9]{2}[0-9]{2}\.[0-9]{2}\.log$")
 POLL_MS = 1000                  # EDMC monitor._POLL, 1 s
 
-SYSTEM_KEYS = ("SystemAddress", "SystemName", "SystemPopulation", "StarPos",
-               "Body", "BodyID", "BodyType", "StationName", "MarketID", "StationType")
+SYSTEM_KEYS = ("SystemAddress", "SystemName", "Body", "BodyID")
 
 
 def newest(folder):
@@ -51,10 +54,8 @@ class Journal:
         self.pos = 0
         self.partial = b""          # a line without its newline yet
         self.cmdr = None
-        self.is_beta = False
         self.running = False        # the last event read was not Shutdown
         self.state = dict.fromkeys(SYSTEM_KEYS)
-        self.state["IsDocked"] = False
         self._error = None
 
     def start(self):
@@ -129,7 +130,6 @@ class Journal:
         if event == "Fileheader":
             self.cmdr = None
             self._reset_system()
-            self.is_beta = "beta" in str(entry.get("gameversion", "")).lower()
         elif event == "Commander":
             self.cmdr = entry.get("Name")
         elif event == "LoadGame":
@@ -137,60 +137,32 @@ class Journal:
             self._reset_system()
         elif event in ("JoinACrew", "QuitACrew"):
             self._reset_system()
-        elif event == "Undocked":
-            state["StationName"] = state["MarketID"] = state["StationType"] = None
-            state["IsDocked"] = False
-        elif event == "Docked":
-            state["IsDocked"] = True
-            for key in ("StationName", "MarketID", "StationType"):
-                state[key] = entry.get(key)
         elif event == "SupercruiseExit":
-            for key in ("Body", "BodyID", "BodyType"):
-                state[key] = entry.get(key)
-            if entry.get("BodyType") == "Station":
-                state["Body"] = state["BodyID"] = None
+            station = entry.get("BodyType") == "Station"
+            state["Body"] = None if station else entry.get("Body")
+            state["BodyID"] = None if station else entry.get("BodyID")
         elif event in ("Location", "FSDJump", "CarrierJump"):
-            for key in ("Body", "BodyID", "BodyType"):
-                state[key] = entry.get(key) if event != "FSDJump" else None
-            if event == "Location":
-                state["IsDocked"] = entry.get("Docked", False)
-            state["StarPos"] = entry.get("StarPos")
+            state["Body"] = entry.get("Body") if event != "FSDJump" else None
+            state["BodyID"] = entry.get("BodyID") if event != "FSDJump" else None
             state["SystemAddress"] = entry.get("SystemAddress")
-            state["SystemPopulation"] = entry.get("Population")
             state["SystemName"] = entry.get("StarSystem")
-            if event == "FSDJump":
-                state["StationName"] = state["MarketID"] = state["StationType"] = None
-            else:
-                state["StationName"] = entry.get("StationName")
-                if entry.get("BodyType") == "Station":
-                    state["StationName"] = entry.get("Body")
-                state["MarketID"] = entry.get("MarketID")
-                state["StationType"] = entry.get("StationType")
         if event:
             self.running = event != "Shutdown"
 
     def _startup(self):
-        """monitor.synthesize_startup_event."""
+        """monitor.synthesize_startup_event, with the fields the plugin reads."""
         state = self.state
         entry = {"timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                  "event": "StartUp", "StarSystem": state["SystemName"],
-                 "StarPos": state["StarPos"], "SystemAddress": state["SystemAddress"],
-                 "Population": state["SystemPopulation"]}
+                 "SystemAddress": state["SystemAddress"]}
         if state["Body"]:
             entry["Body"] = state["Body"]
             entry["BodyID"] = state["BodyID"]
-            entry["BodyType"] = state["BodyType"]
-        if state["StationName"]:
-            entry["Docked"] = True
-            entry["MarketID"] = state["MarketID"]
-            entry["StationName"] = state["StationName"]
-            entry["StationType"] = state["StationType"]
         return entry
 
     def _send(self, entry):
         """One entry to `deliver`; a raise is logged, as EDMC does per plugin."""
         try:
-            self.deliver(self.cmdr, self.is_beta, self.state["SystemName"],
-                         self.state["StationName"], entry, self.state)
+            self.deliver(self.cmdr, False, self.state["SystemName"], None, entry, self.state)
         except Exception:
             logger.exception(f"journal: journal_entry raised on {entry.get('event')}")

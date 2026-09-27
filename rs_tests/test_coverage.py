@@ -465,7 +465,7 @@ class TestRender:
         def red(marks):
             image = coverage.render(fresh(), 0, 0, None, side, marks=marks)
             return sum(1 for i in range(side // 2, side) for j in range(side // 2 - 20, side // 2 + 20)
-                       if image.getpixel((i, j)) == coverage.MARK)
+                       if image.getpixel((i, j)) == palette.rgb(palette.FG))
         assert red([(1500, 0, "T")]) > red([(1500, 0)]) + 10
 
     def test_the_srv_marker_keeps_its_1x_size_when_zoomed(self):
@@ -548,13 +548,19 @@ class TestRender:
                                 title=["A 2  -  Col 285 Sector LS-P b7-1 with a much longer name"])
         assert long.width > bare.width
 
-    def test_a_depleted_bookmark_is_red_an_active_one_green(self):
+    def test_a_depleted_bookmark_is_a_ring_an_active_one_a_dot(self):
         side = 240
         per_m = side / (2 * coverage.VIEW_M)
         image = coverage.render(fresh(), 0, 0, None, side,
                                 marks=[(3000, -2000, "T", False), (-3000, -2000, "PL", True)])
         assert self.pixel(image, side / 2 + 3000 * per_m, side / 2 + 2000 * per_m) == coverage.MARK
-        assert self.pixel(image, side / 2 - 3000 * per_m, side / 2 + 2000 * per_m) == coverage.MARK_DEPLETED
+        ring_x, ring_y = side / 2 - 3000 * per_m, side / 2 + 2000 * per_m
+        r = coverage._mark_radius(side)
+        assert self.pixel(image, ring_x, ring_y) != coverage.MARK_DEPLETED
+        # Right edge too: the code's stroke must not cover it.
+        for sign in (-1, 1):
+            assert coverage.MARK_DEPLETED in [self.pixel(image, ring_x + sign * d, ring_y)
+                                              for d in range(int(r) - 3, int(r) + 1)]
 
     def test_a_legend_row_can_say_depleted(self):
         # The plugin writes (code, text, depleted) rows; the picture must take them.
@@ -580,10 +586,11 @@ class TestRender:
         for step in range(0, 4001, 30):
             cover.add(*at(step, 0))
         first = cover.layer(240)
+        pixels = first.tobytes()
         cover.add(*at(2000, 0))                     # 2 km back: stamps, inside the strip
-        assert cover.layer(240) is first
+        assert cover.layer(240) is first and first.tobytes() == pixels
         cover.add(*at(0, 5000))
-        assert cover.layer(240) is not first
+        assert cover.layer(240).tobytes() != pixels  # patched in place since 5.7.3
 
     def centred(self):
         cover = fresh()
@@ -767,8 +774,9 @@ class TestIds:
 @pytest.mark.unit
 class TestGolden:
 
-    def ring(self, rigs, radius=1000.0):
-        """Spots spread evenly on a circle of this radius, one per rig count."""
+    def ring(self, rigs, radius=600.0):
+        """Spots spread evenly on a circle of this radius, one per rig count.
+        600 m: every spot within GOLDEN_RADIUS_M of any other, so of the seed."""
         n = len(rigs)
         return [(radius * math.cos(2 * math.pi * i / n), radius * math.sin(2 * math.pi * i / n), r)
                 for i, r in enumerate(rigs)]
@@ -778,23 +786,26 @@ class TestGolden:
             groups = coverage.golden_groups(self.ring(rigs))
             assert len(groups) == 1 and len(groups[0][3]) == len(rigs), rigs
 
-    def test_four_rigs_are_not(self):
-        assert coverage.golden_groups(self.ring((2, 1, 1))) == []
+    def test_four_rigs_only_when_no_five(self):
+        assert len(coverage.golden_groups(self.ring((2, 1, 1)))) == 1
+        five_elsewhere = self.ring((2, 1, 1)) + [(10_000, 0, 3), (10_500, 0, 2)]
+        (cx, *_), = coverage.golden_groups(five_elsewhere)
+        assert round(cx) == 10_000
 
     def test_spots_too_far_apart_are_not(self):
         # 3/3 with 6 km between them: no point is within 2.5 km of both.
         assert coverage.golden_groups([(0, 0, 3), (6000, 0, 3)]) == []
 
     def test_spots_without_rigs_count_nothing(self):
-        assert coverage.golden_groups(self.ring((None, 2, 2))) == []
+        assert coverage.golden_groups(self.ring((None, 2, 1))) == []
 
     def test_a_group_inside_a_bigger_one_is_drawn_once(self):
         groups = coverage.golden_groups(self.ring((2, 2, 2, 1), radius=500))
         assert len(groups) == 1 and len(groups[0][3]) == 4
 
-    def test_the_circle_sits_on_the_centroid_and_reaches_every_spot(self):
-        (cx, cy, radius, _), = coverage.golden_groups([(0, 0, 3), (2000, 0, 3)])
-        assert (round(cx), round(cy), round(radius)) == (1000, 0, 1000)
+    def test_the_circle_sits_on_the_seed_and_reaches_every_spot(self):
+        (cx, cy, radius, _), = coverage.golden_groups([(0, 0, 3), (1000, 0, 3)])
+        assert (round(cx), round(cy), round(radius)) == (0, 0, 1000)
 
     def test_the_trip_is_eleven_tons_a_rig_at_that_spot_price(self):
         spots = [(0, 0, 3, 100_000), (1000, 0, 3, 100_000)]
@@ -803,12 +814,12 @@ class TestGolden:
 
     def test_the_tightest_group_wins_on_credits_an_hour(self):
         # Two 3/3 groups of the same price, 10 km apart so neither takes the
-        # other in: 200 m between the members of one, 2 km between the other's.
+        # other in: 200 m between the members of one, 1.2 km between the other's.
         spots = [(0, 0, 3, 50_000), (200, 0, 3, 50_000),
-                 (10_000, 0, 3, 50_000), (12_000, 0, 3, 50_000)]
+                 (10_000, 0, 3, 50_000), (11_200, 0, 3, 50_000)]
         best = coverage.golden_best(coverage.golden_groups(spots), spots)
         assert len(best) == 2
-        assert round(best[0][0]) == 100 and round(best[1][0]) == 11_000
+        assert round(best[0][0]) == 0 and round(best[1][0]) == 10_000
 
     def test_only_the_best_three_are_carried(self):
         spots = []
@@ -826,7 +837,7 @@ class TestGolden:
         assert credits == 0
 
     def test_the_picture_circles_a_golden_group_in_gold(self):
-        spots = [(0, 0, 3), (1500, 0, 3)]
+        spots = [(0, 0, 3), (1000, 0, 3)]
         marks = [(x, y, "T", False) for x, y, _ in spots]
         gold = coverage.GOLD
         count = lambda img: sum(1 for i in range(img.width) for j in range(img.height)

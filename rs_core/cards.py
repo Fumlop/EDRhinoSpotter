@@ -127,8 +127,9 @@ def set_depleted(record, depleted, when=None, db=None):
     back, the time is already there to count from. No mark, no key.
     The record in hand is updated to match.
 
-    Depleted also closes the open yield cycle; the next ton refined there opens
-    the next one.
+    Depleted also closes the open yield cycle; tons refined there while the mark
+    is on go into it (yields.add), the first after the mark comes off opens the
+    next one.
     """
     # Imported here: rs_core.yields reads bookmarks through this module.
     from rs_core import yields
@@ -175,10 +176,14 @@ def same_body(record, name, system_address=None, body_id=None):
     return record.get("planet_name") == name
 
 
-def nearby(spot, db=None, within=SAME_SPOT_M):
+def nearby(spot, db=None, within=SAME_SPOT_M, any_material=False):
     """The bookmark a new mark updates, or None: same body, same material,
     within `within` metres, the nearest one. None too when the mark carries no
-    planet radius, since without it there is no distance to measure."""
+    planet radius, since without it there is no distance to measure.
+
+    `any_material`: the material is not compared - the Bookmark press, where a
+    mark on a bookmarked spot corrects that bookmark's material. Share import
+    leaves it False: a code of another material is another deposit."""
     radius = spot.get("planet_radius")
     lat, lon = spot.get("latitude"), spot.get("longitude")
     material = (spot.get("commodity") or "").lower()
@@ -189,7 +194,7 @@ def nearby(spot, db=None, within=SAME_SPOT_M):
         if not same_body(record, spot.get("planet_name"), spot.get("system_address"),
                          spot.get("body_id")):
             continue
-        if (record.get("commodity") or "").lower() != material:
+        if not any_material and (record.get("commodity") or "").lower() != material:
             continue
         if record.get("latitude") is None or record.get("longitude") is None:
             continue
@@ -304,7 +309,7 @@ def _touched(record, amount):
 
 
 def updated(old, spot, db=None):
-    """`old` with Rigs, Amount and Density taken from `spot`.
+    """`old` with Material, Rigs, Amount and Density taken from `spot`.
 
     Position, heading, location, commander and marked_at stay as first marked;
     coordinates are what identifies the deposit. Only the three fields a
@@ -315,7 +320,7 @@ def updated(old, spot, db=None):
     Fills system_address and body_id when `old` predates them.
     """
     record = _refreshed(old, db)
-    for key in ("rigs", "amount", "density"):
+    for key in ("commodity", "rigs", "amount", "density"):
         if spot.get(key) is not None:
             record[key] = spot[key]
     # Bookmarks written before these columns existed take them from the mark.

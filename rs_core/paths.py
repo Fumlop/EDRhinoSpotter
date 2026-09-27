@@ -63,6 +63,12 @@ def journal_dir():
 _found = None
 
 
+def forget():
+    """Look the folder up again on the next journal_dir(): the journaldir setting changed."""
+    global _found
+    _found = None
+
+
 def _lookup():
     """(path, final). Tried in order:
 

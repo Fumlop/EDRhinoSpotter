@@ -1,6 +1,7 @@
 r"""The one database: bodies, bookmarks and minimap maps.
 
     %LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db
+    $XDG_DATA_HOME/RhinoSpotter/db/rhinospotter.db    without LOCALAPPDATA (Linux)
 
 Three stores of JSON files, each with its own layout, became one file. A
 question across systems - every monazite with six rigs - is one query rather
@@ -19,13 +20,25 @@ No tkinter. See rs_tests/test_database.py.
 import contextlib
 import json
 import os
+import shutil
 import sqlite3
 from datetime import datetime, timezone
 
 from rs_core.logging import logger
 
-ROOT = os.path.join(os.environ.get("LOCALAPPDATA")
-                    or os.path.expanduser("~"), "RhinoSpotter")
+
+def _root():
+    """%LOCALAPPDATA%\\RhinoSpotter; without it $XDG_DATA_HOME/RhinoSpotter,
+    ~/.local/share when unset. Flatpak sets XDG_DATA_HOME to ~/.var/app/<id>/data."""
+    if os.environ.get("LOCALAPPDATA"):
+        return os.path.join(os.environ["LOCALAPPDATA"], "RhinoSpotter")
+    return os.path.join(os.environ.get("XDG_DATA_HOME")
+                        or os.path.join(os.path.expanduser("~"), ".local", "share"), "RhinoSpotter")
+
+
+ROOT = _root()
+# ROOT without LOCALAPPDATA up to 5.7.12. Read by adopt_legacy().
+LEGACY_ROOT = os.path.join(os.path.expanduser("~"), "RhinoSpotter")
 DIR = os.path.join(ROOT, "db")
 PATH = os.path.join(DIR, "rhinospotter.db")
 
@@ -167,3 +180,26 @@ def backup(path=None, keep=BACKUPS_KEPT):
         except OSError as err:
             logger.warning(f"could not remove old backup {name}: {err}")
     return target
+
+
+def adopt_legacy(root=None, legacy=None):
+    """Copy LEGACY_ROOT to ROOT once, before anything opens the database. ROOT or None.
+
+    Only without LOCALAPPDATA and ROOT absent. Via ROOT.tmp: no partial ROOT.
+    Not retried: the start then creates an empty ROOT. LEGACY_ROOT untouched.
+    """
+    root, legacy = root or ROOT, legacy or LEGACY_ROOT
+    if os.environ.get("LOCALAPPDATA") or os.path.exists(root) or not os.path.isdir(legacy):
+        return None
+    temp = root + ".tmp"
+    try:
+        shutil.rmtree(temp, ignore_errors=True)
+        shutil.copytree(legacy, temp)
+        os.replace(temp, root)
+    except (OSError, shutil.Error) as err:
+        logger.warning(f"could not copy {legacy} to {root}: {err} - "
+                       f"not retried; copy it by hand with EDMC closed")
+        shutil.rmtree(temp, ignore_errors=True)
+        return None
+    logger.info(f"copied {legacy} to {root}; {legacy} is no longer read")
+    return root

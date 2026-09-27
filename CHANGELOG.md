@@ -1,14 +1,228 @@
 # Changelog
 
-## 5.7.1-beta.1
+## Unreleased (standalone)
 
-Standalone beta on 5.7.1: everything in 5.7.1 below, in the standalone
-Setup.exe.
+**Added**
+
+- Standalone Settings: Journal folder (Browse..., Default); the tail moves to it on OK, no restart.
+
+**Fixed**
+
+- Standalone crashed at start on 5.8.0+: its config had no get_list/delete.
+
+**Changed**
+
+- Standalone journal feed keeps only what the plugin reads (cmdr, system, body ids).
+
+## 6.1.0
+
+**Added**
+
+- Minimap in the ship (Settings, off by default): under 2 km above ground (radar range), over a map with a centre or a droppoint, it stays up with the ship on it. The grid sits on the centre, else the drop. The latest droppoint is saved with the map again; older maps without one show once a centre is set or the Rhino drops there. Nothing is painted from the ship. #16
+
+**Changed**
+
+- Map bookmarks: a pale dot, a hollow grey ring once depleted (was green/red, hard for red-green blind). The letter beside it is white and no longer touches the dot.
+- Share map: the credits label over a golden circle is gone; the circle stays.
+- RhinoData: made wider than it opens, the card pane and its map grow with it; the body list keeps its width.
+
+**Fixed**
+
+- Tons refined after Mark depleted (leftover fragments) opened a new cycle, so Mined showed "1 t". They now count into the depleted cycle.
+
+## 6.0.0
+
+**Added**
+
+- Linux: hotkeys work while Elite has the focus (X11/XWayland). Chat commands stay as fallback. #12
+- Log says what it runs on (Windows / Linux, Wayland/X11, Flatpak).
+
+**Changed**
+
+- RhinoData: body types in the left list fold, one open at a time. On open it is the type of the body you are at (in space: the picked one); click a type to open it and close the others.
+- A body found by Spansh in a closed type only raises that type's count; the list does not open it.
+- RhinoData: with a material picked, the type with the highest % of it is on top, and each type shows its %.
+
+## 5.8.0
+
+**Added**
+
+- Settings: pick which materials the lists show (Materials in the lists > Select...). #10
+- Linux: chat commands `!rs center`, `!rs border`, `!rs zoom`, `!rs data` instead of hotkeys. #12
+
+**Fixed**
+
+- Linux: guide arrow no longer sits between two monitors; drag it, right-click resets. #11
+- Linux: bookmarks survive a restart in Flatpak EDMC. #9
+- Linux: "open folder" works.
+
+## 5.7.12
+
+**Fixed**
+
+- The update check ran every hour and turned the Bookmark button into Update
+  mid-session; a press meant to bookmark updated the plugin instead, and the
+  bookmark was not saved. The check now runs once, when EDMC starts.
+
+## 5.7.11
+
+**Fixed**
+
+- The guide arrow stayed up after HERE, and the card kept "Stop the arrow",
+  while Elite was not the window in front (RhinoData open, say): `overlay._tick`
+  returned before the HERE clock. Arrival and the 10 s clock now run with the
+  game in the background; only the drawing waits for focus.
+
+**Changed**
+
+- README: a Features list at the end.
+
+## 5.7.10
+
+**Changed**
+
+- Bookmark on a spot that already has a bookmark within 100 m
+  (`cards.SAME_SPOT_M`) updates it whatever its material: the material is
+  taken too (`cards.nearby(any_material=True)`). Changing the material and
+  pressing again gave a second bookmark at 0 m. Position, marked_at, location
+  and counted tons stay; the status line says "Monazite -> Alexandrite".
+  A shared code still merges only with the same material.
+
+## 5.7.9
+
+**Fixed**
+
+- A bookmark filed under a mistyped Location number stayed folded away when
+  you came back to it. RhinoData now also unfolds, on open, every location
+  with a bookmark within 5 km (`scan.UNFOLD_M`) of the Status.json position,
+  whatever number it carries. Live system only, needs a position; bringing
+  the window to the front does not unfold, so a hand fold stays.
+
+## 5.7.8
+
+**Fixed**
+
+- A Spansh answer after the honk brought RhinoData to the front and took the
+  focus from the game (`main._add_spansh` went through `scan.show`). Now only
+  the rail is rebuilt in place (`scan.refresh_rail`); a full redraw only when
+  the picked body changes with it. Nothing opens when the window is closed.
+- Docs pictures re-rendered.
+
+## 5.7.7
+
+**Added**
+
+- RhinoData's Mined column and the card's tons line update 5 s
+  (`main.QUIET_S`) after the last ton counted into a bookmark; by-products
+  and unplaced tons do not restart the wait. Set in place (3 ms measured),
+  not a redraw.
+
+**Fixed**
+
+- Picking a bookmark rebuilt the whole window and flickered: now two rows are
+  relit and the card pane rebuilt (35 ms against 176-212 ms for the window).
+
+## 5.7.6
+
+**Added**
+
+- The map above a bookmark's card marks the picked bookmark with a blue diamond,
+  drawn on a Tk canvas over the cached picture: a pick costs no re-render.
+
+**Changed**
+
+- RhinoData opens with every location folded but the one you are at: the
+  panel's Location, and the location of a bookmark within 175 m of the SRV.
+  Was every location unfolded. `scan._state["opened"]` replaces `"collapsed"`.
+
+## 5.7.5
+
+**Added**
+
+- Material menus (panel, RhinoData filter, Edit dialog): with the menu open, a
+  letter highlights the first material starting with it (Enter picks it), or
+  picks it when only one does. Windows menu mnemonics (`scan.letter_jump`); the
+  panel's "select material" takes none.
+
+**Changed**
+
+- Ctrl+Alt+B before Ctrl+Alt+Z keeps the point (`border_at`, saved with the map)
+  instead of refusing: nothing is clipped, the hint says "border kept - set
+  center", and Ctrl+Alt+Z turns it into the border measured from the centre.
+
+## 5.7.4
+
+**Added**
+
+- Settings: Golden circle radius, 500-2500 m in 250 m steps (`rhinospotter_golden_m`),
+  default 1250. Applied at start and on OK, to the gold circles and to RhinoData's order.
+
+**Changed**
+
+- RhinoData lists a location's bookmarks in clusters: the one with the most rigs,
+  then every one within the golden radius of it by rigs, repeated on the rest;
+  worked out last. Was marking order.
+- Golden groups are those clusters (`coverage.clusters`): 5+ rigs, or 4+ when no
+  cluster on the map reaches 5. The circle sits on the spot with the most rigs.
+  Was any point within 1.5 km; groups overlapped and counted spots twice.
+- Default golden radius 1.5 -> 1.25 km: at 1.5 km the ship dropped out of sight.
+- The picked body in the RhinoData rail: name bold in gold, the accent bar gone.
+
+**Fixed**
+
+- The map above a bookmark's card and the dock picture fed every bookmark on the
+  body to the golden groups, not only the ones the map reaches: another location's
+  5-rig cluster kept this map's circles off it. Now as Share map.
+
+## 5.7.3
+
+**Added**
+
+- RhinoData marks the bookmark the SRV is at (SRV only): within 175 m
+  (`yields.ATTRIBUTE_M`) its row gets a ◉, its location unfolds and the card
+  shows it, so Mark depleted is one click. Checked when the window opens and
+  when it comes to the front (`<Activate>`); redrawn only when that bookmark
+  changed, and a bookmark picked by hand in the meantime stays picked.
+- A Depleted mark 14 days old (`yields.REGEN_DAYS`, assumed) comes off on its
+  own, at start and on every jump; an Amount of Depleted (also one read off
+  the HUD at marking) becomes unread. The mark's date is kept in `regrown`,
+  and the log names each bookmark it took off.
+
+**Changed**
+
+- An open cycle ends as `expired` 14 days after its first ton if nobody
+  marked the deposit depleted; the next ton opens a new cycle. Expired cycles
+  never count as a measurement.
+- Mined column: the tons of the current cycle. The card keeps what the
+  deposit held - min-max over measured cycles, or at least the largest cycle.
+- `rs_tests/make_docs_images.py` refuses a grab when another program's window
+  covers it.
+- Minimap: a disc of new ground redraws only the layer around it, not the
+  whole 20 x 20 km layer. Median per disc 93 -> 19 ms at 640 px, 53 -> 11 ms
+  at 480, 8 -> 2 ms at 180. Pixel-identical to a full redraw and to 5.7.2
+  (`rs_e2etest/layer_e2e.py`, 26 saved maps).
+- README shorter, one screenshot a feature; `docs/API.md` technical only.
+
+## 5.7.2
+
+**Fixed**
+
+- Share bookmark and Copy coords set the status line in place instead of
+  redrawing the whole RhinoData window: the window flickered on every press.
+- The clipboard import retries on the next 1 s poll when another program has
+  the clipboard open; that change was skipped for good before.
 
 ## 5.7.1
 
 **Added**
 
+- Card: **Share bookmark** in place of Share map (Share map stays on the
+  location line). Puts `RhinoData:<code>` on the clipboard; a running
+  RhinoSpotter that finds a code on its clipboard imports it. Not imported:
+  codes shared or imported before by this install (SHA-256 digests in `meta`)
+  and bookmarks already here (same material within 100 m). No commander, dates
+  or tons in the code. The clipboard text is read only when Windows'
+  clipboard sequence number moves.
 - Bookmark table: Brg and Dist columns - bearing and distance from the centre
   of the saved map the bookmark lies on, set with Ctrl+Alt+Z. `-` with no map
   there or no centre set.
@@ -23,6 +237,11 @@ Setup.exe.
   before the labels, so a narrow pane clips Est. left instead of the button.
 - Bookmark table header in Consolas 9, as the rows: at 8 it drifted left of
   the columns it names.
+- The four card buttons under Guide me there are one width (2 x 2 grid).
+- Copy coords and Share bookmark write the clipboard through Win32: Tk's
+  clipboard text was gone once EDMC closed.
+- `mining_sheet.json`: 1005 locations (was 992; 13 more rock 80%+ metallic
+  magma) and the prices of 2026-09-24.
 - Docs pictures re-rendered.
 
 **Fixed**

@@ -21,9 +21,11 @@ import base64
 import io
 import os
 import itertools
+import pathlib
 import threading
 import time
 import tkinter as tk
+import webbrowser
 from tkinter import messagebox
 
 from rs_core import (arrow, cards, coverage, coverstore, database, grounds, guide, migrate,
@@ -40,6 +42,15 @@ except ImportError:      # running outside EDMC
 ENABLED_KEY = "rhinospotter_minimap_enabled"
 CORNER_KEY = "rhinospotter_minimap_corner"
 KEEP_KEY = "rhinospotter_minimap_keep"
+# The map in the ship over a saved map, not painted (#16).
+SHIP_KEY = "rhinospotter_minimap_ship"
+# Shown in the ship up to this Status.json Altitude over the ground, m: the
+# radar is off above it.
+SHIP_CEILING_M = 2000.0
+# Status.json Flags InMainShip | InFighter, AltitudeFromAverageRadius; Flags2 OnFoot.
+IN_SHIP = 0x01000000 | 0x02000000
+ALT_FROM_AVERAGE = 0x20000000
+ON_FOOT = 0x1
 FREE_KEY = "rhinospotter_minimap_free"
 # Where the commander dragged it, as "x,y" screen pixels of its top left -
 # any monitor, and it stays there when the game window moves. Not
@@ -47,9 +58,14 @@ FREE_KEY = "rhinospotter_minimap_free"
 POS_KEY = "rhinospotter_minimap_xy"
 ZOOM_KEY = "rhinospotter_minimap_zoom"
 SRV_KEY = "rhinospotter_srv_type"
-# Whether the material lists carry the cheap half. Not a minimap setting - it
-# lives here because this is the file that draws the settings tab.
+# The materials the lists offer, picked on the settings tab. Not a minimap
+# setting - it lives here because this is the file that draws the settings tab.
+MATERIALS_KEY = "rhinospotter_materials"
+# Up to 5.7.12: on = all 38 materials. Read only to seed MATERIALS_KEY's default.
 LOW_VALUE_KEY = "rhinospotter_low_value"
+# Golden circle radius, m: coverage.golden_m.
+GOLDEN_KEY = "rhinospotter_golden_m"
+GOLDEN_STEPS = tuple(range(500, 2501, 250))
 # Only the Rhino has the mining scanner the painted area stands for.
 RHINO = "mev_rhino"
 CORNERS = ("top left", "top right", "bottom left", "bottom right")
@@ -96,9 +112,11 @@ _fresh = []              # [(system, body, lat, lon, code, when)] bookmarked, ma
 _enabled = None          # tk.BooleanVar on the settings tab
 _corner = None           # tk.StringVar on the settings tab
 _keep = None             # tk.BooleanVar on the settings tab
+_ship = None             # tk.BooleanVar on the settings tab
 _hotkeys = {}            # hotkey id -> (modifier StringVar, key StringVar) on the settings tab
 _free = None             # tk.BooleanVar on the settings tab
-_low_value = None        # tk.BooleanVar on the settings tab
+_picked = None           # [material] from the Select dialog, saved on Settings OK; None: untouched
+_golden = None           # tk.StringVar on the settings tab, metres
 _placing = False         # in place-the-map mode: click-through off, drag to move
 _grab = None             # (pointer x, pointer y, window x, window y) while dragging
 _held = None             # the widget whose Tk grab place() took - EDMC's Settings dialog
@@ -117,6 +135,27 @@ def keep_up():
     return config.get_bool(KEEP_KEY, default=False) if config is not None else False
 
 
+def ship_view():
+    """Whether the map shows in the ship (SHIP_KEY). Off unless asked for."""
+    return config.get_bool(SHIP_KEY, default=False) if config is not None else False
+
+
+def ship_fix(status):
+    """(body, lat, lon, radius, heading) in the ship or fighter at or under
+    SHIP_CEILING_M over the ground, else None. Not on foot. Altitude from the
+    average radius (glide, orbital cruise; assumed, not measured) is None."""
+    flags = int(status.get("Flags") or 0)
+    if (not flags & IN_SHIP or flags & ALT_FROM_AVERAGE
+            or int(status.get("Flags2") or 0) & ON_FOOT):
+        return None
+    body, lat, lon = status.get("BodyName"), status.get("Latitude"), status.get("Longitude")
+    radius, altitude = status.get("PlanetRadius"), status.get("Altitude")
+    if (not body or lat is None or lon is None or not radius or altitude is None
+            or altitude > SHIP_CEILING_M):
+        return None
+    return body, lat, lon, radius, status.get("Heading")
+
+
 def corner():
     value = config.get_str(CORNER_KEY, default=CORNERS[0]) if config is not None else CORNERS[0]
     return value if value in CORNERS else CORNERS[0]
@@ -127,13 +166,81 @@ def free_move():
     return config.get_bool(FREE_KEY, default=False) if config is not None else False
 
 
-def low_value_shown():
-    """Whether the material lists offer the ones under grounds.HIGH_VALUE_MIN.
+def materials_shown(worth):
+    """The materials the lists offer, in spotmark.MATERIALS order.
 
-    Off by default. Price is measured on Sheet.values(): the median, best
-    across grounds.
+    Picked on the settings tab (MATERIALS_KEY). Never picked, or picked
+    empty: `worth` (the ones over grounds.HIGH_VALUE_MIN), or all 38 when
+    LOW_VALUE_KEY was on. Empty is never picked: EDMC's get_list returns []
+    for a missing key.
     """
-    return config.get_bool(LOW_VALUE_KEY, default=False) if config is not None else False
+    chosen = config.get_list(MATERIALS_KEY) if config is not None else None
+    if chosen:
+        return tuple(name for name in spotmark.MATERIALS if name in chosen)
+    if config is not None and config.get_bool(LOW_VALUE_KEY, default=False):
+        return tuple(spotmark.MATERIALS)
+    return tuple(name for name in spotmark.MATERIALS if name in set(worth))
+
+
+def seed_materials(worth, marked):
+    """Once, while MATERIALS_KEY is empty: store materials_shown(worth) plus
+    every bookmarked material (`marked`, lowercased), so an update to the
+    picker drops no material a bookmark was made for. The stored list, or None."""
+    if config is None or config.get_list(MATERIALS_KEY):
+        return None
+    seeded = [name for name in spotmark.MATERIALS
+              if name in materials_shown(worth) or name.lower() in marked]
+    config.set(MATERIALS_KEY, seeded)
+    logger.info(f"materials: seeded {len(seeded)}: {', '.join(seeded)}")
+    return seeded
+
+
+def _select_materials(parent, worth):
+    """Checkbox per material; OK keeps the ticks in _picked for prefs_changed."""
+    global _picked
+    shown = set(_picked if _picked is not None else materials_shown(worth))
+    box = tk.Toplevel(parent)
+    box.title("RhinoSpotter materials")
+    box.transient(parent)
+    ticks = {name: tk.BooleanVar(value=name in shown) for name in spotmark.MATERIALS}
+    rows = (len(spotmark.MATERIALS) + 2) // 3
+    for i, name in enumerate(spotmark.MATERIALS):
+        tk.Checkbutton(box, text=name, variable=ticks[name], anchor="w").grid(
+            row=i % rows, column=i // rows, sticky="w", padx=8)
+
+    def set_all(names):
+        for name, var in ticks.items():
+            var.set(name in names)
+
+    def ok():
+        global _picked
+        _picked = [name for name, var in ticks.items() if var.get()]
+        box.destroy()
+
+    buttons = tk.Frame(box)
+    buttons.grid(row=rows, column=0, columnspan=3, sticky="w", padx=8, pady=8)
+    tk.Button(buttons, text="All", command=lambda: set_all(spotmark.MATERIALS)).pack(side="left")
+    tk.Button(buttons, text=f"Over {grounds.HIGH_VALUE_MIN:,} Cr/t",
+              command=lambda: set_all(set(worth))).pack(side="left", padx=4)
+    tk.Button(buttons, text="None", command=lambda: set_all(())).pack(side="left")
+    tk.Button(buttons, text="OK", width=8, command=ok).pack(side="left", padx=(16, 0))
+    box.grab_set()
+    return box
+
+
+def golden():
+    """Golden circle radius in m from config; not one of GOLDEN_STEPS: the default."""
+    default = int(coverage.GOLDEN_RADIUS_M)
+    try:
+        value = int(config.get_int(GOLDEN_KEY, default=default)) if config is not None else default
+    except (TypeError, ValueError):
+        return default
+    return value if value in GOLDEN_STEPS else default
+
+
+def apply_golden():
+    """Set coverage.golden_m from config: at start and on Settings OK."""
+    coverage.golden_m = float(golden())
 
 
 def position():
@@ -142,13 +249,7 @@ def position():
     Stored as text because EDMC's config holds strings and ints, and a pair
     of them is neither. Anything unreadable is no position at all, which puts
     the map back in its corner rather than at 0,0."""
-    if config is None:
-        return None
-    try:
-        x, y = config.get_str(POS_KEY, default="").split(",")
-        return int(x), int(y)
-    except (AttributeError, TypeError, ValueError):
-        return None
+    return overlay.position(POS_KEY)
 
 
 def free_xy(bounds, width, height, where):
@@ -269,6 +370,8 @@ def update(root, status, system=None, ids=None, ground=None):
             if _in_srv:
                 _docked(system)
             _in_srv = _failed = False
+            if ship_view() and _over_map(root, status, system, ids):
+                return
             _down("not in the SRV" if not int(status.get("Flags") or 0) & coverage.IN_SRV
                   else "in the SRV, but Status.json has no body or coordinates")
             return
@@ -309,6 +412,29 @@ def update(root, status, system=None, ids=None, ground=None):
         _failed = True
         _lock()                       # a hidden map must not keep Settings' grab
         hide()
+
+
+def _over_map(root, status, system, ids):
+    """In the ship: the map in memory, or the body's saved map, that reaches the
+    ship, shown with the ship on it - only with a centre or a drop (saved or
+    live); the grid sits on the centre, else the drop (Coverage.anchor).
+    Nothing painted or saved; no map created. True when shown. A miss reads
+    coverstore.maps, ~7 ms for 3 maps."""
+    global _coverage
+    fix = ship_fix(status)
+    if fix is None:
+        return False
+    body, lat, lon, _, heading = fix
+    address = ids(system, body)[0] if ids else None
+    found = coverage.over(_coverage, body, lat, lon, system_address=address,
+                          saved=lambda name: coverstore.maps(name, system_address=address))
+    if found is None or not (found.centered or found.dropped):
+        return False
+    if found.system_address is None:
+        found.system_address = address
+    _coverage = found
+    _show_map(root, status, system, lat, lon, heading, True, body)
+    return True
 
 
 def _show_map(root, status, system, lat, lon, heading, in_reach, body):
@@ -366,26 +492,26 @@ def center_here():
 
 
 def border_here():
-    """The hotkey: where the SRV is now is the location's edge. Needs a centre
-    to measure from; without one the hint line says so for a few seconds."""
+    """The hotkey: where the SRV is now is the location's edge. Without a centre
+    the point is kept (Coverage.border_at) and becomes the border on Ctrl+Alt+Z."""
     global _drawn, _notice
     if not _in_srv or _coverage is None or _here is None:
         logger.debug("minimap: border hotkey outside the SRV, ignored")
         return
     if not _coverage.set_border(*_here):
-        _notice = ("set center first", time.monotonic() + NOTICE_S)
-        _drawn = None
-        return
+        _notice = ("border kept - set center", time.monotonic() + NOTICE_S)
     _drawn = None
     _remember()
-    logger.debug(f"minimap: border set at {_coverage.border_m:.0f} m")
+    logger.debug(f"minimap: border set at {_coverage.border_m:.0f} m" if _coverage.border_m
+                 else "minimap: border point kept until a centre is set")
 
 
 def _remember():
     """Hand the map to the two-second writer when it has changed."""
     global _saved
-    state = (_coverage, _coverage.version, _coverage.centered, _coverage.border_m,
-             _coverage.location, _coverage.system_address, _coverage.body_id)
+    state = (_coverage, _coverage.version, _coverage.drop, _coverage.centered, _coverage.border_m,
+             _coverage.border_at, _coverage.location, _coverage.system_address,
+             _coverage.body_id)
     if state == _saved:
         return
     if _coverage.name is None:
@@ -480,8 +606,11 @@ def _docked(system):
         return
     body, name = _coverage.body, _coverage.name
     mask = _coverage.mask.copy()
+    # Only what this map reaches: golden_groups' 4-rig fallback depends on every
+    # spot it is given (as scan._map_marks for Share map).
     marks = [(*_coverage.xy(lat, lon), code, depleted, value, rigs)
-             for lat, lon, code, depleted, value, rigs in _bookmarks(system, body)]
+             for lat, lon, code, depleted, value, rigs in _bookmarks(system, body)
+             if _coverage.reaches(lat, lon)]
     # The best coverage.GOLDEN_SHOWN by Cr/h, not every group that qualifies.
     spots = [(x, y, rigs, value or 0) for x, y, _, depleted, value, rigs in marks
              if not depleted]
@@ -620,21 +749,23 @@ def stop():
 
 # ---------------------------------------------------------------- settings
 
-def prefs(parent):
+def prefs(parent, worth=()):
     """The settings tab: the map on or off, whether it stays up through an
-    alt-tab, which corner it sits in, the saved maps, the materials switch and
-    the hotkeys.
+    alt-tab, which corner it sits in, the saved maps, the materials picker and
+    the hotkeys. `worth`: the materials over grounds.HIGH_VALUE_MIN.
 
     Rows come from `place_at`, not from numbers written here: hand-numbered
     rows put two widgets in row 9 the last time one was inserted.
     """
-    global _enabled, _corner, _keep, _free, _low_value
+    global _enabled, _corner, _keep, _ship, _free, _golden, _picked
     frame = nb.Frame(parent)
+    _golden = tk.StringVar(value=str(golden()))
     _enabled = tk.BooleanVar(value=enabled())
     _corner = tk.StringVar(value=corner())
     _keep = tk.BooleanVar(value=keep_up())
+    _ship = tk.BooleanVar(value=ship_view())
     _free = tk.BooleanVar(value=free_move())
-    _low_value = tk.BooleanVar(value=low_value_shown())
+    _picked = None
 
     rows = itertools.count()
 
@@ -656,6 +787,9 @@ def prefs(parent):
         variable=_enabled), pady=(10, 2))
     line(lambda f: nb.Checkbutton(
         f, text="Keep it up when you alt-tab out of the game", variable=_keep))
+    line(lambda f: nb.Checkbutton(
+        f, text=f"Show it in the ship under {SHIP_CEILING_M / 1000:.0f} km over a saved map - not painted",
+        variable=_ship))
     line(lambda f: nb.Label(f, text="Corner"),
          lambda f: nb.OptionMenu(f, _corner, _corner.get(), *CORNERS))
     line(lambda f: nb.Checkbutton(
@@ -665,6 +799,15 @@ def prefs(parent):
          lambda f: nb.Label(f, text="Drag it, any monitor, then double-click or Esc."))
     line(lambda f: nb.Label(f, text="Painted means driven within "
                                     f"{coverage.SCAN_RADIUS_M / 1000:.0f} km, not scanned."))
+    def steps(f):
+        # Readonly: the arrows step through GOLDEN_STEPS, nothing typed in. Tk sets
+        # the variable to the first value on creation, so it is set again after.
+        box = tk.Spinbox(f, values=GOLDEN_STEPS, textvariable=_golden, width=6,
+                         state="readonly", wrap=False)
+        _golden.set(str(golden()))
+        return box
+
+    line(lambda f: nb.Label(f, text="Golden circle radius from the most-rigs spot, m"), steps)
 
     count, size = coverstore.usage()
     amount = f"{size / 1048576:.1f} MB" if size >= 1048576 else f"{size / 1024:.0f} KB"
@@ -680,16 +823,23 @@ def prefs(parent):
     # cheap half is left out of both and out of the rates line under a body -
     # never out of a bookmark that already names one, nor out of a material
     # being mined right now. See rs_ui/main._materials.
-    line(lambda f: nb.Label(f, text="Materials"), pady=(6, 2))
-    line(lambda f: nb.Checkbutton(f, text="Show materials under "
-                                          f"{grounds.HIGH_VALUE_MIN:,} Cr/t",
-                                  variable=_low_value), pady=(2, 10))
+    line(lambda f: nb.Label(f, text="Materials in the lists"),
+         lambda f: nb.Button(f, text="Select...",
+                             command=lambda: _select_materials(frame.winfo_toplevel(), worth)),
+         pady=(6, 10))
 
     # The hotkeys: a modifier set and a key each. Taken on OK and registered
     # again at once; the rows under the map name them from the next frame.
-    line(lambda f: nb.Label(f, text="Hotkeys"), pady=(6, 2))
     _hotkeys.clear()
-    for key_id, name, _, _ in hotkey.ACTIONS:
+    if not hotkey.available():
+        line(lambda f: nb.Label(f, text="Hotkeys: not working here (no X11 grab). Type in chat instead:"),
+             pady=(6, 2))
+        for key_id, name, _, _ in hotkey.ACTIONS:
+            line(lambda f, name=name: nb.Label(f, text=name),
+                 lambda f, key_id=key_id: nb.Label(f, text=hotkey.chat_command(key_id)))
+    else:
+        line(lambda f: nb.Label(f, text="Hotkeys"), pady=(6, 2))
+    for key_id, name, _, _ in (hotkey.ACTIONS if hotkey.available() else ()):
         mods, key = hotkey.label(key_id).rsplit("+", 1)
         mod_var, key_var = tk.StringVar(value=mods), tk.StringVar(value=key)
         _hotkeys[key_id] = (mod_var, key_var)
@@ -704,6 +854,10 @@ def prefs(parent):
             return box
 
         line(lambda f, name=name: nb.Label(f, text=name), keys)
+    if hotkey.available() and not overlay.win32():
+        line(lambda f: nb.Label(f, text="Linux: keys work while Elite has the focus. Also in chat: "
+                                        + ", ".join(hotkey.chat_command(k) for k in hotkey.CHAT)),
+             pady=(4, 2))
     # Settings closed, by OK or the window's X, while placing: locked where it is.
     frame.bind("<Destroy>", lambda event: _lock(), add="+")
     return frame
@@ -870,7 +1024,9 @@ def _open_folder():
     try:
         os.makedirs(coverstore.ROOT, exist_ok=True)
         os.startfile(coverstore.ROOT)
-    except (OSError, AttributeError) as err:       # AttributeError: not Windows
+    except AttributeError:                         # not Windows: xdg-open via webbrowser
+        webbrowser.open(pathlib.Path(coverstore.ROOT).as_uri())
+    except OSError as err:
         logger.warning(f"minimap: could not open {coverstore.ROOT}: {err}")
 
 
@@ -883,10 +1039,17 @@ def prefs_changed():
             config.set(CORNER_KEY, _corner.get())
         if _keep is not None:
             config.set(KEEP_KEY, bool(_keep.get()))
+        if _ship is not None:
+            config.set(SHIP_KEY, bool(_ship.get()))
         if _free is not None:
             config.set(FREE_KEY, bool(_free.get()))
-        if _low_value is not None:
-            config.set(LOW_VALUE_KEY, bool(_low_value.get()))
+        if _picked:
+            config.set(MATERIALS_KEY, list(_picked))
+        elif _picked is not None:
+            config.delete(MATERIALS_KEY, suppress=True)       # none ticked: the default
+        if _golden is not None:
+            config.set(GOLDEN_KEY, int(_golden.get()))
+            apply_golden()
         changed = False
         for key_id, _, _, config_key in hotkey.ACTIONS:
             if key_id not in _hotkeys:

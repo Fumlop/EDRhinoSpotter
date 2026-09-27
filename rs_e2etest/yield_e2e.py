@@ -164,20 +164,35 @@ def child():
     check("the deposit measures 136 t", yields.capacity(row(diamond)), (136, 136, 1))
     yields.TALLY._writes.delay = 0.05
 
-    # 6. Mining it again after the regen opens a second cycle rather than
-    #    reopening the closed one.
+    # 6. Leftovers refined with the Depleted mark on go into the closed cycle;
+    #    the Mined column stays empty (it read "1 t", 2026-09-25, bookmark 122).
+    feed(_restamp([{"event": "MiningRefined", "Type": "$diamond_name;"}] * 3))
+    late = yields.cycles(row(diamond))
+    check("6 leftovers after the mark: still one cycle", len(late), 1)
+    check("6 leftovers in the closed cycle", late[0]["tons"], {"Diamond": 139})
+    check("6 Mined column stays empty", yields.short(row(diamond)), "")
+    check("6 the deposit measures 139 t", yields.capacity(row(diamond)), (139, 139, 1))
+    old = dict(row(diamond), depleted_at=_stamp(-15 * 86400))
+    yields.add(old, {"Diamond": 1}, _stamp(0))
+    check("6 mark 15 d old: a new cycle", [c.get("ended") for c in yields.cycles(old)],
+          ["depleted", None])
+
+    # 6a. Mark taken off, mined again: a second cycle, the closed one untouched.
+    check("6a mark taken off", cards.set_depleted(dict(row(diamond), id=diamond), False), True)
     feed(_restamp([{"event": "MiningRefined", "Type": "$diamond_name;"}] * 4))
     again = yields.cycles(row(diamond))
     check("a second cycle", len(again), 2)
-    check("the closed one untouched", again[0]["tons"], {"Diamond": 136})
+    check("the closed one untouched", again[0]["tons"], {"Diamond": 139})
     check("the new one has the 4 t", again[1]["tons"], {"Diamond": 4})
 
-    # 6b. The Mined column: the best measured cycle once there is one, and what
-    #     is in the open cycle until then.
+    # 6b. The Mined column is the current cycle; the card keeps the measured
+    #     capacity beside it.
     from rs_ui import scan
-    check("Mined column reads the measured cycle", yields.short(row(diamond)), "136 t")
-    check("Mined column is a floor while nothing has measured it",
-          yields.short(row(alex)), "≥46 t")
+    check("Mined column reads the current cycle", yields.short(row(diamond)), "4 t")
+    check("card: this cycle and what the deposit held",
+          yields.describe(row(diamond)), "4 t this cycle  ·  held 139 t")
+    check("card before any measured cycle: the floor is the cycle, said once",
+          yields.describe(row(alex)), "46 t this cycle")
     check("header and row line up",
           len(scan._columns("Material", "Rigs", "Brg", "Dist", "Mined", "Est. left")),
           len(scan._columns("Alexandrite", "4", "359°", "5.7 km", "≥46 t",
@@ -228,10 +243,143 @@ def child():
     check("rigs do", scan._marks_key(body) != was, True)
 
     # 7. The regen assumption, on the mark just written and on an old one.
-    fresh = row(diamond)
+    fresh = dict(row(diamond), depleted_at=_stamp(0))   # 6a took the mark off
     check("fresh depletion is not regrown", yields.regenerated(fresh), False)
     old = dict(fresh, depleted_at=_stamp(-15 * 86400))
     check("15 days past is regrown", yields.regenerated(old), True)
+
+    # 8. An open cycle expires REGEN_DAYS after its first ton: the Mined column
+    #    empties, and the next ton opens a new cycle; the expired one never
+    #    counts as a measurement.
+    later = datetime.now(timezone.utc) + timedelta(days=15)
+    check("8 open cycle past 14 d: Mined column empty",
+          yields.short(row(diamond), now=later.strftime("%Y-%m-%dT%H:%M:%SZ")), "")
+    record = row(diamond)
+    yields.add(record, {"Diamond": 2}, later.strftime("%Y-%m-%dT%H:%M:%SZ"))
+    check("8 next ton after 14 d: the old cycle ended expired",
+          [cycle.get("ended") for cycle in yields.cycles(record)],
+          ["depleted", "expired", None])
+    check("8 new cycle holds only the new tons", yields.cycles(record)[-1]["tons"],
+          {"Diamond": 2})
+    check("8 expired cycle is not a measurement", len(yields.measured(record)), 1)
+    stale = {"amount": "High", "yield": {"cycles": [
+        {"from": _stamp(-20 * 86400), "tons": {"Diamond": 50}, "amount_at_start": "High"}]}}
+    check("8 Depleted on a cycle past 14 d: not closed as depleted",
+          yields.close(stale), False)
+    check("8 it ended expired, not a measurement",
+          (yields.cycles(stale)[0]["ended"], yields.measured(stale)), ("expired", []))
+
+    # 9. regrow(): a Depleted mark 15 days old comes off, Amount 'Depleted'
+    #    becomes unread, the cycles stay; a fresh mark stays.
+    spotcard.save(dict(row(diamond), depleted_at=_stamp(0)), id=diamond)   # 6a took it off
+    spotcard.save(dict(row(alex), depleted_at=_stamp(-15 * 86400), amount="Depleted"), id=alex)
+    check("9 regrow takes off the old mark only", yields.regrow(), 1)
+    check("9 old mark gone", row(alex).get("depleted_at"), None)
+    check("9 Amount Depleted -> unread", row(alex).get("amount"), None)
+    check("9 cycles kept", len(yields.cycles(row(alex))), 1)
+    check("9 fresh mark stays", bool(row(diamond).get("depleted_at")), True)
+    check("9 the old date is kept in regrown",
+          [entry["depleted_at"][:10] for entry in row(alex).get("regrown", [])],
+          [_stamp(-15 * 86400)[:10]])
+    hud = spotcard.save({"system": SYSTEM, "planet_name": BODY, "latitude": LAT,
+                         "longitude": LON, "planet_radius": RADIUS, "commodity": "Opal",
+                         "amount": "Depleted", "marked_at": _stamp(-16 * 86400)})
+    check("9 Amount Depleted off the HUD, 16 d old, regrows too", yields.regrow(), 1)
+    check("9 and reads unread", row(hud).get("amount"), None)
+
+    # 10. RhinoData open while mining: Mined set in place once the tons stop.
+    import time
+    import tkinter as tk
+    from rs_core import bodies, spotmark
+    from rs_ui import main, scan
+    main.QUIET_S = 0.3
+    root = tk.Tk()
+    root.withdraw()
+    main.build(root)
+    main._cancel_landed()
+    register = bodies.Register()
+    register.adopt(SYSTEM, [{"name": BODY, "ground": "metal-rich", "distance": 10.0,
+                             "locations": 7, "volcanism": "", "planet_class": "Metal rich body"}])
+    fresh = bookmark("Diamond", LAT, _metres_east(LAT, LON, 3000.0, RADIUS))
+    folded = spotcard.save({"system": SYSTEM, "planet_name": BODY, "latitude": LAT,
+                            "longitude": _metres_east(LAT, LON, 9000.0, RADIUS),  # 6 km: past scan.UNFOLD_M
+                            "planet_radius": RADIUS, "commodity": "Diamond", "rigs": 2,
+                            "location_index": 2, "marked_at": _stamp(0)})
+    status(LAT, _metres_east(LAT, LON, 3000.0, RADIUS))
+    window = scan.show(root, register, main._sheet, None, variable=tk.StringVar(),
+                       materials=("All",), here=BODY, location=1)
+    window.geometry("+-4000+-4000")
+    scan._state["selected"] = scan._key(row(fresh))
+    scan._draw()
+    draws = []
+    real_draw = scan._draw
+
+    def counted():
+        start = time.perf_counter()
+        real_draw()
+        draws.append(time.perf_counter() - start)
+    scan._draw = counted
+
+    def pump(seconds):
+        end = time.monotonic() + seconds
+        while time.monotonic() < end:
+            root.update()
+            time.sleep(0.01)
+
+    def burst(tons):
+        for _ in range(tons):
+            load.journal_entry("E2E", False, SYSTEM, None,
+                               dict(diamond_line, timestamp=_stamp(0)), {})
+            pump(0.1)
+
+    diamond_line = next(e for e in refined if spotmark.refined_material(e) == "Diamond")
+    key = scan._key(row(fresh))
+    check("10 the fresh bookmark's row is drawn", key in scan._mined, True)
+    check("10 a folded location's row is not drawn", scan._key(row(folded)) in scan._mined, False)
+    label = scan._mined.get(key)
+    pump(0.2)
+    draws.clear()
+    burst(3)
+    check("10 nothing while tons keep coming", len(draws), 0)
+    pump(0.6)
+    check("10 first burst: card had no tons line, one _draw", len(draws), 1)
+    check("10 the tons are in the row by then",
+          yields.cycles(row(fresh))[-1]["tons"], {"Diamond": 3})
+    label = scan._mined[key]
+    card = scan._card_tons["label"]
+    draws.clear()
+    real = scan.refresh_mined
+    spent = []
+
+    def timed():
+        start = time.perf_counter()
+        real()
+        spent.append(time.perf_counter() - start)
+    scan.refresh_mined = timed
+    main.scan.refresh_mined = timed
+    burst(2)
+    pump(0.6)
+    check("10 second burst: no _draw", len(draws), 0)
+    check("10 same Mined widget, new tons", (scan._mined[key] is label,
+                                             label.cget("text").strip()), (True, "5 t"))
+    check("10 same card tons widget, new text", (scan._card_tons["label"] is card,
+                                                 card.cget("text").split(" t")[0]), (True, "5"))
+    scan._draw()
+    print(f"     _draw {draws[-1] * 1000:.1f} ms, in place {spent[-1] * 1000:.1f} ms")
+    load.journal_entry("E2E", False, SYSTEM, None,
+                       dict(diamond_line, timestamp="2020-01-01T00:00:00Z"), {})
+    check("10 a replayed ton schedules nothing", main._quiet, None)
+    window.destroy()
+    burst(1)
+    try:
+        pump(0.6)
+        raised = None
+    except Exception as err:                 # noqa: BLE001 - any raise is the failure
+        raised = repr(err)
+    check("10 window closed: timer flushes, no raise",
+          (raised, main._quiet, yields.cycles(row(fresh))[-1]["tons"]),
+          (None, None, {"Diamond": 6}))
+    root.destroy()
 
     for name, ok, detail in results:
         print(f"{'PASS' if ok else 'FAIL'} {name}" + ("" if ok else f"  [{detail}]"))

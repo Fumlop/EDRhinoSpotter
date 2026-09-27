@@ -19,7 +19,7 @@ import logging.handlers
 import os
 import sys
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import filedialog, messagebox
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
@@ -37,7 +37,7 @@ sys.modules["myNotebook"] = tk
 
 from rs_core import database, palette, paths       # noqa: E402
 from rs_core.logging import logger                 # noqa: E402
-from rs_standalone.journal import POLL_MS, Journal  # noqa: E402
+from rs_standalone.journal import POLL_MS, Journal, newest  # noqa: E402
 from rs_ui import main, scan                       # noqa: E402
 
 LOG_PATH = os.path.join(database.ROOT, "log", "rhinospotter.log")
@@ -112,23 +112,62 @@ class App:
             self.redraw_key = key
 
     def open_settings(self):
-        """main.prefs in a window with OK and Cancel; OK is EDMC's prefs_changed."""
+        """main.prefs in a window with OK and Cancel; OK is EDMC's prefs_changed.
+        Above it the journal folder, `journaldir` in standalone.json."""
         if self.settings is not None and self.settings.winfo_exists():
             self.settings.lift()
             return
         window = self.settings = tk.Toplevel(self.root)
         window.title("RhinoSpotter settings")
+        folder = tk.StringVar(value=_config.config.get_str("journaldir") or "")
+        row = tk.Frame(window)
+        row.pack(fill="x", padx=10, pady=(10, 0))
+        tk.Label(row, text="Journal folder").pack(side="left")
+
+        def browse():
+            picked = filedialog.askdirectory(parent=window, mustexist=True,
+                                             initialdir=folder.get() or paths.journal_dir())
+            if picked:
+                folder.set(os.path.normpath(picked))
+        tk.Button(row, text="Default", command=lambda: folder.set("")).pack(side="right")
+        tk.Button(row, text="Browse...", command=browse).pack(side="right", padx=(0, 6))
+        found = tk.Label(window, anchor="w", justify="left", wraplength=520)
+        found.pack(fill="x", padx=10)
+
+        def describe(*_):
+            path = folder.get()
+            if not path:
+                found.config(text=r"Default: Saved Games\Frontier Developments\Elite Dangerous")
+                return
+            latest = newest(path)
+            found.config(text=f"{path}\nNewest journal: {os.path.basename(latest)}" if latest
+                         else f"{path}\nNo Journal.*.log in this folder")
+        folder.trace_add("write", describe)
+        describe()
         main.prefs(window).pack(fill="both", expand=True)
         buttons = tk.Frame(window)
         buttons.pack(fill="x", padx=10, pady=10)
 
         def ok():
             main.prefs_changed()
+            chosen = folder.get().strip()
+            if chosen != (_config.config.get_str("journaldir") or ""):
+                if chosen:
+                    _config.config.set("journaldir", chosen)
+                else:
+                    _config.config.delete("journaldir")
+                self.move_journal()
             window.destroy()
         tk.Button(buttons, text="OK", width=10, command=ok).pack(side="right")
         tk.Button(buttons, text="Cancel", width=10, command=window.destroy).pack(
             side="right", padx=(0, 6))
         window.bind("<Escape>", lambda event: window.destroy())
+
+    def move_journal(self):
+        """Tail the newest journal of paths.journal_dir() again: the folder setting moved."""
+        paths.forget()
+        self.journal = Journal(paths.journal_dir(), main.journal_entry)
+        self.journal.start()
 
     def close(self):
         for after_id in self.after_ids.values():

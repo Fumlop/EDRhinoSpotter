@@ -1,0 +1,23 @@
+name: x11-e2e
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["*/linux-hotkeys"]
+
+jobs:
+  x11:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: sudo apt-get update && sudo apt-get install -y xvfb xdotool libx11-6 python3-tk
+      - run: pip install pillow
+      - run: xvfb-run -a python rs_e2etest/x11_e2e.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x11-e2e-report
+          path: rs_e2etest/out/

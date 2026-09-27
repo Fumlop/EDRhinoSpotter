@@ -9,15 +9,16 @@ come back through _on_ui. Tk is not thread-safe, and a widget written from a
 worker fails minutes later somewhere unrelated.
 """
 
+import sqlite3
 import threading
 import time
 import tkinter as tk
 from datetime import datetime, timezone
 
 from rs_core import (bodies, cards, coverage, database, deposit, grounds, instance, migrate,
-                     palette, spansh, spotcard, spotmark, store, update, yields)
+                     palette, share, spansh, spotcard, spotmark, store, system, update, yields)
 from rs_core.logging import logger
-from rs_ui import hotkey, minimap, scan
+from rs_ui import clipboard, hotkey, minimap, scan
 
 try:
     from theme import theme
@@ -41,6 +42,7 @@ _card_token = 0          # only the newest render may write to the status line
 _writes = store.Debounced()
 _register = bodies.Register(on_change=_writes, on_arrive=store.load)
 _sheet = None            # rs_core.grounds.Sheet, read once at startup
+_worth_names = None     # _worth(), from _sheet
 # SystemAddress -> this session's Spansh state: "undiscovered", "asking" or
 # "answered". Any entry means Spansh is not asked again this session.
 _spansh = {}
@@ -57,6 +59,12 @@ _tally = yields.TALLY
 # have no Status.json position behind them now.
 _started_at = None
 _replayed = 0
+# No ton for this long: the burst is over, the tally is written and an open
+# RhinoData redraws its Mined column. s.
+QUIET_S = 5.0
+_quiet = None            # the Tk after() id of that timer
+_clip_seen = None        # the clipboard text _check_clipboard last looked at
+_clip_sequence = None    # clipboard.sequence() at that look
 _hint = None             # the line under the buttons: honk, or FSS when the honk brought nothing
 
 _frame = None
@@ -76,7 +84,6 @@ ALL_MATERIALS = "All"
 _card_button = None      # Bookmark, until there is an update to install
 _landed_after = None     # the pending look at whether we are on the ground
 _poll_error = None       # the last failure the poll logged, so it logs each kind once
-_update_after = None     # the pending hourly look for a new release
 _loc = None              # tk.StringVar - mining location index
 _rigs = None             # tk.StringVar - rigs on the patch
 _material = None         # tk.StringVar - the material a new bookmark is named after
@@ -85,7 +92,6 @@ _density = None          # tk.StringVar - the deposit's HUD Density, or NOT_READ
 _amount = None           # tk.StringVar - the deposit's HUD Amount, or NOT_READ
 _search = None           # tk.StringVar - bookmark search text, not used yet
 _menu = None             # the Material OptionMenu, refilled when the settings change
-_offered = None          # (key, materials) - see _materials
 SEARCH_SHOWN = False     # the Search row under Bookmark, off until search works
 # Density and Amount before anything is picked. Not required: a bookmark without
 # them is still a bookmark, it just cannot say how many tons are left.
@@ -94,8 +100,12 @@ NOT_READ = "-"
 
 def start(plugin_dir, owner=OWNER):
     global _sheet, _refused, _started_at
-    # Before anything touches the data folder. A folder that cannot hold the
-    # lock file runs unlocked, as before the lock existed.
+    logger.info(f"running on {system.describe()}")
+    # Before the lock: acquire() creates the data folder, and adopt_legacy()
+    # copies only into a folder that is not there yet.
+    database.adopt_legacy()
+    # Before anything else touches the data folder. A folder that cannot hold
+    # the lock file runs unlocked, as before the lock existed.
     try:
         _refused = instance.acquire(owner)
         # Held by an EDMC still exiting after a restart: up to LOCK_WAIT_S
@@ -119,10 +129,13 @@ def start(plugin_dir, owner=OWNER):
     # The PNG texture set of 5.5.0 and older, where an install was unzipped
     # over the last one by hand.
     coverage.clear_old_textures()
+    minimap.apply_golden()
+    yields.regrow()
     _started_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     _sheet = grounds.Sheet()
     if not _sheet.loaded:
         logger.warning(f"no mining_sheet.json: {_sheet.error}")
+    minimap.seed_materials(_worth(), cards.materials_marked())
     return "RhinoSpotter"
 
 
@@ -134,7 +147,7 @@ def refused():
 
 
 def build(parent, updates=True):
-    """The panel. `updates`: look for a release hourly; standalone.py passes False."""
+    """The panel. `updates`: look for a release once, at start; standalone.py passes False."""
     global _frame, _status, _scan_count, _card_button, _landed_after, _hint
     global _loc, _rigs, _material, _density, _amount, _search, _menu, _filter
 
@@ -179,6 +192,9 @@ def build(parent, updates=True):
     tk.Label(_frame, text="Material", anchor="w").grid(row=2, column=0, sticky="w", padx=2)
     _menu = tk.OptionMenu(_frame, _material, NO_MATERIAL, *_materials())
     _style_menu(_menu)
+    scan.letter_jump(_menu, skip=(NO_MATERIAL,))
+    if not _materials():
+        scan.no_materials_hint(_menu)
     _menu.grid(row=2, column=1, columnspan=3, sticky="we", padx=2)
 
     # What the HUD says about the targeted deposit. Neither is in the journal.
@@ -308,7 +324,8 @@ def open_scan():
         scan.show(_frame.winfo_toplevel(), _register, _sheet, _focus(),
                   variable=_filter,
                   materials=(ALL_MATERIALS,) + _materials(),
-                  here=spotmark.body_here(spotmark.read_status()))
+                  here=spotmark.body_here(spotmark.read_status()),
+                  location=_int(_loc.get()) if _loc is not None else None)
     except Exception as err:                       # a broken window must not
         logger.exception("RhinoData failed")       # take the card flow with it
         _set_status(f"no scan window: {err}")
@@ -364,6 +381,46 @@ def _poll_landed():
         if repr(err) != _poll_error:
             logger.warning(f"landed poll failed, retrying every second: {err!r}", exc_info=True)
             _poll_error = repr(err)
+    # Own try: a failing Status.json read must not stop the import.
+    try:
+        _check_clipboard()
+    except Exception:
+        logger.exception("clipboard import failed")
+
+
+def _check_clipboard():
+    """Import a RhinoData code on the clipboard, once per clipboard text.
+
+    Skips codes this install shared (share.mine) and bookmarks already here
+    (cards.nearby). Non-text clipboard content raises TclError: nothing to do.
+    """
+    global _clip_seen, _clip_sequence
+    # Windows: the text is read only when the sequence number moved, so a
+    # multi-MB copy elsewhere is not read and compared once a second.
+    number = clipboard.sequence()
+    if number is not None and number == _clip_sequence:
+        return
+    try:
+        text = _frame.clipboard_get()
+    except tk.TclError:
+        return      # no text, or another program has it open: retried next poll
+    _clip_sequence = number
+    if text == _clip_seen:
+        return
+    _clip_seen = text
+    if share.PREFIX not in text:
+        return
+    try:
+        state, spot = share.take(text)
+    except (sqlite3.Error, OSError) as err:
+        logger.warning(f"could not import a shared bookmark: {err}")
+        _note(f"shared bookmark not imported: {err}")
+        return
+    if state == "imported":
+        _note(f"imported {spot['commodity']} on {spot['planet_name']}")
+        scan.refresh()
+    elif state == "known":
+        _note(f"shared {spot['commodity']} on {spot['planet_name']} is already bookmarked")
 
 
 def _cancel_landed():
@@ -382,17 +439,11 @@ def stop():
     teardown by design; left alone it fires once against a frame that is no
     longer there.
     """
-    global _landed_after, _done_after, _update_after
+    global _landed_after, _done_after
     if _refused is not None:
         return
     _landed_after = _cancel_landed()
     _done_after = _cancel_done()
-    if _update_after and _frame:
-        try:
-            _frame.after_cancel(_update_after)
-        except (ValueError, tk.TclError):
-            pass
-    _update_after = None
     hotkey.stop()
     minimap.stop()
     # Last, and not through the timer: EDMC is going, and a scan waiting on a
@@ -412,36 +463,24 @@ def stop():
 def _materials():
     """What the Material dropdown and the RhinoData picker offer.
 
-    The whole list when the settings tab says so. Otherwise the ones worth the
-    trip - grounds.HIGH_VALUE_MIN - plus two kinds of exception that have to
-    stay pickable however little they pay:
-
-      every material already bookmarked, because cards.nearby() matches a
-      second mark to the first one on the material's name. Drop the name and
-      that bookmark can never be marked again: the re-mark lands beside it as
-      a duplicate instead of refreshing its Amount and Density.
-
-      whatever either control holds right now - _prefill_material puts a
-      material in the box when it is being mined, and a value with no menu
-      entry behind it cannot be chosen again once it is left.
-
-    Kept until the bookmarks change, the switch moves or either control does:
-    this reads the database, and the scan window asks on every redraw.
+    Exactly the ones picked on the settings tab (minimap.materials_shown;
+    default the ones over grounds.HIGH_VALUE_MIN), plus whatever either
+    control holds right now - _prefill_material puts a material in the box
+    when it is being mined, and a value with no menu entry behind it cannot
+    be chosen again once it is left. A bookmarked material that is not
+    picked is not offered: re-marking it needs it picked again.
     """
-    global _offered
     held = tuple(var.get() for var in (_material, _filter) if var is not None)
-    key = (minimap.low_value_shown(), database.revision(), held)
-    if _offered is not None and _offered[0] == key:
-        return _offered[1]
-    if key[0]:
-        names = tuple(spotmark.MATERIALS)
-    else:
-        kept = set(_sheet.worth(spotmark.MATERIALS))
-        marked = cards.materials_marked()
-        names = tuple(name for name in spotmark.MATERIALS
-                      if name in kept or name.lower() in marked or name in held)
-    _offered = (key, names)
-    return names
+    kept = set(minimap.materials_shown(_worth()))
+    return tuple(name for name in spotmark.MATERIALS if name in kept or name in held)
+
+
+def _worth():
+    """The materials over grounds.HIGH_VALUE_MIN. Once: the sheet is read once."""
+    global _worth_names
+    if _worth_names is None:
+        _worth_names = tuple(_sheet.worth(spotmark.MATERIALS))
+    return _worth_names
 
 
 def _fill_menu():
@@ -457,6 +496,9 @@ def _fill_menu():
     inner.delete(0, "end")
     for name in (NO_MATERIAL,) + _materials():
         inner.add_command(label=name, command=lambda pick=name: _material.set(pick))
+    scan.letter_jump(_menu, skip=(NO_MATERIAL,))
+    if not _materials():
+        scan.no_materials_hint(_menu)
 
 
 def prefs(parent):
@@ -465,14 +507,14 @@ def prefs(parent):
         frame = nb.Frame(parent)
         nb.Label(frame, text=refused()).grid(row=0, column=0, sticky="w", padx=10, pady=10)
         return frame
-    return minimap.prefs(parent)
+    return minimap.prefs(parent, worth=_worth())
 
 
 def prefs_changed():
     if _refused is not None:
         return
     minimap.prefs_changed()
-    # The switch may have taken materials out of the list or put them back, and
+    # The pick may have taken materials out of the list or put them back, and
     # _on_material_changed only fires when the picked one moves.
     _fill_menu()
     if _frame is not None and scan.is_open():
@@ -496,6 +538,7 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
         _cmdr = cmdr
 
     minimap.srv_event(entry)
+    hotkey.chat(entry)
 
     # Landing or dropping the SRV fills Loc in. The nearest bookmark within 10 km
     # on this body says which location this is, and it was checked when it was made;
@@ -522,6 +565,7 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
         _refresh_scan_count()
         # scan.show() would raise the window over the game on every jump.
         if _register.system != before:
+            yields.regrow()     # a session can outlast REGEN_DAYS
             scan.arrived()
 
     # The honk: ask Spansh for the bodies the journal will not describe until
@@ -562,9 +606,29 @@ def _refined(entry, system):
         _replayed += 1
         return
     status = spotmark.read_status()
-    _tally.refined(status, system or _system, material, entry.get("timestamp"))
+    if _tally.refined(status, system or _system, material, entry.get("timestamp")):
+        _quiet_later()
     if _material is not None and spotmark.on_ground(status):
         _prefill_material(material)
+
+
+def _quiet_later():
+    """(Re)start the QUIET_S timer: every ton counted into a bookmark pushes it
+    back; by-products and unplaced tons do not."""
+    global _quiet
+    if _frame is None:
+        return
+    if _quiet is not None:
+        _frame.after_cancel(_quiet)
+    _quiet = _frame.after(int(QUIET_S * 1000), _burst_over)
+
+
+def _burst_over():
+    """No ton for QUIET_S: write the tally, set RhinoData's Mined in place."""
+    global _quiet
+    _quiet = None
+    _tally.flush()
+    scan.refresh_mined()
 
 
 def _prefill_material(refined):
@@ -600,11 +664,10 @@ def _add_spansh(system, address, answer):
         _spansh[address] = "answered"
         _spansh_known[address] = known
         spansh.mark_answered(address)
-        # Hosted (standalone.py): its own redraw picks the bodies up, and
-        # open_scan would pull the window over the game.
-        if (_register.add_known(system, address, found) and scan.is_open()
-                and not scan.hosted()):
-            open_scan()
+        # Redrawn in place: scan.show lifts the window and takes the focus
+        # from the game, which is where the honk was pressed.
+        if _register.add_known(system, address, found):
+            scan.refresh_rail()
     _refresh_scan_count()
 
 
@@ -672,14 +735,16 @@ def _render_card(spot, token):
     """The file name is not worth reading - either the bookmark is there or
     the reason it is not."""
     try:
-        old = cards.nearby(spot)
+        # Any material: a mark on a bookmarked spot corrects that bookmark.
+        old = cards.nearby(spot, any_material=True)
         if old is None:
             spotcard.save(spot)
             message = None
         else:
             spotcard.save(cards.updated(old, spot), id=old["id"])
-            message = (f"updated Rigs/Amount/Density of the {spot.get('commodity')} "
-                       f"bookmark {old['distance_m']:.0f} m away")
+            was, now = old.get("commodity"), spot.get("commodity")
+            what = f"{was} -> {now}" if was and now and was != now else now
+            message = f"updated the {what} bookmark {old['distance_m']:.0f} m away"
     except Exception as err:
         message = f"no bookmark: {err}"
     _on_ui(_report, message, token)
@@ -696,18 +761,13 @@ def _report(message, token):
     _set_done(DONE_TEXT if not message or message.startswith("updated") else "")
 
 
-# How often a running EDMC looks for a new release. Once at start was all it
-# did, and a session left open for a day never heard of one.
-UPDATE_CHECK_MS = 60 * 60 * 1000
-
-
 def _check_updates():
-    """Look for a release now, and again in an hour."""
-    global _update_after
+    """Look for a release, once, at start. Not again: a release found mid-session
+    turns the Bookmark button into Update, and a press meant to bookmark
+    updated instead."""
     if not _frame:
         return
     update.check_async(_on_update_checked)
-    _update_after = _frame.after(UPDATE_CHECK_MS, _check_updates)
 
 
 def _on_update_checked(tag, newer):

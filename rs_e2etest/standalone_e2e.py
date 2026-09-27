@@ -16,6 +16,7 @@ import glob
 import json
 import os
 import queue
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -224,7 +225,7 @@ def wait(until, seconds):
 # ------------------------------------------------------------ part A, in process
 
 import standalone                                        # noqa: E402
-from rs_core import database, instance                  # noqa: E402
+from rs_core import database, instance, paths           # noqa: E402
 from rs_ui import hotkey, main, minimap, scan            # noqa: E402
 
 assert database.PATH.startswith(ENV_A["LOCALAPPDATA"]), database.PATH
@@ -295,6 +296,10 @@ def part_a():
           ui(lambda: (main._system, main._cmdr)) == (SYSTEM, CMDR),
           ui(lambda: (main._system, main._cmdr)))
     check("2 register holds the system", ui(lambda: main._register.system) == SYSTEM)
+    check("18 StartUp after the trim: StarSystem, SystemAddress, and Body/BodyID only together",
+          {"StarSystem", "SystemAddress"} <= set(startup) <= {"timestamp", "event", "StarSystem",
+                                                            "SystemAddress", "Body", "BodyID"}
+          and ("Body" in startup) == ("BodyID" in startup), sorted(startup))
     check("10a dock packed in the middle pane with no bodies", ui(dock_in_middle),
           ui(lambda: str(dock_master())))
     button = ui(lambda: main._card_button)
@@ -411,19 +416,76 @@ def part_a():
                 return hit
         return None
     import tkinter as tk
-    switch = ui(lambda: find(app.settings, tk.Checkbutton, "Show materials under"))
+    select = ui(lambda: find(app.settings, tk.Button, "Select..."))
     ok = ui(lambda: find(app.settings, tk.Button, "OK"))
-    check("10 Settings window with the minimap tab", switch is not None and ok is not None)
-    if switch is not None and ok is not None:
-        ui(switch.invoke)
+    check("10 Settings window with the minimap tab", select is not None and ok is not None)
+    if select is not None and ok is not None:
+        from rs_core import spotmark
+        picked = list(spotmark.MATERIALS[:2])
+        ui(lambda: setattr(minimap, "_picked", picked))      # what Select... leaves on OK
         ui(ok.invoke)
         with open(os.path.join(ROOT_A, "standalone.json"), encoding="utf-8") as handle:
             stored_config = json.load(handle)
-        check("10 OK writes rhinospotter_low_value", stored_config.get("rhinospotter_low_value")
-              is True, stored_config.get("rhinospotter_low_value"))
-        menu_after = ui(lambda: main._menu["menu"].index("end"))
-        check("10 Material menu refilled with the cheap materials", menu_after > menu_before,
-              f"{menu_before} -> {menu_after} entries")
+        check("10 OK writes rhinospotter_materials", stored_config.get("rhinospotter_materials")
+              == picked, stored_config.get("rhinospotter_materials"))
+        labels = ui(lambda: [main._menu["menu"].entrycget(i, "label")
+                             for i in range((main._menu["menu"].index("end") or 0) + 1)])
+        held = {v for v in ui(lambda: (main._material.get(), main._filter.get()
+                                       if main._filter is not None else "")) if v}
+        offered = set(labels) - {main.NO_MATERIAL}
+        check("10 Material menu offers exactly the picked ones (plus the one in the box)",
+              set(picked) <= offered <= set(picked) | held, f"{sorted(offered)}")
+        ui(app.open_settings)
+        ok = ui(lambda: find(app.settings, tk.Button, "OK"))
+        ui(lambda: setattr(minimap, "_picked", []))
+        ui(ok.invoke)
+        with open(os.path.join(ROOT_A, "standalone.json"), encoding="utf-8") as handle:
+            stored_config = json.load(handle)
+        check("10 none picked and OK: rhinospotter_materials deleted, no raise",
+              "rhinospotter_materials" not in stored_config and not errors,
+              errors[0][-200:] if errors else stored_config.get("rhinospotter_materials"))
+
+    # 17. Journal folder
+    jdir_c = os.path.join(OUT, "journals-c")
+    os.makedirs(jdir_c)
+    journal_c = os.path.join(jdir_c, "Journal.2099-01-01T000000.01.log")
+    with open(journal_c, "w", encoding="utf-8", newline="") as handle:
+        handle.writelines(HEAD)
+    shutil.copy2(STATUS, os.path.join(jdir_c, "Status.json"))
+    standalone.filedialog.askdirectory = lambda **kw: jdir_c
+
+    def settings_button(prefix):
+        return ui(lambda: find(app.settings, tk.Button, prefix))
+    ui(app.open_settings)
+    ui(settings_button("Browse...").invoke)
+    shown = ui(lambda: find(app.settings, tk.Label, jdir_c))
+    check("17 Browse: the row names the folder and its newest journal",
+          shown is not None and "Journal.2099-01-01T000000.01.log" in str(shown.cget("text")),
+          shown and shown.cget("text"))
+    ui(settings_button("Cancel").invoke)
+    with open(os.path.join(ROOT_A, "standalone.json"), encoding="utf-8") as handle:
+        check("17 Cancel: journaldir unchanged", json.load(handle).get("journaldir") == JDIR_A)
+    check("17 Cancel: still tailing the first folder", ui(lambda: app.journal.folder) == JDIR_A)
+    ui(app.open_settings)
+    ui(settings_button("Browse...").invoke)
+    ui(settings_button("OK").invoke)
+    with open(os.path.join(ROOT_A, "standalone.json"), encoding="utf-8") as handle:
+        check("17 OK: journaldir stored", json.load(handle).get("journaldir") == jdir_c)
+    check("17 OK: tailing the new folder's newest journal, Status.json from there",
+          ui(lambda: (app.journal.path, paths.journal_dir())) == (journal_c, jdir_c),
+          ui(lambda: (app.journal.path, paths.journal_dir())))
+    delivered.clear()
+    with open(journal_c, "a", encoding="utf-8", newline="") as handle:
+        handle.write(line("Music", MusicTrack="E2E_folder_c"))
+    check("17 a line appended there is delivered",
+          wait(lambda: any(d[2].get("MusicTrack") == "E2E_folder_c" for d in delivered), 4))
+    ui(app.open_settings)
+    ui(settings_button("Default").invoke)
+    ui(settings_button("OK").invoke)
+    with open(os.path.join(ROOT_A, "standalone.json"), encoding="utf-8") as handle:
+        check("17 Default + OK: journaldir cleared", "journaldir" not in json.load(handle))
+    check("17 Default: no longer tailing the chosen folder", ui(lambda: app.journal.folder) != jdir_c,
+          ui(lambda: app.journal.folder))
 
     check("10a Tk callback exceptions", not errors, errors[0][-300:] if errors else "")
 
