@@ -702,6 +702,9 @@ FILL = _mix(palette.BG, palette.ACCENT, 0.22)
 EDGE = _mix(palette.BG, palette.ACCENT, 0.85)
 RING = _mix(palette.BG, palette.GOOD, 0.4)
 BORDER = palette.rgb(palette.FG_SOFT)      # not WARN: that is the mask edge
+# The 1 km grid: dim yellow, reads on the driven area where RULE did not; under
+# the mask edge (WARN) and the gold circles.
+GRID = _mix(palette.BG, palette.WARN, 0.315)
 # Bookmarks: a pale dot, a hollow grey ring once depleted. Told apart by
 # shape, not red against green.
 MARK = palette.rgb(palette.FG_SOFT)
@@ -1050,8 +1053,8 @@ def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True, view=VIEW_M
     steps = int(REACH_M // GRID_M)
     for k in range(-steps, steps + 1):
         gx, gy = at(k * GRID_M, k * GRID_M)
-        draw.line([(gx, -oy), (gx, big - oy)], fill=palette.rgb(palette.RULE), width=SS)
-        draw.line([(-ox, gy), (big - ox, gy)], fill=palette.rgb(palette.RULE), width=SS)
+        draw.line([(gx, -oy), (gx, big - oy)], fill=GRID, width=SS)
+        draw.line([(-ox, gy), (big - ox, gy)], fill=GRID, width=SS)
 
     # Where the mask ends - past it nothing is painted.
     draw.rectangle([-ox, -oy, big - 1 - ox, big - 1 - oy], outline=palette.rgb(palette.WARN),
