@@ -117,6 +117,12 @@ app = None
 try:
     # 1. install
     check("0 Setup.exe built", os.path.isfile(SETUP), SETUP)
+    bundled = os.listdir(os.path.join(os.path.dirname(HERE), "installer", "dist", "RhinoSpotter", "_internal"))
+    strays = [name for name in bundled
+              if name.split("-")[0].split(".")[0].lower() in ("numpy", "psutil", "pywin32_system32",
+                                                              "win32", "yaml", "setuptools")]
+    check("0b built from the venv: no numpy, psutil, pywin32, yaml, setuptools bundled", not strays,
+          f"{strays}")
     done = subprocess.run([SETUP, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/NOICONS",
                            f"/DIR={APP}", f"/LOG={os.path.join(OUT, 'install.log')}"], timeout=300)
     exe = os.path.join(APP, "RhinoSpotter.exe")

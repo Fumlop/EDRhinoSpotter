@@ -26,3 +26,4 @@ rs_e2etest/out/
 # Standalone installer build output.
 installer/build/
 installer/dist/
+installer/.venv/

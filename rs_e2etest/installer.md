@@ -20,6 +20,18 @@ Output: `rs_e2etest/out/<timestamp>/report.txt`, `install.log`, a screenshot.
 Writes outside the run folder: the HKCU uninstall key for the length of the
 run. `/NOICONS` keeps the Start menu folder from being made.
 
+## Build from a venv
+
+`installer/build.py` bundles from `installer/.venv` with `installer/requirements.txt`
+(Pillow, requests, PyInstaller, pinned). Built from the system Python it
+carried numpy, psutil, pywin32, yaml, setuptools (69 MB unpacked).
+
+Ways it can fail:
+- The venv not used: PyInstaller run by the system interpreter.
+- A package the app imports missing from requirements.txt: the exe starts
+  and dies on the first import (checks 2-6 catch it).
+- A stale venv kept after requirements.txt changed.
+
 ## Checks
 
 1. Setup exits 0 and puts `RhinoSpotter.exe` and `_internal\texture` in the target folder.
@@ -29,4 +41,6 @@ run. `/NOICONS` keeps the Start menu folder from being made.
 5. Status.json in the SRV: `minimap: built` in the log (texture and sheet load from the bundle).
 6. No `Traceback` and no missing texture or sheet in the log.
 7. Uninstall exits 0, the exe is gone, the uninstall key is gone.
+0b. `installer\dist\RhinoSpotter\_internal` holds no numpy, psutil, pywin32,
+    yaml or setuptools.
 8. Nothing written to the live `%LOCALAPPDATA%\RhinoSpotter` (no `standalone.json`, no `instance.lock`).

@@ -1,9 +1,11 @@
 """Build the standalone installer:  python installer/build.py
 
-PyInstaller bundles standalone.py with Python, Pillow and requests into
-installer/dist/RhinoSpotter/; Inno Setup wraps that folder into
-installer/dist/RhinoSpotter-<version>-Setup.exe. Needs `pip install pyinstaller`
-and Inno Setup 6 (ISCC.exe). Output folders are gitignored.
+PyInstaller, run from installer/.venv (requirements.txt only: Pillow, requests,
+PyInstaller, pinned), bundles standalone.py into installer/dist/RhinoSpotter/;
+Inno Setup wraps that folder into installer/dist/RhinoSpotter-<version>-Setup.exe.
+The venv is made on first use and made again when requirements.txt is newer
+than it. Needs Pillow in the Python running this (the icon) and Inno Setup 6
+(ISCC.exe). Output folders and the venv are gitignored.
 """
 
 import os
@@ -15,6 +17,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 BUILD = os.path.join(HERE, "build")
 DIST = os.path.join(HERE, "dist")
+VENV = os.path.join(HERE, ".venv")
+REQUIREMENTS = os.path.join(HERE, "requirements.txt")
 ISCC = [os.path.expandvars(r"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe"),
         r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe"]
 
@@ -23,6 +27,9 @@ from rs_core import update                              # noqa: E402
 
 # Read at run time next to rs_core / rs_ui, as in the plugin folder.
 DATA = [("texture", "texture"), ("mining_sheet.json", "."), (os.path.join("docs", "running.png"), "docs")]
+# In the venv only as PyInstaller's dependency; pulled in through urllib3's
+# optional `backports.zstd` import, which resolves to setuptools' vendored copy.
+EXCLUDE = ("setuptools", "pkg_resources")
 
 
 def icon():
@@ -35,13 +42,30 @@ def icon():
     return target
 
 
+def venv_python():
+    """installer/.venv's python with requirements.txt installed, and nothing else."""
+    python = os.path.join(VENV, "Scripts", "python.exe")
+    stamp = os.path.join(VENV, "requirements.stamp")
+    if not os.path.isfile(stamp) or os.path.getmtime(stamp) < os.path.getmtime(REQUIREMENTS):
+        shutil.rmtree(VENV, ignore_errors=True)
+        subprocess.run([sys.executable, "-m", "venv", VENV], check=True)
+        subprocess.run([python, "-m", "pip", "install", "--disable-pip-version-check",
+                        "-r", REQUIREMENTS], check=True)
+        open(stamp, "w").close()
+    return python
+
+
 def main():
     shutil.rmtree(BUILD, ignore_errors=True)
     shutil.rmtree(DIST, ignore_errors=True)
     ico = icon()
-    args = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--windowed", "--onedir",
+    python = venv_python()
+    print(f"PyInstaller from {python}")
+    args = [python, "-m", "PyInstaller", "--noconfirm", "--windowed", "--onedir",
             "--name", "RhinoSpotter", "--icon", ico,
             "--distpath", DIST, "--workpath", os.path.join(BUILD, "work"), "--specpath", BUILD]
+    for module in EXCLUDE:
+        args += ["--exclude-module", module]
     for source, target in DATA:
         args += ["--add-data", f"{os.path.join(ROOT, source)}{os.pathsep}{target}"]
     subprocess.run(args + [os.path.join(ROOT, "standalone.py")], check=True, cwd=ROOT)
