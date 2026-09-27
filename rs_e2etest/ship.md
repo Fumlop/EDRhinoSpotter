@@ -17,6 +17,8 @@ position; nothing is painted or saved. Above 2 km or off the map it goes away.
 - A new, empty map created for a body with no saved map (a map of nothing
   over the hotspot).
 - Shown above 2000 m altitude, or with no altitude in Status.json.
+- Shown on an Altitude from the average radius (Flags AltitudeFromAverageRadius,
+  glide / orbital cruise): not height over the ground.
 - Shown once the ship is off the map (`reaches` false).
 - Shown on foot, or in the SRV path taken from the ship branch (the SRV must
   still paint).
@@ -34,6 +36,10 @@ position; nothing is painted or saved. Above 2 km or off the map it goes away.
 | Elite's window | a Tk stand-in titled like the game | the game's own z-order |
 | EDMC config | a dict stand-in shared with overlay | EDMC's own settings storage |
 
+Known, not covered: the map over the main menu after a disconnect
+(plan/todo.md, Next). A stale in-ship Status.json under 2 km over a map is a
+second way into it once the switch is on.
+
 ## Checks
 
 1. Switch off: ship at 500 m over the SRV's map: not shown.
@@ -41,7 +47,8 @@ position; nothing is painted or saved. Above 2 km or off the map it goes away.
 3. SRV drives 3 fixes (paints), docks: ship at 30 m on the same spot: shown,
    same map, `version` and launches unchanged after 5 ship fixes.
 4. Ship moves 1 km: marker (drawn state) moves; still not painted.
-5. Ship at 2100 m: down. Back at 1900 m: up.
+5. Ship at 2100 m: down. Back at 1900 m: up. No Altitude: down. 500 m with
+   AltitudeFromAverageRadius: down.
 6. Ship 12 km off the map: down.
 7. Fresh process state (`_coverage` None), ship over the saved map: shown, from
    the saved file; no new map file written.

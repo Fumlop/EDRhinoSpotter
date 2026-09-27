@@ -393,9 +393,7 @@ def follow(coverage, fix, was_in_srv, saved=None, system_address=None):
     body.
     """
     body, lat, lon, radius, _ = fix
-    same = (coverage is not None and coverage.body == body
-            and (None in (coverage.system_address, system_address)
-                 or coverage.system_address == system_address))
+    same = _same(coverage, body, system_address)
     if not same or (not was_in_srv and not coverage.reaches(lat, lon)):
         loaded = _pick_saved(saved(body) if saved else [], body, lat, lon,
                                 skip=coverage.name if same else None)
@@ -406,6 +404,22 @@ def follow(coverage, fix, was_in_srv, saved=None, system_address=None):
     if not was_in_srv:
         coverage.launched(lat, lon)
     return coverage
+
+
+def _same(coverage, body, system_address):
+    """Whether `coverage` is of `body`: same name, and the same system when both
+    addresses are known."""
+    return (coverage is not None and coverage.body == body
+            and (None in (coverage.system_address, system_address)
+                 or coverage.system_address == system_address))
+
+
+def over(coverage, body, lat, lon, saved=None, system_address=None):
+    """The map in memory, else the saved map (`saved(body)`, as follow), that
+    reaches here; None when none does. Paints, launches and creates nothing."""
+    if _same(coverage, body, system_address) and coverage.reaches(lat, lon):
+        return coverage
+    return _pick_saved(saved(body) if saved else [], body, lat, lon)
 
 
 def _pick_saved(found, body, lat, lon, skip=None):

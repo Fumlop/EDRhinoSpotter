@@ -166,6 +166,8 @@ try:
     check("5 1900 m: up again", shown())
     tick(dict(ship(north(1200)), Altitude=None))
     check("5 no Altitude: down", not shown())
+    tick(dict(ship(north(1200), altitude=500), Flags=SHIP_FLAGS | minimap.ALT_FROM_AVERAGE))
+    check("5 Altitude from the average radius: down", not shown())
 
     # 6. off the map
     tick(ship(north(12000)))

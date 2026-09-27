@@ -46,8 +46,9 @@ KEEP_KEY = "rhinospotter_minimap_keep"
 SHIP_KEY = "rhinospotter_minimap_ship"
 # Shown in the ship up to this Status.json Altitude, m.
 SHIP_CEILING_M = 2000.0
-# Status.json Flags InMainShip | InFighter; Flags2 OnFoot.
+# Status.json Flags InMainShip | InFighter, AltitudeFromAverageRadius; Flags2 OnFoot.
 IN_SHIP = 0x01000000 | 0x02000000
+ALT_FROM_AVERAGE = 0x20000000
 ON_FOOT = 0x1
 FREE_KEY = "rhinospotter_minimap_free"
 # Where the commander dragged it, as "x,y" screen pixels of its top left -
@@ -140,8 +141,11 @@ def ship_view():
 
 def ship_fix(status):
     """(body, lat, lon, radius, heading) in the ship or fighter at or under
-    SHIP_CEILING_M, else None. Not on foot."""
-    if not int(status.get("Flags") or 0) & IN_SHIP or int(status.get("Flags2") or 0) & ON_FOOT:
+    SHIP_CEILING_M over the ground, else None. Not on foot. Altitude from the
+    average radius (glide, orbital cruise; assumed, not measured) is None."""
+    flags = int(status.get("Flags") or 0)
+    if (not flags & IN_SHIP or flags & ALT_FROM_AVERAGE
+            or int(status.get("Flags2") or 0) & ON_FOOT):
         return None
     body, lat, lon = status.get("BodyName"), status.get("Latitude"), status.get("Longitude")
     radius, altitude = status.get("PlanetRadius"), status.get("Altitude")
@@ -419,13 +423,13 @@ def _over_map(root, status, system, ids):
         return False
     body, lat, lon, _, heading = fix
     address = ids(system, body)[0] if ids else None
-    same = (_coverage is not None and _coverage.body == body
-            and (None in (_coverage.system_address, address) or _coverage.system_address == address))
-    if not (same and _coverage.reaches(lat, lon)):
-        loaded = coverage._pick_saved(coverstore.maps(body, system_address=address), body, lat, lon)
-        if loaded is None:
-            return False
-        _coverage = loaded
+    found = coverage.over(_coverage, body, lat, lon, system_address=address,
+                          saved=lambda name: coverstore.maps(name, system_address=address))
+    if found is None:
+        return False
+    if found.system_address is None:
+        found.system_address = address
+    _coverage = found
     _show_map(root, status, system, lat, lon, heading, True, body)
     return True
 
