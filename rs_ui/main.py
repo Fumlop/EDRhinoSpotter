@@ -205,7 +205,7 @@ def build(parent, updates=True):
     # bottom. Side by side they were picked into each other's box, and each
     # label then sat against the far edge of the panel from its own menu.
     _density = tk.StringVar(value=NOT_READ)
-    _amount = tk.StringVar(value=NOT_READ)
+    _amount = tk.StringVar(value="High")         # a deposit is High when first found
     tk.Label(_frame, text="Amount", anchor="w").grid(row=3, column=0, sticky="w", padx=2)
     amount_menu = tk.OptionMenu(_frame, _amount, NOT_READ, *deposit.AMOUNTS)
     _style_menu(amount_menu)
