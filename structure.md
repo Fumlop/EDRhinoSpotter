@@ -214,6 +214,14 @@ No tkinter anywhere in here.
   the cards cannot drift apart. They used to be two schemes and looked like
   two tools.
 - **[logging.py](rs_core/logging.py)** - one logger, named so EDMC picks it up.
+- **[instance.py](rs_core/instance.py)** - one RhinoSpotter per data folder.
+  `main.start` takes `%LOCALAPPDATA%\RhinoSpotter\db\instance.lock` (msvcrt
+  byte lock at 1 MiB, released by Windows when the process dies) before
+  anything else; the file text names the holder. An older plugin still exiting
+  is waited for up to `main.LOCK_WAIT_S`; any other holder refuses at once.
+  Refused, the plugin shows the holder in its panel and Settings tab and does
+  nothing else. The standalone (branch `standalone`) takes the same lock and
+  draws RhinoData into its own root through `scan.host()`.
 - **[system.py](rs_core/system.py)** - what it runs on, read once: `WINDOWS`,
   `LINUX`, `FLATPAK`, `SESSION` (wayland/x11). `main.start` logs `describe()`.
   `overlay.win32()` and `hotkey.available()` read it.

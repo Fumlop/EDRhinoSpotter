@@ -11,11 +11,12 @@ worker fails minutes later somewhere unrelated.
 
 import sqlite3
 import threading
+import time
 import tkinter as tk
 from datetime import datetime, timezone
 
-from rs_core import (bodies, cards, coverage, database, deposit, grounds, migrate, palette,
-                     share, spansh, spotcard, spotmark, store, system, update, yields)
+from rs_core import (bodies, cards, coverage, database, deposit, grounds, instance, migrate,
+                     palette, share, spansh, spotcard, spotmark, store, system, update, yields)
 from rs_core.logging import logger
 from rs_ui import clipboard, hotkey, minimap, scan
 
@@ -23,6 +24,13 @@ try:
     from theme import theme
 except ImportError:      # running outside EDMC
     theme = None
+
+# Who holds rs_core.instance when this process does, and the holder's text
+# when another one does: then no panel, journal, hotkeys or writes here.
+OWNER = "the EDMC plugin"
+# How long start() waits for a previous EDMC to let the lock go, seconds.
+LOCK_WAIT_S = 5.0
+_refused = None
 
 _system = ""
 _cmdr = None
@@ -90,10 +98,28 @@ SEARCH_SHOWN = False     # the Search row under Bookmark, off until search works
 NOT_READ = "-"
 
 
-def start(plugin_dir):
-    global _sheet, _started_at
+def start(plugin_dir, owner=OWNER):
+    global _sheet, _refused, _started_at
     logger.info(f"running on {system.describe()}")
+    # Before the lock: acquire() creates the data folder, and adopt_legacy()
+    # copies only into a folder that is not there yet.
     database.adopt_legacy()
+    # Before anything else touches the data folder. A folder that cannot hold
+    # the lock file runs unlocked, as before the lock existed.
+    try:
+        _refused = instance.acquire(owner)
+        # Held by an EDMC still exiting after a restart: up to LOCK_WAIT_S
+        # for it to go. Standalone holding it is refused at once.
+        waited = 0.0
+        while _refused and _refused.startswith(OWNER) and waited < LOCK_WAIT_S:
+            time.sleep(0.25)
+            waited += 0.25
+            _refused = instance.acquire(owner)
+    except OSError as err:
+        logger.warning(f"no instance lock, running without one: {err}")
+    if _refused is not None:
+        logger.warning(f"not started: {_refused} holds {instance.PATH}")
+        return "RhinoSpotter"
     # Before anything reads the database: the JSON files of 4.1 go in once.
     try:
         migrate.run()
@@ -113,9 +139,23 @@ def start(plugin_dir):
     return "RhinoSpotter"
 
 
-def build(parent):
+def refused():
+    """The refusal line when another RhinoSpotter holds the data folder, else None."""
+    if _refused is None:
+        return None
+    return f"RhinoSpotter off: {_refused} is running on the same data. Close it and restart."
+
+
+def build(parent, updates=True):
+    """The panel. `updates`: look for a release once, at start; standalone.py passes False."""
     global _frame, _status, _scan_count, _card_button, _landed_after, _hint
     global _loc, _rigs, _material, _density, _amount, _search, _menu, _filter
+
+    if _refused is not None:
+        frame = tk.Frame(parent)
+        tk.Label(frame, text=refused(), anchor="w", wraplength=320, justify="left",
+                 fg=palette.ALERT).grid(row=0, column=0, sticky="w", padx=2, pady=4)
+        return frame
 
     _frame = tk.Frame(parent)
     _frame.columnconfigure(1, weight=1)
@@ -218,7 +258,8 @@ def build(parent):
     _poll_landed()
 
     _refresh_scan_count()
-    _check_updates()
+    if updates:
+        _check_updates()
     hotkey.start({hotkey.CENTER: lambda: _on_ui(minimap.center_here),
                   hotkey.BORDER: lambda: _on_ui(minimap.border_here),
                   hotkey.SIZE: lambda: _on_ui(minimap.bigger),
@@ -399,6 +440,8 @@ def stop():
     longer there.
     """
     global _landed_after, _done_after
+    if _refused is not None:
+        return
     _landed_after = _cancel_landed()
     _done_after = _cancel_done()
     hotkey.stop()
@@ -414,6 +457,7 @@ def stop():
                     f"{_replayed} replayed lines skipped")
     # After every write, so the copy has them.
     database.backup()
+    instance.release()
 
 
 def _materials():
@@ -458,10 +502,17 @@ def _fill_menu():
 
 
 def prefs(parent):
+    if _refused is not None:
+        import myNotebook as nb                    # EDMC's; plugin_prefs must return an nb.Frame
+        frame = nb.Frame(parent)
+        nb.Label(frame, text=refused()).grid(row=0, column=0, sticky="w", padx=10, pady=10)
+        return frame
     return minimap.prefs(parent, worth=_worth())
 
 
 def prefs_changed():
+    if _refused is not None:
+        return
     minimap.prefs_changed()
     # The pick may have taken materials out of the list or put them back, and
     # _on_material_changed only fires when the picked one moves.
@@ -478,6 +529,8 @@ def _focus():
 
 def journal_entry(cmdr, is_beta, system, station, entry, state):
     global _system, _cmdr
+    if _refused is not None:
+        return
 
     if system:
         _system = system

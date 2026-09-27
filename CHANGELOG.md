@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+**Added**
+
+- One RhinoSpotter per data folder: the plugin takes a lock at start and stays off, naming the holder, while the standalone runs on the same data (waits up to 5 s for an EDMC still closing).
+
 ## 6.1.0
 
 **Added**
