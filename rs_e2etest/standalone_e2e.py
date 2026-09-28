@@ -374,6 +374,7 @@ def part_a():
     ui_wait(lambda: str(main._card_button.cget("state")) == "normal", 3)
     material = ui(lambda: main._materials()[0])
     ui(main._material.set, material)
+    ui(main._loc.set, "1")      # an empty Loc opens the No location popup (location_e2e)
     ui(main._card_button.invoke)
     marked = wait(lambda: rows("SELECT count(*) FROM bookmarks WHERE planet_name = ?",
                                body)[0][0], 5)
