@@ -18,6 +18,8 @@ is fixed later with Edit.
    the popup never opens (caught on the first run).
 3. No popup with Loc empty and no `Destination` in Status.json; popup text
    without the loc 0 / no map warning; popup spinbox not 0-50 or not at 0.
+   Popup labels not on `palette.BG` (WARN on the system grey was unreadable);
+   `popup.png` (client area, topmost, physical pixels) is read back by eye.
 4. Cancel still saves a bookmark, or leaves the status line empty.
 5. Popup left at 0: not saved at loc 0, or Loc filled with 0 (the next press
    would then skip the popup).
@@ -41,5 +43,4 @@ is fixed later with Edit.
 
 - The real pointer: `winfo_containing` is stubbed, the mouse is not moved.
 - Spinbox arrow clicks: values are typed into the spinbox, not stepped.
-- EDMC's theme on the popup: plain Tk colours, not checked.
 - Minimap caption list without loc 0 (`minimap._about` path): not drawn here.
