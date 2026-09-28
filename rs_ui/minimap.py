@@ -667,7 +667,8 @@ def picture_text(cover, system, when=None):
         if planet.get("locations") is not None:
             facts.append(f"{planet['locations']} locations")
 
-    locations = sorted({r["location_index"] for r in records if r.get("location_index") is not None})
+    locations = sorted({r["location_index"] for r in records
+                        if r.get("location_index") not in (None, spotmark.NO_LOCATION)})
     if not locations and cover.location is not None:
         locations = [cover.location]
     about = [cover.name or "map"]

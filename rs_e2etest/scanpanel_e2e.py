@@ -182,10 +182,10 @@ try:
           f"{dock.winfo_width()} / req {dock.winfo_reqwidth()} / pane {master.winfo_width()} px")
 
     # 3. shared variables
-    entry = find(dock, tk.Entry)
+    entry = find(dock, tk.Spinbox, textvariable=str(main._loc))
     entry.delete(0, "end")
     entry.insert(0, "7")
-    spin = find(dock, tk.Spinbox)
+    spin = find(dock, tk.Spinbox, textvariable=str(main._rigs))
     spin.delete(0, "end")
     spin.insert(0, "4")
     main._amount.set("Low")

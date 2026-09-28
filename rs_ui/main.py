@@ -234,7 +234,11 @@ def _panel(parent, docked=False):
     # same right edge - the names are long enough that a narrow dropdown cut
     # "Low Temp Diamonds" in half.
     tk.Label(frame, text="Location", anchor="w").grid(row=1, column=0, sticky="w", padx=2)
-    tk.Entry(frame, textvariable=_loc, width=4).grid(row=1, column=1, sticky="w", padx=2)
+    # tk.Spinbox writes from_ into an empty variable; empty = not typed, so put it back.
+    typed = _loc.get()
+    tk.Spinbox(frame, from_=spotmark.NO_LOCATION, to=spotmark.MAX_LOCATION, textvariable=_loc,
+               width=4).grid(row=1, column=1, sticky="w", padx=2)
+    _loc.set(typed)
     tk.Label(frame, text="Rigs", anchor="w").grid(row=1, column=2, sticky="e", padx=2)
     # Ten is what a deposit can hold; the box used to go to twelve, which was
     # a number nobody can enter in the game.
@@ -767,18 +771,23 @@ def make_card():
     # ApproachBody or Touchdown for this body.
     spot["system_address"], spot["body_id"] = _register.ids(_system, spot["planet_name"])
 
-    # A typed Loc wins: Status.json only knows the location while it is the
-    # selected destination, and it is often deselected by the time you land.
-    typed = _int(_loc.get())
-    if typed is None and spot["location_index"] is not None:
-        _loc.set(str(spot["location_index"]))
-    else:
-        spot["location_index"] = typed
-
     if not spotmark.on_surface(spot):
         _set_status(f"no coordinates in Status.json for "
                     f"{spot['planet_name'] or 'no body'} - are you on the surface?")
         return
+
+    # A typed Loc wins: Status.json only knows the location while it is the
+    # selected destination, and it is often deselected by the time you land.
+    typed = _int(_loc.get())
+    if typed is None and spot["location_index"] is None:
+        typed = _ask_location(spot["planet_name"])
+        if typed is None:
+            _set_status("no bookmark - location cancelled")
+            return
+    if typed is None:
+        _loc.set(str(spot["location_index"]))
+    else:
+        spot["location_index"] = typed
 
     # Tk variables belong to the main thread - read them here, not in the worker.
     spot["commodity"] = _material.get()
@@ -790,6 +799,56 @@ def make_card():
     minimap.bookmarked(spot)
     _card_token += 1
     threading.Thread(target=_render_card, args=(spot, _card_token), daemon=True).start()
+
+
+def _ask_location(planet):
+    """Modal: the location number when Loc is empty and none is targeted.
+
+    Returns the number (spotmark.NO_LOCATION when left at 0), or None on Cancel.
+    A number above 0 goes into Loc; 0 does not, so the next press asks again.
+    Opens over the window under the pointer (EDMC or RhinoData), else EDMC's.
+    """
+    parent = _frame.winfo_toplevel()
+    pressed = parent.winfo_containing(*parent.winfo_pointerxy())
+    if pressed is not None:
+        parent = pressed.winfo_toplevel()
+    box = tk.Toplevel(parent)
+    box.title("No location")
+    box.transient(parent)
+    box.resizable(False, False)
+    value = tk.StringVar(value=str(spotmark.NO_LOCATION))
+    answer = []
+
+    def ok(*_):
+        number = _int(value.get())
+        answer.append(number if number is not None and number >= 0 else spotmark.NO_LOCATION)
+        box.destroy()
+
+    tk.Label(box, text=f"No location typed or targeted on {planet or 'this body'}.\n"
+                       f"Loc 0 gets no map. Change it later: RhinoData > Edit.",
+             fg=palette.WARN, justify="left", anchor="w").grid(
+        row=0, column=0, columnspan=3, sticky="w", padx=10, pady=(10, 6))
+    tk.Label(box, text="Location", anchor="w").grid(row=1, column=0, sticky="w", padx=(10, 4))
+    spin = tk.Spinbox(box, from_=spotmark.NO_LOCATION, to=spotmark.MAX_LOCATION,
+                      textvariable=value, width=4)
+    spin.grid(row=1, column=1, sticky="w")
+    buttons = tk.Frame(box)
+    buttons.grid(row=2, column=0, columnspan=3, sticky="e", padx=10, pady=(8, 10))
+    tk.Button(buttons, text="Cancel", width=8, command=box.destroy).pack(side="right")
+    tk.Button(buttons, text="Bookmark", width=10, command=ok).pack(side="right", padx=(0, 6))
+    box.bind("<Return>", ok)
+    box.bind("<Escape>", lambda _: box.destroy())
+
+    box.update_idletasks()
+    box.geometry(f"+{parent.winfo_rootx()}+{parent.winfo_rooty()}")
+    spin.focus_set()
+    spin.selection_range(0, "end")
+    box.grab_set()
+    box.wait_window()
+
+    if answer and answer[0] != spotmark.NO_LOCATION:
+        _loc.set(str(answer[0]))
+    return answer[0] if answer else None
 
 
 def _render_card(spot, token):

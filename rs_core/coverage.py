@@ -23,7 +23,7 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
-from rs_core import arrow, guide, measure, palette, spotcard
+from rs_core import arrow, guide, measure, palette, spotcard, spotmark
 from rs_core.logging import logger
 
 # Status.json Flags bit for "in the SRV", as EDMC's edmc_data names it.
@@ -494,7 +494,7 @@ def mapped_locations(found, body, records=()):
     for record in records or ():
         location = record.get("location_index")
         lat, lon = record.get("latitude"), record.get("longitude")
-        if location is None or lat is None or lon is None:
+        if location in (None, spotmark.NO_LOCATION) or lat is None or lon is None:
             continue
         try:
             name = map_at(found, body, float(lat), float(lon))

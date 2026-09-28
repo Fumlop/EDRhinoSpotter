@@ -61,6 +61,12 @@ def _index(name):
     return int(match.group(1)) if match else None
 
 
+# Location 0: a bookmark saved without a location number. The game's #index
+# starts at 1 (159 bookmarks on 2026-09-28: 1-17), so 0 never ties a map.
+NO_LOCATION = 0
+MAX_LOCATION = 50       # top of the Location spinboxes
+
+
 def location_index(status):
     """The mining location the ship is targeting, from Status.json.
 

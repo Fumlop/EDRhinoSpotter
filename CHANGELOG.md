@@ -1,5 +1,12 @@
 # Changelog
 
+## 6.3.0
+
+**Changed**
+
+- Panel and Edit: Location is a spinbox 0-50, like Rigs.
+- Bookmark with Location empty and no location targeted: a warning asks for the number (Cancel saves nothing). Left at 0, the bookmark is saved at loc 0: it never ties a map and is fixed later with Edit.
+
 ## 6.2.0
 
 **Changed**
