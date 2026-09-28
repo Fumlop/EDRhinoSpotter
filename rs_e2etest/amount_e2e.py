@@ -87,6 +87,7 @@ try:
     # 2. untouched panel, material picked, pressed
     material = main._materials()[0]
     main._material.set(material)
+    main._loc.set("1")      # an empty Loc opens the No location popup (location_e2e)
     status(LAT)
     main.make_card()
     check("2 bookmark saved", pump_until(lambda: len(rows()) == 1), f"{len(rows())} rows")

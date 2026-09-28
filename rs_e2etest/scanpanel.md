@@ -42,7 +42,7 @@ without going to EDMC. Behind a setting, `rhinospotter_scan_panel`, on by defaul
 
 1. Setting unset: `minimap.panel_in_scan()` is True. Setting off: open_scan builds no copy, `scan._dock` None.
 2. Setting on, open_scan again: the copy is a child of the RhinoData window, mapped, above the list, at its natural width (narrower than the pane), without the RhinoData button, version label or landable count (EDMC's panel keeps them).
-3. Copy's Location entry typed 7, Rigs 4, Density picked High: `main._loc` / `_rigs` / `_density` read them; EDMC's Amount set Low shows in the copy's menu text.
+3. Copy's Location spinbox typed 7, Rigs 4, Density picked High: `main._loc` / `_rigs` / `_density` read them; EDMC's Amount set Low shows in the copy's menu text.
 4. Status.json on the ground: after a poll the copy's Bookmark is normal; off the ground: disabled.
 5. Material picked through the copy's menu, copy's Bookmark invoked: one bookmark saved with location 7, rigs 4, amount Low, density High.
 6. `_set_status` and the hint show the same text in both panels; EDMC's landable count still set with no copy of it.

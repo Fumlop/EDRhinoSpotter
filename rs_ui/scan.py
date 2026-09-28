@@ -1816,7 +1816,11 @@ def _edit_bookmark(record):
     field(3, "Rigs", tk.Spinbox(box, from_=0, to=deposit.MAX_RIGS, textvariable=rigs))
     field(4, "Amount", tk.OptionMenu(box, amount, NOT_SET, *deposit.AMOUNTS))
     field(5, "Density", tk.OptionMenu(box, density, NOT_SET, *deposit.DENSITIES))
-    field(6, "Location", tk.Entry(box, textvariable=location))
+    field(6, "Location", tk.Spinbox(box, from_=spotmark.NO_LOCATION, to=spotmark.MAX_LOCATION,
+                                    textvariable=location))
+    # tk.Spinbox writes from_ into an empty variable: a bookmark with no
+    # location would save as loc 0.
+    location.set("" if record.get("location_index") is None else str(record["location_index"]))
 
     buttons = tk.Frame(box, bg=BG)
     buttons.grid(row=7, column=0, columnspan=2, sticky="e", padx=14, pady=(10, 14))

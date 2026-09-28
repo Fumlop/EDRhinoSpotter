@@ -11,7 +11,7 @@ import os
 import sqlite3
 from datetime import datetime, timezone
 
-from rs_core import database, guide
+from rs_core import database, guide, spotmark
 from rs_core.logging import logger
 from rs_core.spotcard import card_dir
 
@@ -228,7 +228,8 @@ def location_at(system, body, lat, lon, radius, db=None, within=SAME_LOCATION_M,
     best = None
     for record in for_system(system, db):
         index = record.get("location_index")
-        if not same_body(record, body, system_address, body_id) or not isinstance(index, int):
+        if (not same_body(record, body, system_address, body_id) or not isinstance(index, int)
+                or index == spotmark.NO_LOCATION):
             continue
         if record.get("latitude") is None or record.get("longitude") is None:
             continue
