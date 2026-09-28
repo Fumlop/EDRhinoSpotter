@@ -82,7 +82,7 @@ def widgets(parent, kind):
     return found
 
 
-def press(value=None, button="Bookmark"):
+def press(value=None, button="Bookmark", grab=False):
     """make_card with the popup answered: `value` typed into its spinbox, `button`
     pressed. Returns (popup seen, its text, spinbox from/to)."""
     seen = {}
@@ -96,6 +96,18 @@ def press(value=None, button="Bookmark"):
                     text=" ".join(w.cget("text") for w in widgets(box, tk.Label)),
                     range=(float(spin.cget("from")), float(spin.cget("to"))),
                     start=spin.get())
+        if grab:
+            from PIL import ImageGrab
+            box.attributes("-topmost", True)
+            box.update()
+            # Client area only, topmost: nothing of another window in it. Tk is in
+            # logical units, ImageGrab in physical (make_docs_images.grab).
+            scale = ImageGrab.grab().width / box.winfo_screenwidth()
+            x, y = box.winfo_rootx(), box.winfo_rooty()
+            ImageGrab.grab(tuple(int(v * scale) for v in (
+                x, y, x + box.winfo_width(), y + box.winfo_height()))).save(
+                os.path.join(OUT, "popup.png"))
+            seen.update(bg=[str(w.cget("bg")) for w in widgets(box, tk.Label)])
         if value is not None:
             spin.delete(0, "end")
             spin.insert(0, value)
@@ -144,8 +156,13 @@ try:
           main._status.cget("text"))
     check("2 popup gone", popup() is None)
 
-    # 3. popup left at 0: bookmark at loc 0, Loc stays empty
-    seen = press()
+    # 3. popup left at 0: bookmark at loc 0, Loc stays empty. Root shown for the
+    # grab: a transient of a withdrawn root is not drawn. popup.png is read back.
+    root.deiconify()
+    seen = press(grab=True)
+    root.withdraw()
+    check("3 popup labels on the dark background",
+          seen.get("bg") and set(seen["bg"]) == {main.palette.BG}, seen.get("bg"))
     check("3 popup shown", bool(seen), seen)
     check("3 saved at loc 0", pump_until(lambda: at(lat) is not None)
           and at(lat).get("location_index") == 0, at(lat))

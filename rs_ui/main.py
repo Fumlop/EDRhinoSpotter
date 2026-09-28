@@ -780,7 +780,7 @@ def make_card():
     # selected destination, and it is often deselected by the time you land.
     typed = _int(_loc.get())
     if typed is None and spot["location_index"] is None:
-        typed = _ask_location(spot["planet_name"])
+        typed = _ask_location()
         if typed is None:
             _set_status("no bookmark - location cancelled")
             return
@@ -801,7 +801,7 @@ def make_card():
     threading.Thread(target=_render_card, args=(spot, _card_token), daemon=True).start()
 
 
-def _ask_location(planet):
+def _ask_location():
     """Modal: the location number when Loc is empty and none is targeted.
 
     Returns the number (spotmark.NO_LOCATION when left at 0), or None on Cancel.
@@ -812,7 +812,7 @@ def _ask_location(planet):
     pressed = parent.winfo_containing(*parent.winfo_pointerxy())
     if pressed is not None:
         parent = pressed.winfo_toplevel()
-    box = tk.Toplevel(parent)
+    box = tk.Toplevel(parent, bg=palette.BG)
     box.title("No location")
     box.transient(parent)
     box.resizable(False, False)
@@ -824,18 +824,21 @@ def _ask_location(planet):
         answer.append(number if number is not None and number >= 0 else spotmark.NO_LOCATION)
         box.destroy()
 
-    tk.Label(box, text=f"No location typed or targeted on {planet or 'this body'}.\n"
-                       f"Loc 0 gets no map. Change it later: RhinoData > Edit.",
-             fg=palette.WARN, justify="left", anchor="w").grid(
-        row=0, column=0, columnspan=3, sticky="w", padx=10, pady=(10, 6))
-    tk.Label(box, text="Location", anchor="w").grid(row=1, column=0, sticky="w", padx=(10, 4))
+    # RhinoData's dialog colours (scan._style_field, scan._button): WARN on the
+    # system grey was unreadable.
+    tk.Label(box, text="Loc 0 = no map, fix later in Edit", bg=palette.BG, fg=palette.WARN,
+             font=("Segoe UI", 9)).grid(row=0, column=0, columnspan=2, sticky="w",
+                                        padx=12, pady=(12, 6))
+    tk.Label(box, text="Location", bg=palette.BG, fg=palette.FG_SOFT,
+             font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", padx=(12, 6))
     spin = tk.Spinbox(box, from_=spotmark.NO_LOCATION, to=spotmark.MAX_LOCATION,
                       textvariable=value, width=4)
+    scan._style_field(spin)
     spin.grid(row=1, column=1, sticky="w")
-    buttons = tk.Frame(box)
-    buttons.grid(row=2, column=0, columnspan=3, sticky="e", padx=10, pady=(8, 10))
-    tk.Button(buttons, text="Cancel", width=8, command=box.destroy).pack(side="right")
-    tk.Button(buttons, text="Bookmark", width=10, command=ok).pack(side="right", padx=(0, 6))
+    buttons = tk.Frame(box, bg=palette.BG)
+    buttons.grid(row=2, column=0, columnspan=2, sticky="e", padx=12, pady=(10, 12))
+    scan._button(buttons, "Cancel", box.destroy).pack(side="right")
+    scan._button(buttons, "Bookmark", ok).pack(side="right", padx=(0, 6))
     box.bind("<Return>", ok)
     box.bind("<Escape>", lambda _: box.destroy())
 

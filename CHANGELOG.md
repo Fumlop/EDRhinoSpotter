@@ -1,6 +1,12 @@
 # Changelog
 
-## 6.3.0
+## 6.3.1
+
+**Fixed**
+
+- No location warning: RhinoData colours (yellow on grey was unreadable), one line.
+
+## 6.3.0 (tagged, not released)
 
 **Changed**
 
