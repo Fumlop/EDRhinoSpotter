@@ -4,8 +4,8 @@
 
 **Changed**
 
-- Est. left: tons per rig = 125-175 t times Density (High x1, Medium x2, Low x3). High Density was a guess before; two High deposits mined to Depleted gave 134 and 153 t a rig. Low now reads 375-525 t a rig, Medium 250-350.
-- Mining sheet regenerated from 1,074 mining locations (5 more bodies, rocky-ice 1 -> 3).
+- Est. left: 125-175 t a rig x Density (High x1, Medium x2, Low x3).
+- Mining sheet: 1,074 locations (was 1,005).
 
 ## 6.3.1
 
