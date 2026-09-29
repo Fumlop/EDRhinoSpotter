@@ -6,46 +6,34 @@ from rs_core import deposit
 
 
 class TestTonsLeft:
-    def test_the_low_density_deposit_sits_inside_its_own_range(self):
-        """Four positions, High Amount, Low Density, 1,150 t mined to Depleted."""
-        low, high = deposit.tons_left(4, "High", "Low")
-        assert (low, high) == (620, 1200)
-        assert low <= 1150 <= high
+    # (rig positions, Density, tons mined High Amount -> Depleted); deposit.py docstring
+    MEASURED = [(4, "High", 538), (4, "High", 612), (4, "Low", 1150),
+                (1, "Low", 446), (4, "Low", 1892)]
 
-    def test_the_medium_density_deposit_sits_inside_its_own_range(self):
-        """Eme A 1 a loc 9: four positions, High Amount, Medium Density,
-        1,537 t mined to Depleted."""
-        low, high = deposit.tons_left(4, "High", "Medium")
-        assert (low, high) == (840, 1600)
-        assert low <= 1537 <= high
+    @pytest.mark.parametrize("rigs,density,tons", MEASURED)
+    def test_measured_deposits_sit_inside_their_range(self, rigs, density, tons):
+        low, high = deposit.tons_left(rigs, "High", density)
+        assert low <= tons <= high
 
-    def test_the_medium_deposit_does_not_fit_the_low_band(self):
-        """The reason Density is in the range at all: without it, this deposit
-        gave 337 t more than the most the estimate allowed."""
-        assert 1537 - deposit.tons_left(4, "High", "Low")[1] == 337
+    def test_the_medium_deposit_is_over_its_band(self):
+        """Eme A 1 a loc 9, 1,537 t: 137 t over Medium's top (350 t/pos * 4)."""
+        assert 1537 - deposit.tons_left(4, "High", "Medium")[1] == 137
 
-    @pytest.mark.parametrize("density", ["High", None, "Plenty"])
-    def test_high_or_unread_density_spans_both_bands(self, density):
-        """Nothing measured at High: the range covers both measured deposits
-        rather than guessing which one it is like."""
-        low, high = deposit.tons_left(4, "High", density)
-        assert (low, high) == (620, 1600)
-        assert low <= 1150 and 1537 <= high
+    def test_density_factor_orders_the_bands(self):
+        high, medium, low = (deposit.tons_left(4, "High", d) for d in ("High", "Medium", "Low"))
+        assert high == (280, 700) and medium == (570, 1400) and low == (850, 2100)
 
-    def test_six_low_density_positions_reach_the_public_traces(self):
-        """1,716 t falls inside six Low positions; 1,841 t is 41 t over the top -
-        307 t a position, just past the range."""
+    @pytest.mark.parametrize("density", [None, "Plenty"])
+    def test_unread_density_spans_all_bands(self, density):
+        assert deposit.tons_left(4, "High", density) == (280, 2100)
+
+    def test_six_low_density_positions_hold_the_public_traces(self):
+        """Register PE-042/043/044: 1,716-1,841 t, Density not recorded."""
         low, high = deposit.tons_left(6, "High", "Low")
-        assert low <= 1716 <= high
-        assert 1841 - high == 41
-
-    def test_the_public_traces_fit_when_density_is_unknown(self):
-        """The register does not record Density, so neither trace is ruled out."""
-        low, high = deposit.tons_left(6, "High")
         assert low <= 1716 and 1841 <= high
 
     def test_low_amount_can_be_nearly_empty(self):
-        assert deposit.tons_left(6, "Low", "Low") == (0, 620)
+        assert deposit.tons_left(6, "Low", "Low") == (0, 1080)
 
     def test_depleted_is_nothing(self):
         assert deposit.tons_left(4, "Depleted", "Medium") == (0, 0)
@@ -60,13 +48,13 @@ class TestTonsLeft:
 
 class TestDescribe:
     def test_range(self):
-        assert deposit.describe(4, "High", "Low") == "≈ 620-1,200 t left"
+        assert deposit.describe(4, "High", "Low") == "≈ 850-2,100 t left"
 
     def test_density_moves_the_range(self):
-        assert deposit.describe(4, "High", "Medium") == "≈ 840-1,600 t left"
+        assert deposit.describe(4, "High", "Medium") == "≈ 570-1,400 t left"
 
     def test_open_lower_end(self):
-        assert deposit.describe(2, "Low", "Low") == "≈ up to 210 t left"
+        assert deposit.describe(2, "Low", "Low") == "≈ up to 360 t left"
 
     def test_depleted_needs_no_rigs(self):
         assert deposit.describe(None, "Depleted") == "depleted"
