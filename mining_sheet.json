@@ -1,13 +1,13 @@
 {
- "generated": "2026-09-24 08:56 UTC",
+ "generated": "2026-09-29 06:35 UTC",
  "source": "EDIntel prospecting guide",
  "note": "Percentages are the share of a ground's mining locations that carried the material. A ground is the body class, and a Rocky body splits on its volcanism; magma on a metal-rich or high-metal body counts under that class, not under a rock 80%+ magma column. The magma material rules ask rock >= 80%: every Rocky body read clears it, no metal-rich or high-metal body does. Prices exclude Ega, fleet carriers, on-foot settlements and rows reading demand 999999, which are a placeholder rather than a market.",
  "locations": {
-  "rock 80%+ [metallic magma]": 48,
+  "rock 80%+ [metallic magma]": 84,
   "rock 80%+ [rocky magma]": 23,
   "rock 80%+ [none]": 242,
   "rock 80%+ [silicate vapour geysers]": 139,
-  "rocky-ice": 14,
+  "rocky-ice": 47,
   "high-metal-content": 247,
   "metal-rich": 114,
   "icy": 178
@@ -16,167 +16,185 @@
   "rock 80%+ [metallic magma]": [
    {
     "material": "Olivine",
-    "pct": 45.8,
-    "median": 26973,
-    "best": 96001
+    "pct": 48.8,
+    "median": 26923,
+    "best": 87858
+   },
+   {
+    "material": "Quartz Pyroxenite",
+    "pct": 47.6,
+    "median": 39824,
+    "best": 129804
+   },
+   {
+    "material": "Bastnasite",
+    "pct": 46.4,
+    "median": 67451,
+    "best": 219577
    },
    {
     "material": "Alexandrite",
     "pct": 41.7,
-    "median": 207367,
-    "best": 674722
-   },
-   {
-    "material": "Bastnasite",
-    "pct": 41.7,
-    "median": 67510,
-    "best": 254863
+    "median": 206744,
+    "best": 722426
    },
    {
     "material": "Monazite",
-    "pct": 41.7,
-    "median": 207586,
-    "best": 896105
-   },
-   {
-    "material": "Quartz Pyroxenite",
-    "pct": 39.6,
-    "median": 39886,
-    "best": 145408
-   },
-   {
-    "material": "Copper",
-    "pct": 31.2,
-    "median": 551,
-    "best": 1931
+    "pct": 40.5,
+    "median": 207312,
+    "best": 865908
    },
    {
     "material": "Samarium",
-    "pct": 31.2,
-    "median": 25946,
+    "pct": 33.3,
+    "median": 25906,
     "best": 48636
    },
    {
-    "material": "Haematite",
-    "pct": 27.1,
-    "median": 2333,
-    "best": 20088
-   },
-   {
-    "material": "Sapphire",
-    "pct": 25.0,
-    "median": 99889,
-    "best": 437096
-   },
-   {
-    "material": "Serendibite",
-    "pct": 25.0,
-    "median": 164487,
-    "best": 789866
+    "material": "Copper",
+    "pct": 32.1,
+    "median": 540,
+    "best": 1931
    },
    {
     "material": "Uraninite",
-    "pct": 25.0,
-    "median": 2416,
+    "pct": 29.8,
+    "median": 2405,
     "best": 4731
    },
    {
+    "material": "Serendibite",
+    "pct": 27.4,
+    "median": 164296,
+    "best": 570948
+   },
+   {
+    "material": "Sapphire",
+    "pct": 23.8,
+    "median": 99270,
+    "best": 374656
+   },
+   {
+    "material": "Haematite",
+    "pct": 22.6,
+    "median": 2326,
+    "best": 18412
+   },
+   {
     "material": "Ruby",
-    "pct": 18.8,
-    "median": 87616,
-    "best": 365748
-   },
-   {
-    "material": "Gold",
-    "pct": 16.7,
-    "median": 44707,
-    "best": 67832
-   },
-   {
-    "material": "Magnesite",
-    "pct": 16.7,
-    "median": 32785,
-    "best": 117505
+    "pct": 21.4,
+    "median": 86626,
+    "best": 318141
    },
    {
     "material": "Thorium",
-    "pct": 16.7,
+    "pct": 21.4,
     "median": 12346,
     "best": 12917
    },
    {
-    "material": "Diamond",
-    "pct": 14.6,
-    "median": 107047,
-    "best": 447050
+    "material": "Magnesite",
+    "pct": 20.2,
+    "median": 32729,
+    "best": 106739
    },
    {
-    "material": "Jadeite",
-    "pct": 14.6,
-    "median": 28816,
-    "best": 148462
+    "material": "Diamond",
+    "pct": 16.7,
+    "median": 105821,
+    "best": 388631
+   },
+   {
+    "material": "Gold",
+    "pct": 15.5,
+    "median": 44707,
+    "best": 67832
    },
    {
     "material": "Palladium",
-    "pct": 14.6,
-    "median": 53743,
+    "pct": 14.3,
+    "median": 53737,
     "best": 71476
    },
    {
     "material": "Silver",
-    "pct": 14.6,
+    "pct": 13.1,
     "median": 33775,
     "best": 49426
    },
    {
-    "material": "Grandidierite",
-    "pct": 8.3,
-    "median": 187903,
-    "best": 782476
+    "material": "Jadeite",
+    "pct": 9.5,
+    "median": 28816,
+    "best": 148579
    },
    {
-    "material": "Helium",
-    "pct": 4.2,
-    "median": 86462,
-    "best": 490542
+    "material": "Grandidierite",
+    "pct": 8.3,
+    "median": 187431,
+    "best": 563640
    },
    {
     "material": "Thortveitite",
-    "pct": 4.2,
-    "median": 159496,
-    "best": 699227
+    "pct": 4.8,
+    "median": 158422,
+    "best": 588613
+   },
+   {
+    "material": "Helium",
+    "pct": 2.4,
+    "median": 85875,
+    "best": 286210
+   },
+   {
+    "material": "Low Temp Diamonds",
+    "pct": 2.4,
+    "median": 110255,
+    "best": 384562
+   },
+   {
+    "material": "Deuterium",
+    "pct": 1.2,
+    "median": 34938,
+    "best": 113919
+   },
+   {
+    "material": "Periclase Dunite",
+    "pct": 1.2,
+    "median": 158422,
+    "best": 588613
    }
   ],
   "rock 80%+ [rocky magma]": [
    {
     "material": "Olivine",
     "pct": 60.9,
-    "median": 26973,
-    "best": 96001
+    "median": 26923,
+    "best": 87858
    },
    {
     "material": "Bastnasite",
     "pct": 52.2,
-    "median": 67510,
-    "best": 254863
+    "median": 67451,
+    "best": 219577
    },
    {
     "material": "Monazite",
     "pct": 52.2,
-    "median": 207586,
-    "best": 896105
+    "median": 207312,
+    "best": 865908
    },
    {
     "material": "Copper",
     "pct": 47.8,
-    "median": 551,
+    "median": 540,
     "best": 1931
    },
    {
     "material": "Haematite",
     "pct": 43.5,
-    "median": 2333,
-    "best": 20088
+    "median": 2326,
+    "best": 18412
    },
    {
     "material": "Silver",
@@ -187,8 +205,8 @@
    {
     "material": "Serendibite",
     "pct": 39.1,
-    "median": 164487,
-    "best": 789866
+    "median": 164296,
+    "best": 570948
    },
    {
     "material": "Gold",
@@ -205,94 +223,94 @@
    {
     "material": "Magnesite",
     "pct": 30.4,
-    "median": 32785,
-    "best": 117505
+    "median": 32729,
+    "best": 106739
    },
    {
     "material": "Alexandrite",
     "pct": 26.1,
-    "median": 207367,
-    "best": 674722
+    "median": 206744,
+    "best": 722426
    },
    {
     "material": "Samarium",
     "pct": 21.7,
-    "median": 25946,
+    "median": 25906,
     "best": 48636
    },
    {
     "material": "Uraninite",
     "pct": 21.7,
-    "median": 2416,
+    "median": 2405,
     "best": 4731
    },
    {
     "material": "Palladium",
     "pct": 17.4,
-    "median": 53743,
+    "median": 53737,
     "best": 71476
    },
    {
     "material": "Diamond",
     "pct": 8.7,
-    "median": 107047,
-    "best": 447050
+    "median": 105821,
+    "best": 388631
    },
    {
     "material": "Helium",
     "pct": 8.7,
-    "median": 86462,
-    "best": 490542
+    "median": 85875,
+    "best": 286210
    },
    {
     "material": "Low Temp Diamonds",
     "pct": 8.7,
-    "median": 111941,
-    "best": 546227
+    "median": 110255,
+    "best": 384562
    },
    {
     "material": "Jadeite",
     "pct": 4.3,
     "median": 28816,
-    "best": 148462
+    "best": 148579
    },
    {
     "material": "Periclase Dunite",
     "pct": 4.3,
-    "median": 159748,
-    "best": 699340
+    "median": 158422,
+    "best": 588613
    },
    {
     "material": "Ruby",
     "pct": 4.3,
-    "median": 87616,
-    "best": 365748
+    "median": 86626,
+    "best": 318141
    },
    {
     "material": "Thortveitite",
     "pct": 4.3,
-    "median": 159496,
-    "best": 699227
+    "median": 158422,
+    "best": 588613
    }
   ],
   "rock 80%+ [none]": [
    {
     "material": "Copper",
     "pct": 64.9,
-    "median": 551,
+    "median": 540,
     "best": 1931
    },
    {
     "material": "Uraninite",
     "pct": 51.2,
-    "median": 2416,
+    "median": 2405,
     "best": 4731
    },
    {
     "material": "Haematite",
     "pct": 50.8,
-    "median": 2333,
-    "best": 20088
+    "median": 2326,
+    "best": 18412
    },
    {
     "material": "Thorium",
@@ -303,14 +321,14 @@
    {
     "material": "Samarium",
     "pct": 43.8,
-    "median": 25946,
+    "median": 25906,
     "best": 48636
    },
    {
     "material": "Magnesite",
     "pct": 43.0,
-    "median": 32785,
-    "best": 117505
+    "median": 32729,
+    "best": 106739
    },
    {
     "material": "Gold",
@@ -327,92 +345,92 @@
    {
     "material": "Palladium",
     "pct": 28.5,
-    "median": 53743,
+    "median": 53737,
     "best": 71476
    },
    {
     "material": "Jadeite",
     "pct": 21.1,
     "median": 28816,
-    "best": 148462
+    "best": 148579
    },
    {
     "material": "Thortveitite",
     "pct": 13.6,
-    "median": 159496,
-    "best": 699227
+    "median": 158422,
+    "best": 588613
    },
    {
     "material": "Grandidierite",
     "pct": 11.2,
-    "median": 187903,
-    "best": 782476
+    "median": 187431,
+    "best": 563640
    },
    {
     "material": "Bastnasite",
     "pct": 9.5,
-    "median": 67510,
-    "best": 254863
+    "median": 67451,
+    "best": 219577
    },
    {
     "material": "Periclase Dunite",
     "pct": 9.5,
-    "median": 159748,
-    "best": 699340
+    "median": 158422,
+    "best": 588613
    },
    {
     "material": "Helium",
     "pct": 6.6,
-    "median": 86462,
-    "best": 490542
+    "median": 85875,
+    "best": 286210
    },
    {
     "material": "Olivine",
     "pct": 6.6,
-    "median": 26973,
-    "best": 96001
+    "median": 26923,
+    "best": 87858
    },
    {
     "material": "Deuterium",
     "pct": 5.8,
-    "median": 34971,
-    "best": 125698
+    "median": 34938,
+    "best": 113919
    },
    {
     "material": "Low Temp Diamonds",
     "pct": 4.1,
-    "median": 111941,
-    "best": 546227
+    "median": 110255,
+    "best": 384562
    },
    {
     "material": "Monazite",
     "pct": 3.3,
-    "median": 207586,
-    "best": 896105
+    "median": 207312,
+    "best": 865908
    },
    {
     "material": "Alexandrite",
     "pct": 2.5,
-    "median": 207367,
-    "best": 674722
+    "median": 206744,
+    "best": 722426
    },
    {
     "material": "Diamond",
     "pct": 2.1,
-    "median": 107047,
-    "best": 447050
+    "median": 105821,
+    "best": 388631
    },
    {
     "material": "Serendibite",
     "pct": 2.1,
-    "median": 164487,
-    "best": 789866
+    "median": 164296,
+    "best": 570948
    },
    {
     "material": "Sapphire",
     "pct": 1.2,
-    "median": 99889,
-    "best": 437096
+    "median": 99270,
+    "best": 374656
    }
   ],
   "rock 80%+ [silicate vapour geysers]": [
@@ -420,30 +438,30 @@
     "material": "Jadeite",
     "pct": 61.9,
     "median": 28816,
-    "best": 148462
+    "best": 148579
    },
    {
     "material": "Helium",
     "pct": 60.4,
-    "median": 86462,
-    "best": 490542
+    "median": 85875,
+    "best": 286210
    },
    {
     "material": "Copper",
     "pct": 49.6,
-    "median": 551,
+    "median": 540,
     "best": 1931
    },
    {
     "material": "Haematite",
     "pct": 45.3,
-    "median": 2333,
-    "best": 20088
+    "median": 2326,
+    "best": 18412
    },
    {
     "material": "Uraninite",
     "pct": 43.9,
-    "median": 2416,
+    "median": 2405,
     "best": 4731
    },
    {
@@ -455,7 +473,7 @@
    {
     "material": "Samarium",
     "pct": 33.8,
-    "median": 25946,
+    "median": 25906,
     "best": 48636
    },
    {
@@ -467,8 +485,8 @@
    {
     "material": "Magnesite",
     "pct": 33.1,
-    "median": 32785,
-    "best": 117505
+    "median": 32729,
+    "best": 106739
    },
    {
     "material": "Silver",
@@ -479,131 +497,143 @@
    {
     "material": "Palladium",
     "pct": 26.6,
-    "median": 53743,
+    "median": 53737,
     "best": 71476
    },
    {
     "material": "Grandidierite",
     "pct": 12.2,
-    "median": 187903,
-    "best": 782476
+    "median": 187431,
+    "best": 563640
    },
    {
     "material": "Thortveitite",
     "pct": 10.1,
-    "median": 159496,
-    "best": 699227
+    "median": 158422,
+    "best": 588613
    },
    {
     "material": "Low Temp Diamonds",
     "pct": 6.5,
-    "median": 111941,
-    "best": 546227
+    "median": 110255,
+    "best": 384562
    },
    {
     "material": "Periclase Dunite",
     "pct": 5.8,
-    "median": 159748,
-    "best": 699340
+    "median": 158422,
+    "best": 588613
    },
    {
     "material": "Olivine",
     "pct": 4.3,
-    "median": 26973,
-    "best": 96001
+    "median": 26923,
+    "best": 87858
    },
    {
     "material": "Bastnasite",
     "pct": 2.9,
-    "median": 67510,
-    "best": 254863
+    "median": 67451,
+    "best": 219577
    },
    {
     "material": "Deuterium",
     "pct": 2.9,
-    "median": 34971,
-    "best": 125698
+    "median": 34938,
+    "best": 113919
    },
    {
     "material": "Monazite",
     "pct": 1.4,
-    "median": 207586,
-    "best": 896105
+    "median": 207312,
+    "best": 865908
    },
    {
     "material": "Sapphire",
     "pct": 1.4,
-    "median": 99889,
-    "best": 437096
+    "median": 99270,
+    "best": 374656
    }
   ],
   "rocky-ice": [
    {
+    "material": "Copper",
+    "pct": 85.1,
+    "median": 540,
+    "best": 1931
+   },
+   {
     "material": "Methanol Monohydrate Crystals",
-    "pct": 78.6,
-    "median": 2394,
+    "pct": 76.6,
+    "median": 2391,
     "best": 3794
    },
    {
     "material": "Water",
-    "pct": 78.6,
-    "median": 624,
-    "best": 5120
-   },
-   {
-    "material": "Copper",
-    "pct": 71.4,
-    "median": 551,
-    "best": 1931
+    "pct": 76.6,
+    "median": 622,
+    "best": 1969
    },
    {
     "material": "Haematite",
-    "pct": 71.4,
-    "median": 2333,
-    "best": 20088
-   },
-   {
-    "material": "Deuterium",
-    "pct": 35.7,
-    "median": 34971,
-    "best": 125698
+    "pct": 74.5,
+    "median": 2326,
+    "best": 18412
    },
    {
     "material": "Palladium",
-    "pct": 35.7,
-    "median": 53743,
+    "pct": 27.7,
+    "median": 53737,
     "best": 71476
    },
    {
+    "material": "Deuterium",
+    "pct": 23.4,
+    "median": 34938,
+    "best": 113919
+   },
+   {
     "material": "Olivine",
-    "pct": 14.3,
-    "median": 26973,
-    "best": 96001
+    "pct": 19.1,
+    "median": 26923,
+    "best": 87858
    },
    {
     "material": "Low Temp Diamonds",
-    "pct": 7.1,
-    "median": 111941,
-    "best": 546227
+    "pct": 8.5,
+    "median": 110255,
+    "best": 384562
+   },
+   {
+    "material": "Helium",
+    "pct": 4.3,
+    "median": 85875,
+    "best": 286210
+   },
+   {
+    "material": "Diamond",
+    "pct": 2.1,
+    "median": 105821,
+    "best": 388631
    }
   ],
   "high-metal-content": [
    {
     "material": "Copper",
     "pct": 55.5,
-    "median": 551,
+    "median": 540,
     "best": 1931
    },
    {
     "material": "Haematite",
     "pct": 53.4,
-    "median": 2333,
-    "best": 20088
+    "median": 2326,
+    "best": 18412
    },
    {
     "material": "Titanium",
     "pct": 52.6,
-    "median": 4948,
+    "median": 4945,
     "best": 5865
    },
    {
@@ -633,7 +663,7 @@
    {
     "material": "Tantalum",
     "pct": 34.8,
-    "median": 14825,
+    "median": 14827,
     "best": 15582
    },
    {
@@ -645,7 +675,7 @@
    {
     "material": "Samarium",
     "pct": 28.3,
-    "median": 25946,
+    "median": 25906,
     "best": 48636
    },
    {
@@ -657,8 +687,8 @@
    {
     "material": "Iridium",
     "pct": 19.8,
-    "median": 181146,
-    "best": 1006820
+    "median": 179631,
+    "best": 653996
    },
    {
     "material": "Gold",
@@ -669,38 +699,38 @@
    {
     "material": "Palladium",
     "pct": 10.5,
-    "median": 53743,
+    "median": 53737,
     "best": 71476
    },
    {
     "material": "Helium",
     "pct": 6.1,
-    "median": 86462,
-    "best": 490542
+    "median": 85875,
+    "best": 286210
    },
    {
     "material": "Ruby",
     "pct": 5.3,
-    "median": 87616,
-    "best": 365748
+    "median": 86626,
+    "best": 318141
    },
    {
     "material": "Sapphire",
     "pct": 4.9,
-    "median": 99889,
-    "best": 437096
+    "median": 99270,
+    "best": 374656
    },
    {
     "material": "Diamond",
     "pct": 4.0,
-    "median": 107047,
-    "best": 447050
+    "median": 105821,
+    "best": 388631
    },
    {
     "material": "Rhodplumsite",
     "pct": 3.2,
-    "median": 176809,
-    "best": 816962
+    "median": 176447,
+    "best": 763141
    }
   ],
   "metal-rich": [
@@ -713,20 +743,20 @@
    {
     "material": "Titanium",
     "pct": 44.7,
-    "median": 4948,
+    "median": 4945,
     "best": 5865
    },
    {
     "material": "Copper",
     "pct": 43.9,
-    "median": 551,
+    "median": 540,
     "best": 1931
    },
    {
     "material": "Haematite",
     "pct": 41.2,
-    "median": 2333,
-    "best": 20088
+    "median": 2326,
+    "best": 18412
    },
    {
     "material": "Thorium",
@@ -743,7 +773,7 @@
    {
     "material": "Samarium",
     "pct": 36.8,
-    "median": 25946,
+    "median": 25906,
     "best": 48636
    },
    {
@@ -755,20 +785,20 @@
    {
     "material": "Tantalum",
     "pct": 33.3,
-    "median": 14825,
+    "median": 14827,
     "best": 15582
    },
    {
     "material": "Diamond",
     "pct": 29.8,
-    "median": 107047,
-    "best": 447050
+    "median": 105821,
+    "best": 388631
    },
    {
     "material": "Iridium",
     "pct": 29.8,
-    "median": 181146,
-    "best": 1006820
+    "median": 179631,
+    "best": 653996
    },
    {
     "material": "Silver",
@@ -791,31 +821,31 @@
    {
     "material": "Rhodplumsite",
     "pct": 10.5,
-    "median": 176809,
-    "best": 816962
+    "median": 176447,
+    "best": 763141
    },
    {
     "material": "Sapphire",
     "pct": 7.9,
-    "median": 99889,
-    "best": 437096
+    "median": 99270,
+    "best": 374656
    },
    {
     "material": "Ruby",
     "pct": 6.1,
-    "median": 87616,
-    "best": 365748
+    "median": 86626,
+    "best": 318141
    },
    {
     "material": "Helium",
     "pct": 5.3,
-    "median": 86462,
-    "best": 490542
+    "median": 85875,
+    "best": 286210
    },
    {
     "material": "Palladium",
     "pct": 5.3,
-    "median": 53743,
+    "median": 53737,
     "best": 71476
    }
   ],
@@ -823,20 +853,20 @@
    {
     "material": "Water",
     "pct": 99.4,
-    "median": 624,
-    "best": 5120
+    "median": 622,
+    "best": 1969
    },
    {
     "material": "Methanol Monohydrate Crystals",
     "pct": 66.9,
-    "median": 2394,
+    "median": 2391,
     "best": 3794
    },
    {
     "material": "Deuterium",
     "pct": 55.6,
-    "median": 34971,
-    "best": 125698
+    "median": 34938,
+    "best": 113919
    },
    {
     "material": "Tritium",
@@ -847,14 +877,14 @@
    {
     "material": "Low Temp Diamonds",
     "pct": 24.2,
-    "median": 111941,
-    "best": 546227
+    "median": 110255,
+    "best": 384562
    },
    {
     "material": "Helium-3",
     "pct": 17.4,
-    "median": 80743,
-    "best": 476935
+    "median": 80325,
+    "best": 267743
    }
   ]
  }

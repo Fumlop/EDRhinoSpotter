@@ -1,5 +1,12 @@
 # Changelog
 
+## 6.3.2
+
+**Changed**
+
+- Est. left: 125-175 t a rig x Density (High x1, Medium x2, Low x3).
+- Mining sheet: 1,074 locations (was 1,005).
+
 ## 6.3.1
 
 **Fixed**
