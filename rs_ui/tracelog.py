@@ -76,7 +76,7 @@ def start(root):
     _rows, _last_mtime, _bad_reads = [], None, 0
     _cancel()                # a pending "no rig fits" close
     _open_window(root)
-    _show("TRACE  recording\nwaiting for Status.json")
+    _show(_live_text())
     logger.info(f"trace: recording to {_stem}.csv")
     _poll()
 
@@ -111,7 +111,7 @@ def stop():
         _write_txt(lines, [])
         _close_window()
         return
-    _show("TRACE  lap closed\nplanning rigs ...")
+    _show("Planning rigs ...")
     body, radius = fixes[-1]["body"], fixes[-1]["radius"]
     points = [(r["lat"], r["lon"]) for r in fixes]
 
@@ -232,14 +232,17 @@ def _closed():
 
 
 def _live_text():
-    n = len(_rows)
-    gap = f"{_rows[-1]['t'] - _rows[-2]['t']:.2f} s" if n > 1 else "-"
+    """Overlay while tracing: what to do next; distance back once SNAP_PATH_M is driven."""
     fixes = [r for r in _rows if r["lat"] is not None and r["radius"]]
-    back = (f"{metres((fixes[0]['lat'], fixes[0]['lon']), (fixes[-1]['lat'], fixes[-1]['lon']), fixes[-1]['radius']):.1f} m"
-            if len(fixes) > 1 else "no position")
-    return (f"TRACE  recording  {n} writes  last {gap}\n"
-            f"start->here {back}\n"
-            f"drive the border slowly; closes {SNAP_M:.0f} m from start, {_key(TRACE)} closes now")
+    if not fixes:
+        return "Land and get into the SRV"
+    at = lambda r: (r["lat"], r["lon"])
+    path = sum(metres(at(a), at(b), b["radius"]) for a, b in zip(fixes, fixes[1:]))
+    lines = ["Drive the border slowly"]
+    if path >= SNAP_PATH_M:
+        lines.append(f"back to start: {metres(at(fixes[0]), at(fixes[-1]), fixes[-1]['radius']):.0f} m")
+    lines.append(f"{_key(TRACE)}: finish here")
+    return "\n".join(lines)
 
 
 TRACE, PLACED = "trace", "placed"
