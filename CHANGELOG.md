@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+**Added (experimental)**
+
+- Ctrl+Alt+R: drive round the deposit border; the lap closes by itself within 10 m of the start (after 60 m). Rig spots are planned 80 m apart inside the outline and the arrow guides to rig 1. Ctrl+Alt+P after deploying a rig moves the arrow to the next. Each lap is logged to `%LOCALAPPDATA%\RhinoSpotter\trace\`.
+
 ## 6.3.1
 
 **Fixed**
