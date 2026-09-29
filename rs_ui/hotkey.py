@@ -55,17 +55,21 @@ CENTER = 0x5253             # 'RS'
 BORDER = 0x5254
 SCAN = 0x5255
 SIZE = 0x5256
+TRACE = 0x5257              # lab: rs_ui/tracelog.py
+PLACED = 0x5258             # lab: rs_ui/tracelog.placed
 
 # What each key does, its default, and where a change is kept in EDMC's
 # config. In the order Settings lists them.
 ACTIONS = ((CENTER, "Set center", "Ctrl+Alt+Z", "rhinospotter_hotkey_center"),
            (BORDER, "Set border", "Ctrl+Alt+B", "rhinospotter_hotkey_border"),
            (SIZE, "Zoom", "Ctrl+Alt+M", "rhinospotter_hotkey_zoom"),
-           (SCAN, "Open RhinoData", "Ctrl+Alt+D", "rhinospotter_hotkey_data"))
+           (SCAN, "Open RhinoData", "Ctrl+Alt+D", "rhinospotter_hotkey_data"),
+           (TRACE, "Trace log (lab)", "Ctrl+Alt+R", "rhinospotter_hotkey_trace"),
+           (PLACED, "Rig placed (lab)", "Ctrl+Alt+P", "rhinospotter_hotkey_placed"))
 
 # Off Windows: the chat command per key, typed in any chat channel.
 CHAT_PREFIX = "!rs"
-CHAT = {CENTER: "center", BORDER: "border", SIZE: "zoom", SCAN: "data"}
+CHAT = {CENTER: "center", BORDER: "border", SIZE: "zoom", SCAN: "data", TRACE: "trace", PLACED: "placed"}
 
 # What Settings offers: a modifier set and a key. Every set has two modifiers
 # at least - one alone would steal ordinary typing.

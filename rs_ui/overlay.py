@@ -204,7 +204,9 @@ def _tick():
     # RhinoData in front kept the arrow, and the card's Stop, up for good.
     if reading["state"] == "arrived" and _here is None:
         _here = time.monotonic()
-    if _here is not None and (time.monotonic() - _here) * 1000 >= HERE_MS:
+    # "hold": rig spots stay on HERE until the placed key (rs_ui/tracelog.placed).
+    if (_here is not None and not (_target or {}).get("hold")
+            and (time.monotonic() - _here) * 1000 >= HERE_MS):
         logger.info("overlay: arrived, closing")
         stop()
         return
@@ -488,6 +490,8 @@ def _draw(reading):
 
 
 def _caption(target):
+    if target.get("caption"):
+        return target["caption"]
     index = target.get("location_index")
     where = f"loc {index}" if index is not None else "bookmark"
     return f"{where}  {target.get('commodity') or ''}".strip()

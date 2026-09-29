@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from rs_core import (bodies, cards, coverage, database, deposit, grounds, instance, migrate,
                      palette, share, spansh, spotcard, spotmark, store, system, update, yields)
 from rs_core.logging import logger
-from rs_ui import clipboard, hotkey, minimap, scan
+from rs_ui import clipboard, hotkey, minimap, scan, tracelog
 
 try:
     from theme import theme
@@ -201,7 +201,9 @@ def build(parent, updates=True, docked=False):
                   # The window is the only thing here that could not be
                   # reached without leaving the game: alt-tab, find EDMC,
                   # press the button. The key opens it where you are.
-                  hotkey.SCAN: lambda: _on_ui(open_scan)})
+                  hotkey.SCAN: lambda: _on_ui(open_scan),
+                  hotkey.TRACE: lambda: _on_ui(tracelog.toggle, _frame),
+                  hotkey.PLACED: lambda: _on_ui(tracelog.placed)})
     scan.dock_with(_dock_panel)
     return _frame
 
@@ -509,6 +511,7 @@ def stop():
     _landed_after = _cancel_landed()
     _done_after = _cancel_done()
     hotkey.stop()
+    tracelog.shutdown()      # closes the CSV, writes the summary, plans nothing
     minimap.stop()
     # Last, and not through the timer: EDMC is going, and a scan waiting on a
     # two-second thread would go with it.

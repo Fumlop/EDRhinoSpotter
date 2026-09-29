@@ -83,7 +83,8 @@ def fix(status, target):
     if heading is not None and heading >= 0:
         reading["relative_deg"] = (reading["bearing_deg"] - heading) % 360.0
 
-    reading["state"] = "arrived" if reading["distance_m"] <= ARRIVED_M else "guiding"
+    arrive = target.get("arrive_m") or ARRIVED_M     # rig spots: rs_ui/tracelog.RIG_ARRIVE_M
+    reading["state"] = "arrived" if reading["distance_m"] <= arrive else "guiding"
     return reading
 
 
