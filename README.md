@@ -87,8 +87,8 @@ The same material within 100 m updates the existing bookmark instead of adding o
 </table>
 
 **Share bookmark** puts one `RhinoData:...` line on the clipboard for Discord or a DM.
-Another RhinoSpotter that sees it on its clipboard imports it, unless it made the line itself or
-already has that material within 100 m. No commander name, dates or tons in it.
+Paste it into the import box under the bookmarks in another RhinoData window and press Import. Refused when that
+install made the line itself or already has that material within 100 m. No commander name, dates or tons in it.
 
 Rates are where to prospect, not what a location holds - no journal says that.
 
@@ -193,7 +193,7 @@ Debug log: `RHINOSPOTTER_DEBUG=1` before starting EDMC. Code layout: [structure.
 - **Tons mined:** counted per bookmark from the journal, refreshed 5 s after the last ton.
 - **Depleted marks:** set on the card, taken off after 14 days.
 - **You are here:** the bookmark within 175 m of the SRV marked and picked; locations within 5 km unfolded.
-- **Share bookmark:** one line for Discord; another RhinoSpotter imports it from the clipboard.
+- **Share bookmark:** one line for Discord; paste it into the import box in another RhinoData window.
 - **Spansh:** bodies of a new system filled in on the honk.
 - **Updates:** from inside EDMC; your data stays outside the plugin folder.
 

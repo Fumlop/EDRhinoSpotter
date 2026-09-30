@@ -274,7 +274,11 @@ def main_images():
     # No shadow margin under this one: the panel has no menu to cast one, and
     # those few pixels are whatever else is on the desktop.
     grab(panel, "plugin.png", scale, bottom=0)
-    panel.destroy()
+    # Withdrawn, not destroyed: main._dock_panel copies its status and hint
+    # into the panel RhinoData shows (minimap.PANEL_KEY, on by default). Its
+    # 1 s poll is stopped: it hands the real Status.json to the minimap.
+    panel.withdraw()
+    main._landed_after = main._cancel_landed()
 
     found = register()
     plant_maps(f"{SYSTEM} 4 a")

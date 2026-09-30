@@ -9,16 +9,15 @@ come back through _on_ui. Tk is not thread-safe, and a widget written from a
 worker fails minutes later somewhere unrelated.
 """
 
-import sqlite3
 import threading
 import time
 import tkinter as tk
 from datetime import datetime, timezone
 
 from rs_core import (bodies, cards, coverage, database, deposit, grounds, instance, migrate,
-                     palette, share, spansh, spotcard, spotmark, store, system, update, yields)
+                     palette, spansh, spotcard, spotmark, store, system, update, yields)
 from rs_core.logging import logger
-from rs_ui import clipboard, hotkey, minimap, scan
+from rs_ui import hotkey, minimap, scan, tracelog
 
 try:
     from theme import theme
@@ -63,8 +62,6 @@ _replayed = 0
 # RhinoData redraws its Mined column. s.
 QUIET_S = 5.0
 _quiet = None            # the Tk after() id of that timer
-_clip_seen = None        # the clipboard text _check_clipboard last looked at
-_clip_sequence = None    # clipboard.sequence() at that look
 _hint = None             # the line under the buttons: honk, or FSS when the honk brought nothing
 
 _frame = None
@@ -201,7 +198,9 @@ def build(parent, updates=True, docked=False):
                   # The window is the only thing here that could not be
                   # reached without leaving the game: alt-tab, find EDMC,
                   # press the button. The key opens it where you are.
-                  hotkey.SCAN: lambda: _on_ui(open_scan)})
+                  hotkey.SCAN: lambda: _on_ui(open_scan),
+                  hotkey.TRACE: lambda: _on_ui(tracelog.toggle, _frame),
+                  hotkey.PLACED: lambda: _on_ui(tracelog.placed)})
     scan.dock_with(_dock_panel)
     return _frame
 
@@ -445,46 +444,6 @@ def _poll_landed():
         if repr(err) != _poll_error:
             logger.warning(f"landed poll failed, retrying every second: {err!r}", exc_info=True)
             _poll_error = repr(err)
-    # Own try: a failing Status.json read must not stop the import.
-    try:
-        _check_clipboard()
-    except Exception:
-        logger.exception("clipboard import failed")
-
-
-def _check_clipboard():
-    """Import a RhinoData code on the clipboard, once per clipboard text.
-
-    Skips codes this install shared (share.mine) and bookmarks already here
-    (cards.nearby). Non-text clipboard content raises TclError: nothing to do.
-    """
-    global _clip_seen, _clip_sequence
-    # Windows: the text is read only when the sequence number moved, so a
-    # multi-MB copy elsewhere is not read and compared once a second.
-    number = clipboard.sequence()
-    if number is not None and number == _clip_sequence:
-        return
-    try:
-        text = _frame.clipboard_get()
-    except tk.TclError:
-        return      # no text, or another program has it open: retried next poll
-    _clip_sequence = number
-    if text == _clip_seen:
-        return
-    _clip_seen = text
-    if share.PREFIX not in text:
-        return
-    try:
-        state, spot = share.take(text)
-    except (sqlite3.Error, OSError) as err:
-        logger.warning(f"could not import a shared bookmark: {err}")
-        _note(f"shared bookmark not imported: {err}")
-        return
-    if state == "imported":
-        _note(f"imported {spot['commodity']} on {spot['planet_name']}")
-        scan.refresh()
-    elif state == "known":
-        _note(f"shared {spot['commodity']} on {spot['planet_name']} is already bookmarked")
 
 
 def _cancel_landed():
@@ -509,6 +468,7 @@ def stop():
     _landed_after = _cancel_landed()
     _done_after = _cancel_done()
     hotkey.stop()
+    tracelog.shutdown()      # closes the CSV, writes the summary, plans nothing
     minimap.stop()
     # Last, and not through the timer: EDMC is going, and a scan waiting on a
     # two-second thread would go with it.

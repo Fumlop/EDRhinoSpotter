@@ -173,8 +173,8 @@ No tkinter anywhere in here.
   `decode()` checks types, ranges and the material name, and inflates to 16 KB
   at most. Codes shared here are kept as SHA-256 digests in `meta`
   (`shared:<digest>`), and so are imported ones; `take()` skips those and
-  anything `cards.nearby` finds. main's 1 s landed poll reads the clipboard
-  when `GetClipboardSequenceNumber` moved and calls it once per new text.
+  anything `cards.nearby` finds. the import box in the RhinoData middle pane
+  (scan._import_strip, under the bookmarks) calls it on the pasted text.
 - **[yields.py](rs_core/yields.py)** - tons refined at a bookmark. One
   `MiningRefined` is 1 t, placed by the Status.json reading at that moment -
   the event carries no position. `ATTRIBUTE_M` is a 175 m radius,
@@ -386,9 +386,9 @@ mapping the unit tests it replaced.
   plugin; corrupt, foreign and unreachable downloads refused.
 - **data_e2e.py** - migrate, replay (`--rebuild`, `--testmode`, a locked db)
   and `rs_api` against copies of the db and the journals.
-- **share_e2e.py** - Share bookmark in one install, the clipboard import in a
+- **share_e2e.py** - Share bookmark in one install, the Import box in a
   second: no personal fields, no re-import of one's own code, no duplicates,
-  mangled codes refused, the four card buttons one width, poll cost.
+  mangled codes refused, the four card buttons one width, status lines.
 - **yield_e2e.py** - the real journal's 171 MiningRefined lines through
   `load.journal_entry`: attribution, unplaced and unreadable tons, the replay
   skip, Depleted closing a cycle with the pending tons in it, a second cycle,

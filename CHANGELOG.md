@@ -1,5 +1,17 @@
 # Changelog
 
+## 6.3.3
+
+**Added (experimental)**
+
+- Ctrl+Alt+R: drive the deposit border; closes itself back at the start.
+- Rig spots 80 m apart inside the border, arrow to each.
+- Ctrl+Alt+P: rig placed, arrow to the next.
+
+**Changed**
+
+- Shared bookmarks: no import from the clipboard. Paste the RhinoData line into the import box under the bookmarks in RhinoData, press Import (or Enter).
+
 ## 6.3.2
 
 **Changed**
