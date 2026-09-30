@@ -30,13 +30,6 @@ def copy(widget, text):
     widget.clipboard_append(text)
 
 
-def sequence():
-    """GetClipboardSequenceNumber, which moves on every clipboard change. None off Windows."""
-    if sys.platform != "win32":
-        return None
-    return ctypes.windll.user32.GetClipboardSequenceNumber()
-
-
 def _win32(text):
     from ctypes import wintypes
     user32 = ctypes.WinDLL("user32", use_last_error=True)

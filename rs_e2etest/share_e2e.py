@@ -1,12 +1,13 @@
-"""E2E harness for Share bookmark and the clipboard import. Checks and blind
+"""E2E harness for Share bookmark and the RhinoData import box. Checks and blind
 spots: share.md.
 
 Run from the plugin folder:  python rs_e2etest/share_e2e.py
 Writes rs_e2etest/out/<timestamp>/report.txt. Exit code 1 on a failure.
 
 Two children, A (shares) and B (imports), each with LOCALAPPDATA set to its own
-folder before the interpreter starts. They talk only through the real Windows
-clipboard, which the parent saves first and puts back at the end.
+folder before the interpreter starts. The code goes A -> B through the real
+Windows clipboard (saved first, put back at the end); B pastes it into the
+import box under the bookmarks in RhinoData.
 """
 
 import base64
@@ -14,7 +15,6 @@ import json
 import os
 import subprocess
 import sys
-import time
 import zlib
 from datetime import datetime
 
@@ -47,6 +47,37 @@ def _boot():
     main.build(root)
     main._cancel_landed()           # the poll is driven by hand here
     return tk, root, main
+
+
+def _widgets(tk, top, kind):
+    """Every widget of class `kind` under `top`."""
+    stack, found = [top], []
+    while stack:
+        widget = stack.pop()
+        stack.extend(widget.winfo_children())
+        if isinstance(widget, kind):
+            found.append(widget)
+    return found
+
+
+def _import_row(tk, scan):
+    """(Import button, its Entry) in the RhinoData window. Looked up again after every draw."""
+    button = next(b for b in _widgets(tk, scan._window, tk.Button)
+                  if str(b.cget("text")) == "Import")
+    entry = next(w for w in button.master.winfo_children() if isinstance(w, tk.Entry))
+    return button, entry
+
+
+def _paster(tk, root, scan):
+    """paste(text): `text` typed into the import box, Import pressed. Returns the status line."""
+    def paste(text):
+        button, entry = _import_row(tk, scan)
+        entry.delete(0, "end")
+        entry.insert(0, text)
+        button.invoke()
+        root.update()
+        return str(scan._status_label.cget("text"))
+    return paste
 
 
 def _rows():
@@ -103,13 +134,29 @@ def child_a(results):
           sorted(set(payload) & {"commander", "marked_at", "altitude", "yield"}), [])
     results.append(("2 code length (chars)", True, str(len(code))))
 
-    main._check_clipboard()
+    check("15 no Import row in the EDMC panel",
+          [str(b.cget("text")) for b in _widgets(tk, main._frame, tk.Button)
+           if str(b.cget("text")) == "Import"] + _widgets(tk, main._frame, tk.Entry), [])
+    button, entry = _import_row(tk, scan)
+    heights = (button.master.winfo_height(), entry.winfo_height(), button.winfo_height())
+    results.append(("16 import row, entry, button heights (px)", True, str(heights)))
+    check("16 import row one line: under 30 px", heights[0] < 30, True)
+    check("16 import row below the bookmark list",
+          button.master.winfo_rooty() > max(w.winfo_rooty() for w in scan._rows.values())
+          if scan._rows else False, True)
+    entry.insert(0, "half typed")
+    scan._draw()
+    root.update()
+    check("17 typed text survives a redraw", _import_row(tk, scan)[1].get(), "half typed")
+
+    paste = _paster(tk, root, scan)
+    said = paste(code)
     check("3 own code not imported back", len(_rows()), 1)
+    check("3 status says shared here before", "shared or imported here before" in said, True)
 
     from rs_core import cards
     cards.delete(dict(_rows()[0], id=1))
-    main._clip_seen = main._clip_sequence = None     # look at the same text again
-    main._check_clipboard()
+    paste(code)
     check("4 after delete: own code still not imported (digest)", len(_rows()), 0)
     print("CODE " + code)
     root.destroy()
@@ -117,20 +164,31 @@ def child_a(results):
 
 def child_b(results, code):
     tk, root, main = _boot()
-    from rs_core import share
+    from rs_core import bodies, share
+    from rs_ui import scan
 
     def check(name, got, want):
         results.append((name, got == want, f"{got!r} != {want!r}"))
 
-    def clip(text):
-        root.clipboard_clear()
-        root.clipboard_append(text)
+    # No bodies: the empty view, which must still carry the import box and a status line.
+    window = scan.show(root, bodies.Register(), main._sheet, None, variable=tk.StringVar(),
+                       materials=("All",))
+    window.geometry("+-4000+-4000")
+    for _ in range(20):
         root.update()
+    paste = _paster(tk, root, scan)
 
     check("5 the code survived A exiting", root.clipboard_get(), code)
-    main._check_clipboard()
+    main._poll_landed()
+    main._cancel_landed()
+    check("13 code on the clipboard, panel polled: nothing imported", len(_rows()), 0)
+    said = paste(code)
     rows = _rows()
     check("6 imported once", len(rows), 1)
+    check("14 status line names what was imported", said,
+          f"{SYSTEM} {BODY} Location {SPOT['location_index']} {SPOT['commodity']} "
+          f"{SPOT['rigs']} rigs bookmark imported")
+    check("14 import box emptied", _import_row(tk, scan)[1].get(), "")
     if rows:
         row = rows[0]
         check("6 fields as shared",
@@ -138,21 +196,20 @@ def child_b(results, code):
               {key: SPOT.get(key) for key in share.FIELDS})
         check("6 no commander in the imported row", "commander" in row, False)
 
-    main._check_clipboard()
-    check("7 same text polled again: no second row", len(_rows()), 1)
-    clip(f"hey, try this one {code} - good rocks")
-    main._check_clipboard()
+    said = paste(code)
+    check("7 same code pasted again: no second row", len(_rows()), 1)
+    check("7 and the status line says so", "shared or imported here before" in said, True)
+    paste(f"hey, try this one {code} - good rocks")
     check("7 same code inside chat text: no second row", len(_rows()), 1)
 
     # Another sharer's code for the same patch: different heading, same spot.
     other = json.loads(zlib.decompress(base64.urlsafe_b64decode(code[len(share.PREFIX):])))
     other["heading"] = 200
-    clip(share.PREFIX + base64.urlsafe_b64encode(
+    said = paste(share.PREFIX + base64.urlsafe_b64encode(
         zlib.compress(json.dumps(other).encode())).decode())
-    main._check_clipboard()
     check("7 other code, same patch: no second row", len(_rows()), 1)
-    check("7 and the status line says it is already bookmarked", "already bookmarked" in
-          str(main._status.cget("text")), True)
+    check("7 and the status line says it is already bookmarked", "already bookmarked" in said,
+          True)
 
     bomb = share.PREFIX + base64.urlsafe_b64encode(
         zlib.compress(b'{"a":"' + b"x" * 5_000_000 + b'"}', 9)).decode()
@@ -176,33 +233,24 @@ def child_b(results, code):
                        ("oversized zip", bomb),
                        ("unknown material", tampered),
                        ("prefix only", share.PREFIX)):
-        clip(text)
         try:
-            main._check_clipboard()
+            said = paste(text)
             raised = None
         except Exception as err:            # noqa: BLE001 - any raise is the failure
-            raised = repr(err)
+            said, raised = "", repr(err)
         check(f"8 {name}: no raise, no row", (raised, len(_rows())), (None, 1))
+        check(f"8 {name}: status says no code found", said.startswith("No RhinoData code"),
+              True)
 
     # An imported code, its bookmark deleted, the same code seen again.
     from rs_core import cards
-    clip(code)
-    main._clip_seen = main._clip_sequence = None
-    main._check_clipboard()
     cards.delete(dict(_rows()[0], id=1))
-    main._clip_seen = main._clip_sequence = None
-    main._check_clipboard()
-    check("11 imported, deleted, seen again: not imported again", len(_rows()), 0)
+    paste(code)
+    check("11 imported, deleted, pasted again: not imported again", len(_rows()), 0)
 
-    clip("plain text, nothing shared")
-    main._clip_seen = main._clip_sequence = None
-    start = time.perf_counter()
-    for _ in range(1000):
-        main._check_clipboard()
-    per_call = (time.perf_counter() - start)
-    results.append(("10 _check_clipboard, unchanged text: ms per call", True,
-                    f"{per_call:.3f}"))
-    check("10 under 1 ms per call", per_call < 1.0, True)
+    said = paste("plain text, nothing shared")
+    check("10 plain text: no row, status says no code found",
+          (len(_rows()), said.startswith("No RhinoData code")), (0, True))
     root.destroy()
 
 
@@ -245,8 +293,6 @@ def _clipboard(text=None):
 def main():
     out = os.path.join(HERE, "out", datetime.now().strftime("%Y%m%d-%H%M%S"))
     saved = _clipboard()
-    # A RhinoData code already there would be imported by the children's first poll.
-    _clipboard("share_e2e: clipboard cleared for the run")
     report, ok, code = [], True, ""
     try:
         for role in ("a", "b"):

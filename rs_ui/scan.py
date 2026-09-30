@@ -17,6 +17,7 @@ the list itself, so opening it twice costs nothing.
 
 import os
 import pathlib
+import sqlite3
 import io
 import tkinter as tk
 import webbrowser
@@ -120,6 +121,7 @@ _state = {
     "ground": None,       # the one rail ground unfolded, or None; every other one is folded
     "grounds_for": None,  # the body whose ground was last unfolded by _rail
     "status": "",
+    "import": "",         # what is typed in the import box
     "system": None,       # a system browsed from the search box, or None for the live one
     "search": "",         # what is typed in the search box
     "here": None,         # _key() of the bookmark within yields.ATTRIBUTE_M of the SRV
@@ -491,6 +493,8 @@ def _draw():
     middle = tk.Frame(outer, bg=BG)
     middle.pack(side="left", fill="both", expand=True)
     picked = _middle(middle, register, sheet, focus, body, records, groups, maps, materials)
+
+    _import_strip(middle)
 
     _card(card, register, sheet, body, picked, maps)
     _panes.update(card=card, register=register, sheet=sheet, body=body, maps=maps,
@@ -900,6 +904,7 @@ def _middle(parent, register, sheet, focus, body, records, groups, maps, materia
     if body is None:
         _pack_dock(parent)
         _empty(parent, register, focus)
+        _status_line(parent, "")
         return None
 
     head = tk.Frame(parent, bg=BG)
@@ -939,12 +944,63 @@ def _middle(parent, register, sheet, focus, body, records, groups, maps, materia
     else:
         picked = _bookmark_list(parent, body, groups, maps)
 
+    _status_line(parent, HINT)
+    return picked
+
+
+def _status_line(parent, idle):
+    """The status line at the bottom of `parent`; `idle`: its text while _state["status"] is empty."""
     global _status_label
-    _status_label = tk.Label(parent, text=_state["status"] or HINT, bg=BG, fg=DIM,
+    _status_label = tk.Label(parent, text=_state["status"] or idle, bg=BG, fg=DIM,
                              anchor="w", justify="left", font=("Segoe UI", 8))
     _status_label.pack(side="bottom", fill="x", padx=16, pady=(6, 10))
     _status_label.bind("<Configure>", _wrap_to_width, add="+")
-    return picked
+
+
+def _import_strip(parent):
+    """One row at the bottom of the middle pane: a box for a RhinoData code and Import.
+    The typed text is kept in _state["import"] across draws."""
+    strip = tk.Frame(parent, bg=BG)
+    strip.pack(side="bottom", fill="x", padx=16, pady=(6, 0))
+    text = tk.StringVar(master=strip, value=_state["import"])
+    text.trace_add("write", lambda *_: _state.__setitem__("import", text.get()))
+    pasted = tk.Entry(strip, textvariable=text)
+    _style_field(pasted)
+    _button(strip, "Import", _import_code).pack(side="right", padx=(6, 0))
+    pasted.pack(side="left", fill="x", expand=True)
+    pasted.bind("<Return>", lambda _: _import_code())
+
+
+def _import_code():
+    """Import the RhinoData code in the import box; the result on the status line.
+
+    Skips codes this install shared or imported (share.mine) and bookmarks
+    already here (cards.nearby). The box is emptied on an import.
+    """
+    try:
+        state, spot = share.take(_state["import"])
+    except (sqlite3.Error, OSError) as err:
+        logger.warning(f"could not import a shared bookmark: {err}")
+        _say(f"Bookmark not imported: {err}")
+        return
+    if state is None:
+        _say("No RhinoData code found. Paste the whole RhinoData:... line.")
+        return
+    what = f"{spot['commodity']} on {spot['planet_name']}"
+    if state == "seen":
+        _say(f"{what}: this code was shared or imported here before.")
+    elif state == "known":
+        _say(f"{what} is already bookmarked.")
+    else:
+        parts = [spot["system"], spot["planet_name"]]
+        if spot.get("location_index") is not None:
+            parts.append(f"Location {spot['location_index']}")
+        parts.append(spot["commodity"])
+        if spot.get("rigs") is not None:
+            parts.append(f"{spot['rigs']} rigs")
+        _state["import"] = ""
+        _state["status"] = " ".join(parts) + " bookmark imported"
+        _draw()
 
 
 def _say(text):
@@ -1923,7 +1979,7 @@ def _copy_coords(record):
 def _share_bookmark(record):
     """The bookmark as a RhinoData code on the clipboard.
 
-    Remembered before the copy, so the clipboard poll in rs_ui.main skips it.
+    Remembered (share.remember), so pasting it into the import box here adds no copy.
     """
     if _window is None:
         return
@@ -1931,7 +1987,7 @@ def _share_bookmark(record):
     share.remember(code)
     clipboard.copy(_window, code)
     _say(f"Copied a RhinoData code for {_short(record.get('commodity'))} - "
-         f"a RhinoSpotter that sees it on its clipboard imports it")
+         f"paste it into the import box under the bookmarks of another RhinoData")
 
 
 def _share_map(body, group):
