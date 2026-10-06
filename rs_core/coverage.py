@@ -1101,7 +1101,7 @@ def _marker(heading, size):
         big = size * 4
         sprite = Image.new("RGBA", (big, big), (0, 0, 0, 0))
         draw = ImageDraw.Draw(sprite)
-        fg = palette.rgb(palette.FG) + (255,)
+        fg = palette.rgb(palette.SRV) + (255,)
         bg = palette.rgb(palette.BG) + (255,)
         if heading is None:
             draw.ellipse([big * 0.3, big * 0.3, big * 0.7, big * 0.7], fill=fg, outline=bg, width=4)
