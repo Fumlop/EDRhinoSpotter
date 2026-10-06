@@ -470,7 +470,7 @@ class TestRender:
 
     def test_the_srv_marker_keeps_its_1x_size_when_zoomed(self):
         def marker_px(image):
-            fg = palette.rgb(palette.FG)
+            fg = palette.rgb(palette.SRV)
             c = image.width // 2
             return sum(image.getpixel((x, y)) == fg
                        for x in range(c - 30, c + 30) for y in range(c - 30, c + 30))

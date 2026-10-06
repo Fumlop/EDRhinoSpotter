@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.3.4
+
+**Changed**
+
+- Minimap: the SRV marker is orange; it was the same pale blue as the bookmark dots (#8).
+
 ## 6.3.3
 
 **Added (experimental)**

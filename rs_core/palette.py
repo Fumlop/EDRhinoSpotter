@@ -33,6 +33,10 @@ GOLD = "#f5c542"
 # The ring of a depleted bookmark.
 SPENT = "#8a96a3"
 
+# The SRV marker on the minimap. Orange: FG_SOFT is the bookmarks, GOLD and WARN
+# the groups and mask edge.
+SRV = "#ff7a1a"
+
 
 def rgb(colour):
     """'#87ceeb' -> (135, 206, 235). Raises ValueError on anything else.
