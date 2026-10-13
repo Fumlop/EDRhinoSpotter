@@ -29,9 +29,9 @@ import webbrowser
 from tkinter import messagebox
 
 from rs_core import (arrow, cards, coverage, coverstore, database, grounds, guide, migrate,
-                     palette, spansh, spotmark, store)
+                     palette, rigplan, spansh, spotmark, store)
 from rs_core.logging import logger
-from rs_ui import hotkey, overlay
+from rs_ui import hotkey, overlay, rigradar
 
 try:
     import myNotebook as nb
@@ -68,6 +68,8 @@ PANEL_KEY = "rhinospotter_scan_panel"
 # Golden circle radius, m: coverage.golden_m.
 GOLDEN_KEY = "rhinospotter_golden_m"
 GOLDEN_STEPS = tuple(range(500, 2501, 250))
+# Settings tab row for rs_ui.press / rs_ui.rigradar: on by default.
+RIG_RADAR_KEY = "rhinospotter_rig_radar"
 # Only the Rhino has the mining scanner the painted area stands for.
 RHINO = "mev_rhino"
 CORNERS = ("top left", "top right", "bottom left", "bottom right")
@@ -120,6 +122,7 @@ _free = None             # tk.BooleanVar on the settings tab
 _picked = None           # [material] from the Select dialog, saved on Settings OK; None: untouched
 _golden = None           # tk.StringVar on the settings tab, metres
 _in_scan = None          # tk.BooleanVar on the settings tab; None: row not shown
+_rig_radar = None        # tk.BooleanVar on the settings tab
 _placing = False         # in place-the-map mode: click-through off, drag to move
 _grab = None             # (pointer x, pointer y, window x, window y) while dragging
 _held = None             # the widget whose Tk grab place() took - EDMC's Settings dialog
@@ -127,6 +130,11 @@ _held = None             # the widget whose Tk grab place() took - EDMC's Settin
 
 def enabled():
     return config.get_bool(ENABLED_KEY, default=True) if config is not None else True
+
+
+def rig_radar():
+    """Whether presses are tracked and the rig radar opens (press.released)."""
+    return config.get_bool(RIG_RADAR_KEY, default=True) if config is not None else True
 
 
 def keep_up():
@@ -767,7 +775,7 @@ def prefs(parent, worth=(), panel=True):
     Rows come from `place_at`, not from numbers written here: hand-numbered
     rows put two widgets in row 9 the last time one was inserted.
     """
-    global _enabled, _corner, _keep, _ship, _free, _golden, _picked, _in_scan
+    global _enabled, _corner, _keep, _ship, _free, _golden, _picked, _in_scan, _rig_radar
     frame = nb.Frame(parent)
     _golden = tk.StringVar(value=str(golden()))
     _enabled = tk.BooleanVar(value=enabled())
@@ -777,6 +785,8 @@ def prefs(parent, worth=(), panel=True):
     _free = tk.BooleanVar(value=free_move())
     _picked = None
     _in_scan = tk.BooleanVar(value=panel_in_scan()) if panel else None
+    _rig_radar = tk.BooleanVar(value=rig_radar())
+    from rs_ui import press      # press imports minimap; late import keeps the cycle out
 
     rows = itertools.count()
 
@@ -810,6 +820,9 @@ def prefs(parent, worth=(), panel=True):
          lambda f: nb.Label(f, text="Drag it, any monitor, then double-click or Esc."))
     line(lambda f: nb.Label(f, text="Painted means driven within "
                                     f"{coverage.SCAN_RADIUS_M / 1000:.0f} km, not scanned."))
+    line(lambda f: nb.Checkbutton(
+        f, text=f"Rig radar - mouse button held {press.RIG_PRESS_S:g} s or longer in the Rhino "
+                f"places a rig, {rigplan.SPACING_M:.0f} m ring, double click closes", variable=_rig_radar))
     def steps(f):
         # Readonly: the arrows step through GOLDEN_STEPS, nothing typed in. Tk sets
         # the variable to the first value on creation, so it is set again after.
@@ -1060,6 +1073,10 @@ def prefs_changed():
             config.set(FREE_KEY, bool(_free.get()))
         if _in_scan is not None:
             config.set(PANEL_KEY, bool(_in_scan.get()))
+        if _rig_radar is not None:
+            config.set(RIG_RADAR_KEY, bool(_rig_radar.get()))
+            if not _rig_radar.get():
+                rigradar.close()
         if _picked:
             config.set(MATERIALS_KEY, list(_picked))
         elif _picked is not None:

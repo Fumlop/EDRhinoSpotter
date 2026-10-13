@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.4.0
+
+**Added (experimental)**
+
+- Rig radar: hold a mouse button 1 s or longer in the Rhino and a rig counts as placed; the first button held that long is the rig button until EDMC restarts. A radar under the guide arrow shows an 80 m ring round each rig on a 10 m grid and says how far to drive; the rings turn thick green when the next rig can go down. A double click on the rig button closes it; the line under the radar names the button.
+- Every mouse press in the SRV with Elite in front goes to `trace\presses-<date>.csv`, to measure how long a rig press really is.
+- Settings: Rig radar on/off, default on. Off: no presses logged, no radar.
+
 ## 6.3.5
 
 **Added**

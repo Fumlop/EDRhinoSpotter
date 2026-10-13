@@ -273,6 +273,20 @@ Everything in here imports tkinter.
   Off Windows there is no game window to find: top middle of the screen, or
   where it was dragged (`rhinospotter_arrow_xy`, clamped to the screen),
   right-click resets.
+- **[press.py](rs_ui/press.py)** - left/right mouse press lengths, GetAsyncKeyState
+  polled every 20 ms on a daemon thread, handed to Tk through `main._on_ui`. In
+  the SRV with Elite in front every press is a row in `trace\presses-<date>.csv`;
+  nothing at all with `rhinospotter_rig_radar` off (Settings, default on). A press of
+  `RIG_PRESS_S` (1.0 s, placeholder until measured) in the Rhino with Elite in
+  front calls `rigradar.placed()`; the first one sets `_rig_button` for the
+  EDMC session, a long press on the other button is not a rig. Two short presses on it within
+  `DOUBLE_S` (0.4 s) call `rigradar.close()`.
+- **[rigradar.py](rs_ui/rigradar.py)** - 250 m across, north up, the SRV in the
+  middle, a `rigplan.SPACING_M` ring per rig placed on the body; border GOOD and
+  "Next rig: OK here" once clear of every ring. Centred under the guide arrow,
+  click-through, hidden while Elite is not in front; closes and forgets the
+  rigs when the SRV fix ends or the body changes. `placed()` is the one way in,
+  for a journal event as well.
 - **[clipboard.py](rs_ui/clipboard.py)** - text onto the clipboard with
   Win32 `SetClipboardData`: Tk's clipboard text is gone once EDMC exits.
 - **[scan.py](rs_ui/scan.py)** - the RhinoData window: three panes side by
@@ -397,6 +411,10 @@ mapping the unit tests it replaced.
   and the CLI.
 - **scan_arrive_e2e.py** - an open RhinoData window redrawn on FSDJump and on a
   saved bookmark without `scan.show()`; a browsed system kept; no-op controls.
+- **totals_e2e.py** - the RhinoData rail's totals against the db's own rows.
+- **rigradar_e2e.py** - scripted button state through the real press thread,
+  `_on_ui`, Status.json, CSV and radar window; checks run on a driver thread
+  because `_on_ui` needs the mainloop.
 
 ## Where the data comes from
 
