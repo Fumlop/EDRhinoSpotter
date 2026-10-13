@@ -275,7 +275,8 @@ Everything in here imports tkinter.
   right-click resets.
 - **[press.py](rs_ui/press.py)** - left/right mouse press lengths, GetAsyncKeyState
   polled every 20 ms on a daemon thread, handed to Tk through `main._on_ui`. In
-  the SRV with Elite in front every press is a row in `trace\presses-<date>.csv`;
+  the SRV with Elite in front every press is a row in `trace\presses-<date>.csv`, only with
+  `RHINOSPOTTER_DEBUG` set;
   nothing at all with `rhinospotter_rig_radar` off (Settings, default on). A press of
   `RIG_PRESS_S` (1.0 s, placeholder until measured) in the Rhino with Elite in
   front calls `rigradar.placed()`; the first one sets `_rig_button` for the
