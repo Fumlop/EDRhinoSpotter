@@ -5,6 +5,7 @@
 **Changed**
 
 - Minimap: the SRV marker is orange; it was the same pale blue as the bookmark dots (#8).
+- Mining sheet: 1,131 locations (was 1,074).
 
 ## 6.3.3
 
