@@ -691,6 +691,33 @@ def _bookmarked_systems():
         return []
 
 
+def _totals():
+    """(systems, bookmarks, bodies, maps) over the whole database; None on a read error.
+
+    systems counts as _bookmarked_systems() does: systems that hold bookmarks.
+    """
+    try:
+        with database.connect() as conn:
+            systems, marks, bodies_ = conn.execute(
+                "SELECT count(DISTINCT system), count(*), count(DISTINCT planet_name) "
+                "FROM bookmarks").fetchone()
+            maps = conn.execute("SELECT count(*) FROM maps").fetchone()[0]
+    except Exception as err:                       # sqlite3.Error, OSError
+        logger.warning(f"scan: could not count the totals: {err}")
+        return None
+    return systems, marks, bodies_, maps
+
+
+def _totals_line(totals):
+    """'235 bookmarks  ·  23 bodies  ·  44 maps'; '' with no bookmarks and no maps."""
+    if not totals or not (totals[1] or totals[3]):
+        return ""
+    _, marks, bodies_, maps = totals
+    return (f"{marks} bookmark{'' if marks == 1 else 's'}"
+            f"  ·  {bodies_} {'body' if bodies_ == 1 else 'bodies'}"
+            f"  ·  {maps} map{'' if maps == 1 else 's'}")
+
+
 def _search_box(parent):
     """Type a system, pick it, and the page shows that system's bookmarks.
 
@@ -706,12 +733,18 @@ def _search_box(parent):
     entry = tk.Entry(parent, textvariable=typed, bg=BG, fg=FG, insertbackground=FG,
                      relief="solid", borderwidth=1, highlightthickness=0,
                      font=("Segoe UI", 9))
-    tk.Label(parent, text="SYSTEMS WITH BOOKMARKS", bg=PANEL, fg=DIM, anchor="w",
+    totals = _totals()
+    title = "SYSTEMS WITH BOOKMARKS" + (f"  ·  {totals[0]}" if totals else "")
+    tk.Label(parent, text=title, bg=PANEL, fg=DIM, anchor="w",
              font=("Segoe UI", 7)).pack(fill="x", pady=(0, 2))
     entry.pack(fill="x")
 
     hits = tk.Frame(parent, bg=PANEL)
     hits.pack(fill="x")
+    line = _totals_line(totals)
+    if line:
+        tk.Label(parent, text=line, bg=PANEL, fg=DIM, anchor="w",
+                 font=("Segoe UI", 8)).pack(fill="x", pady=(3, 0))
 
     def redraw(*_):
         text = typed.get().strip().lower()

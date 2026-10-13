@@ -276,7 +276,9 @@ Everything in here imports tkinter.
 - **[clipboard.py](rs_ui/clipboard.py)** - text onto the clipboard with
   Win32 `SetClipboardData`: Tk's clipboard text is gone once EDMC exits.
 - **[scan.py](rs_ui/scan.py)** - the RhinoData window: three panes side by
-  side, at 60% of the screen. The rail lists every landable body with its
+  side, at 60% of the screen. The rail's head counts the whole database
+  (`_totals`: systems with bookmarks, bookmarks, bodies, maps), read on every
+  draw. The rail lists every landable body with its
   distance, locations and bookmark count; the middle holds the picked body's
   bookmarks folded into their mining locations, or its maps
   (`coverage.mapped_locations`) under the Mapped tab; the card on the right is
