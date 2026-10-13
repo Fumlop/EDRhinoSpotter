@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+**Changed**
+
+- Ctrl+Alt+R (trace the deposit border) and Ctrl+Alt+P (rig placed) only with `RHINOSPOTTER_DEBUG` set: they write trace files.
+
 ## 6.4.1
 
 **Changed**

@@ -246,7 +246,8 @@ Everything in here imports tkinter.
   loop, since the game holds the focus while you drive. A press is bounced to
   Tk and sets the map's center or border, steps its size, or opens the
   RhinoData window. A combination already held elsewhere is a logged warning;
-  the others still register. Off Windows no RegisterHotKey: `chat()` fires the
+  the others still register. Ctrl+Alt+R / Ctrl+Alt+P (lab, tracelog.py) are in
+  `ACTIONS` only with `RHINOSPOTTER_DEBUG` set. Off Windows no RegisterHotKey: `chat()` fires the
   same callbacks from the journal's SendText `!rs center|border|zoom|data`, and
   `label()` names the chat command.
 - **[rhino.py](rs_ui/rhino.py)** - the easter egg. `docs/running.png` placed

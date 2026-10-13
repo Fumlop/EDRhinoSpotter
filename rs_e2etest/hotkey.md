@@ -39,8 +39,10 @@ Replaces the unit tests in `rs_tests/test_hotkey.py`; mapping in
 
 ## Checks
 
-1. Defaults: all four combos held by the module after `start()` (probe:
-   `RegisterHotKey` from a second thread fails with error 1409).
+1. Defaults: every combo in `ACTIONS` held by the module after `start()` (probe:
+   `RegisterHotKey` from a second thread fails with error 1409). Callbacks for
+   all six ids, as main.py passes them; without `RHINOSPOTTER_DEBUG` Ctrl+Alt+R
+   and Ctrl+Alt+P (lab, trace files) are not held. Run once with and once without.
 2. Dispatch: WM_HOTKEY posted to the module's thread, per key id: callback
    runs on `rhinospotter-hotkey`, the bounced function runs on the Tk thread.
 3. Real press: `SendInput` Ctrl+Alt+<key> for each default -> the Tk function runs.
