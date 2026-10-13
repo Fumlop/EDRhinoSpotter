@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from rs_core import (bodies, cards, coverage, database, deposit, grounds, instance, migrate,
                      palette, spansh, spotcard, spotmark, store, system, update, yields)
 from rs_core.logging import logger
-from rs_ui import hotkey, minimap, scan, tracelog
+from rs_ui import hotkey, minimap, press, rigradar, scan, tracelog
 
 try:
     from theme import theme
@@ -201,6 +201,8 @@ def build(parent, updates=True, docked=False):
                   hotkey.SCAN: lambda: _on_ui(open_scan),
                   hotkey.TRACE: lambda: _on_ui(tracelog.toggle, _frame),
                   hotkey.PLACED: lambda: _on_ui(tracelog.placed)})
+    # winfo_toplevel() on the Tk thread, inside the posted call, not on the press thread.
+    press.start(lambda *release: _on_ui(lambda: press.released(_frame.winfo_toplevel(), *release)))
     scan.dock_with(_dock_panel)
     return _frame
 
@@ -468,6 +470,8 @@ def stop():
     _landed_after = _cancel_landed()
     _done_after = _cancel_done()
     hotkey.stop()
+    press.stop()
+    rigradar.close()
     tracelog.shutdown()      # closes the CSV, writes the summary, plans nothing
     minimap.stop()
     # Last, and not through the timer: EDMC is going, and a scan waiting on a
