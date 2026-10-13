@@ -2,7 +2,8 @@
 
 A daemon thread polls GetAsyncKeyState every POLL_S for BUTTONS; each release
 goes to `on_release(button, when, seconds)` on that thread (main passes it on
-through _on_ui). `released()` runs on the Tk thread: one CSV row per press
+through _on_ui). `released()` runs on the Tk thread: one CSV row per press,
+only with RHINOSPOTTER_DEBUG set (rs_core.logging.DEBUG),
 in the SRV with Elite in front, and a rig for rigradar when the press qualifies.
 
     %LOCALAPPDATA%\\RhinoSpotter\\trace\\presses-<YYYYmmdd>.csv
@@ -19,7 +20,7 @@ import time
 from datetime import datetime, timedelta
 
 from rs_core import coverage, database, spotmark
-from rs_core.logging import logger
+from rs_core.logging import DEBUG, logger
 from rs_ui import minimap, overlay, rigradar
 
 POLL_S = 0.02            # 20 ms: press lengths to +-20 ms
@@ -84,7 +85,7 @@ def _poll(on_release):
 
 
 def released(root, button, when, seconds):
-    """Tk thread: one CSV row per press; a rig for rigradar when it qualifies.
+    """Tk thread: one CSV row per press (DEBUG only); a rig for rigradar when it qualifies.
 
     Only with minimap.rig_radar() on, in the SRV and Elite in front: clicks in
     other windows are neither logged nor rigs. Rig: >= RIG_PRESS_S in the Rhino on
@@ -103,8 +104,9 @@ def released(root, button, when, seconds):
     if rig and _rig_button is None:
         _rig_button = button
         logger.info(f"press: rig button is {button} for this session")
-    _write([when.isoformat(timespec="milliseconds"), button, round(seconds * 1000), body,
-            lat, lon, heading, radius, int(rhino), int(rig)])
+    if DEBUG:
+        _write([when.isoformat(timespec="milliseconds"), button, round(seconds * 1000), body,
+                lat, lon, heading, radius, int(rhino), int(rig)])
     if rig:
         logger.info(f"press: rig placed on {body} at {lat:.6f}, {lon:.6f} ({seconds:.2f} s press)")
         rigradar.placed(root, body, lat, lon, radius, button)

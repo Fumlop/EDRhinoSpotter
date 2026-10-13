@@ -27,6 +27,7 @@ os.makedirs(os.path.join(OUT, "RhinoSpotter", "db"))
 os.makedirs(JOURNALS)
 live_before = sorted((f, os.path.getmtime(f)) for f in glob.glob(os.path.join(LIVE_TRACE, "*")))
 os.environ["LOCALAPPDATA"] = OUT
+os.environ["RHINOSPOTTER_DEBUG"] = "1"                   # the CSV the checks read is DEBUG only
 sys.path.insert(0, PLUGIN)
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -49,6 +50,9 @@ u.IsWindowVisible.argtypes = [wintypes.HWND]
 u.WindowFromPoint.argtypes = [wintypes.POINT]
 u.WindowFromPoint.restype = wintypes.HWND
 u.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+u.SetThreadDpiAwarenessContext.argtypes = [ctypes.c_void_p]
+u.SetThreadDpiAwarenessContext.restype = ctypes.c_void_p
+u.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
 
 results = []
 
@@ -194,11 +198,12 @@ class Notebook:
         return tk.OptionMenu(master, variable, default, *values)
 
 
-def front(window_handle):
-    """Bring a window of this process to the front (ALT tap lets SetForegroundWindow through)."""
-    u.keybd_event(0x12, 0, 0, 0)
-    u.keybd_event(0x12, 0, 2, 0)
-    u.SetForegroundWindow(window_handle)
+def front(at):
+    """Stand-in ("elite") or harness window to the front by a real left click on it.
+
+    No ALT tap: it put the Tk window in menu mode and stalled the mainloop 14 s.
+    """
+    click("left", 0.05, at)
     pump(0.4)
 
 
@@ -218,10 +223,17 @@ def foreign(box):
 
 
 def shot(name):
+    """Grab the radar. Box from GetWindowRect per-monitor aware: ImageGrab takes physical
+    pixels, winfo_* gives scaled ones (125%: 794 -> 992 px)."""
     rigradar._window.update_idletasks()
-    x, y = rigradar._window.winfo_rootx(), rigradar._window.winfo_rooty()
-    box = (x, y, x + rigradar._window.winfo_width(), y + rigradar._window.winfo_height())
-    others = foreign(box)
+    old = u.SetThreadDpiAwarenessContext(ctypes.c_void_p(-4))   # PER_MONITOR_AWARE_V2
+    try:
+        rect = wintypes.RECT()
+        u.GetWindowRect(radar_handle(), ctypes.byref(rect))
+        box = (rect.left, rect.top, rect.right, rect.bottom)
+        others = foreign(box)
+    finally:
+        u.SetThreadDpiAwarenessContext(old)
     if others:
         return f"not grabbed: windows of pids {sorted(others)} over the box"
     ImageGrab.grab(bbox=box, all_screens=True).save(os.path.join(OUT, name))
@@ -256,7 +268,6 @@ spot.update(elite=(stand_in.winfo_rootx() + 100, stand_in.winfo_rooty() + 100),
             harness=(root.winfo_rootx() + 150, root.winfo_rooty() + 40))
 cursor = wintypes.POINT()
 u.GetCursorPos(ctypes.byref(cursor))
-harness = u.GetParent(root.winfo_id()) or root.winfo_id()
 grabs = []
 
 main.build(root)
@@ -267,7 +278,8 @@ root.report_callback_exception = lambda *exc: errors.append("".join(traceback.fo
 def body():
     try:
         status()
-        front(elite)
+        u.SetForegroundWindow(elite)                     # no click: it would be a CSV row before check 1
+        pump(0.4)
         check("0 stand-in Elite is in front", overlay.game_focused())
 
         # 1: short press
@@ -332,7 +344,7 @@ def body():
               and r[-1]["rig"] == "0", repr(r[-1:]))
 
         # 7 / 8: Elite not in front
-        front(harness)
+        front("harness")
         pump(0.6)
         check("7 Elite not in front: game_focused False", not overlay.game_focused())
         check("7 Elite not in front: radar hidden", not visible())
@@ -340,7 +352,7 @@ def body():
         hold("right", 1.3, at="harness")
         check("8 long press, Elite not in front: not logged", len(rows()) == n, f"{len(rows()) - n} rows")
         check("8 still two rings", len(rings()) == 2, f"{len(rings())}")
-        front(elite)
+        front("elite")
         pump(0.6)
         check("7 back in front: radar shown", visible())
 
@@ -398,6 +410,14 @@ def body():
         tap("left")
         check("16 double click on the rig button: radar closed, rigs forgotten",
               rigradar._window is None and rigradar._rigs == [], repr(rigradar._rigs))
+
+        # 17: release build (RHINOSPOTTER_DEBUG unset): no CSV, rig still placed
+        press.DEBUG = False
+        n = len(rows())
+        hold("left", 1.3)
+        check("17 DEBUG off: press not written, rig placed", len(rows()) == n and len(rigradar._rigs) == 1,
+              f"{len(rows()) - n} rows, {len(rigradar._rigs)} rigs")
+        press.DEBUG = True
 
         # 11: out of the SRV
         status(flags=0)

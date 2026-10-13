@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.4.1
+
+**Changed**
+
+- Mouse presses go to `trace\presses-<date>.csv` only with `RHINOSPOTTER_DEBUG` set; a normal install writes no trace files.
+
 ## 6.4.0
 
 **Added (experimental)**

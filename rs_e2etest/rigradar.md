@@ -10,11 +10,11 @@ game is open: it takes the foreground back and sits under the click-through rada
 
 Writes `rs_e2etest/out/<timestamp>/report.txt`, `presses.csv` (copy) and
 `radar-*.png` grabs; exit 1 on a failure. `LOCALAPPDATA` points at the run
-folder before rs_core loads; the db starts empty.
+folder and `RHINOSPOTTER_DEBUG` is set before rs_core loads; the db starts empty.
 
 Real input: `mouse_event` presses and releases the buttons with the cursor on
 the stand-in (top left, clear of the radar) or, for check 8, on the harness
-window; the cursor is put back after. GetAsyncKeyState and everything after it
+window; focus moves by the same clicks; the cursor is put back after. GetAsyncKeyState and everything after it
 are the shipped code. Moves the mouse for about 40 s.
 
 ## Ways it can fail
@@ -41,15 +41,13 @@ are the shipped code. Moves the mouse for about 40 s.
 | 14 | Settings `Rig radar` off: saved, open radar closed, long press neither logged nor a rig; on again: rig placed | toggle not wired |
 | 15 | new session (`_rig_button` reset to None, as at EDMC start): long left press -> rig, left learned, hide line names left; long right -> rig 0 | players with deploy on the left button get no radar |
 | 16 | double click on the other button, or two rig-button taps 1.0 s apart -> radar stays; double click on the rig button -> closed, rigs forgotten | radar cannot be put away, or closes on scans |
+| 17 | `press.DEBUG` False (RHINOSPOTTER_DEBUG unset, as in a release): long press -> no CSV row, rig placed | a release writes trace files |
 | 0 | CSV under the run folder, live `trace\` untouched | harness writes live data |
 
 ## Not covered
 
 - How long a rig deploy is held: one measured, right button, 3052 ms
   (`presses-20261013.csv`); scans 30-187 ms. 1.0 s `RIG_PRESS_S` sits between.
-- Open: run 20261013-134628 40/45. Checks 7, 8, 9, 16 failed: the ALT tap in
-  `front()` left the harness window in menu mode, Tk stalled 14 s until a
-  manual click, which also added presses.
 - Check 15 resets `_rig_button` by hand: a real EDMC restart is a new import.
 - GetAsyncKeyState while Elite holds raw input: only the game can show it.
 - The look over a real game frame; grabs are over the stand-in window.

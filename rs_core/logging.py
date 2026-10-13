@@ -20,4 +20,5 @@ except ImportError:                                  # bare interpreter, tests
 # INFO by default, DEBUG with RHINOSPOTTER_DEBUG set. The 9 info-level lines
 # are once-per-event (map shown/hidden, guide start/stop, migration) and are
 # what post-hoc questions need. Per-tick lines are debug.
-logger.setLevel(logging.DEBUG if os.environ.get("RHINOSPOTTER_DEBUG") else logging.INFO)
+DEBUG = bool(os.environ.get("RHINOSPOTTER_DEBUG"))     # also gates trace files (press.py)
+logger.setLevel(logging.DEBUG if DEBUG else logging.INFO)
