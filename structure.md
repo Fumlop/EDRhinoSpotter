@@ -246,7 +246,8 @@ Everything in here imports tkinter.
   loop, since the game holds the focus while you drive. A press is bounced to
   Tk and sets the map's center or border, steps its size, or opens the
   RhinoData window. A combination already held elsewhere is a logged warning;
-  the others still register. Off Windows no RegisterHotKey: `chat()` fires the
+  the others still register. Ctrl+Alt+R / Ctrl+Alt+P (lab, tracelog.py) are in
+  `ACTIONS` only with `RHINOSPOTTER_DEBUG` set. Off Windows no RegisterHotKey: `chat()` fires the
   same callbacks from the journal's SendText `!rs center|border|zoom|data`, and
   `label()` names the chat command.
 - **[rhino.py](rs_ui/rhino.py)** - the easter egg. `docs/running.png` placed
@@ -278,9 +279,10 @@ Everything in here imports tkinter.
   the SRV with Elite in front every press is a row in `trace\presses-<date>.csv`, only with
   `RHINOSPOTTER_DEBUG` set;
   nothing at all with `rhinospotter_rig_radar` off (Settings, default on). A press of
-  `RIG_PRESS_S` (1.0 s, placeholder until measured) in the Rhino with Elite in
-  front calls `rigradar.placed()`; the first one sets `_rig_button` for the
-  EDMC session, a long press on the other button is not a rig. Two short presses on it within
+  `RIG_PRESS_S` (0.5 s) in the Rhino with Elite in
+  front calls `rigradar.placed()`; the rig button is `rhinospotter_rig_button`
+  (`left` / `right`, Settings) when set, else the first such press sets `_rig_button`
+  for the EDMC session; a long press on the other button is not a rig. Two short presses on it within
   `DOUBLE_S` (0.4 s) call `rigradar.close()`.
 - **[rigradar.py](rs_ui/rigradar.py)** - 250 m across, north up, the SRV in the
   middle, a `rigplan.SPACING_M` ring per rig placed on the body; border GOOD and

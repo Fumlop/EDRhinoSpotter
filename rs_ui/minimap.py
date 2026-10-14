@@ -70,6 +70,9 @@ GOLDEN_KEY = "rhinospotter_golden_m"
 GOLDEN_STEPS = tuple(range(500, 2501, 250))
 # Settings tab row for rs_ui.press / rs_ui.rigradar: on by default.
 RIG_RADAR_KEY = "rhinospotter_rig_radar"
+# "left" / "right": the rig button for rs_ui.press; "" (default): first long press picks it.
+RIG_BUTTON_KEY = "rhinospotter_rig_button"
+RIG_BUTTONS = {"First long press": "", "Mouse 1 (left)": "left", "Mouse 2 (right)": "right"}
 # Only the Rhino has the mining scanner the painted area stands for.
 RHINO = "mev_rhino"
 CORNERS = ("top left", "top right", "bottom left", "bottom right")
@@ -123,6 +126,7 @@ _picked = None           # [material] from the Select dialog, saved on Settings 
 _golden = None           # tk.StringVar on the settings tab, metres
 _in_scan = None          # tk.BooleanVar on the settings tab; None: row not shown
 _rig_radar = None        # tk.BooleanVar on the settings tab
+_rig_choice = None       # tk.StringVar on the settings tab, a RIG_BUTTONS label
 _placing = False         # in place-the-map mode: click-through off, drag to move
 _grab = None             # (pointer x, pointer y, window x, window y) while dragging
 _held = None             # the widget whose Tk grab place() took - EDMC's Settings dialog
@@ -135,6 +139,12 @@ def enabled():
 def rig_radar():
     """Whether presses are tracked and the rig radar opens (press.released)."""
     return config.get_bool(RIG_RADAR_KEY, default=True) if config is not None else True
+
+
+def rig_button():
+    """The rig button from RIG_BUTTON_KEY: "left" / "right", or None: not set, press.py learns it."""
+    value = config.get_str(RIG_BUTTON_KEY, default="") if config is not None else ""
+    return value if value in ("left", "right") else None
 
 
 def keep_up():
@@ -775,7 +785,7 @@ def prefs(parent, worth=(), panel=True):
     Rows come from `place_at`, not from numbers written here: hand-numbered
     rows put two widgets in row 9 the last time one was inserted.
     """
-    global _enabled, _corner, _keep, _ship, _free, _golden, _picked, _in_scan, _rig_radar
+    global _enabled, _corner, _keep, _ship, _free, _golden, _picked, _in_scan, _rig_radar, _rig_choice
     frame = nb.Frame(parent)
     _golden = tk.StringVar(value=str(golden()))
     _enabled = tk.BooleanVar(value=enabled())
@@ -786,6 +796,7 @@ def prefs(parent, worth=(), panel=True):
     _picked = None
     _in_scan = tk.BooleanVar(value=panel_in_scan()) if panel else None
     _rig_radar = tk.BooleanVar(value=rig_radar())
+    _rig_choice = tk.StringVar(value=next(k for k, v in RIG_BUTTONS.items() if v == (rig_button() or "")))
     from rs_ui import press      # press imports minimap; late import keeps the cycle out
 
     rows = itertools.count()
@@ -823,6 +834,8 @@ def prefs(parent, worth=(), panel=True):
     line(lambda f: nb.Checkbutton(
         f, text=f"Rig radar - mouse button held {press.RIG_PRESS_S:g} s or longer in the Rhino "
                 f"places a rig, {rigplan.SPACING_M:.0f} m ring, double click closes", variable=_rig_radar))
+    line(lambda f: nb.Label(f, text="Rig button"),
+         lambda f: nb.OptionMenu(f, _rig_choice, _rig_choice.get(), *RIG_BUTTONS))
     def steps(f):
         # Readonly: the arrows step through GOLDEN_STEPS, nothing typed in. Tk sets
         # the variable to the first value on creation, so it is set again after.
@@ -1077,6 +1090,8 @@ def prefs_changed():
             config.set(RIG_RADAR_KEY, bool(_rig_radar.get()))
             if not _rig_radar.get():
                 rigradar.close()
+        if _rig_choice is not None:
+            config.set(RIG_BUTTON_KEY, RIG_BUTTONS.get(_rig_choice.get(), ""))
         if _picked:
             config.set(MATERIALS_KEY, list(_picked))
         elif _picked is not None:

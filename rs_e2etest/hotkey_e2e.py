@@ -32,6 +32,7 @@ import tkinter as tk                                     # noqa: E402
 from ctypes import wintypes                              # noqa: E402
 
 from rs_core import database                             # noqa: E402
+from rs_core.logging import DEBUG                        # noqa: E402
 from rs_ui import hotkey, main                           # noqa: E402
 
 assert database.PATH.startswith(DATA), database.PATH
@@ -125,7 +126,8 @@ def pump(until=lambda: False, seconds=2.0):
 fired = []          # (key_id, thread name of the callback, thread ident of the Tk function)
 
 
-def callbacks(ids=(hotkey.CENTER, hotkey.BORDER, hotkey.SIZE, hotkey.SCAN)):
+def callbacks(ids=(hotkey.CENTER, hotkey.BORDER, hotkey.SIZE, hotkey.SCAN,
+                   hotkey.TRACE, hotkey.PLACED)):
     """As rs_ui/main.py builds them: the hotkey thread calls main._on_ui."""
     def make(key_id):
         def on_hotkey_thread():
@@ -211,6 +213,10 @@ def body():
               f"tid {tid1}")
         for kid, combo in defaults().items():
             check(f"1 {combo} held after start", held(combo), f"probe error {probe(combo)}")
+        if not DEBUG:
+            for kid, combo in ((hotkey.TRACE, "Ctrl+Alt+R"), (hotkey.PLACED, "Ctrl+Alt+P")):
+                check(f"1 {combo} (lab) not held without RHINOSPOTTER_DEBUG",
+                      not held(combo) and kid not in hotkey._callbacks, f"probe error {probe(combo)}")
 
         # 2. WM_HOTKEY posted to the module's thread: callback on the hotkey thread, function on Tk.
         for kid, combo in defaults().items():
@@ -290,7 +296,8 @@ def body():
         for kid, combo in new.items():
             check(f"7 {combo} held after restart", held(combo), f"probe error {probe(combo)}")
             check(f"7 label() says {combo}", hotkey.label(kid) == combo, hotkey.label(kid))
-        for combo in defaults().values():
+        for kid in new:                                  # keys not rebound keep their combo
+            combo = defaults()[kid]
             check(f"7 old {combo} released by restart", probe(combo) == 0)
         fired.clear()
         post(hotkey.SIZE)

@@ -1,5 +1,16 @@
 # Changelog
 
+## 6.4.2
+
+**Changed**
+
+- Ctrl+Alt+R (trace the deposit border) and Ctrl+Alt+P (rig placed) only with `RHINOSPOTTER_DEBUG` set: they write trace files.
+- Rig radar: a mouse button held 0.5 s or longer in the Rhino counts as a rig placed, was 1 s; a scan click is shorter than 0.5 s.
+
+**Added**
+
+- Settings: Rig button - First long press (default), Mouse 1 (left) or Mouse 2 (right). Set, it is used instead of the button learned from the first long press.
+
 ## 6.4.1
 
 **Changed**
