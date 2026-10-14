@@ -42,12 +42,13 @@ are the shipped code. Moves the mouse for about 40 s.
 | 15 | new session (`_rig_button` reset to None, as at EDMC start): long left press -> rig, left learned, hide line names left; long right -> rig 0 | players with deploy on the left button get no radar |
 | 16 | double click on the other button, or two rig-button taps 1.0 s apart -> radar stays; double click on the rig button -> closed, rigs forgotten | radar cannot be put away, or closes on scans |
 | 17 | `press.DEBUG` False (RHINOSPOTTER_DEBUG unset, as in a release): long press -> no CSV row, rig placed | a release writes trace files |
+| 18 | Settings `Rig button` Mouse 2: saved `right`, long left -> rig 0, long right -> rig, hide line names right, `_rig_button` stays left, double click right closes; First long press: saved `""`, 0.6 s left -> rig | config ignored, or it overwrites the learned button |
 | 0 | CSV under the run folder, live `trace\` untouched | harness writes live data |
 
 ## Not covered
 
 - How long a rig deploy is held: one measured, right button, 3052 ms
-  (`presses-20261013.csv`); scans 30-187 ms. 1.0 s `RIG_PRESS_S` sits between.
+  (`presses-20261013.csv`); scans 30-187 ms. 0.5 s `RIG_PRESS_S` sits between.
 - Check 15 resets `_rig_button` by hand: a real EDMC restart is a new import.
 - GetAsyncKeyState while Elite holds raw input: only the game can show it.
 - The look over a real game frame; grabs are over the stand-in window.

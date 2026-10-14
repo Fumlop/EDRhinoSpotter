@@ -419,6 +419,34 @@ def body():
               f"{len(rows()) - n} rows, {len(rigradar._rigs)} rigs")
         press.DEBUG = True
 
+        # 18: Settings rig button Mouse 2 overrides the learned left; back to default: learned left again
+        on_tk(lambda: minimap.prefs(root))
+        on_tk(lambda: minimap._rig_choice.set("Mouse 2 (right)"))
+        on_tk(minimap.prefs_changed)
+        check("18 Mouse 2 saved: right", config.values.get(minimap.RIG_BUTTON_KEY) == "right",
+              repr(config.values.get(minimap.RIG_BUTTON_KEY)))
+        hold("left", 1.3)
+        r = rows()
+        check("18 Mouse 2 set, long left press: rig 0", r[-1]["button"] == "left" and r[-1]["rig"] == "0"
+              and len(rigradar._rigs) == 1, repr(r[-1:]))
+        hold("right", 1.3)
+        r = rows()
+        check("18 Mouse 2 set, long right press: rig 1", r[-1]["button"] == "right" and r[-1]["rig"] == "1"
+              and len(rigradar._rigs) == 2, repr(r[-1:]))
+        check("18 hide line names right", hint() == "To hide: double click right mouse", repr(hint()))
+        check("18 learned button kept: left", press._rig_button == "left", repr(press._rig_button))
+        tap("right", gap=0.15)
+        tap("right")
+        check("18 double click right closes the radar", rigradar._window is None, repr(rigradar._rigs))
+        on_tk(lambda: minimap._rig_choice.set("First long press"))
+        on_tk(minimap.prefs_changed)
+        check("18 First long press saved: ''", config.values.get(minimap.RIG_BUTTON_KEY) == "",
+              repr(config.values.get(minimap.RIG_BUTTON_KEY)))
+        hold("left", 0.6)
+        r = rows()
+        check("18 default again, 0.6 s left press: rig 1", r[-1]["button"] == "left" and r[-1]["rig"] == "1"
+              and len(rigradar._rigs) == 1, repr(r[-1:]))
+
         # 11: out of the SRV
         status(flags=0)
         pump(0.6)
