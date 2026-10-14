@@ -173,7 +173,8 @@ No tkinter anywhere in here.
   `decode()` checks types, ranges and the material name, and inflates to 16 KB
   at most. Codes shared here are kept as SHA-256 digests in `meta`
   (`shared:<digest>`), and so are imported ones; `take()` skips those and
-  anything `cards.nearby` finds. the import box in the RhinoData middle pane
+  anything `cards.nearby` finds, and saves the rest with `commander`
+  `@Import-Shared` (`IMPORTED_BY`). the import box in the RhinoData middle pane
   (scan._import_strip, under the bookmarks) calls it on the pasted text.
 - **[yields.py](rs_core/yields.py)** - tons refined at a bookmark. One
   `MiningRefined` is 1 t, placed by the Status.json reading at that moment -

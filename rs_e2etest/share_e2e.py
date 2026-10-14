@@ -194,7 +194,8 @@ def child_b(results, code):
         check("6 fields as shared",
               {key: row.get(key) for key in share.FIELDS},
               {key: SPOT.get(key) for key in share.FIELDS})
-        check("6 no commander in the imported row", "commander" in row, False)
+        check("18 imported row's commander is @Import-Shared", row.get("commander"),
+              "@Import-Shared")
 
     said = paste(code)
     check("7 same code pasted again: no second row", len(_rows()), 1)

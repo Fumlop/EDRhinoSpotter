@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.4.3
+
+**Changed**
+
+- A bookmark imported from a `RhinoData:` code is saved with commander `@Import-Shared`, was empty.
+
 ## 6.4.2
 
 **Changed**

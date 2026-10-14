@@ -44,6 +44,9 @@ MAX_TEXT = 64
 # Longest code accepted, in characters. A shared bookmark is ~250.
 MAX_CODE = 4000
 
+# `commander` of an imported row; the code carries none.
+IMPORTED_BY = "@Import-Shared"
+
 
 def encode(record):
     """`record` -> 'RhinoData:<code>'."""
@@ -134,6 +137,7 @@ def take(text, db=None):
     if cards.nearby(spot, db) is not None:
         return "known", spot
     spot["marked_at"] = _now()
+    spot["commander"] = IMPORTED_BY
     spotcard.save(spot, db=db)
     remember(code, db)
     logger.info(f"imported shared bookmark: {spot['commodity']} on {spot['planet_name']}")
