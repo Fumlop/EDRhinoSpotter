@@ -27,10 +27,12 @@ The RhinoData window is drawn off-screen (-4000, -4000), mapped but not visible.
 15. The EDMC panel still has an Import row.
 16. The import row is taller than one line, or not below the bookmark list.
 17. Text typed into the box is lost when the window redraws.
+18. The imported row's `commander` is not `@Import-Shared`: missing, or the
+    sharer's name.
 
 ## Checked
 
-All of 1-17. 8 includes NaN and zero radius, a 5,000-char body name, an int
+All of 1-18. 8 includes NaN and zero radius, a 5,000-char body name, an int
 over 2^63 and an unknown Amount. The Import button is found in the RhinoData window
 and pressed with `invoke()`; the text goes in with `Entry.insert`. 16: row
 under 30 px, top edge below every bookmark row.
