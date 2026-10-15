@@ -287,8 +287,8 @@ Everything in here imports tkinter.
   `SCAN_PRESS_S` (0.5 s) on it within `DOUBLE_S` (0.4 s) call `rigradar.close()`;
   0.5 to 2.0 s is neither.
 - **[rigradar.py](rs_ui/rigradar.py)** - 250 m across, north up, the SRV in the
-  middle, a `rigplan.SPACING_M` ring per rig placed on the body; border GOOD and
-  "Next rig: OK here" once clear of every ring. Centred under the guide arrow,
+  middle, a band from `measure.RIG_SPACING` (76 m) to `rigplan.SPACING_M` (80 m) per rig
+  placed on the body, ALERT or GOOD mixed 55% into BG; "Next rig: OK here" once clear of every band. Centred under the guide arrow,
   click-through, hidden while Elite is not in front; closes and forgets the
   rigs when the SRV fix ends or the body changes. `placed()` is the one way in,
   for a journal event as well.

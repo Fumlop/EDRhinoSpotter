@@ -34,7 +34,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 import tkinter as tk                                     # noqa: E402
 
 from PIL import ImageGrab                                # noqa: E402
-from rs_core import coverage, database, palette, paths, rigplan   # noqa: E402
+from rs_core import coverage, database, measure, paths, rigplan   # noqa: E402
 from rs_ui import main, minimap, overlay, press, rigradar         # noqa: E402
 
 assert database.PATH.startswith(OUT), database.PATH
@@ -144,12 +144,23 @@ def visible():
 
 
 def rings():
-    """[(outline, width, dash)] of the rings on the canvas."""
+    """[(outline, dash, inner edge m, outer edge m)] of the rig bands on the canvas."""
     c = rigradar._canvas
     if c is None:
         return []
-    return [(c.itemcget(i, "outline"), float(c.itemcget(i, "width")), c.itemcget(i, "dash"))
-            for i in c.find_withtag("ring")]
+    px_m = rigradar.SIZE / rigradar.VIEW_M
+    out = []
+    for i in c.find_withtag("ring"):
+        x0, _, x1, _ = c.coords(i)
+        r, w = (x1 - x0) / 2 / px_m, float(c.itemcget(i, "width")) / px_m
+        out.append((c.itemcget(i, "outline"), c.itemcget(i, "dash"), round(r - w / 2, 1), round(r + w / 2, 1)))
+    return out
+
+
+def band(colour):
+    """True when every ring is a solid `colour` band from 76 to 80 m, edges +-0.6 m (half a px)."""
+    return bool(rings()) and all(o == colour and d == "" and abs(lo - measure.RIG_SPACING) <= 0.6
+                                 and abs(hi - rigplan.SPACING_M) <= 0.6 for o, d, lo, hi in rings())
 
 
 def border():
@@ -306,8 +317,10 @@ def body():
         check("2 text at the rig", rigradar._text == f"Next rig: drive {rigplan.SPACING_M:.0f} m on", rigradar._text)
         check("2 hide line names the rig button", hint() == "To hide: double click right mouse", repr(hint()))
         check("2 no border", rigradar._canvas is not None and border() is None, border())
-        check("2 too close: ring thin dashed ALERT",
-              rings() and all(o == palette.ALERT and w == 1 and d for o, w, d in rings()), repr(rings()))
+        check("2 too close: solid ALERT band 76-80 m", band(rigradar.ALERT_BAND), repr(rings()))
+        widths = [rigradar._canvas.itemcget(i, "width") for i in rigradar._canvas.find_withtag("ring")]
+        check("2 band width whole px (EDMC's Tk rejects a float)", widths and all(float(w).is_integer() for w in widths),
+              repr(widths))
         lines = grid()
         want = int(rigradar.VIEW_M / rigradar.GRID_M)
         check("2 10 m raster: 25-26 lines each way", all(want <= n <= want + 1 for n in lines), repr(lines))
@@ -320,8 +333,7 @@ def body():
         status(north_m=90.0, heading=45)
         pump(0.6)
         check("3 90 m north: OK here", rigradar._text == "Next rig: OK here", rigradar._text)
-        check("3 90 m north: ring thick solid GOOD",
-              rings() and all(o == palette.GOOD and w == 3 and not d for o, w, d in rings()), repr(rings()))
+        check("3 90 m north: solid GOOD band 76-80 m", band(rigradar.GOOD_BAND), repr(rings()))
         check("3 90 m north: still no border", border() is None, border())
         grabs.append(shot("radar-2-ok.png"))
 

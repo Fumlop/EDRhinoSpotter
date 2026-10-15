@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.4.5
+
+**Changed**
+
+- Rig radar: each rig is a band from 76 m (closest two rigs deploy) to 80 m, red while you are inside it, green once you are clear of every rig. Was a dashed red / thick green 80 m ring.
+
 ## 6.4.4
 
 **Added**

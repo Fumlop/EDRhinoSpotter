@@ -27,13 +27,13 @@ are the shipped code. Moves the mouse for about 60 s (estimate: 40 s before 6.4.
 | 2 | text `Next rig: drive 80 m on`, no border | distance from the wrong point |
 | 2 | hide line `To hide: double click right mouse` | the close gesture is not on screen |
 | 2 | 10 m raster: 25-26 lines each way | raster missing or wrong step |
-| 2 | ring thin dashed ALERT while inside it | ring gives no "too close" cue |
-| 3 | SRV 50 m north -> `drive 30 m on`; 90 m -> `OK here`, rings thick solid GOOD, no border | projection or poll broken |
+| 2 | band solid ALERT_BAND (ALERT 55% into BG), 76-80 m (`measure.RIG_SPACING` to `rigplan.SPACING_M`) +-0.6 m (width rounded to whole px), while inside it | band gives no "too close" cue, wrong radius, or a float width Tk rejects |
+| 3 | SRV 50 m north -> `drive 30 m on`; 90 m -> `OK here`, band solid GOOD_BAND 76-80 m, no border | projection or poll broken |
 | 4 | x centred on the game rect, y = top + max(24, 4%) + 190 + 8 | overlaps the guide arrow |
-| 5 | second long press -> 2 rings, text from the nearest | rings replaced, not added |
+| 5 | second long press -> 2 bands, text from the nearest | bands replaced, not added |
 | 6 | 2.3 s left press after right was learned -> row button left, rig 0 | a long hold on the scan button places a rig |
 | 7 | Elite not in front -> radar hidden; back in front -> shown | radar over the desktop |
-| 8 | long press with Elite not in front -> no CSV row, rings unchanged | clicks in other windows logged or counted as rigs |
+| 8 | long press with Elite not in front -> no CSV row, bands unchanged | clicks in other windows logged or counted as rigs |
 | 9 | LaunchSRV `testbuggy` -> long press rig 0, rhino 0 | rigs from another SRV |
 | 10 | radar ex-style has WS_EX_TRANSPARENT | radar eats game clicks |
 | 11 | out of the SRV -> radar closed, rigs forgotten, press not logged | radar stays after docking |
