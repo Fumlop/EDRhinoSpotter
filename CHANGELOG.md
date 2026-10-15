@@ -1,5 +1,15 @@
 # Changelog
 
+## 6.4.4
+
+**Added**
+
+- RhinoData: a gear beside MATERIAL FILTER opens the materials selection (same as Settings, Materials in the lists: Select...). OK saves at once and refills the panel Material dropdown and the RhinoData filter.
+
+**Changed**
+
+- Rig radar: a mouse button held 2 s or longer in the Rhino counts as a rig placed and teaches the rig button, was 0.5 s. A scan click is shorter than 0.5 s; 0.5 to 2 s is neither.
+
 ## 6.4.3
 
 **Changed**

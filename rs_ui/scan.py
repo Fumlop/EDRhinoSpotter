@@ -104,6 +104,7 @@ _host = None             # standalone.py: the root drawn into instead of a Tople
 _dock = None             # the panel frame, a child of the window, kept across draws
 _docking = None          # plugin: main._dock_panel, called with the window before each draw
 _scan = None             # (register, sheet, focus, variable, materials)
+_on_select = None        # main._pick_materials(parent), the gear beside MATERIAL FILTER; None: disabled
 _status_label = None     # the middle pane's status line, rebuilt by every _draw()
 _base_width = None       # the window width _size() set, px: the card grows past it
 _resize_job = None       # the pending after() of _on_resize
@@ -206,7 +207,7 @@ def restyle(widget):
 
 
 def show(parent, register, sheet, focus=None, variable=None, materials=(), here=None,
-         location=None):
+         location=None, on_select=None):
     """Open the window, or raise the one already open.
 
     `focus` is one material. Given one, only the grounds that have ever carried
@@ -225,11 +226,15 @@ def show(parent, register, sheet, focus=None, variable=None, materials=(), here=
     `location`: the panel's Location on `here`. On open only that location is
     unfolded, the one of a bookmark within 175 m of the SRV (_mark_here), and
     every location with a bookmark within UNFOLD_M of the ship (_unfold_near).
+
+    `on_select(parent)`: opens the material selection dialog; the gear beside
+    MATERIAL FILTER calls it.
     """
-    global _window, _scan
+    global _window, _scan, _on_select
 
     # First, so the draw below reads the material that was just picked.
     _scan = (register, sheet, focus, variable, materials)
+    _on_select = on_select
 
     if _window is not None and _window.winfo_exists():
         logger.debug(f"scan: redraw, system={register.system!r} focus={focus!r}")
@@ -904,8 +909,17 @@ def _picker(parent, variable, materials, focus):
     """
     box = tk.Frame(parent, bg=PANEL)
     box.pack(fill="x", padx=13, pady=(10, 0))
-    tk.Label(box, text="MATERIAL FILTER", bg=PANEL, fg=DIM, anchor="w",
-             font=("Segoe UI", 7)).pack(fill="x")
+    head = tk.Frame(box, bg=PANEL)
+    head.pack(fill="x")
+    tk.Label(head, text="MATERIAL FILTER", bg=PANEL, fg=DIM, anchor="w",
+             font=("Segoe UI", 7)).pack(side="left", anchor="s")
+    # Packed side="right" in a fill="x" row: right edge flush with the picker's.
+    # No gear without _on_select (standalone host).
+    if _on_select is not None:
+        gear = _button(head, "⚙", lambda: _on_select(box.winfo_toplevel()))
+        gear.config(padx=4, pady=0, font=("Segoe UI Symbol", 8))
+        gear.pack(side="right")
+        _tooltip(gear, "Setting available materials")
 
     picker = tk.OptionMenu(box, variable, *materials)
     picker.config(relief="solid", borderwidth=1, highlightthickness=0,
@@ -2328,6 +2342,37 @@ def _button(parent, text, command=None, active=ACCENT):
                      padx=8, pady=1, font=("Segoe UI", 8),
                      cursor="hand2" if command else "arrow",
                      state="normal" if command else "disabled")
+
+
+def _tooltip(widget, text):
+    """`text` in a borderless topmost Toplevel under `widget`, 500 ms after
+    <Enter>; gone on <Leave>, <ButtonPress> and <Destroy>. Topmost: the
+    window it sits on can be topmost."""
+    tip = {"job": None, "box": None}
+
+    def show():
+        tip["job"] = None
+        box = tip["box"] = tk.Toplevel(widget)
+        box.overrideredirect(True)
+        box.attributes("-topmost", True)
+        tk.Label(box, text=text, bg=PANEL, fg=FG, relief="solid", borderwidth=1,
+                 padx=6, pady=2, font=("Segoe UI", 8)).pack()
+        box.geometry(f"+{widget.winfo_rootx()}+{widget.winfo_rooty() + widget.winfo_height() + 2}")
+
+    def enter(_):
+        tip["job"] = widget.after(500, show)
+
+    def leave(_):
+        if tip["job"] is not None:
+            widget.after_cancel(tip["job"])
+            tip["job"] = None
+        if tip["box"] is not None:
+            tip["box"].destroy()
+            tip["box"] = None
+
+    widget.bind("<Enter>", enter, add="+")
+    for event in ("<Leave>", "<ButtonPress>", "<Destroy>"):
+        widget.bind(event, leave, add="+")
 
 
 def _clickable(widget, command, skip_buttons=False):

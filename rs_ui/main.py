@@ -390,7 +390,8 @@ def open_scan():
                   variable=_filter,
                   materials=(ALL_MATERIALS,) + _materials(),
                   here=spotmark.body_here(spotmark.read_status()),
-                  location=_int(_loc.get()) if _loc is not None else None)
+                  location=_int(_loc.get()) if _loc is not None else None,
+                  on_select=_pick_materials if minimap.config is not None else None)
     except Exception as err:                       # a broken window must not
         logger.exception("RhinoData failed")       # take the card flow with it
         _set_status(f"no scan window: {err}")
@@ -501,6 +502,17 @@ def _materials():
     held = tuple(var.get() for var in (_material, _filter) if var is not None)
     kept = set(minimap.materials_shown(_worth()))
     return tuple(name for name in spotmark.MATERIALS if name in kept or name in held)
+
+
+def _pick_materials(parent):
+    """The material selection dialog from RhinoData's gear: OK saves MATERIALS_KEY
+    and refills the panel dropdown and the RhinoData picker."""
+    def picked(names):
+        minimap.save_materials(names)
+        _fill_menu()
+        open_scan()
+
+    minimap.select_materials(parent, _worth(), on_ok=picked)
 
 
 def _worth():
