@@ -489,7 +489,7 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
         # alt-tab, not through a minimise - a minimised game has no corner for
         # the map to sit in.
         _down(f"game window {rect} is minimised" if minimised
-              else f"Elite not in front ({overlay.foreground_title()!r})")
+              else "Elite not in front")
         return
     if not _build(root):
         _down("no window could be built")

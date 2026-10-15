@@ -1,5 +1,12 @@
 # Changelog
 
+## 6.4.7
+
+**Changed**
+
+- EDMC log: the home folder in paths and tracebacks is written as `~` (`~\AppData\Local\RhinoSpotter\...`), was `C:\Users\<account>\...`.
+- EDMC log: `minimap: down, Elite not in front` no longer names the window in front. Was its title, e.g. a browser tab.
+
 ## 6.4.6
 
 **Fixed**
