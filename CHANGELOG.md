@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.4.6
+
+**Fixed**
+
+- RhinoData bookmark list: a location line names its 3 most valuable materials (Cr/t), each once. Was one name per bookmark: 6 Iridium bookmarks read "Iridium, Iridium, ...".
+
 ## 6.4.5
 
 **Changed**

@@ -53,6 +53,7 @@ MARKS_W = 14
 # What a location line says about itself before it starts taking room from the
 # button and the distance packed on its right.
 SUMMARY_W = 54
+HEADER_MATERIALS = 3     # materials named on a location line
 # The deposits of a location sit in from it, so the fold reads as a tree rather
 # than as a list with headings in it.
 INDENT = "      "
@@ -1161,7 +1162,14 @@ def _location_header(parent, body, index, group, maps, status, open_here):
     tk.Label(row, text=_nearest(group, status), bg=BG, fg=FG_SOFT, anchor="e",
              font=("Consolas", 9)).pack(side="right")
 
-    names = ", ".join(_short(record.get("commodity")) for record in group)
+    # Each material once, HEADER_MATERIALS of them, most Cr/t first (Sheet.values()).
+    # Unpriced (0, or mining_sheet.json missing) keep the row order: most rigs first.
+    values = _scan[1].values()
+    kinds = {}
+    for record in group:
+        kinds.setdefault((record.get("commodity") or "").lower(), record.get("commodity"))
+    ranked = sorted(kinds.items(), key=lambda kind: -values.get(kind[0], 0))
+    names = ", ".join(_short(name) for _lower, name in ranked[:HEADER_MATERIALS])
     worked = sum(1 for record in group if record.get("depleted_at"))
     summary = (f"{len(group)} deposit{'' if len(group) == 1 else 's'}  ·  {names}"
                + (f"  ·  {worked} worked out" if worked else ""))
