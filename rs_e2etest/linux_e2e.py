@@ -312,7 +312,7 @@ try:
     menu = main._menu["menu"]
     last = menu.index("end")
     check("23 panel: empty list shows the Settings hint",
-          menu.entrycget(last, "label") == main.scan.NO_MATERIALS
+          menu.entrycget(last, "label") == main.widgets.NO_MATERIALS
           and menu.entrycget(last, "state") == "disabled",
           menu.entrycget(last, "label"))
     variable = tk.StringVar(value=main.ALL_MATERIALS)
@@ -321,13 +321,13 @@ try:
     picker = next(w for w in widgets(holder) if isinstance(w, tk.Menubutton))
     pmenu = picker["menu"]
     check("23 RhinoData: empty list shows the Settings hint",
-          pmenu.entrycget(pmenu.index("end"), "label") == main.scan.NO_MATERIALS)
+          pmenu.entrycget(pmenu.index("end"), "label") == main.widgets.NO_MATERIALS)
     holder.destroy()
     minimap.materials_shown = real_shown
     main._fill_menu()
     menu = main._menu["menu"]
     check("23 hint gone once materials are back",
-          menu.entrycget(menu.index("end"), "label") != main.scan.NO_MATERIALS)
+          menu.entrycget(menu.index("end"), "label") != main.widgets.NO_MATERIALS)
 
     # ------------------------------------------------------------ #11
     out("#11 arrow position")
