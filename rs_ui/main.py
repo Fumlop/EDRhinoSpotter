@@ -837,6 +837,9 @@ def _render_card(spot, token):
         # Any material: a mark on a bookmarked spot corrects that bookmark.
         old = cards.nearby(spot, any_material=True)
         if old is None:
+            # Maps and the card button read depleted_at, not Amount.
+            if spot.get("amount") == "Depleted":
+                spot = dict(spot, depleted_at=spot.get("marked_at"))
             spotcard.save(spot)
             message = None
         else:

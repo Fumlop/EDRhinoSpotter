@@ -6,6 +6,11 @@
 
 - Bookmark card: Mark depleted on a bookmark the 14 d regen took off Depleted, with no ton refined there since, keeps the first depletion date and reads "still depleted at 15 d, look again in 7 d". The mark comes off again 7 d after that look. Was a new depletion dated that day (issue 21). Tons refined since the regen: a new depletion, as before.
 - Bookmark data: each such look is kept in `rechecks` (timestamps).
+- Bookmark card: Set active on a bookmark at Amount Depleted also sets Amount to unread (`-`).
+
+**Fixed**
+
+- Minimap and card map: a new bookmark saved with Amount Depleted is a grey ring, and its card offers Set active. Was a pale dot and Mark depleted. Bookmarks already saved this way under 14 d old are dated by their marked time on start.
 
 ## 6.4.7
 

@@ -130,7 +130,8 @@ def set_depleted(record, depleted, when=None, db=None):
     Depleted also closes the open yield cycle; tons refined there while the mark
     is on go into it (yields.add), the first after the mark comes off opens the
     next one. With no ton since regrow() took the mark off, yields.recheck()
-    puts the old `depleted_at` back instead.
+    puts the old `depleted_at` back instead. Taking the mark off also sets
+    Amount 'Depleted' to None (unread), or regrow() would date it again.
     """
     # Imported here: rs_core.yields reads bookmarks through this module.
     from rs_core import yields
@@ -151,6 +152,8 @@ def set_depleted(record, depleted, when=None, db=None):
                 yields.close(data, data["depleted_at"])
             elif not depleted:
                 data.pop("depleted_at", None)
+                if data.get("amount") == "Depleted":
+                    data["amount"] = None
             database.write_bookmark(conn, data, record["id"])
     except (sqlite3.Error, OSError, ValueError) as err:
         logger.warning(f"could not mark bookmark {record['id']} depleted: {err}")
@@ -164,6 +167,7 @@ def set_depleted(record, depleted, when=None, db=None):
                 record[key] = data[key]
     else:
         record.pop("depleted_at", None)
+        record["amount"] = data.get("amount")
     return True
 
 

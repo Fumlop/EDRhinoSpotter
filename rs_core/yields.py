@@ -292,13 +292,15 @@ def regrow(db=None, now=None):
     Depleted = `depleted_at`, or Amount 'Depleted' read off the HUD (dated by
     `marked_at`). The mark moves to `regrown` [{depleted_at, regrown_at}], so the
     date survives; Amount 'Depleted' becomes None (unread). Returns the count.
+    Amount 'Depleted' under REGEN_DAYS with no `depleted_at` gets `marked_at`
+    as `depleted_at`: the maps and the card button read only `depleted_at`.
     """
     moment = _parse(now) or datetime.now(timezone.utc)
     try:
         with database.connect(db) as conn:
             rows = conn.execute("SELECT id, data FROM bookmarks WHERE depleted_at IS NOT NULL "
                                 "OR data LIKE '%\"amount\": \"Depleted\"%'").fetchall()
-            names = []
+            names, stamped = [], []
             for id, data in rows:
                 try:
                     record = json.loads(data)
@@ -311,7 +313,13 @@ def regrow(db=None, now=None):
                 check = _parse(last_check(record))
                 due = (check + timedelta(days=RECHECK_DAYS) if check else
                        start + timedelta(days=REGEN_DAYS) if start else None)
-                if due is None or moment < due:
+                if due is None:
+                    continue
+                if moment < due:
+                    if not record.get("depleted_at"):
+                        record["depleted_at"] = since
+                        database.write_bookmark(conn, record, id)
+                        stamped.append(f"{record.get('planet_name')} {record.get('commodity')}")
                     continue
                 record.setdefault("regrown", []).append(
                     {"depleted_at": since, "regrown_at": _stamp(moment)})
@@ -323,8 +331,11 @@ def regrow(db=None, now=None):
     except (sqlite3.Error, OSError) as err:
         logger.warning(f"could not take regrown deposits off Depleted: {err}")
         return 0
-    if names:
+    if names or stamped:
         database.changed()
+    if stamped:
+        logger.info(f"Amount Depleted dated by marked_at: {', '.join(stamped)}")
+    if names:
         logger.info(f"past the {REGEN_DAYS} d regen, active again: {', '.join(names)}")
     return len(names)
 
