@@ -503,7 +503,7 @@ def _rail(parent, register, sheet, focus, variable, materials, listed, body, liv
                     anchor="w", justify="left", font=("Segoe UI", 12, "bold"),
                     wraplength=RAIL_WIDTH - 26)
     name.pack(fill="x", pady=(6, 0))
-    # Easter egg, unlabelled: a click on the system name runs rs_ui/rhino.py.
+    # <Button-1> on the system name runs rs_ui/rhino.py; no label says so.
     name.bind("<Button-1>", lambda event: rhino.run(name.winfo_toplevel()))
 
     # Only while a searched system is shown.
@@ -788,7 +788,7 @@ def _middle(parent, register, sheet, focus, body, records, groups, maps, materia
     title.pack(fill="x")
     tk.Label(title, text=body["short"], bg=BG, fg=FG, anchor="w",
              font=("Segoe UI", 16, "bold")).pack(side="left")
-    # Stop the arrow on the heading: its card may be folded away or on another body.
+    # Stop the arrow on the heading, whatever body, tab or fold the card is under.
     if overlay.guiding():
         stop = widgets.button(title, "Stop the arrow", _stop_guide)
         stop.config(fg=GOOD)
@@ -907,7 +907,7 @@ def _bookmark_list(parent, body, groups, maps):
     if groups:
         folded = all(not _unfolded(body["name"], index) for index, _group in groups)
         widgets.button(header, "Open all" if folded else "Fold all",
-                lambda: _fold_all(body["name"], groups, not folded)).pack(side="right")
+                       lambda: _fold_all(body["name"], groups, not folded)).pack(side="right")
     tk.Frame(parent, bg=RULE, height=1).pack(fill="x", padx=16, pady=(3, 0))
 
     listing = _scrollable(parent, "list")
@@ -949,7 +949,7 @@ def _location_header(parent, body, index, group, maps, status, open_here):
 
     # The picture is found on the press: that rebuilds a mask per saved map of the body.
     widgets.button(row, "Share map",
-            (lambda: _share_map(body, group)) if maps else None).pack(
+                   (lambda: _share_map(body, group)) if maps else None).pack(
         side="right", padx=(8, 16))
     tk.Label(row, text=_nearest(group, status), bg=BG, fg=FG_SOFT, anchor="e",
              font=("Consolas", 9)).pack(side="right")
@@ -1223,7 +1223,8 @@ def _bookmark_card(box, register, sheet, body, record, maps):
     marked = str(record.get("marked_at") or "").replace("T", " ")[:16]
     depleted = str(record.get("depleted_at") or "")[:10]
     tk.Label(box, text=(marked or "unknown")
-                       + (f"  ·  depleted {depleted}" if depleted else "  ·  active"),
+                       + (f"  ·  depleted {depleted}" if depleted
+                          else "  ·  depleted" if dead else "  ·  active"),
              bg=PANEL, fg=FG_SOFT, anchor="w",
              font=("Consolas", 8)).pack(fill="x", padx=13)
     # yields.regrow() takes the mark off at REGEN_DAYS, or RECHECK_DAYS after a
@@ -1253,7 +1254,7 @@ def _card_buttons(box, record, dead):
     # No coordinates (bookmarks older than the sidecar): no Guide, Share or Copy.
     has_fix = record.get("latitude") is not None and record.get("longitude") is not None
     arrow = widgets.button(buttons, "Stop the arrow" if running else "Guide me there",
-                    (lambda: _toggle_guide(record)) if has_fix else None)
+                           (lambda: _toggle_guide(record)) if has_fix else None)
     arrow.config(fg=GOOD if running else ACCENT, font=("Segoe UI", 9))
     arrow.pack(fill="x")
 
@@ -1262,11 +1263,11 @@ def _card_buttons(box, record, dead):
     grid.pack(fill="x", pady=(6, 0))
     grid.columnconfigure((0, 1), weight=1, uniform="card")
     depleted = widgets.button(grid, "Set active" if dead else "Mark depleted",
-                       lambda: _toggle_depleted(record))
+                              lambda: _toggle_depleted(record))
     depleted.config(fg=WARN)
     for index, button in enumerate((
             widgets.button(grid, "Share bookmark",
-                    (lambda: _share_bookmark(record)) if share.shareable(record) else None),
+                           (lambda: _share_bookmark(record)) if share.shareable(record) else None),
             depleted,
             widgets.button(grid, "Copy coords", (lambda: _copy_coords(record)) if has_fix else None),
             widgets.button(grid, "Delete", lambda: _delete_bookmark(record), active=ALERT))):
@@ -1300,7 +1301,7 @@ def _map_card(box, body, row):
 
     picture = _newest_picture(body["name"], row["names"])
     button = widgets.button(box, "Open the picture",
-                     (lambda: _open_card(picture)) if picture else None)
+                            (lambda: _open_card(picture)) if picture else None)
     button.config(font=("Segoe UI", 9))
     button.pack(fill="x", padx=13, pady=(12, 13))
 
@@ -1559,8 +1560,7 @@ def _stop_guide():
     _draw()
 
 
-# The Edit dialog: what an unset Amount or Density reads, how wide the value
-# column is, and how far the body name wraps.
+# Edit dialog: unset Amount/Density label, value column minsize px, body name wraplength px.
 NOT_SET = "-"
 EDIT_FIELD_PX = 170
 EDIT_WIDTH_PX = 300
@@ -1644,7 +1644,7 @@ def _save_edit(box, record, material, rigs, amount, density, location):
     }
     try:
         spotcard.save(cards.edited(record, fields), id=record["id"])
-    except (sqlite3.Error, OSError, ValueError) as err:
+    except Exception as err:        # any raise: the dialog says Not saved, the row is unchanged
         logger.exception("scan: could not save the edit")
         messagebox.showwarning("Edit bookmark", f"Not saved: {err}", parent=box)
         return
@@ -1787,9 +1787,7 @@ def _map_marks(cover, records, sheet):
 
 
 def refresh_rail():
-    """The rail rebuilt with the register's bodies, the rest left standing (a
-    _draw rebuilds every widget and flickers): for a Spansh answer. _draw when
-    the picked body is not the one the middle pane shows, or none was."""
+    """Rebuild only the rail, for a Spansh answer; _draw when the picked body is not the one shown."""
     if _window is None or not _window.winfo_exists() or _scan is None:
         return
     rail, shown = _panes.get("rail"), _panes.get("body")
@@ -1917,8 +1915,7 @@ def _nearest(group, status):
 
 
 def _away_text(record):
-    """'821 m away', or what is in the way of knowing - another body, orbit,
-    supercruise."""
+    """'821 m away', or why there is no fix: another body, supercruise or docked, too high."""
     reading = guide.fix(spotmark.read_status(), record)
     if reading.get("distance_m") is not None:
         return f"{guide.metres(reading['distance_m'])} away"
@@ -1958,8 +1955,7 @@ def _price(credits):
 def _volcanism(body):
     """What kind of volcanism and how much of it - "major metallic magma"."""
     words = " ".join((body.get("volcanism") or "").lower().split())
-    # The journal's own suffix - "major rocky magma volcanism". The line already
-    # says it once.
+    # Journal suffix " volcanism" dropped: "major rocky magma volcanism".
     if words.endswith(" volcanism"):
         words = words[:-len(" volcanism")]
     return words
