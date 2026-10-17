@@ -175,7 +175,7 @@ try:
                 for lat, lon, code, depleted, value, rigs in minimap._bookmarks(SYSTEM, BODY)]
     got = flags(marks_mm, cover, want)
     check("3 minimap._bookmarks flags", got == want, f"{got}")
-    marks_sc, _ = scan._map_marks(cover, SYSTEM, BODY, grounds.Sheet())
+    marks_sc, _ = scan._map_marks(cover, [r for r in cards.for_system(SYSTEM) if r.get('planet_name') == BODY], grounds.Sheet())
     got = flags(marks_sc, cover, want)
     check("3 scan._map_marks flags", got == want, f"{got}")
 

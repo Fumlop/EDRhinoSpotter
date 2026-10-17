@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from rs_core import (bodies, cards, coverage, database, deposit, grounds, instance, migrate,
                      palette, spansh, spotcard, spotmark, store, system, update, yields)
 from rs_core.logging import logger
-from rs_ui import hotkey, minimap, press, rigradar, scan, tracelog
+from rs_ui import hotkey, minimap, press, rigradar, scan, tracelog, widgets
 
 try:
     from theme import theme
@@ -249,9 +249,9 @@ def _panel(parent, docked=False):
     tk.Label(frame, text="Material", anchor="w").grid(row=2, column=0, sticky="w", padx=2)
     menu = tk.OptionMenu(frame, _material, NO_MATERIAL, *_materials())
     _style_menu(menu)
-    scan.letter_jump(menu, skip=(NO_MATERIAL,))
+    widgets.letter_jump(menu, skip=(NO_MATERIAL,))
     if not _materials():
-        scan.no_materials_hint(menu)
+        widgets.no_materials_hint(menu)
     menu.grid(row=2, column=1, columnspan=3, sticky="we", padx=2)
 
     # What the HUD says about the targeted deposit. Neither is in the journal.
@@ -323,7 +323,7 @@ def _dock_panel(window):
     text = str(_card_button.cget("text"))
     options = ("text", "state", "command") + (() if text in (CARD_TEXT, DONE_TEXT) else ("fg",))
     _docked["card"].config(**{option: _card_button.cget(option) for option in options})
-    scan.restyle(_docked["frame"])
+    widgets.restyle(_docked["frame"])
     return _docked["frame"]
 
 
@@ -537,9 +537,9 @@ def _fill_menu():
         inner.delete(0, "end")
         for name in (NO_MATERIAL,) + _materials():
             inner.add_command(label=name, command=lambda pick=name: _material.set(pick))
-        scan.letter_jump(menu, skip=(NO_MATERIAL,))
+        widgets.letter_jump(menu, skip=(NO_MATERIAL,))
         if not _materials():
-            scan.no_materials_hint(menu)
+            widgets.no_materials_hint(menu)
 
 
 def prefs(parent):
@@ -800,7 +800,7 @@ def _ask_location():
         answer.append(number if number is not None and number >= 0 else spotmark.NO_LOCATION)
         box.destroy()
 
-    # RhinoData's dialog colours (scan._style_field, scan._button): WARN on the
+    # RhinoData's dialog colours (widgets.style_field, widgets.button): WARN on the
     # system grey was unreadable.
     tk.Label(box, text="Loc 0 = no map, fix later in Edit", bg=palette.BG, fg=palette.WARN,
              font=("Segoe UI", 9)).grid(row=0, column=0, columnspan=2, sticky="w",
@@ -809,12 +809,12 @@ def _ask_location():
              font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", padx=(12, 6))
     spin = tk.Spinbox(box, from_=spotmark.NO_LOCATION, to=spotmark.MAX_LOCATION,
                       textvariable=value, width=4)
-    scan._style_field(spin)
+    widgets.style_field(spin)
     spin.grid(row=1, column=1, sticky="w")
     buttons = tk.Frame(box, bg=palette.BG)
     buttons.grid(row=2, column=0, columnspan=2, sticky="e", padx=12, pady=(10, 12))
-    scan._button(buttons, "Cancel", box.destroy).pack(side="right")
-    scan._button(buttons, "Bookmark", ok).pack(side="right", padx=(0, 6))
+    widgets.button(buttons, "Cancel", box.destroy).pack(side="right")
+    widgets.button(buttons, "Bookmark", ok).pack(side="right", padx=(0, 6))
     box.bind("<Return>", ok)
     box.bind("<Escape>", lambda _: box.destroy())
 
@@ -837,7 +837,7 @@ def _render_card(spot, token):
         # Any material: a mark on a bookmarked spot corrects that bookmark.
         old = cards.nearby(spot, any_material=True)
         if old is None:
-            # Maps and the card button read depleted_at, not Amount.
+            # depleted_at: the card's depleted date and the regen countdown (yields.regrow).
             if spot.get("amount") == "Depleted":
                 spot = dict(spot, depleted_at=spot.get("marked_at"))
             spotcard.save(spot)

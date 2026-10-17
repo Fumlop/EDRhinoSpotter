@@ -51,7 +51,7 @@ Material pick (#10):
     None ticked on OK: key removed, default again.
 23. A list that still comes out empty (broken config) gives a dropdown with
     nothing in it and no word on why: needs the disabled
-    `scan.NO_MATERIALS` hint in the panel and the RhinoData picker.
+    `widgets.NO_MATERIALS` hint in the panel and the RhinoData picker.
 24. The update drops bookmarked materials from the lists: the first start
     with an empty `rhinospotter_materials` must store the 18 over 50,000
     Cr/t plus every bookmarked material, once; never over a stored pick.

@@ -588,7 +588,7 @@ def _bookmarks(system, body):
                 if (record.get("planet_name") == body and isinstance(lat, (int, float))
                         and isinstance(lon, (int, float))):
                     points.append((lat, lon, _code(record.get("commodity")),
-                                   bool(record.get("depleted_at")),
+                                   cards.depleted(record),
                                    _value(record.get("commodity")), record.get("rigs")))
             _marks = (key, points)
     # While a read fails: the last good read of this body, nothing for another.
@@ -729,9 +729,9 @@ def picture_text(cover, system, when=None):
         parts = [r.get("commodity") or "?", f"{float(r['latitude']):.6f} / {float(r['longitude']):.6f}"]
         if r.get("rigs") is not None:
             parts.append(f"{r['rigs']} rig" + ("" if r["rigs"] == 1 else "s"))
-        if r.get("depleted_at"):
+        if cards.depleted(r):
             parts.append("depleted")
-        legend.append((_code(r.get("commodity")), "  ·  ".join(parts), bool(r.get("depleted_at"))))
+        legend.append((_code(r.get("commodity")), "  ·  ".join(parts), cards.depleted(r)))
     return title, legend
 
 

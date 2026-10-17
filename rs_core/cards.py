@@ -119,6 +119,11 @@ def delete(record, db=None):
     return removed
 
 
+def depleted(record):
+    """Mined out: `depleted_at` set, or Amount 'Depleted' read off the HUD."""
+    return bool(record.get("depleted_at")) or record.get("amount") == "Depleted"
+
+
 def set_depleted(record, depleted, when=None, db=None):
     """Mark a bookmark as mined out, or take the mark off. True when written.
 

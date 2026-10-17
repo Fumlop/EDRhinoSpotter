@@ -96,7 +96,7 @@ try:
     check("1 minimap._bookmarks: depleted for the marked one only", got == want, f"{got}")
 
     # 2. card map / Share map
-    marks_sc, golden = scan._map_marks(cover, SYSTEM, BODY, grounds.Sheet())
+    marks_sc, golden = scan._map_marks(cover, [r for r in cards.for_system(SYSTEM) if r.get('planet_name') == BODY], grounds.Sheet())
     got2 = states_by_id(marks_sc, xy)
     check("2 scan._map_marks: same flags as the minimap", got2 == want, f"{got2}")
 
