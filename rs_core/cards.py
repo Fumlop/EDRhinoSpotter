@@ -129,7 +129,8 @@ def set_depleted(record, depleted, when=None, db=None):
 
     Depleted also closes the open yield cycle; tons refined there while the mark
     is on go into it (yields.add), the first after the mark comes off opens the
-    next one.
+    next one. With no ton since regrow() took the mark off, yields.recheck()
+    puts the old `depleted_at` back instead.
     """
     # Imported here: rs_core.yields reads bookmarks through this module.
     from rs_core import yields
@@ -145,10 +146,10 @@ def set_depleted(record, depleted, when=None, db=None):
                 logger.warning(f"could not mark bookmark {record['id']} depleted: it is gone")
                 return False
             data = json.loads(row[0])
-            if depleted:
+            if depleted and not yields.recheck(data, when):
                 data["depleted_at"] = when or datetime.now(timezone.utc).isoformat(timespec="seconds")
                 yields.close(data, data["depleted_at"])
-            else:
+            elif not depleted:
                 data.pop("depleted_at", None)
             database.write_bookmark(conn, data, record["id"])
     except (sqlite3.Error, OSError, ValueError) as err:
@@ -158,6 +159,9 @@ def set_depleted(record, depleted, when=None, db=None):
     if depleted:
         record["depleted_at"] = data["depleted_at"]
         record["yield"] = data.get("yield")
+        for key in ("rechecks", "regrown"):
+            if key in data:
+                record[key] = data[key]
     else:
         record.pop("depleted_at", None)
     return True
@@ -296,12 +300,14 @@ def _refreshed(old, db=None):
 
 
 def _touched(record, amount):
-    """Stamp updated_at. Amount Depleted marks and closes the cycle, any other
-    Amount clears the mark. Set here as well as in set_depleted: the Edit
-    dialog and a re-mark write `amount` straight to the row."""
+    """Stamp updated_at. Amount Depleted marks and closes the cycle, or puts
+    back a mark regrow() took off (yields.recheck), any other Amount clears the
+    mark. Set here as well as in set_depleted: the Edit dialog and a re-mark
+    write `amount` straight to the row."""
     from rs_core import yields
     record["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     if amount == "Depleted":
+        yields.recheck(record, record["updated_at"])
         record.setdefault("depleted_at", record["updated_at"])
         yields.close(record, record["depleted_at"])
     elif amount is not None:

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+**Changed**
+
+- Bookmark card: Mark depleted on a bookmark the 14 d regen took off Depleted, with no ton refined there since, keeps the first depletion date and reads "still depleted at 15 d, look again in 7 d". The mark comes off again 7 d after that look. Was a new depletion dated that day (issue 21). Tons refined since the regen: a new depletion, as before.
+- Bookmark data: each such look is kept in `rechecks` (timestamps).
+
 ## 6.4.7
 
 **Changed**

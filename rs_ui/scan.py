@@ -1463,9 +1463,17 @@ def _bookmark_card(box, register, sheet, body, record, maps):
                        + (f"  ·  depleted {depleted}" if depleted else "  ·  active"),
              bg=PANEL, fg=FG_SOFT, anchor="w",
              font=("Consolas", 8)).pack(fill="x", padx=13)
-    # yields.regrow() takes the mark off at REGEN_DAYS, on start and each jump.
+    # yields.regrow() takes the mark off at REGEN_DAYS, or RECHECK_DAYS after a
+    # recheck, on start and each jump.
     days = yields.days_since_depleted(record)
-    if days is not None:
+    check = yields.last_check(record)
+    if check:
+        at = yields.days_since_depleted(record, check)
+        left = max(0.0, yields.RECHECK_DAYS - (days - at))
+        tk.Label(box, text=f"still depleted at {at:.0f} d, look again in {left:.0f} d",
+                 bg=PANEL, fg=DIM, anchor="w",
+                 font=("Consolas", 8)).pack(fill="x", padx=13)
+    elif days is not None:
         tk.Label(box, text=f"{days:.0f} d since, back after {yields.REGEN_DAYS} d (assumed)",
                  bg=PANEL, fg=DIM, anchor="w",
                  font=("Consolas", 8)).pack(fill="x", padx=13)
@@ -1806,10 +1814,13 @@ def _toggle_depleted(record):
     look the same as one that worked.
     """
     depleted = not record.get("depleted_at")
+    checks = len(record.get("rechecks") or [])
     if cards.set_depleted(record, depleted):
+        still = len(record.get("rechecks") or []) > checks
         _state["status"] = (f"{_loc(record.get('location_index'))}, "
                             f"{_short(record.get('commodity'))}, "
-                            + ("marked depleted." if depleted else "is active again."))
+                            + (f"still depleted, look again in {yields.RECHECK_DAYS} d." if still
+                               else "marked depleted." if depleted else "is active again."))
     else:
         messagebox.showwarning(
             "Depleted", "The bookmark could not be written - see the EDMC log.",
