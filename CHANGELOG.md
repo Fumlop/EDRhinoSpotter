@@ -7,6 +7,10 @@
 - RhinoData list, card and maps, minimap: a bookmark at Amount Depleted counts as depleted everywhere (grey ring, Set active, sorted last), with or without a Mark depleted date. Was the list only.
 - Code: `rs_ui/scan.py` 2,491 -> 2,019 lines. Widget helpers moved to `rs_ui/widgets.py`, one map-marks builder for the card map and Share map, docstrings cut to the comment rules.
 
+**Fixed**
+
+- RhinoData Share map: draws the bookmarks and ground of the system on screen. Was a map with no bookmarks when a searched system was shown, or when the live system had no bodies listed yet.
+
 ## 6.4.8
 
 **Changed**

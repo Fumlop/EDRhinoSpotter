@@ -1733,13 +1733,15 @@ def _drawn_now(body, group, maps):
         cover = coverage.Coverage.from_dict(body, stored, name)
         if cover is None:
             return None
-        system = _scan[0].system if _scan and _scan[0] else None
+        # The shown register, not the live one; `is None`: a Register with no bodies is falsy (__len__).
+        register = _shown_register(_scan[0]) if _scan else None
+        system = register.system if register is not None else None
         sheet = _scan[1] if _scan else None
         records = [r for r in (cards.for_system(system) if system else ())
                    if r.get("planet_name") == body]
         marks, golden = _map_marks(cover, records, sheet)
         title, legend = minimap.picture_text(cover, system)
-        ground = _scan[0].ground(system, body) if _scan and _scan[0] else None
+        ground = register.ground(system, body) if register is not None else None
         image = coverage.picture(cover.mask, marks, title, legend, cover.border_m, golden,
                                  ground)
     except Exception:       # PIL and coverage: any raise must not cost Share map
