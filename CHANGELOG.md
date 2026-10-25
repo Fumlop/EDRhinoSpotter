@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.5.1
+
+**Changed**
+
+- RhinoData location line: Mark good / Mark bad are 👍 / 👎 buttons, 25 px each, were 76 / 68 px. Gold when marked good, red when marked bad, normal text colour when not. The tooltip says what a press does.
+- RhinoData location line: 👍 / 👎 sit at the right edge, after Share map, at the same place on every line. Were left of the distance and moved with its width.
+- A location without a number: the greyed-out thumbs say "Set a loc number in Edit to mark it".
+
 ## 6.5.0
 
 **Added**
