@@ -940,9 +940,10 @@ def _bookmark_list(parent, body, groups, maps):
 
 
 def _location_header(parent, body, index, group, maps, status, open_here):
-    """'loc 2', summary, Mark good, Mark bad, nearest distance and Share map; a click on the line folds it.
+    """'loc 2', summary, nearest distance, Share map, thumb up, thumb down; a click on the line folds it.
 
     Buttons and distance packed first, from the right: pack gives out width in call order.
+    Thumbs at the right edge: the distance text varies in width, they stay in place.
     Good: arrow, 'loc N' and summary in GOLD. Bad: arrow, 'loc N', summary and distance in DIM.
     """
     mark = _spot_mark(body, index)
@@ -955,20 +956,14 @@ def _location_header(parent, body, index, group, maps, status, open_here):
     tk.Label(row, text=_loc(index), bg=BG, fg=GOLD if good else DIM if bad else FG,
              anchor="w", width=8, font=("Segoe UI", 10, "bold")).pack(side="left")
 
+    _spot_button(row, body, index, cards.BAD_SPOT, bad).pack(side="right", padx=(4, 16))
+    _spot_button(row, body, index, cards.GOOD_SPOT, good).pack(side="right", padx=(8, 0))
     # The picture is found on the press: that rebuilds a mask per saved map of the body.
     widgets.button(row, "Share map",
                    (lambda: _share_map(body, group)) if maps else None).pack(
-        side="right", padx=(8, 16))
+        side="right", padx=(8, 0))
     tk.Label(row, text=_nearest(group, status), bg=BG, fg=DIM if bad else FG_SOFT, anchor="e",
              font=("Consolas", 9)).pack(side="right")
-    # Unnumbered (index None): no key to keep the mark under, disabled. The lit one unmarks.
-    numbered = index is not None
-    widgets.button(row, "Unmark bad" if bad else "Mark bad",
-                   (lambda: _set_spot_mark(body, index, cards.BAD_SPOT)) if numbered else None).pack(
-        side="right", padx=(0, 8))
-    widgets.button(row, "Unmark good" if good else "Mark good",
-                   (lambda: _set_spot_mark(body, index, cards.GOOD_SPOT)) if numbered else None,
-                   active=GOLD).pack(side="right", padx=(0, 4))
 
     # Each material once, HEADER_MATERIALS of them, most Cr/t first (Sheet.values()).
     # Unpriced (0, or mining_sheet.json missing) keep the row order: most rigs first.
@@ -1892,8 +1887,23 @@ def _spot_mark(body, index):
                       cards.UNMARKED)
 
 
+def _spot_button(row, body, index, mark, lit):
+    """👍 (GOOD_SPOT, GOLD when lit) or 👎 (BAD_SPOT, ALERT when lit), FG unlit; the lit one unmarks.
+
+    Unnumbered (index None): disabled, no key to keep the mark under.
+    """
+    glyph, colour, word, effect = {cards.GOOD_SPOT: ("👍", GOLD, "good", "listed first"),
+                                   cards.BAD_SPOT: ("👎", ALERT, "bad", "listed last")}[mark]
+    button = widgets.button(row, glyph, (lambda: _set_spot_mark(body, index, mark))
+                            if index is not None else None, active=colour)
+    button.config(fg=colour if lit else FG, padx=4, font=("Segoe UI Emoji", 9))
+    widgets.tooltip(button, "Set a loc number in Edit to mark it" if index is None
+                    else f"Unmark {word}" if lit else f"Mark {word}: {effect}")
+    return button
+
+
 def _set_spot_mark(body, index, mark):
-    """Mark good / Mark bad; pressed on the mark the location has, unmark. A failed write on the status line."""
+    """👍 / 👎 pressed; pressed on the mark the location has, unmark. A failed write on the status line."""
     if _spot_mark(body, index) == mark:
         mark = cards.UNMARKED
     key = cards.spot_key(_shown_register(_scan[0]).system, body, index)

@@ -256,12 +256,12 @@ def location_at(system, body, lat, lon, radius, db=None, within=SAME_LOCATION_M,
     return best
 
 
-# Mark good / Mark bad on a location line; no meta row is UNMARKED.
+# 👍 / 👎 on a location line (rs_ui/scan.py); no meta row is UNMARKED.
 GOOD_SPOT, UNMARKED, BAD_SPOT = 1, 0, -1
 
 
 def spot_key(system, body, index):
-    """The meta key of a Mark good / Mark bad location: 'spot:<system>|<body>|<location_index>'."""
+    """The meta key of a 👍 / 👎 location: 'spot:<system>|<body>|<location_index>'."""
     return f"spot:{system}|{body}|{index}"
 
 

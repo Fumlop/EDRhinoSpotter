@@ -1,4 +1,4 @@
-"""E2E harness for Mark good / Mark bad on the location line. Checks and blind spots: spot.md.
+"""E2E harness for the thumb up / thumb down marks on the location line. Checks and blind spots: spot.md.
 
 Run from the plugin folder:  python rs_e2etest/spot_e2e.py
 Writes rs_e2etest/out/<timestamp>/report.txt. Exit code 1 on a failure.
@@ -92,9 +92,24 @@ def child():
         return next((row for text, row in rows() if text == f"loc {loc}"), None)
 
     def button(row, word):
-        """The Mark/Unmark `word` button of `row`, or None."""
+        """The thumb button of `row` for `word` ('good' or 'bad'), or None."""
+        glyph = {"good": "👍", "bad": "👎"}[word]
         return next((c for c in row.winfo_children() if isinstance(c, tk.Button)
-                     and c.cget("text") in (f"Mark {word}", f"Unmark {word}")), None)
+                     and c.cget("text") == glyph), None)
+
+    def fg(widget):
+        return str(widget.cget("fg")).lower()
+
+    def tip(widget):
+        """The tooltip text shown after <Enter>, or None: the Label in the Toplevel it opens."""
+        widget.event_generate("<Enter>")
+        root.after(800, root.quit)      # TOOLTIP_MS 500 ms + 300 ms
+        root.mainloop()
+        text = next((label.cget("text") for box in widget.winfo_children()
+                     if isinstance(box, tk.Toplevel) for label in box.winfo_children()), None)
+        widget.event_generate("<Leave>")
+        root.update()
+        return text
 
     def label(row, kind):
         for c in row.winfo_children():
@@ -140,11 +155,20 @@ def child():
     parts = (button(row4, "good"), button(row4, "bad"), label(row4, "distance"),
              next(c for c in row4.winfo_children()
                   if isinstance(c, tk.Button) and c.cget("text") == "Share map"))
-    check("1: loc 4 has Mark good, Mark bad",
-          [p.cget("text") if p is not None else None for p in parts[:2]], ["Mark good", "Mark bad"])
+    check("1: loc 4 has thumb up, thumb down", [p is not None for p in parts[:2]], [True, True])
+    check("1: unmarked thumbs in FG", [fg(p) for p in parts[:2]], [palette.FG.lower()] * 2)
+    check("1: tooltips unmarked", [tip(p) for p in parts[:2]],
+          ["Mark good: listed first", "Mark bad: listed last"])
     xs = [p.winfo_x() for p in parts]
-    report.append(f"loc 4 x: Mark good {xs[0]}, Mark bad {xs[1]}, distance {xs[2]}, Share map {xs[3]}")
-    check("1: Mark good < Mark bad < distance < Share map (x)", xs == sorted(xs) and len(set(xs)) == 4, True)
+    report.append(f"loc 4 x: thumb up {xs[0]}, thumb down {xs[1]}, distance {xs[2]}, Share map {xs[3]}")
+    check("1: distance < Share map < thumb up < thumb down (x)",
+          xs[2] < xs[3] < xs[0] < xs[1], True)
+    distances = [label(r, "distance").cget("text") for _l, r in rows()]
+    places = {(button(r, "good").winfo_x(), button(r, "bad").winfo_x()) for _l, r in rows()}
+    report.append(f"distances {distances}, thumb x (up, down) per line {sorted(places)}")
+    check("1: distance texts differ in width (premise of the next check)",
+          len({len(d) for d in distances}) > 1, True)
+    check("1: thumbs at one x on every line", len(places), 1)
     # Width left on the loc 4 line, as drawn and at scan.MIN_WIDTH: report only, no check.
     drawn_width, height = window.winfo_width(), window.winfo_height()
     for width in (drawn_width, scan.MIN_WIDTH):
@@ -158,8 +182,8 @@ def child():
             pads = str(pad).strip("()").replace(",", " ").split()
             needed += c.winfo_reqwidth() + sum(int(p) for p in pads)
         report.append(f"window {width} px: loc 4 row {row4.winfo_width()} px, line needs "
-                      f"{needed} px (Mark good {button(row4, 'good').winfo_reqwidth()} px, "
-                      f"Mark bad {button(row4, 'bad').winfo_reqwidth()} px, "
+                      f"{needed} px (thumb up {button(row4, 'good').winfo_reqwidth()} px, "
+                      f"thumb down {button(row4, 'bad').winfo_reqwidth()} px, "
                       f"summary {label(row4, 'summary').winfo_reqwidth()} px)")
     window.geometry(f"{drawn_width}x{height}")
     root.update()
@@ -167,12 +191,17 @@ def child():
     check("2: no marks: loc 4 plain colours", colours(row_of(4), four), plain)
     check("12: unnumbered: both buttons disabled",
           [str(button(row_of("-"), w).cget("state")) for w in ("good", "bad")], ["disabled"] * 2)
+    check("12: unnumbered: tooltip says what to do",
+          [tip(button(row_of("-"), w)) for w in ("good", "bad")],
+          ["Set a loc number in Edit to mark it"] * 2)
 
     press(6, "good")
     step("good 6")
     check("3: loc 6 first", order(), ["6", "4", "5", "7", "-"])
     check("3: loc 6 arrow, loc, summary gold", colours(row_of(6)), [gold] * 3)
-    check("3: loc 6 button renamed", button(row_of(6), "good").cget("text"), "Unmark good")
+    check("3: loc 6 thumb up GOLD, thumb down FG",
+          [fg(button(row_of(6), w)) for w in ("good", "bad")], [gold, palette.FG.lower()])
+    check("3: loc 6 thumb up tooltip", tip(button(row_of(6), "good")), "Unmark good")
     check("3: loc 4 still plain", colours(row_of(4), four), plain)
     check("4: meta row 1", meta(), {key(6): "1"})
 
@@ -187,7 +216,9 @@ def child():
     step("bad 4")
     check("6: loc 4 last", order(), ["6", "5", "7", "-", "4"])
     check("6: loc 4 arrow, loc, summary, distance muted", colours(row_of(4), four), [muted] * 4)
-    check("6: loc 4 button renamed", button(row_of(4), "bad").cget("text"), "Unmark bad")
+    check("6: loc 4 thumb down ALERT, thumb up FG",
+          [fg(button(row_of(4), w)) for w in ("bad", "good")], [palette.ALERT.lower(), palette.FG.lower()])
+    check("6: loc 4 thumb down tooltip", tip(button(row_of(4), "bad")), "Unmark bad")
     check("6: meta row -1", meta(), {key(6): "1", key(4): "-1"})
 
     press(7, "good")
