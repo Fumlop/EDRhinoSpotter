@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.5.2
+
+**Changed**
+
+- RhinoData location line: the thumbs are 16 px icons drawn by the plugin, were the 👍 / 👎 emoji. The whole icon turns gold when marked good, red when marked bad. Same on Linux, which needed an emoji font before. As tall as Share map.
+
 ## 6.5.1
 
 **Changed**
