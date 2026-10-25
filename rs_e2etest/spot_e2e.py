@@ -91,25 +91,36 @@ def child():
     def row_of(loc):
         return next((row for text, row in rows() if text == f"loc {loc}"), None)
 
+    def thumb_key(widget):
+        """(colour, down) of the scan._thumbs PhotoImage on `widget`, or None."""
+        photos = {str(photo): key for key, photo in scan._thumbs.items()}
+        return photos.get(str(widget.cget("image")))
+
     def button(row, word):
         """The thumb button of `row` for `word` ('good' or 'bad'), or None."""
-        glyph = {"good": "👍", "bad": "👎"}[word]
         return next((c for c in row.winfo_children() if isinstance(c, tk.Button)
-                     and c.cget("text") == glyph), None)
+                     and (thumb_key(c) or (None, None))[1] == (word == "bad")), None)
 
     def fg(widget):
-        return str(widget.cget("fg")).lower()
+        """The icon colour of a thumb button."""
+        return thumb_key(widget)[0].lower()
 
     def tip(widget):
-        """The tooltip text shown after <Enter>, or None: the Label in the Toplevel it opens."""
-        widget.event_generate("<Enter>")
-        root.after(800, root.quit)      # TOOLTIP_MS 500 ms + 300 ms
-        root.mainloop()
-        text = next((label.cget("text") for box in widget.winfo_children()
-                     if isinstance(box, tk.Toplevel) for label in box.winfo_children()), None)
-        widget.event_generate("<Leave>")
-        root.update()
-        return text
+        """The tooltip text shown after <Enter>, or None: the Label in the Toplevel it opens.
+
+        3 tries: a real pointer move during the 800 ms makes Tk send <Leave>, which closes it.
+        """
+        for _attempt in range(3):
+            widget.event_generate("<Enter>")
+            root.after(800, root.quit)      # TOOLTIP_MS 500 ms + 300 ms
+            root.mainloop()
+            text = next((label.cget("text") for box in widget.winfo_children()
+                         if isinstance(box, tk.Toplevel) for label in box.winfo_children()), None)
+            widget.event_generate("<Leave>")
+            root.update()
+            if text is not None:
+                return text
+        return None
 
     def label(row, kind):
         for c in row.winfo_children():
@@ -169,6 +180,12 @@ def child():
     check("1: distance texts differ in width (premise of the next check)",
           len({len(d) for d in distances}) > 1, True)
     check("1: thumbs at one x on every line", len(places), 1)
+    heights = {(button(r, "good").winfo_height(), button(r, "bad").winfo_height(),
+                next(c for c in r.winfo_children() if isinstance(c, tk.Button)
+                     and c.cget("text") == "Share map").winfo_height()) for _l, r in rows()}
+    report.append(f"height px (thumb up, thumb down, Share map) per line {sorted(heights)}")
+    check("1: thumbs as tall as Share map on every line",
+          len(heights) == 1 and len(set(next(iter(heights)))) == 1, True)
     # Width left on the loc 4 line, as drawn and at scan.MIN_WIDTH: report only, no check.
     drawn_width, height = window.winfo_width(), window.winfo_height()
     for width in (drawn_width, scan.MIN_WIDTH):

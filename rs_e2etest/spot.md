@@ -14,7 +14,9 @@ the distance and of Share map. Good: golden header, listed first. Bad: greyed
 header, listed last. The rest by number. Stored as 1 / 0 / -1 (0: no row).
 Changed (2026-10-25, after 6.5.0): the buttons are 👍 / 👎, GOLD / ALERT when
 marked, FG when not; the words moved to the tooltip. Then: the thumbs right of
-Share map at the right edge, fixed x on every line.
+Share map at the right edge, fixed x on every line. Then: 16 px icons drawn
+with PIL (`rs_core/thumb.py`) instead of the emoji; the colour is the
+PhotoImage's key in `scan._thumbs`.
 
 ## Ways it can fail, each checked
 
@@ -49,9 +51,8 @@ Share map at the right edge, fixed x on every line.
 
 ## Not covered
 
-- Pixels: colours read from the widget `fg`, no screen grab. Whether Tk draws
-  the emoji in the `fg` colour (GDI, monochrome) or as a colour glyph is not
-  seen here.
+- Pixels: the icon colour is read from the `scan._thumbs` key of the button's
+  image, no screen grab.
 - Clipping: the free width is reported, not checked. At 900 px the line is
   already overfull before these buttons; pack clips the summary first.
 - A location renumbered in the Edit dialog: the mark stays with the number, not

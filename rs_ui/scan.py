@@ -14,7 +14,7 @@ from tkinter import messagebox
 from PIL import Image
 
 from rs_core import (bodies, cards, coverage, coverstore, database, deposit, grounds, guide,
-                     measure, palette, share, spotcard, spotmark, store, yields)
+                     measure, palette, share, spotcard, spotmark, store, thumb, yields)
 from rs_core.logging import logger
 from rs_ui import clipboard, minimap, overlay, rhino, widgets
 
@@ -122,6 +122,8 @@ _rows = {}
 _panes = {}
 # cards.spot_marks(), read once a draw: the location lines and their order.
 _spots = {}
+# thumb.image() PhotoImages by (colour, down), see _thumb().
+_thumbs = {}
 
 # On open, a location with a bookmark this close to the ship is unfolded, m.
 UNFOLD_M = 5000.0
@@ -956,12 +958,13 @@ def _location_header(parent, body, index, group, maps, status, open_here):
     tk.Label(row, text=_loc(index), bg=BG, fg=GOLD if good else DIM if bad else FG,
              anchor="w", width=8, font=("Segoe UI", 10, "bold")).pack(side="left")
 
-    _spot_button(row, body, index, cards.BAD_SPOT, bad).pack(side="right", padx=(4, 16))
-    _spot_button(row, body, index, cards.GOOD_SPOT, good).pack(side="right", padx=(8, 0))
     # The picture is found on the press: that rebuilds a mask per saved map of the body.
-    widgets.button(row, "Share map",
-                   (lambda: _share_map(body, group)) if maps else None).pack(
-        side="right", padx=(8, 0))
+    share = widgets.button(row, "Share map", (lambda: _share_map(body, group)) if maps else None)
+    # Created before the thumbs to give them its height, packed after: they hold the right edge.
+    tall = share.winfo_reqheight() - 2 * int(share.cget("borderwidth"))
+    _spot_button(row, body, index, cards.BAD_SPOT, bad, tall).pack(side="right", padx=(4, 16))
+    _spot_button(row, body, index, cards.GOOD_SPOT, good, tall).pack(side="right", padx=(8, 0))
+    share.pack(side="right", padx=(8, 0))
     tk.Label(row, text=_nearest(group, status), bg=BG, fg=DIM if bad else FG_SOFT, anchor="e",
              font=("Consolas", 9)).pack(side="right")
 
@@ -1887,19 +1890,31 @@ def _spot_mark(body, index):
                       cards.UNMARKED)
 
 
-def _spot_button(row, body, index, mark, lit):
-    """👍 (GOOD_SPOT, GOLD when lit) or 👎 (BAD_SPOT, ALERT when lit), FG unlit; the lit one unmarks.
+def _spot_button(row, body, index, mark, lit, tall):
+    """Thumb up (GOOD_SPOT) / down (BAD_SPOT): GOLD / ALERT when lit, FG unlit; the lit one unmarks.
 
+    `tall`: px inside the border; an image button is image + border high, Tk ignores pady.
     Unnumbered (index None): disabled, no key to keep the mark under.
     """
-    glyph, colour, word, effect = {cards.GOOD_SPOT: ("👍", GOLD, "good", "listed first"),
-                                   cards.BAD_SPOT: ("👎", ALERT, "bad", "listed last")}[mark]
-    button = widgets.button(row, glyph, (lambda: _set_spot_mark(body, index, mark))
+    colour, word, effect = {cards.GOOD_SPOT: (GOLD, "good", "listed first"),
+                            cards.BAD_SPOT: (ALERT, "bad", "listed last")}[mark]
+    button = widgets.button(row, "", (lambda: _set_spot_mark(body, index, mark))
                             if index is not None else None, active=colour)
-    button.config(fg=colour if lit else FG, padx=4, font=("Segoe UI Emoji", 9))
+    button.config(image=_thumb(row, colour if lit else FG, mark == cards.BAD_SPOT), padx=4,
+                  height=tall)
     widgets.tooltip(button, "Set a loc number in Edit to mark it" if index is None
                     else f"Unmark {word}" if lit else f"Mark {word}: {effect}")
     return button
+
+
+def _thumb(parent, colour, down):
+    """thumb.image() as a PhotoImage, built once per (colour, down): Tk drops an unreferenced image."""
+    key = (colour, down)
+    if key not in _thumbs:
+        out = io.BytesIO()
+        thumb.image(colour, down).save(out, format="PNG")
+        _thumbs[key] = tk.PhotoImage(master=parent, data=out.getvalue())
+    return _thumbs[key]
 
 
 def _set_spot_mark(body, index, mark):
