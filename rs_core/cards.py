@@ -256,6 +256,49 @@ def location_at(system, body, lat, lon, radius, db=None, within=SAME_LOCATION_M,
     return best
 
 
+# Mark good / Mark bad on a location line; no meta row is UNMARKED.
+GOOD_SPOT, UNMARKED, BAD_SPOT = 1, 0, -1
+
+
+def spot_key(system, body, index):
+    """The meta key of a Mark good / Mark bad location: 'spot:<system>|<body>|<location_index>'."""
+    return f"spot:{system}|{body}|{index}"
+
+
+def spot_marks(db=None):
+    """{spot_key(): GOOD_SPOT | BAD_SPOT} from the meta table; {} when unreadable (logged).
+    A value other than '1' or '-1' is skipped and logged."""
+    try:
+        with database.connect(db) as conn:
+            rows = conn.execute("SELECT key, value FROM meta WHERE key LIKE 'spot:%'").fetchall()
+    except (sqlite3.Error, OSError) as err:
+        logger.warning(f"could not read the location marks: {err}")
+        return {}
+    marks = {}
+    for key, value in rows:
+        if str(value) in ("1", "-1"):
+            marks[key] = int(value)
+        else:
+            logger.warning(f"location mark {key}: value {value!r} skipped, not 1 or -1")
+    return marks
+
+
+def set_spot_mark(key, mark, db=None):
+    """Meta row `key` (a spot_key()) set to GOOD_SPOT or BAD_SPOT; UNMARKED deletes it.
+    True when written; a failure is logged."""
+    try:
+        with database.connect(db) as conn:
+            if mark == UNMARKED:
+                conn.execute("DELETE FROM meta WHERE key = ?", (key,))
+            else:
+                conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+                             (key, str(mark)))
+        return True
+    except (sqlite3.Error, OSError) as err:
+        logger.warning(f"could not write the location mark: {err}")
+        return False
+
+
 # What the Edit dialog may change. Coordinates, heading, commander and
 # marked_at are excluded: they are readings taken at the press, and the
 # coordinates identify the deposit.

@@ -120,6 +120,8 @@ _spent_labels = []
 # _pick_record() relights two rows and rebuilds the card only.
 _rows = {}
 _panes = {}
+# cards.spot_marks(), read once a draw: the location lines and their order.
+_spots = {}
 
 # On open, a location with a bookmark this close to the ship is unfolded, m.
 UNFOLD_M = 5000.0
@@ -387,11 +389,13 @@ def _draw():
     _spent_labels.clear()
     _rows.clear()
     _panes.clear()
+    _spots.clear()
+    _spots.update(cards.spot_marks())
 
     listed = _bodies(register, sheet, focus)
     body = _current(listed)
     records = list(body["shown"]) if body else []
-    groups = _by_location(records)
+    groups = _by_location(records, body["name"] if body else None)
     # Read once a draw: gzipped blobs, used by the list, the location lines and the card.
     maps = coverstore.maps(body["name"], system_address=_system_address()) if body else {}
 
@@ -936,23 +940,35 @@ def _bookmark_list(parent, body, groups, maps):
 
 
 def _location_header(parent, body, index, group, maps, status, open_here):
-    """'loc 2', summary, nearest distance and Share map; a click on the line folds it.
+    """'loc 2', summary, Mark good, Mark bad, nearest distance and Share map; a click on the line folds it.
 
-    Button and distance packed first, from the right: pack gives out width in call order.
+    Buttons and distance packed first, from the right: pack gives out width in call order.
+    Good: arrow, 'loc N' and summary in GOLD. Bad: arrow, 'loc N', summary and distance in DIM.
     """
+    mark = _spot_mark(body, index)
+    good, bad = mark == cards.GOOD_SPOT, mark == cards.BAD_SPOT
     row = tk.Frame(parent, bg=BG)
     row.pack(fill="x", pady=(8, 0))
-    tk.Label(row, text="▼" if open_here else "▶", bg=BG, fg=ACCENT, width=3,
+    tk.Label(row, text="▼" if open_here else "▶", bg=BG,
+             fg=GOLD if good else DIM if bad else ACCENT, width=3,
              font=("Segoe UI", 7)).pack(side="left")
-    tk.Label(row, text=_loc(index), bg=BG, fg=FG, anchor="w", width=8,
-             font=("Segoe UI", 10, "bold")).pack(side="left")
+    tk.Label(row, text=_loc(index), bg=BG, fg=GOLD if good else DIM if bad else FG,
+             anchor="w", width=8, font=("Segoe UI", 10, "bold")).pack(side="left")
 
     # The picture is found on the press: that rebuilds a mask per saved map of the body.
     widgets.button(row, "Share map",
                    (lambda: _share_map(body, group)) if maps else None).pack(
         side="right", padx=(8, 16))
-    tk.Label(row, text=_nearest(group, status), bg=BG, fg=FG_SOFT, anchor="e",
+    tk.Label(row, text=_nearest(group, status), bg=BG, fg=DIM if bad else FG_SOFT, anchor="e",
              font=("Consolas", 9)).pack(side="right")
+    # Unnumbered (index None): no key to keep the mark under, disabled. The lit one unmarks.
+    numbered = index is not None
+    widgets.button(row, "Unmark bad" if bad else "Mark bad",
+                   (lambda: _set_spot_mark(body, index, cards.BAD_SPOT)) if numbered else None).pack(
+        side="right", padx=(0, 8))
+    widgets.button(row, "Unmark good" if good else "Mark good",
+                   (lambda: _set_spot_mark(body, index, cards.GOOD_SPOT)) if numbered else None,
+                   active=GOLD).pack(side="right", padx=(0, 4))
 
     # Each material once, HEADER_MATERIALS of them, most Cr/t first (Sheet.values()).
     # Unpriced (0, or mining_sheet.json missing) keep the row order: most rigs first.
@@ -965,7 +981,7 @@ def _location_header(parent, body, index, group, maps, status, open_here):
     worked = sum(1 for record in group if cards.depleted(record))
     summary = (f"{len(group)} deposit{'' if len(group) == 1 else 's'}  ·  {names}"
                + (f"  ·  {worked} worked out" if worked else ""))
-    tk.Label(row, text=summary[:SUMMARY_W], bg=BG, fg=DIM, anchor="w",
+    tk.Label(row, text=summary[:SUMMARY_W], bg=BG, fg=GOLD if good else DIM, anchor="w",
              font=("Consolas", 8)).pack(side="left")
 
     widgets.clickable(row, lambda: _fold(body, index), skip_buttons=True)
@@ -1858,13 +1874,36 @@ def _system_address():
     return _shown_register(_scan[0]).system_address
 
 
-def _by_location(records):
-    """[(location, [bookmark, ...]), ...], by location, unnumbered last."""
+def _by_location(records, body):
+    """[(location, [bookmark, ...]), ...]: marked good, unmarked, unnumbered, marked bad;
+    each by location."""
     groups = {}
     for record in records:
         groups.setdefault(record.get("location_index"), []).append(record)
     return sorted(((index, _clustered(group)) for index, group in groups.items()),
-                  key=lambda item: (item[0] is None, item[0] or 0))
+                  key=lambda item: (-_spot_mark(body, item[0]), item[0] is None, item[0] or 0))
+
+
+def _spot_mark(body, index):
+    """cards.GOOD_SPOT, BAD_SPOT or UNMARKED of location `index` of `body` in the shown system."""
+    if index is None or not _scan:
+        return cards.UNMARKED
+    return _spots.get(cards.spot_key(_shown_register(_scan[0]).system, body, index),
+                      cards.UNMARKED)
+
+
+def _set_spot_mark(body, index, mark):
+    """Mark good / Mark bad; pressed on the mark the location has, unmark. A failed write on the status line."""
+    if _spot_mark(body, index) == mark:
+        mark = cards.UNMARKED
+    key = cards.spot_key(_shown_register(_scan[0]).system, body, index)
+    if cards.set_spot_mark(key, mark):
+        _state["status"] = f"{_loc(index)} " + {cards.GOOD_SPOT: "marked good.",
+                                                cards.BAD_SPOT: "marked bad.",
+                                                cards.UNMARKED: "unmarked."}[mark]
+    else:
+        _state["status"] = "The mark could not be written - see the EDMC log."
+    _draw()
 
 
 def _clustered(group):

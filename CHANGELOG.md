@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+**Added**
+
+- RhinoData location line: Mark good and Mark bad, left of the distance and Share map. Good: gold header, listed first. Bad: grey header, listed last. The rest by location number. Pressed again: Unmark. Kept in the database `meta` table as `spot:<system>|<body>|<location_index>` = `1` / `-1`; unmarked has no row.
+
 ## 6.4.9
 
 **Changed**
