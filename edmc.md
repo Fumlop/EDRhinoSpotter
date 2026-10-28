@@ -174,22 +174,14 @@ to exist first.
    which is not a folder EDMC can load - our own updater handles that, a
    person unpacking by hand does not.
 
-   Build it from what git tracks, so the zip and the tag cannot disagree, and
-   build it in `%TEMP%`: this checkout is often the live plugin folder, and a
-   zip left beside `load.py` is clutter nobody needs.
+   Build it with `git archive` from the tag, so the zip and the tag cannot
+   disagree and the `export-ignore` rules in `.gitattributes` (standalone
+   files, `.github`) apply as they do to the updater's zipball. Build it in
+   `%TEMP%`: this checkout is often the live plugin folder.
 
    ```bash
-   python - <<'EOF'
-   import os, subprocess, tempfile, zipfile, hashlib
-   from rs_core.update import VERSION
-   out = os.path.join(tempfile.gettempdir(), f"EDMC_RhinoSpotter-{VERSION}.zip")
-   tracked = subprocess.run(["git", "ls-files"], capture_output=True,
-                            text=True).stdout.split()
-   with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
-       for rel in sorted(tracked):
-           archive.write(rel, f"RhinoSpotter/{rel}")
-   print(out, hashlib.sha256(open(out, "rb").read()).hexdigest())
-   EOF
+   git archive --format=zip --prefix=RhinoSpotter/        -o "$TEMP/EDMC_RhinoSpotter-X.Y.Z.zip" vX.Y.Z
+   sha256sum "$TEMP/EDMC_RhinoSpotter-X.Y.Z.zip"
    ```
 
    Upload it with `gh release create vX.Y.Z "$TEMP/EDMC_RhinoSpotter-X.Y.Z.zip" ...`,
