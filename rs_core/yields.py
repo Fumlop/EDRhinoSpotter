@@ -12,6 +12,7 @@ mark is on and under REGEN_DAYS old go into the cycle it closed (leftover
 fragments). A cycle that opened at Amount High
 and ended depleted is the deposit's capacity; any other cycle bounds it from
 below. A Depleted mark older than REGEN_DAYS is taken off by regrow().
+A Depleted press after that with no ton since puts it back (recheck()).
 
 No tkinter and no PIL. `python -m rs_core.yields` prints what the closed cycles
 imply for deposit.TONS_PER_RIG.
@@ -34,6 +35,9 @@ ATTRIBUTE_M = 175.0
 # which an open cycle expires. Assumed, not measured: Amount was not back at
 # High immediately after a depletion.
 REGEN_DAYS = 14
+
+# Days after a recheck() before regrow() takes the restored mark off again.
+RECHECK_DAYS = 7
 
 # Seconds a delta waits before it reaches the row. 171 t in a 90-minute session
 # is 3 writes rather than 171.
@@ -248,19 +252,55 @@ def regenerated(record, now=None, after=REGEN_DAYS):
     return None if days is None else days >= after
 
 
+def last_check(record):
+    """The newest `rechecks` stamp after `depleted_at`, or None."""
+    since = _parse(record.get("depleted_at"))
+    if since is None:
+        return None
+    later = [stamp for stamp in record.get("rechecks") or []
+             if (_parse(stamp) or since) > since]
+    return max(later, key=_parse) if later else None
+
+
+def recheck(record, when=None):
+    """Put back the Depleted mark regrow() took off. True when put back.
+
+    Only with no `depleted_at` and no cycle from at or after the last `regrown`
+    entry's `regrown_at`: no ton refined since the lift. Its `depleted_at` is
+    restored, `when` appended to `rechecks`; the entry stays, so Set active
+    after it keeps the date.
+    """
+    regrown = record.get("regrown") or []
+    if record.get("depleted_at") or not regrown:
+        return False
+    lifted = _parse(regrown[-1].get("regrown_at"))
+    if lifted is None:
+        return False
+    for cycle in cycles(record):
+        start = _parse(cycle.get("from"))
+        if start is not None and start >= lifted:
+            return False
+    record["depleted_at"] = regrown[-1]["depleted_at"]
+    record.setdefault("rechecks", []).append(when or _now())
+    return True
+
+
 def regrow(db=None, now=None):
-    """Take the Depleted mark off every bookmark depleted REGEN_DAYS or more ago.
+    """Take the Depleted mark off every bookmark depleted REGEN_DAYS or more ago,
+    or rechecked RECHECK_DAYS or more ago.
 
     Depleted = `depleted_at`, or Amount 'Depleted' read off the HUD (dated by
     `marked_at`). The mark moves to `regrown` [{depleted_at, regrown_at}], so the
     date survives; Amount 'Depleted' becomes None (unread). Returns the count.
+    Amount 'Depleted' under REGEN_DAYS with no `depleted_at` gets `marked_at`
+    as `depleted_at`: the maps and the card button read only `depleted_at`.
     """
     moment = _parse(now) or datetime.now(timezone.utc)
     try:
         with database.connect(db) as conn:
             rows = conn.execute("SELECT id, data FROM bookmarks WHERE depleted_at IS NOT NULL "
                                 "OR data LIKE '%\"amount\": \"Depleted\"%'").fetchall()
-            names = []
+            names, stamped = [], []
             for id, data in rows:
                 try:
                     record = json.loads(data)
@@ -270,7 +310,16 @@ def regrow(db=None, now=None):
                 since = record.get("depleted_at") or (
                     record.get("marked_at") if record.get("amount") == "Depleted" else None)
                 start = _parse(since)
-                if start is None or moment - start < timedelta(days=REGEN_DAYS):
+                check = _parse(last_check(record))
+                due = (check + timedelta(days=RECHECK_DAYS) if check else
+                       start + timedelta(days=REGEN_DAYS) if start else None)
+                if due is None:
+                    continue
+                if moment < due:
+                    if not record.get("depleted_at"):
+                        record["depleted_at"] = since
+                        database.write_bookmark(conn, record, id)
+                        stamped.append(f"{record.get('planet_name')} {record.get('commodity')}")
                     continue
                 record.setdefault("regrown", []).append(
                     {"depleted_at": since, "regrown_at": _stamp(moment)})
@@ -282,8 +331,11 @@ def regrow(db=None, now=None):
     except (sqlite3.Error, OSError) as err:
         logger.warning(f"could not take regrown deposits off Depleted: {err}")
         return 0
-    if names:
+    if names or stamped:
         database.changed()
+    if stamped:
+        logger.info(f"Amount Depleted dated by marked_at: {', '.join(stamped)}")
+    if names:
         logger.info(f"past the {REGEN_DAYS} d regen, active again: {', '.join(names)}")
     return len(names)
 

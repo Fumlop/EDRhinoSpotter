@@ -119,6 +119,11 @@ def delete(record, db=None):
     return removed
 
 
+def depleted(record):
+    """Mined out: `depleted_at` set, or Amount 'Depleted' read off the HUD."""
+    return bool(record.get("depleted_at")) or record.get("amount") == "Depleted"
+
+
 def set_depleted(record, depleted, when=None, db=None):
     """Mark a bookmark as mined out, or take the mark off. True when written.
 
@@ -129,7 +134,9 @@ def set_depleted(record, depleted, when=None, db=None):
 
     Depleted also closes the open yield cycle; tons refined there while the mark
     is on go into it (yields.add), the first after the mark comes off opens the
-    next one.
+    next one. With no ton since regrow() took the mark off, yields.recheck()
+    puts the old `depleted_at` back instead. Taking the mark off also sets
+    Amount 'Depleted' to None (unread), or regrow() would date it again.
     """
     # Imported here: rs_core.yields reads bookmarks through this module.
     from rs_core import yields
@@ -145,11 +152,13 @@ def set_depleted(record, depleted, when=None, db=None):
                 logger.warning(f"could not mark bookmark {record['id']} depleted: it is gone")
                 return False
             data = json.loads(row[0])
-            if depleted:
+            if depleted and not yields.recheck(data, when):
                 data["depleted_at"] = when or datetime.now(timezone.utc).isoformat(timespec="seconds")
                 yields.close(data, data["depleted_at"])
-            else:
+            elif not depleted:
                 data.pop("depleted_at", None)
+                if data.get("amount") == "Depleted":
+                    data["amount"] = None
             database.write_bookmark(conn, data, record["id"])
     except (sqlite3.Error, OSError, ValueError) as err:
         logger.warning(f"could not mark bookmark {record['id']} depleted: {err}")
@@ -158,8 +167,12 @@ def set_depleted(record, depleted, when=None, db=None):
     if depleted:
         record["depleted_at"] = data["depleted_at"]
         record["yield"] = data.get("yield")
+        for key in ("rechecks", "regrown"):
+            if key in data:
+                record[key] = data[key]
     else:
         record.pop("depleted_at", None)
+        record["amount"] = data.get("amount")
     return True
 
 
@@ -243,6 +256,49 @@ def location_at(system, body, lat, lon, radius, db=None, within=SAME_LOCATION_M,
     return best
 
 
+# 👍 / 👎 on a location line (rs_ui/scan.py); no meta row is UNMARKED.
+GOOD_SPOT, UNMARKED, BAD_SPOT = 1, 0, -1
+
+
+def spot_key(system, body, index):
+    """The meta key of a 👍 / 👎 location: 'spot:<system>|<body>|<location_index>'."""
+    return f"spot:{system}|{body}|{index}"
+
+
+def spot_marks(db=None):
+    """{spot_key(): GOOD_SPOT | BAD_SPOT} from the meta table; {} when unreadable (logged).
+    A value other than '1' or '-1' is skipped and logged."""
+    try:
+        with database.connect(db) as conn:
+            rows = conn.execute("SELECT key, value FROM meta WHERE key LIKE 'spot:%'").fetchall()
+    except (sqlite3.Error, OSError) as err:
+        logger.warning(f"could not read the location marks: {err}")
+        return {}
+    marks = {}
+    for key, value in rows:
+        if str(value) in ("1", "-1"):
+            marks[key] = int(value)
+        else:
+            logger.warning(f"location mark {key}: value {value!r} skipped, not 1 or -1")
+    return marks
+
+
+def set_spot_mark(key, mark, db=None):
+    """Meta row `key` (a spot_key()) set to GOOD_SPOT or BAD_SPOT; UNMARKED deletes it.
+    True when written; a failure is logged."""
+    try:
+        with database.connect(db) as conn:
+            if mark == UNMARKED:
+                conn.execute("DELETE FROM meta WHERE key = ?", (key,))
+            else:
+                conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+                             (key, str(mark)))
+        return True
+    except (sqlite3.Error, OSError) as err:
+        logger.warning(f"could not write the location mark: {err}")
+        return False
+
+
 # What the Edit dialog may change. Coordinates, heading, commander and
 # marked_at are excluded: they are readings taken at the press, and the
 # coordinates identify the deposit.
@@ -296,12 +352,14 @@ def _refreshed(old, db=None):
 
 
 def _touched(record, amount):
-    """Stamp updated_at. Amount Depleted marks and closes the cycle, any other
-    Amount clears the mark. Set here as well as in set_depleted: the Edit
-    dialog and a re-mark write `amount` straight to the row."""
+    """Stamp updated_at. Amount Depleted marks and closes the cycle, or puts
+    back a mark regrow() took off (yields.recheck), any other Amount clears the
+    mark. Set here as well as in set_depleted: the Edit dialog and a re-mark
+    write `amount` straight to the row."""
     from rs_core import yields
     record["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     if amount == "Depleted":
+        yields.recheck(record, record["updated_at"])
         record.setdefault("depleted_at", record["updated_at"])
         yields.close(record, record["depleted_at"])
     elif amount is not None:

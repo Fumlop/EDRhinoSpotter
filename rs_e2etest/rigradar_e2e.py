@@ -34,7 +34,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 import tkinter as tk                                     # noqa: E402
 
 from PIL import ImageGrab                                # noqa: E402
-from rs_core import coverage, database, palette, paths, rigplan   # noqa: E402
+from rs_core import coverage, database, measure, paths, rigplan   # noqa: E402
 from rs_ui import main, minimap, overlay, press, rigradar         # noqa: E402
 
 assert database.PATH.startswith(OUT), database.PATH
@@ -144,12 +144,23 @@ def visible():
 
 
 def rings():
-    """[(outline, width, dash)] of the rings on the canvas."""
+    """[(outline, dash, inner edge m, outer edge m)] of the rig bands on the canvas."""
     c = rigradar._canvas
     if c is None:
         return []
-    return [(c.itemcget(i, "outline"), float(c.itemcget(i, "width")), c.itemcget(i, "dash"))
-            for i in c.find_withtag("ring")]
+    px_m = rigradar.SIZE / rigradar.VIEW_M
+    out = []
+    for i in c.find_withtag("ring"):
+        x0, _, x1, _ = c.coords(i)
+        r, w = (x1 - x0) / 2 / px_m, float(c.itemcget(i, "width")) / px_m
+        out.append((c.itemcget(i, "outline"), c.itemcget(i, "dash"), round(r - w / 2, 1), round(r + w / 2, 1)))
+    return out
+
+
+def band(colour):
+    """True when every ring is a solid `colour` band from 76 to 80 m, edges +-0.6 m (half a px)."""
+    return bool(rings()) and all(o == colour and d == "" and abs(lo - measure.RIG_SPACING) <= 0.6
+                                 and abs(hi - rigplan.SPACING_M) <= 0.6 for o, d, lo, hi in rings())
 
 
 def border():
@@ -289,18 +300,27 @@ def body():
               repr(r[-1:]))
         check("1 short press: no radar", rigradar._window is None)
 
-        # 2: long press
-        hold("right", 1.3)
+        # 1b: between scan and rig
+        hold("right", 1.0)
         r = rows()
-        check("2 long press: rig 1", len(r) == 2 and r[1]["rig"] == "1", repr(r[-1:]))
+        check("1b 1.0 s press logged, rig 0", len(r) == 2 and r[1]["rig"] == "0", repr(r[-1:]))
+        check("1b 1.0 s press: no radar, nothing learned", rigradar._window is None
+              and press._rig_button is None, repr(press._rig_button))
+
+        # 2: long press
+        hold("right", 2.3)
+        r = rows()
+        check("2 long press: rig 1", len(r) == 3 and r[2]["rig"] == "1", repr(r[-1:]))
         check("2 rig button learned: right", press._rig_button == "right", repr(press._rig_button))
-        check("2 ms measured 1300 +-80", r and abs(int(r[-1]["ms"]) - 1300) <= 80, r[-1]["ms"] if r else "")
+        check("2 ms measured 2300 +-80", r and abs(int(r[-1]["ms"]) - 2300) <= 80, r[-1]["ms"] if r else "")
         check("2 radar visible", visible())
         check("2 text at the rig", rigradar._text == f"Next rig: drive {rigplan.SPACING_M:.0f} m on", rigradar._text)
         check("2 hide line names the rig button", hint() == "To hide: double click right mouse", repr(hint()))
         check("2 no border", rigradar._canvas is not None and border() is None, border())
-        check("2 too close: ring thin dashed ALERT",
-              rings() and all(o == palette.ALERT and w == 1 and d for o, w, d in rings()), repr(rings()))
+        check("2 too close: solid ALERT band 76-80 m", band(rigradar.ALERT_BAND), repr(rings()))
+        widths = [rigradar._canvas.itemcget(i, "width") for i in rigradar._canvas.find_withtag("ring")]
+        check("2 band width whole px (EDMC's Tk rejects a float)", widths and all(float(w).is_integer() for w in widths),
+              repr(widths))
         lines = grid()
         want = int(rigradar.VIEW_M / rigradar.GRID_M)
         check("2 10 m raster: 25-26 lines each way", all(want <= n <= want + 1 for n in lines), repr(lines))
@@ -313,8 +333,7 @@ def body():
         status(north_m=90.0, heading=45)
         pump(0.6)
         check("3 90 m north: OK here", rigradar._text == "Next rig: OK here", rigradar._text)
-        check("3 90 m north: ring thick solid GOOD",
-              rings() and all(o == palette.GOOD and w == 3 and not d for o, w, d in rings()), repr(rings()))
+        check("3 90 m north: solid GOOD band 76-80 m", band(rigradar.GOOD_BAND), repr(rings()))
         check("3 90 m north: still no border", border() is None, border())
         grabs.append(shot("radar-2-ok.png"))
 
@@ -327,7 +346,7 @@ def body():
               f"at {got}, want {(want_x, want_y)}")
 
         # 5: second rig
-        hold("right", 1.3)
+        hold("right", 2.3)
         check("5 two rings", len(rings()) == 2, f"{len(rings())} rings")
         check("5 text from the nearest (new) rig", rigradar._text == f"Next rig: drive {rigplan.SPACING_M:.0f} m on",
               rigradar._text)
@@ -338,7 +357,7 @@ def body():
 
         # 6: left button
         n = len(rows())
-        hold("left", 1.3)
+        hold("left", 2.3)
         r = rows()
         check("6 left long press after right learned: logged, rig 0", len(r) == n + 1 and r[-1]["button"] == "left"
               and r[-1]["rig"] == "0", repr(r[-1:]))
@@ -349,7 +368,7 @@ def body():
         check("7 Elite not in front: game_focused False", not overlay.game_focused())
         check("7 Elite not in front: radar hidden", not visible())
         n = len(rows())
-        hold("right", 1.3, at="harness")
+        hold("right", 2.3, at="harness")
         check("8 long press, Elite not in front: not logged", len(rows()) == n, f"{len(rows()) - n} rows")
         check("8 still two rings", len(rings()) == 2, f"{len(rings())}")
         front("elite")
@@ -359,7 +378,7 @@ def body():
         # 9: other SRV
         minimap.srv_event({"event": "LaunchSRV", "SRVType": "testbuggy"})
         n = len(rows())
-        hold("right", 1.3)
+        hold("right", 2.3)
         r = rows()
         check("9 other SRV: rig 0, rhino 0", len(r) == n + 1 and r[-1]["rig"] == "0" and r[-1]["rhino"] == "0",
               repr(r[-1:]))
@@ -377,24 +396,24 @@ def body():
               repr(config.values.get(minimap.RIG_RADAR_KEY)))
         check("14 toggle off: open radar closed", rigradar._window is None and rigradar._rigs == [])
         n = len(rows())
-        hold("right", 1.3)
+        hold("right", 2.3)
         check("14 toggle off: long press not logged, no radar", len(rows()) == n and rigradar._window is None,
               f"{len(rows()) - n} rows")
         on_tk(lambda: minimap._rig_radar.set(True))
         on_tk(minimap.prefs_changed)
-        hold("right", 1.3)
+        hold("right", 2.3)
         check("14 toggle on again: rig placed", rigradar._window is not None and len(rigradar._rigs) == 1,
               repr(rigradar._rigs))
 
         # 15: new session, deploy bound to the left button
         press._rig_button = None                         # as at EDMC start (module import)
-        hold("left", 1.3)
+        hold("left", 2.3)
         r = rows()
         check("15 new session, long left press: rig, left learned",
               r[-1]["button"] == "left" and r[-1]["rig"] == "1" and press._rig_button == "left"
               and len(rigradar._rigs) == 2, repr(r[-1:]) + repr(press._rig_button))
         check("15 hide line names left", hint() == "To hide: double click left mouse", repr(hint()))
-        hold("right", 1.3)
+        hold("right", 2.3)
         r = rows()
         check("15 then long right press: rig 0", r[-1]["button"] == "right" and r[-1]["rig"] == "0"
               and len(rigradar._rigs) == 2, repr(r[-1:]))
@@ -414,7 +433,7 @@ def body():
         # 17: release build (RHINOSPOTTER_DEBUG unset): no CSV, rig still placed
         press.DEBUG = False
         n = len(rows())
-        hold("left", 1.3)
+        hold("left", 2.3)
         check("17 DEBUG off: press not written, rig placed", len(rows()) == n and len(rigradar._rigs) == 1,
               f"{len(rows()) - n} rows, {len(rigradar._rigs)} rigs")
         press.DEBUG = True
@@ -425,11 +444,11 @@ def body():
         on_tk(minimap.prefs_changed)
         check("18 Mouse 2 saved: right", config.values.get(minimap.RIG_BUTTON_KEY) == "right",
               repr(config.values.get(minimap.RIG_BUTTON_KEY)))
-        hold("left", 1.3)
+        hold("left", 2.3)
         r = rows()
         check("18 Mouse 2 set, long left press: rig 0", r[-1]["button"] == "left" and r[-1]["rig"] == "0"
               and len(rigradar._rigs) == 1, repr(r[-1:]))
-        hold("right", 1.3)
+        hold("right", 2.3)
         r = rows()
         check("18 Mouse 2 set, long right press: rig 1", r[-1]["button"] == "right" and r[-1]["rig"] == "1"
               and len(rigradar._rigs) == 2, repr(r[-1:]))
@@ -442,9 +461,9 @@ def body():
         on_tk(minimap.prefs_changed)
         check("18 First long press saved: ''", config.values.get(minimap.RIG_BUTTON_KEY) == "",
               repr(config.values.get(minimap.RIG_BUTTON_KEY)))
-        hold("left", 0.6)
+        hold("left", 2.1)
         r = rows()
-        check("18 default again, 0.6 s left press: rig 1", r[-1]["button"] == "left" and r[-1]["rig"] == "1"
+        check("18 default again, 2.1 s left press: rig 1", r[-1]["button"] == "left" and r[-1]["rig"] == "1"
               and len(rigradar._rigs) == 1, repr(r[-1:]))
 
         # 11: out of the SRV
@@ -453,7 +472,7 @@ def body():
         check("11 out of the SRV: radar closed", rigradar._window is None)
         check("11 rigs forgotten", rigradar._rigs == [], repr(rigradar._rigs))
         n = len(rows())
-        hold("right", 1.3)
+        hold("right", 2.3)
         check("11 press out of the SRV: not logged", len(rows()) == n, f"{len(rows()) - n} rows")
     except Exception:
         check("harness ran without an exception", False, traceback.format_exc())

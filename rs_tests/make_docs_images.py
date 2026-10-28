@@ -293,7 +293,7 @@ def main_images():
         # RhinoData opens with every location folded but the one you are at;
         # the pictures show the rows.
         records = cards.by_body(SYSTEM)[f"{SYSTEM} 4 a"]
-        scan._fold_all(f"{SYSTEM} 4 a", scan._by_location(records), False)
+        scan._fold_all(f"{SYSTEM} 4 a", scan._by_location(records, f"{SYSTEM} 4 a"), False)
 
     for focus, name in ((None, "rhinoscan.png"), ("Monazite", "rhinoscan-filtered.png")):
         main._filter.set(focus or "All")

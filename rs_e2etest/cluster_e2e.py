@@ -51,7 +51,7 @@ def child():
         fails.append("reorder lost or doubled a bookmark")
 
     radius = next(r["planet_radius"] for r in group if r.get("planet_radius"))
-    live = [r for r in ordered if not scan._worked_out(r)]
+    live = [r for r in ordered if not cards.depleted(r)]
     if ordered[:len(live)] != live:
         fails.append("a worked-out bookmark sits above a live one")
     points = [(x, y, int(r.get("rigs") or 0)) for (x, y), r in
@@ -92,7 +92,7 @@ def child():
         found_maps = coverstore.maps(body)
         name = coverage.map_at(found_maps, body, lat, lon)
         cover = coverage.Coverage.from_dict(body, dict(found_maps)[name])
-        marks, golden = scan._map_marks(cover, system, body, sheet)
+        marks, golden = scan._map_marks(cover, [r for r in cards.for_system(system) if r.get('planet_name') == body], sheet)
         spots = [(x, y, rigs, value or 0) for x, y, _, spent, value, rigs in marks if not spent]
         before = old.golden_best(old.golden_groups(spots), spots)
         groups = coverage.golden_groups(spots)
@@ -151,7 +151,7 @@ def child():
     # The 4-rig fallback: the first saved map whose best cluster holds exactly 4 rigs.
     def best_cluster(name, body, system, data):
         cover = coverage.Coverage.from_dict(body, data, name)
-        marks, _ = scan._map_marks(cover, system, body, sheet)
+        marks, _ = scan._map_marks(cover, [r for r in cards.for_system(system) if r.get('planet_name') == body], sheet)
         points = coverage._golden_points(
             [(x, y, rigs, 0) for x, y, _, spent, _, rigs in marks if not spent])
         sums = [sum(points[i][2] for i in m) for m in coverage.clusters([p[:3] for p in points])]
@@ -230,7 +230,7 @@ def child():
     check("OK applies 1500", coverage.golden_m == 1500.0, coverage.golden_m)
     check_map("r1500", body, system, group[0]["latitude"], group[0]["longitude"])
     ordered = scan._clustered(group)
-    live = [r for r in ordered if not scan._worked_out(r)]
+    live = [r for r in ordered if not cards.depleted(r)]
     xy = measure.to_metres([(r["latitude"], r["longitude"]) for r in live], radius)
     points = [(x, y, int(r.get("rigs") or 0)) for (x, y), r in zip(xy, live)]
     far = max(math.hypot(points[i][0] - points[m[0]][0], points[i][1] - points[m[0]][1])

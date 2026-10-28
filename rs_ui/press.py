@@ -10,7 +10,7 @@ in the SRV with Elite in front, and a rig for rigradar when the press qualifies.
 
 The rig button is minimap.rig_button() (Settings) when set, else learned per EDMC
 session: the first press >= RIG_PRESS_S in the Rhino sets _rig_button, a long
-press on the other button is not a rig.
+press on the other button is not a rig. SCAN_PRESS_S to RIG_PRESS_S: neither.
 GetAsyncKeyState reads the physical buttons. Off Windows nothing runs.
 """
 
@@ -26,7 +26,8 @@ from rs_ui import minimap, overlay, rigradar
 
 POLL_S = 0.02            # 20 ms: press lengths to +-20 ms
 BUTTONS = {"left": 0x01, "right": 0x02}     # VK_LBUTTON, VK_RBUTTON
-RIG_PRESS_S = 0.5        # press >= this places a rig; one measured deploy 3052 ms, scans 30-187 ms
+SCAN_PRESS_S = 0.5       # press < this is a scan; measured scans 30-187 ms
+RIG_PRESS_S = 2.0        # press >= this places a rig; one measured deploy 3052 ms
 DOUBLE_S = 0.4           # release to next press on _rig_button, s: double click closes rigradar
 DIR = os.path.join(database.ROOT, "trace")
 COLUMNS = ["when", "button", "ms", "body", "lat", "lon", "heading", "radius", "rhino", "rig"]
@@ -91,7 +92,7 @@ def released(root, button, when, seconds):
     Only with minimap.rig_radar() on, in the SRV and Elite in front: clicks in
     other windows are neither logged nor rigs. Rig: >= RIG_PRESS_S in the Rhino on
     minimap.rig_button(), else on _rig_button; the first such press sets _rig_button.
-    Two short presses on the rig button within DOUBLE_S close the radar.
+    Two presses < SCAN_PRESS_S on the rig button within DOUBLE_S close the radar.
     """
     global _rig_button, _last_short
     if not minimap.rig_radar() or not overlay.game_focused():
@@ -112,7 +113,9 @@ def released(root, button, when, seconds):
     if rig:
         logger.info(f"press: rig placed on {body} at {lat:.6f}, {lon:.6f} ({seconds:.2f} s press)")
         rigradar.placed(root, body, lat, lon, radius, button)
-    elif button == chosen and seconds < RIG_PRESS_S:
+    elif rhino and SCAN_PRESS_S <= seconds < RIG_PRESS_S:
+        logger.info(f"press: {button} {seconds:.2f} s, neither scan nor rig (rig >= {RIG_PRESS_S:g} s)")
+    elif button == chosen and seconds < SCAN_PRESS_S:
         double = _last_short is not None and (when - _last_short).total_seconds() <= DOUBLE_S
         if double and rigradar._window is not None:
             logger.info("press: double click on the rig button, rig radar closed")

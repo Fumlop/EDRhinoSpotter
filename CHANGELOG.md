@@ -1,5 +1,77 @@
 # Changelog
 
+## 6.5.2
+
+**Changed**
+
+- RhinoData location line: the thumbs are 16 px icons drawn by the plugin, were the 👍 / 👎 emoji. The whole icon turns gold when marked good, red when marked bad. Same on Linux, which needed an emoji font before. As tall as Share map.
+
+## 6.5.1
+
+**Changed**
+
+- RhinoData location line: Mark good / Mark bad are 👍 / 👎 buttons, 25 px each, were 76 / 68 px. Gold when marked good, red when marked bad, normal text colour when not. The tooltip says what a press does.
+- RhinoData location line: 👍 / 👎 sit at the right edge, after Share map, at the same place on every line. Were left of the distance and moved with its width.
+- A location without a number: the greyed-out thumbs say "Set a loc number in Edit to mark it".
+
+## 6.5.0
+
+**Added**
+
+- RhinoData location line: Mark good and Mark bad, left of the distance and Share map. Good: gold header, listed first. Bad: grey header, listed last. The rest by location number. Pressed again: Unmark. Kept in the database `meta` table as `spot:<system>|<body>|<location_index>` = `1` / `-1`; unmarked has no row.
+
+## 6.4.9
+
+**Changed**
+
+- RhinoData list, card and maps, minimap: a bookmark at Amount Depleted counts as depleted everywhere (grey ring, Set active, sorted last), with or without a Mark depleted date. Was the list only.
+- Code: `rs_ui/scan.py` 2,491 -> 2,019 lines. Widget helpers moved to `rs_ui/widgets.py`, one map-marks builder for the card map and Share map, docstrings cut to the comment rules.
+
+**Fixed**
+
+- RhinoData Share map: draws the bookmarks and ground of the system on screen. Was a map with no bookmarks when a searched system was shown, or when the live system had no bodies listed yet.
+
+## 6.4.8
+
+**Changed**
+
+- Bookmark card: Mark depleted on a bookmark the 14 d regen took off Depleted, with no ton refined there since, keeps the first depletion date and reads "still depleted at 15 d, look again in 7 d". The mark comes off again 7 d after that look. Was a new depletion dated that day (issue 21). Tons refined since the regen: a new depletion, as before.
+- Bookmark data: each such look is kept in `rechecks` (timestamps).
+- Bookmark card: Set active on a bookmark at Amount Depleted also sets Amount to unread (`-`).
+
+**Fixed**
+
+- Minimap and card map: a new bookmark saved with Amount Depleted is a grey ring, and its card offers Set active. Was a pale dot and Mark depleted. Bookmarks already saved this way under 14 d old are dated by their marked time on start.
+
+## 6.4.7
+
+**Changed**
+
+- EDMC log: the home folder in paths and tracebacks is written as `~` (`~\AppData\Local\RhinoSpotter\...`), was `C:\Users\<account>\...`.
+- EDMC log: `minimap: down, Elite not in front` no longer names the window in front. Was its title, e.g. a browser tab.
+
+## 6.4.6
+
+**Fixed**
+
+- RhinoData bookmark list: a location line names its 3 most valuable materials (Cr/t), each once. Was one name per bookmark: 6 Iridium bookmarks read "Iridium, Iridium, ...".
+
+## 6.4.5
+
+**Changed**
+
+- Rig radar: each rig is a band from 76 m (closest two rigs deploy) to 80 m, red while you are inside it, green once you are clear of every rig. Was a dashed red / thick green 80 m ring.
+
+## 6.4.4
+
+**Added**
+
+- RhinoData: a gear beside MATERIAL FILTER opens the materials selection (same as Settings, Materials in the lists: Select...). OK saves at once and refills the panel Material dropdown and the RhinoData filter.
+
+**Changed**
+
+- Rig radar: a mouse button held 2 s or longer in the Rhino counts as a rig placed and teaches the rig button, was 0.5 s. A scan click is shorter than 0.5 s; 0.5 to 2 s is neither.
+
 ## 6.4.3
 
 **Changed**

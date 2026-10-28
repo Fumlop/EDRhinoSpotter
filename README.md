@@ -183,7 +183,7 @@ Debug log: `RHINOSPOTTER_DEBUG=1` before starting EDMC. Code layout: [structure.
 ## Features
 
 - **Where to land:** every landable body of the system with its mining locations and the materials its ground carries.
-- **Material filter:** only grounds that ever carried it; type a letter in the menu to jump to it.
+- **Material filter:** only grounds that ever carried it; type a letter in the menu to jump to it. The gear beside it picks which materials the lists offer.
 - **Bookmarks:** material, rigs, amount, density and position of the deposit you stand on; a second press on the spot updates it, material too.
 - **Clusters:** a location's bookmarks grouped by the spot with the most rigs and everything within the golden radius.
 - **Golden circles:** the best 3 one-stop groups (5+ rigs, else 4+) circled on the maps, radius set in Settings.

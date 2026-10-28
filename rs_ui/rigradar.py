@@ -1,11 +1,11 @@
-"""Rig radar: rigs placed on this body, each ringed at rigplan.SPACING_M, around the SRV.
+"""Rig radar: rigs placed on this body, each a 76-80 m band, around the SRV.
 
 Opened by `placed()` (press.released; a journal event can call it the same way).
-VIEW_M across, north up, the SRV in the middle, GRID_M raster, no border. Rings
-thin dashed ALERT while the SRV is inside one, thick GOOD once SPACING_M or more
-from every rig. Centred under the guide arrow
-(overlay._place: top + max(24 px, 4%), overlay.HEIGHT tall). Click-through,
-hidden while Elite is not in front; Status.json read every POLL_MS.
+VIEW_M across, north up, the SRV in the middle, GRID_M raster, no border. Each rig
+gets a band from measure.RIG_SPACING (76 m) to SPACING_M (80 m), no outline: ALERT_BAND
+while the SRV is inside one, GOOD_BAND once SPACING_M or more from every rig.
+Centred under the guide arrow (overlay._place: top + max(24 px, 4%), overlay.HEIGHT
+tall). Click-through, hidden while Elite is not in front; Status.json read every POLL_MS.
 Closes and forgets the rigs when the SRV fix ends (docked, on foot, ship) or
 the body changes.
 """
@@ -17,7 +17,7 @@ from rs_core import coverage, measure, palette, rigplan, spotmark
 from rs_core.logging import logger
 from rs_ui import overlay
 
-VIEW_M = 250.0           # ground shown across, m: 80 m ring = 31% of the side
+VIEW_M = 250.0           # ground shown across, m: 80 m band = 31% of the side
 GRID_M = 10.0            # raster, m: 8.8 px at SIZE
 SIZE = 220               # map side, px
 BAND = 30                # text line under the map, px
@@ -28,6 +28,10 @@ POLL_MS = 250
 ALPHA = 0.85             # as minimap.MAP_ALPHA
 FONT = ("Segoe UI", 11, "bold")
 HINT_FONT = ("Segoe UI", 9)
+# Band colour mixed 55% into BG: per-item alpha does not exist on a Tk canvas.
+BAND_SHARE = 0.55
+GOOD_BAND, ALERT_BAND = ("#%02x%02x%02x" % coverage._mix(palette.BG, colour, BAND_SHARE)
+                         for colour in (palette.GOOD, palette.ALERT))
 
 _window = None
 _canvas = None
@@ -37,12 +41,12 @@ _radius = None
 _rigs = []               # [(lat, lon)] placed on _body, oldest first
 _shown = False
 _text = ""               # the line under the map, last drawn
-_clear = False           # rings GOOD, last drawn
+_clear = False           # bands GOOD, last drawn
 _button = None           # "left" / "right": the rig button, named in the hide line
 
 
 def placed(root, body, lat, lon, radius, button=None):
-    """A rig down at lat, lon on body: ring added, radar opened. button: hide line, None for none."""
+    """A rig down at lat, lon on body: band added, radar opened. button: hide line, None for none."""
     global _body, _radius, _button
     if body != _body:
         _rigs.clear()
@@ -140,13 +144,14 @@ def _draw(fix):
             c.create_line(vx, BORDER, vx, BORDER + SIZE, fill=palette.RULE, tags="grid")
         if BORDER <= vy <= BORDER + SIZE:
             c.create_line(BORDER, vy, BORDER + SIZE, vy, fill=palette.RULE, tags="grid")
-    r = rigplan.SPACING_M * scale
-    # Too close: thin dashed ALERT. Clear of every ring: thick solid GOOD.
-    ring = dict(outline=palette.GOOD, width=3) if _clear else \
-        dict(outline=palette.ALERT, width=1, dash=(4, 3))
+    # 76-80 m band as one oval line: radius the middle, width the band (4 m = 3.5 px, drawn 4 px).
+    # Whole px: EDMC's Tk raises "bad screen distance" on a float width.
+    r = (measure.RIG_SPACING + rigplan.SPACING_M) / 2 * scale
+    band = max(1, round((rigplan.SPACING_M - measure.RIG_SPACING) * scale))
     for x, y in points:
         cx, cy = mid + x * scale, mid - y * scale
-        c.create_oval(cx - r, cy - r, cx + r, cy + r, tags="ring", **ring)
+        c.create_oval(cx - r, cy - r, cx + r, cy + r, outline=GOOD_BAND if _clear else ALERT_BAND,
+                      width=band, tags="ring")
         c.create_oval(cx - 4, cy - 4, cx + 4, cy + 4, fill=palette.FG_SOFT, outline="")
     if heading is None:
         c.create_oval(mid - 6, mid - 6, mid + 6, mid + 6, fill=palette.SRV, outline=palette.BG)

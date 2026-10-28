@@ -1,18 +1,6 @@
-"""The RhinoData window: what is worth landing on, here, right now.
+"""RhinoData window: rail of landable bodies | bookmarks of one body | card of the picked one.
 
-Three panes on one screen, side by side, and nothing that navigates away:
-
-    bodies of the system | the bookmarks of one body | the one that is picked
-
-The rail on the left is every landable body, grouped by what kind of ground it
-is, with how far away it is and how many bookmarks it carries. The middle is
-the bookmarks of the body the rail has picked, folded into their mining
-locations. The card on the right is the bookmark the middle has picked - its
-coordinates, what the deposit read, what the ground pays for it - and every
-button that acts on it.
-
-The window is read-only apart from the card's buttons. Nothing is saved from
-the list itself, so opening it twice costs nothing.
+Writes only from the card's buttons, the Edit dialog and the import box.
 """
 
 import os
@@ -26,12 +14,11 @@ from tkinter import messagebox
 from PIL import Image
 
 from rs_core import (bodies, cards, coverage, coverstore, database, deposit, grounds, guide,
-                     measure, palette, share, spotcard, spotmark, store, yields)
+                     measure, palette, share, spotcard, spotmark, store, thumb, yields)
 from rs_core.logging import logger
-from rs_ui import clipboard, minimap, overlay, rhino
+from rs_ui import clipboard, minimap, overlay, rhino, widgets
 
-# Three. A fourth is the least likely material anyway, and a row of four pairs
-# reads as a run of words rather than a list.
+# Materials on the rates line, and the % of locations under which one is left off.
 TOP_MATERIALS = 3
 MIN_PCT = 2.0
 
@@ -53,8 +40,8 @@ MARKS_W = 14
 # What a location line says about itself before it starts taking room from the
 # button and the distance packed on its right.
 SUMMARY_W = 54
-# The deposits of a location sit in from it, so the fold reads as a tree rather
-# than as a list with headings in it.
+HEADER_MATERIALS = 3     # materials named on a location line
+# Indent of a bookmark row under its location line.
 INDENT = "      "
 
 BG = palette.BG
@@ -69,18 +56,13 @@ ALERT = palette.ALERT
 GOLD = palette.GOLD
 RULE = palette.RULE
 
-# The window is a fixed share of the screen rather than a size measured off its
-# own content. Three panes side by side have no natural width - the middle one
-# is as wide as whatever is left - and a window that changed size every time a
-# body was picked was the thing the old one did worst.
+# Window size: a share of the screen both ways, fixed so a pick does not resize it.
 SCREEN_SHARE = 0.6
 MIN_WIDTH = 900
 MIN_HEIGHT = 520
 RAIL_WIDTH = 280
 CARD_WIDTH = 310
-# The map over the bookmark card, in pixels. Square, and short enough that the
-# card under it keeps its buttons on screen: at the card's full width the
-# picture pushed Share map and Mark depleted off the bottom of the window.
+# Square map over the bookmark card, px. At CARD_WIDTH it pushed the card buttons off screen.
 MAP_PX = 240
 # Half the picked bookmark's diamond on that map, px: over a dot (~4 px at 240).
 DIAMOND_PX = 6
@@ -104,14 +86,14 @@ _host = None             # standalone.py: the root drawn into instead of a Tople
 _dock = None             # the panel frame, a child of the window, kept across draws
 _docking = None          # plugin: main._dock_panel, called with the window before each draw
 _scan = None             # (register, sheet, focus, variable, materials)
+_on_select = None        # main._pick_materials(parent), the gear beside MATERIAL FILTER; None: disabled
 _status_label = None     # the middle pane's status line, rebuilt by every _draw()
 _base_width = None       # the window width _size() set, px: the card grows past it
 _resize_job = None       # the pending after() of _on_resize
 _canvases = {}           # the scrolling canvases of the draw on screen
 _scroll = {}             # how far each of them had been scrolled, by name
 
-# What the window is showing. Kept here rather than in the widgets: every draw
-# throws the widgets away, and the body you were on has to survive that.
+# What the window shows; survives _draw(), which destroys every widget.
 _state = {
     "body": None,         # the body the rail has picked
     "view": "bookmarks",  # "bookmarks" or "mapped"
@@ -138,6 +120,10 @@ _spent_labels = []
 # _pick_record() relights two rows and rebuilds the card only.
 _rows = {}
 _panes = {}
+# cards.spot_marks(), read once a draw: the location lines and their order.
+_spots = {}
+# thumb.image() PhotoImages by (colour, down), see _thumb().
+_thumbs = {}
 
 # On open, a location with a bookmark this close to the ship is unfolded, m.
 UNFOLD_M = 5000.0
@@ -149,9 +135,7 @@ HERE_MARK = "  ◉   "
 # cache, and a draw happens on every click in the window.
 _browsed = None
 
-# The search box: how many letters before it answers, and how many systems it
-# names. Three of each - a list that opens on an empty box is in the way, and a
-# fourth row pushes the body list down the rail.
+# Search box: letters typed before it lists systems, and systems listed.
 SEARCH_MIN = 3
 SEARCH_HITS = 3
 
@@ -188,103 +172,73 @@ def _fetch_dock():
         _dock = _docking(_window)
 
 
-def restyle(widget):
-    """`widget` and its children in the RhinoData colours. A foreground left at
-    the system default becomes FG."""
-    for child in widget.winfo_children():
-        restyle(child)
-    if isinstance(widget, (tk.Entry, tk.Spinbox, tk.Menubutton)):
-        _style_field(widget)
-        return
-    options = widget.keys()
-    widget.config(bg=BG)
-    if "fg" in options and str(widget.cget("fg")).startswith("System"):
-        widget.config(fg=FG)
-    if isinstance(widget, tk.Button):
-        widget.config(bg=PANEL, activebackground=PANEL, activeforeground=ACCENT,
-                      relief="solid", borderwidth=1)
-
-
 def show(parent, register, sheet, focus=None, variable=None, materials=(), here=None,
-         location=None):
-    """Open the window, or raise the one already open.
+         location=None, on_select=None):
+    """Open the window, or redraw and raise the open one.
 
-    `focus` is one material. Given one, only the grounds that have ever carried
-    it are listed and only its bookmarks are counted - the question has changed
-    from "what is here" to "where is the jadeite".
-
-    `here` is the body name when Status.json has us on or over one. Then the
-    window opens with that body picked in the rail, and that body stays listed
-    even when the material filter would drop its ground: the body under the
-    ship is the one thing on screen that is not a choice.
-
-    `variable` is the panel's filter StringVar, not a copy, so the picker in
-    the rail and `focus` can never disagree. It is not the panel's Material
-    box: that one names the next bookmark and is left alone.
-
-    `location`: the panel's Location on `here`. On open only that location is
-    unfolded, the one of a bookmark within 175 m of the SRV (_mark_here), and
-    every location with a bookmark within UNFOLD_M of the ship (_unfold_near).
+    `focus`: one material; only grounds that carried it are listed, only its
+    bookmarks counted. `here`: Status.json body, picked and listed whatever the
+    filter. `variable`: the panel's filter StringVar itself, not the Material box.
+    `location`: the panel's Location on `here`; unfolded on open with those of
+    _mark_here and _unfold_near. `on_select(parent)`: the gear beside MATERIAL FILTER.
     """
-    global _window, _scan
+    global _window, _scan, _on_select
 
     # First, so the draw below reads the material that was just picked.
     _scan = (register, sheet, focus, variable, materials)
+    _on_select = on_select
 
     if _window is not None and _window.winfo_exists():
         logger.debug(f"scan: redraw, system={register.system!r} focus={focus!r}")
-        # The material changed under us, so whatever the last press said is
-        # about a list that is being rebuilt.
-        _state["status"] = ""
+        _state["status"] = ""       # about the list being rebuilt
         _fetch_dock()
         _unfold_near()
         _mark_here()
         _draw()
-        # lift() alone leaves a window behind another program, or minimised,
-        # where it was: the same way up as a first open, topmost until left.
         if _window.state() == "iconic":
             _window.deiconify()
-        _window.attributes("-topmost", True)
-        _window.bind("<FocusIn>", _drop_topmost, add="+")
-        _window.lift()
-        _window.focus_force()
+        _raise()
         return _window
 
     logger.debug(f"scan: open, system={register.system!r} focus={focus!r}")
     _window = _host if _host is not None else tk.Toplevel(parent)
     _window.configure(bg=BG)
-    # Debug only, and only on the window itself: whatever takes it away, this is
-    # the line that names it. A window that vanishes with no Python frame behind
-    # it is the one thing the stack cannot be asked about afterwards.
+    # Debug: Tk can destroy the window with no Python frame to trace.
     _window.bind("<Destroy>", _log_destroy, add="+")
-    # Over the game on the way up - the key that opens it is pressed with the
-    # game in front, and a window behind it is not an answer. Given up the
-    # moment something else is clicked.
-    _window.attributes("-topmost", True)
-    _window.bind("<FocusIn>", _drop_topmost, add="+")
     if _host is None:
         _window.bind("<Escape>", lambda event: _window.destroy())
     _window.bind("<Activate>", _on_front, add="+")
-    _window.focus_force()
+    _raise()
     _size(_window)
     _window.bind("<Configure>", _on_resize, add="+")
 
-    _state["view"] = "bookmarks"
-    _state["selected"] = None
-    _state["map"] = None
-    _state["opened"] = {(here, location)} if here and location is not None else set()
-    _state["ground"] = None
-    _state["grounds_for"] = None
-    _state["status"] = ""
+    _reset(view="bookmarks", here=None, here_picked=None,
+           opened={(here, location)} if here and location is not None else set())
     _scroll.clear()
     if here:
         _state["body"] = here
-    _state["here"] = _state["here_picked"] = None
     _fetch_dock()
     _unfold_near()
     _mark_here()
     _draw()
     return _window
+
+
+def _raise():
+    """Topmost until the window has the focus (_drop_topmost), then lifted and focused.
+
+    Opened by a key press with the game in front: lift() alone loses the foreground race.
+    """
+    _window.attributes("-topmost", True)
+    _window.bind("<FocusIn>", _drop_topmost, add="+")
+    _window.lift()
+    _window.focus_force()
+
+
+def _reset(**changes):
+    """Clear the picked bookmark and map, the unfolded ground and the status line; apply `changes`."""
+    _state.update(selected=None, map=None, ground=None, grounds_for=None, status="")
+    _state.update(changes)
 
 
 def _unfold_near():
@@ -300,7 +254,8 @@ def _unfold_near():
     if not body or lat is None or lon is None or not radius:
         return
     for record in cards.for_system(live.system):
-        if record.get("planet_name") != body or record.get("latitude") is None                 or record.get("longitude") is None:
+        if (record.get("planet_name") != body or record.get("latitude") is None
+                or record.get("longitude") is None):
             continue
         if guide.distance(lat, lon, record["latitude"], record["longitude"], radius) <= UNFOLD_M:
             _state["opened"].add((body, record.get("location_index")))
@@ -355,13 +310,7 @@ def _mark_here():
 
 
 def _size(window):
-    """Six tenths of the screen, both ways.
-
-    A share rather than a measurement: the panes are fixed-width on the outside
-    and elastic in the middle, so there is nothing to measure, and a window that
-    keeps its size while the content under it changes is the point of the
-    layout.
-    """
+    """SCREEN_SHARE of the screen both ways, at least MIN_WIDTH x MIN_HEIGHT; sets _base_width."""
     width = max(MIN_WIDTH, int(window.winfo_screenwidth() * SCREEN_SHARE))
     height = max(MIN_HEIGHT, int(window.winfo_screenheight() * SCREEN_SHARE))
     logger.debug(f"scan: {width}x{height}, {SCREEN_SHARE:.0%} of the screen")
@@ -394,17 +343,7 @@ def _on_resize(event):
 
 
 def _drop_topmost(event):
-    """Topmost is a crowbar for the first raise, and nothing after it.
-
-    The window is opened by a key press with the game in front, and a plain
-    lift() loses that race: a process that does not have the foreground cannot
-    take it. Topmost wins it. The moment the window has the focus it has won,
-    and every second it keeps the flag after that is a second it spends
-    shadowing whatever is clicked next.
-
-    Any widget inside it counts - after a draw the focus sits on a button, not
-    on the window.
-    """
+    """<FocusIn> on any widget of the window: drop topmost (set by _raise) and this binding."""
     if _window is None or not _window.winfo_exists():
         return
     if event.widget.winfo_toplevel() is not _window:
@@ -440,18 +379,7 @@ def _pack_dock(parent):
 
 
 def _draw():
-    """Build all three panes into the empty window.
-
-    Everything, every time: a pick in the rail changes the middle and the card,
-    a pick in the middle changes the card and the row that is lit, and folding a
-    location changes which bookmark the card is showing. Redrawing only the
-    piece that changed would mean knowing which pieces those are for each of a
-    dozen actions, and the whole window is a few hundred labels.
-
-    What a draw must not throw away is how far the lists had been scrolled: a
-    click on a body fourteen rows down would otherwise take both lists back to
-    the top, and the row that was just clicked with them.
-    """
+    """Rebuild all three panes; the lists keep their scroll position (_remember_scroll)."""
     if _window is None or not _window.winfo_exists() or _scan is None:
         return
     live, sheet, focus, variable, materials = _scan
@@ -463,14 +391,14 @@ def _draw():
     _spent_labels.clear()
     _rows.clear()
     _panes.clear()
+    _spots.clear()
+    _spots.update(cards.spot_marks())
 
     listed = _bodies(register, sheet, focus)
     body = _current(listed)
     records = list(body["shown"]) if body else []
-    groups = _by_location(records)
-    # Once for the whole draw: every map of a body is a gzipped blob in the
-    # database, and the middle pane, the location lines and the card all want
-    # the same answer.
+    groups = _by_location(records, body["name"] if body else None)
+    # Read once a draw: gzipped blobs, used by the list, the location lines and the card.
     maps = coverstore.maps(body["name"], system_address=_system_address()) if body else {}
 
     _window.title(f"RhinoData - {register.system or 'unknown system'}"
@@ -502,12 +430,9 @@ def _draw():
 
 
 def _bodies(register, sheet, focus):
-    """Every listed body, in rail order.
+    """Every listed body in rail order.
 
-    Each entry carries `marks`, every bookmark on it, and `shown`, the ones the
-    material filter leaves. The rail counts `shown` - a rail that says "3 bm"
-    beside a list that says "no bookmarks" is the filter lying about itself -
-    and the rates line needs `marks` to say which materials have been stood on.
+    Each carries `marks`, all its bookmarks, and `shown`, those `focus` leaves.
     """
     marked = cards.by_body(register.system) if register.system else {}
     prefix = (register.system or "") + " "
@@ -518,16 +443,14 @@ def _bodies(register, sheet, focus):
         by_ground.sort(key=lambda item: (sheet.rate(item[0], focus) is None,
                                          -(sheet.rate(item[0], focus) or 0)))
     for ground, found in by_ground:
-        # The body under the ship stays listed whatever the filter says: it is
-        # where the commander is, not one of the answers to a question.
+        # The picked body stays listed whatever the filter.
         if focus and sheet.rate(ground, focus) is None \
                 and not any(body["name"] == _state["body"] for body in found):
             continue
         for body in found:
             row = dict(body)
             name = body["name"]
-            # The system name is in the rail heading and the window title, and
-            # repeating it on every row pushes the counts off a 280px rail.
+            # System prefix dropped: it is in the heading, and pushed the counts off the rail.
             row["short"] = name[len(prefix):] if name.startswith(prefix) else name
             row["ground"] = ground
             row["marks"] = marked.get(name) or []
@@ -539,13 +462,7 @@ def _bodies(register, sheet, focus):
 
 
 def _current(listed):
-    """The body the rail has picked, or the first one carrying a bookmark the
-    filter leaves, or the first one at all.
-
-    Falls through on purpose: the material picker can drop the picked body out
-    of the list entirely, and a window showing nothing because of a body that is
-    no longer listed is a window that looks broken.
-    """
+    """The picked body, else the first with a `shown` bookmark, else the first; sets _state["body"]."""
     if not listed:
         return None
     for entry in listed:
@@ -560,12 +477,7 @@ def _current(listed):
 
 
 def _key(record):
-    """What identifies a bookmark across a draw.
-
-    Not the dict: the rows are read off disk again after every delete and every
-    depleted flip, so the object the card was given is not the object the list
-    holds a moment later.
-    """
+    """(planet_name, location_index, commodity, marked_at): one bookmark across draws."""
     return (record.get("planet_name"), record.get("location_index"),
             record.get("commodity"), record.get("marked_at"))
 
@@ -576,8 +488,7 @@ def _short(material):
 
 
 def _pct(value):
-    """40.0 -> '40', 61.9 -> '61.9'. A trailing zero claims a precision the
-    sheet does not have."""
+    """40.0 -> '40', 61.9 -> '61.9'."""
     return f"{value:g}"
 
 
@@ -598,13 +509,12 @@ def _rail(parent, register, sheet, focus, variable, materials, listed, body, liv
                     anchor="w", justify="left", font=("Segoe UI", 12, "bold"),
                     wraplength=RAIL_WIDTH - 26)
     name.pack(fill="x", pady=(6, 0))
-    # Click the system name. Nothing says so - that is the point of it.
+    # <Button-1> on the system name runs rs_ui/rhino.py; no label says so.
     name.bind("<Button-1>", lambda event: rhino.run(name.winfo_toplevel()))
 
-    # Only while a searched system is shown. Bookmark always marks where the
-    # ship is, so this is the way back to the system that can be marked.
+    # Only while a searched system is shown.
     if _state["system"] and live is not None and live.system:
-        back = _button(head, f"\u25c0  Back to {live.system}", _back_to_live)
+        back = widgets.button(head, f"\u25c0  Back to {live.system}", _back_to_live)
         back.config(fg=GOOD, font=("Segoe UI", 9, "bold"))
         back.pack(fill="x", pady=(6, 0))
 
@@ -647,23 +557,14 @@ def arrived():
     if not is_open():
         return
     if not _state["system"]:
-        _state["body"] = None
-        _state["selected"] = None
-        _state["map"] = None
-        _state["opened"] = set()
-        _state["ground"] = None
-        _state["grounds_for"] = None
-        _state["status"] = ""
+        _reset(body=None, opened=set())
     _draw()
 
 
 def _shown_register(live):
-    """The register the window draws: the live one, or a searched system filled
-    from the body cache.
+    """The live register, or a searched system's from the body cache (Register.adopt).
 
-    Register.adopt() is the cache's own path in, so a browsed system lists and
-    groups exactly as the live one does. Kept between draws - adopt() re-reads
-    the cache and every click redraws.
+    The searched one is kept in _browsed between draws: adopt() re-reads the cache.
     """
     global _browsed
     system = _state["system"]
@@ -676,17 +577,13 @@ def _shown_register(live):
 
 
 def _bookmarked_systems():
-    """[(system, bookmarks), ...], most recently marked first.
-
-    Only systems that hold bookmarks: the search box is for finding a bookmark
-    again, and a system with none is not an answer to that.
-    """
+    """[(system, bookmarks), ...] of the systems holding bookmarks, most recently marked first."""
     try:
         with database.connect() as conn:
             return conn.execute(
                 "SELECT system, count(*) FROM bookmarks WHERE system IS NOT NULL "
                 "GROUP BY system ORDER BY max(id) DESC").fetchall()
-    except Exception as err:                       # sqlite3.Error, OSError
+    except (sqlite3.Error, OSError) as err:
         logger.warning(f"scan: could not list the bookmarked systems: {err}")
         return []
 
@@ -702,7 +599,7 @@ def _totals():
                 "SELECT count(DISTINCT system), count(*), count(DISTINCT planet_name) "
                 "FROM bookmarks").fetchone()
             maps = conn.execute("SELECT count(*) FROM maps").fetchone()[0]
-    except Exception as err:                       # sqlite3.Error, OSError
+    except (sqlite3.Error, OSError) as err:
         logger.warning(f"scan: could not count the totals: {err}")
         return None
     return systems, marks, bodies_, maps
@@ -719,16 +616,7 @@ def _totals_line(totals):
 
 
 def _search_box(parent):
-    """Type a system, pick it, and the page shows that system's bookmarks.
-
-    Only systems that hold bookmarks are listed - the box exists to find a
-    bookmark again, and a system with none is not an answer to that.
-
-    An entry rather than a picker: the list grows with every system marked in,
-    and a dropdown of fifty is a scroll-hunt.
-
-    Silent under SEARCH_MIN letters, and at most SEARCH_HITS matches.
-    """
+    """SYSTEMS WITH BOOKMARKS box: up to SEARCH_HITS matches from SEARCH_MIN letters; a pick browses it."""
     typed = tk.StringVar(value=_state["search"])
     entry = tk.Entry(parent, textvariable=typed, bg=BG, fg=FG, insertbackground=FG,
                      relief="solid", borderwidth=1, highlightthickness=0,
@@ -760,7 +648,7 @@ def _search_box(parent):
                            fg=ACCENT if system == _state["system"] else FG_SOFT,
                            anchor="w", font=("Consolas", 9))
             row.pack(fill="x")
-            _clickable(row, lambda pick=system: _browse(pick))
+            widgets.clickable(row, lambda pick=system: _browse(pick))
         if not found:
             tk.Label(hits, text="no bookmarks in a system of that name", bg=PANEL,
                      fg=DIM, anchor="w", font=("Segoe UI", 8)).pack(fill="x")
@@ -774,34 +662,18 @@ def _browse(system):
     Bookmark button reads the journal, not this."""
     if system == _state["system"]:
         return
-    _state["system"] = system
-    _state["body"] = None
-    _state["ground"] = None
-    _state["grounds_for"] = None
-    _state["selected"] = None
-    _state["map"] = None
-    _state["status"] = f"Showing {system}. Bookmark still marks where the ship is."
+    _reset(system=system, body=None,
+           status=f"Showing {system}. Bookmark still marks where the ship is.")
     _draw()
 
 
 def _back_to_live():
-    _state["system"] = None
-    _state["search"] = ""
-    _state["body"] = None
-    _state["ground"] = None
-    _state["grounds_for"] = None
-    _state["selected"] = None
-    _state["map"] = None
-    _state["status"] = ""
+    _reset(system=None, search="", body=None)
     _draw()
 
 
 def _rail_footer(parent, sheet):
-    """Where the percentages come from, or how to get them back.
-
-    At the foot of the rail rather than under the list: it is about the sheet
-    the whole window reads, not about the body that happens to be picked.
-    """
+    """At the foot of the rail: where the rates come from, or how to restore mining_sheet.json."""
     if sheet.loaded:
         text = (f"Rates from every mining location read so far, {sheet.generated}. "
                 "Where to prospect, not what you will find.")
@@ -830,7 +702,7 @@ def _rail_ground(parent, sheet, focus, ground, entries):
                                   f"{marks} bm" if marks else "") if t)
     tk.Label(row, text=right, bg=PANEL, fg=GOLD, anchor="e",
              font=("Consolas", 9)).pack(side="right", padx=(0, 13))
-    _clickable(row, lambda: _toggle_ground(ground))
+    widgets.clickable(row, lambda: _toggle_ground(ground))
 
 
 def _toggle_ground(ground):
@@ -840,13 +712,7 @@ def _toggle_ground(ground):
 
 
 def _rail_body(parent, entry, chosen):
-    """One body in the rail: name, how far out, locations, bookmarks.
-
-    The whole row is the button. A body with no bookmarks is still worth
-    picking - the middle pane says what its ground pays - and the distance is
-    here because "which of these is nearest" is a question about the list, not
-    about the one body that is open.
-    """
+    """One rail row: name, distance, locations, bookmarks; the whole row picks the body."""
     row = tk.Frame(parent, bg=PANEL)
     row.pack(fill="x")
     inner = tk.Frame(row, bg=PANEL)
@@ -867,45 +733,27 @@ def _rail_body(parent, entry, chosen):
     tk.Label(inner, text=f"{locations} loc" if locations is not None else "unprobed",
              bg=PANEL, fg=DIM, anchor="e", font=("Consolas", 9)).pack(side="right", padx=6)
 
-    _clickable(row, lambda: _pick_body(entry["name"]))
-
-
-NO_MATERIALS = "No materials - pick them: File > Settings > RhinoSpotter > Select..."
-
-
-def no_materials_hint(option_menu):
-    """A disabled NO_MATERIALS entry at the end of the menu. For a menu that
-    offers no material: a broken or empty rhinospotter_materials pick."""
-    option_menu["menu"].add_command(label=NO_MATERIALS, state="disabled")
-
-
-def letter_jump(option_menu, skip=()):
-    """First letter of each entry as its Windows menu mnemonic: with the menu
-    open, a letter highlights the first entry starting with it (Enter picks
-    it), or picks it when only one does. `skip`: labels left without one."""
-    menu = option_menu["menu"]
-    last = menu.index("end")
-    for i in range(0 if last is None else last + 1):
-        label = str(menu.entrycget(i, "label")) if menu.type(i) == "command" else ""
-        if label[:1].isalnum() and label not in skip:
-            menu.entryconfigure(i, underline=0)
+    widgets.clickable(row, lambda: _pick_body(entry["name"]))
 
 
 def _picker(parent, variable, materials, focus):
-    """The material picker, under the system name.
+    """MATERIAL FILTER: an OptionMenu on the panel's own `variable`, the gear, a hint line.
 
-    Bound to the panel's own variable rather than a copy of its value, so
-    choosing here is the same act as choosing down in the panel. Two pickers
-    that can disagree are worse than one picker in the wrong place.
-
-    Nothing is watched from here. A trace added on every open is a trace added
-    three times by the third open, and then one pick draws the window three
-    times.
+    No trace added here: one per open would draw the window once per open on each pick.
     """
     box = tk.Frame(parent, bg=PANEL)
     box.pack(fill="x", padx=13, pady=(10, 0))
-    tk.Label(box, text="MATERIAL FILTER", bg=PANEL, fg=DIM, anchor="w",
-             font=("Segoe UI", 7)).pack(fill="x")
+    head = tk.Frame(box, bg=PANEL)
+    head.pack(fill="x")
+    tk.Label(head, text="MATERIAL FILTER", bg=PANEL, fg=DIM, anchor="w",
+             font=("Segoe UI", 7)).pack(side="left", anchor="s")
+    # Packed side="right" in a fill="x" row: right edge flush with the picker's.
+    # No gear without _on_select (standalone host).
+    if _on_select is not None:
+        gear = widgets.button(head, "⚙", lambda: _on_select(box.winfo_toplevel()))
+        gear.config(padx=4, pady=0, font=("Segoe UI Symbol", 8))
+        gear.pack(side="right")
+        widgets.tooltip(gear, "Setting available materials")
 
     picker = tk.OptionMenu(box, variable, *materials)
     picker.config(relief="solid", borderwidth=1, highlightthickness=0,
@@ -915,9 +763,9 @@ def _picker(parent, variable, materials, focus):
                           activeforeground=BG, borderwidth=1,
                           activeborderwidth=0, tearoff=False,
                           font=("Segoe UI", 9))
-    letter_jump(picker)
+    widgets.letter_jump(picker)
     if len(materials) < 2:          # ALL_MATERIALS only
-        no_materials_hint(picker)
+        widgets.no_materials_hint(picker)
     picker.pack(fill="x", pady=(4, 0))
     tk.Label(box, text=f"Only {_short(focus)}, everywhere." if focus
                        else "The rail counts and the list follow it.",
@@ -929,10 +777,9 @@ def _picker(parent, variable, materials, focus):
 
 
 def _middle(parent, register, sheet, focus, body, records, groups, maps, materials=()):
-    """The body's heading, its two tabs, and whatever the open tab holds.
+    """Body heading, its two tabs and the open tab's list.
 
-    Returns what the card is to show - a bookmark, a map row, or None. It is the
-    pane that knows what is folded, and the card is downstream of that.
+    Returns what the card shows: a bookmark, a map row or None.
     """
     if body is None:
         _pack_dock(parent)
@@ -947,16 +794,13 @@ def _middle(parent, register, sheet, focus, body, records, groups, maps, materia
     title.pack(fill="x")
     tk.Label(title, text=body["short"], bg=BG, fg=FG, anchor="w",
              font=("Segoe UI", 16, "bold")).pack(side="left")
-    # An arrow is up and its card may be two clicks away - a folded location, a
-    # different body, the other tab. The way to take it down belongs where it
-    # can always be reached.
+    # Stop the arrow on the heading, whatever body, tab or fold the card is under.
     if overlay.guiding():
-        stop = _button(title, "Stop the arrow", _stop_guide)
+        stop = widgets.button(title, "Stop the arrow", _stop_guide)
         stop.config(fg=GOOD)
         stop.pack(side="left", padx=(12, 0))
 
-    # Every map of the body, not the ones the filter leaves: a map is driven
-    # ground, and a material has nothing to say about which locations were on it.
+    # All the body's marks, not `shown`: the material filter does not apply to maps.
     mapped, unknown = coverage.mapped_locations(maps, body["name"], body["marks"])
     total = body.get("locations")
     # Packed from the right edge inwards, so Bookmarks lands left of Mapped.
@@ -987,7 +831,7 @@ def _status_line(parent, idle):
     _status_label = tk.Label(parent, text=_state["status"] or idle, bg=BG, fg=DIM,
                              anchor="w", justify="left", font=("Segoe UI", 8))
     _status_label.pack(side="bottom", fill="x", padx=16, pady=(6, 10))
-    _status_label.bind("<Configure>", _wrap_to_width, add="+")
+    _status_label.bind("<Configure>", widgets.wrap_to_width, add="+")
 
 
 def _import_strip(parent):
@@ -998,8 +842,8 @@ def _import_strip(parent):
     text = tk.StringVar(master=strip, value=_state["import"])
     text.trace_add("write", lambda *_: _state.__setitem__("import", text.get()))
     pasted = tk.Entry(strip, textvariable=text)
-    _style_field(pasted)
-    _button(strip, "Import", _import_code).pack(side="right", padx=(6, 0))
+    widgets.style_field(pasted)
+    widgets.button(strip, "Import", _import_code).pack(side="right", padx=(6, 0))
     pasted.pack(side="left", fill="x", expand=True)
     pasted.bind("<Return>", lambda _: _import_code())
 
@@ -1045,54 +889,31 @@ def _say(text):
         _draw()
 
 
-def _wrap_to_width(event):
-    """Wrap a label at whatever width it has been given.
-
-    A label with anchor="w" and fill="x" is as wide as its pane; wraplength
-    knows nothing about that until it is told, and until then the sentence runs
-    off the right edge of the window.
-    """
-    if event.width > 80:
-        event.widget.config(wraplength=event.width - 8)
-
-
 def _tab(parent, text, view, enabled):
-    """Bookmarks and Mapped, packed from the right edge inwards.
-
-    Tabs rather than a second page: the maps of a body and the bookmarks on it
-    are two readings of the same ground, and stepping between them used to cost
-    two clicks through the body list.
-    """
+    """The Bookmarks or Mapped tab, packed from the right edge inwards."""
     on = _state["view"] == view
-    tk.Button(parent, text=text,
-              command=(lambda: _pick_view(view)) if enabled else None,
-              bg=PANEL if on else BG, fg=ACCENT if on else FG_SOFT,
-              activebackground=PANEL, activeforeground=ACCENT, disabledforeground=DIM,
-              relief="solid", borderwidth=1, highlightthickness=0,
-              padx=10, pady=1, font=("Segoe UI", 8),
-              cursor="hand2" if enabled else "arrow",
-              state="normal" if enabled else "disabled").pack(side="right", padx=(6, 0))
+    tab = widgets.button(parent, text, (lambda: _pick_view(view)) if enabled else None)
+    tab.config(bg=PANEL if on else BG, fg=ACCENT if on else FG_SOFT,
+               activebackground=PANEL, padx=10)
+    tab.pack(side="right", padx=(6, 0))
 
 
 def _bookmark_list(parent, body, groups, maps):
-    """Every location of this body that carries a bookmark, folded.
+    """Column header and every location of the body, folded per _state["opened"].
 
-    Returns the bookmark the card is to show: the one that was picked while its
-    location is open, otherwise the first row of the first open location,
-    otherwise nothing at all. A card left showing a bookmark whose location has
-    just been folded away is a card about something you can no longer see.
+    Returns the bookmark the card shows: the selected one if its location is
+    open, else the first open row, else None.
     """
     header = tk.Frame(parent, bg=BG)
     header.pack(fill="x", padx=16, pady=(12, 0))
-    # The 4px of the accent strip every row starts with, so the headings sit
-    # over the columns they name rather than four pixels left of them.
+    # 4 px: the accent strip each row starts with.
     tk.Frame(header, bg=BG, width=4).pack(side="left", fill="y")
-    tk.Label(header, text=INDENT + _columns("Material", "Rigs", "Brg", "Dist", "Mined", "Est. left"), bg=BG,
-             fg=DIM, anchor="w", font=("Consolas", 9)).pack(side="left")
+    tk.Label(header, text=INDENT + _columns("Material", "Rigs", "Brg", "Dist", "Mined", "Est. left"),
+             bg=BG, fg=DIM, anchor="w", font=("Consolas", 9)).pack(side="left")
     if groups:
         folded = all(not _unfolded(body["name"], index) for index, _group in groups)
-        _button(header, "Open all" if folded else "Fold all",
-                lambda: _fold_all(body["name"], groups, not folded)).pack(side="right")
+        widgets.button(header, "Open all" if folded else "Fold all",
+                       lambda: _fold_all(body["name"], groups, not folded)).pack(side="right")
     tk.Frame(parent, bg=RULE, height=1).pack(fill="x", padx=16, pady=(3, 0))
 
     listing = _scrollable(parent, "list")
@@ -1101,14 +922,11 @@ def _bookmark_list(parent, body, groups, maps):
                  anchor="w", font=("Segoe UI", 9)).pack(fill="x", pady=(8, 0))
         return None
 
-    # Once for the whole table rather than once a row, and a reading rather than
-    # a subscription: the distances are what they were when the list was drawn.
-    # The arrow is what follows you.
+    # One Status.json read for the table; the distances are as of this draw.
     status = spotmark.read_status()
     ordered = [(index, cards.ordered(group), _unfolded(body["name"], index))
                for index, group in groups]
-    # Which row the card is showing has to be known before the first row is
-    # drawn, because it is the one that is lit.
+    # Picked before the rows are drawn: it is the lit one.
     open_rows = [record for _index, rows, open_here in ordered if open_here
                  for record in rows]
     picked = next((record for record in open_rows
@@ -1124,48 +942,54 @@ def _bookmark_list(parent, body, groups, maps):
 
 
 def _location_header(parent, body, index, group, maps, status, open_here):
-    """'loc 2', what is in it, and Share map for the picture it was driven on.
+    """'loc 2', summary, nearest distance, Share map, thumb up, thumb down; a click on the line folds it.
 
-    The whole line folds it. The distance and the button are packed first, from
-    the right edge inwards: pack hands out the width in the order it is asked
-    for, and a location whose summary runs long was dropping both of them off
-    the end of a narrow pane.
+    Buttons and distance packed first, from the right: pack gives out width in call order.
+    Thumbs at the right edge: the distance text varies in width, they stay in place.
+    Good: arrow, 'loc N' and summary in GOLD. Bad: arrow, 'loc N', summary and distance in DIM.
     """
+    mark = _spot_mark(body, index)
+    good, bad = mark == cards.GOOD_SPOT, mark == cards.BAD_SPOT
     row = tk.Frame(parent, bg=BG)
     row.pack(fill="x", pady=(8, 0))
-    tk.Label(row, text="▼" if open_here else "▶", bg=BG, fg=ACCENT, width=3,
+    tk.Label(row, text="▼" if open_here else "▶", bg=BG,
+             fg=GOLD if good else DIM if bad else ACCENT, width=3,
              font=("Segoe UI", 7)).pack(side="left")
-    tk.Label(row, text=_loc(index), bg=BG, fg=FG, anchor="w", width=8,
-             font=("Segoe UI", 10, "bold")).pack(side="left")
+    tk.Label(row, text=_loc(index), bg=BG, fg=GOLD if good else DIM if bad else FG,
+             anchor="w", width=8, font=("Segoe UI", 10, "bold")).pack(side="left")
 
-    # The picture is looked for when the button is pressed, not now: finding it
-    # rebuilds a mask for every saved map of the body, and this line is drawn
-    # for every location on every draw.
-    _button(row, "Share map",
-            (lambda: _share_map(body, group)) if maps else None).pack(
-        side="right", padx=(8, 16))
-    tk.Label(row, text=_nearest(group, status), bg=BG, fg=FG_SOFT, anchor="e",
+    # The picture is found on the press: that rebuilds a mask per saved map of the body.
+    share = widgets.button(row, "Share map", (lambda: _share_map(body, group)) if maps else None)
+    # Created before the thumbs to give them its height, packed after: they hold the right edge.
+    tall = share.winfo_reqheight() - 2 * int(share.cget("borderwidth"))
+    _spot_button(row, body, index, cards.BAD_SPOT, bad, tall).pack(side="right", padx=(4, 16))
+    _spot_button(row, body, index, cards.GOOD_SPOT, good, tall).pack(side="right", padx=(8, 0))
+    share.pack(side="right", padx=(8, 0))
+    tk.Label(row, text=_nearest(group, status), bg=BG, fg=DIM if bad else FG_SOFT, anchor="e",
              font=("Consolas", 9)).pack(side="right")
 
-    names = ", ".join(_short(record.get("commodity")) for record in group)
-    worked = sum(1 for record in group if record.get("depleted_at"))
+    # Each material once, HEADER_MATERIALS of them, most Cr/t first (Sheet.values()).
+    # Unpriced (0, or mining_sheet.json missing) keep the row order: most rigs first.
+    values = _scan[1].values()
+    kinds = {}
+    for record in group:
+        kinds.setdefault((record.get("commodity") or "").lower(), record.get("commodity"))
+    ranked = sorted(kinds.items(), key=lambda kind: -values.get(kind[0], 0))
+    names = ", ".join(_short(name) for _lower, name in ranked[:HEADER_MATERIALS])
+    worked = sum(1 for record in group if cards.depleted(record))
     summary = (f"{len(group)} deposit{'' if len(group) == 1 else 's'}  ·  {names}"
                + (f"  ·  {worked} worked out" if worked else ""))
-    tk.Label(row, text=summary[:SUMMARY_W], bg=BG, fg=DIM, anchor="w",
+    tk.Label(row, text=summary[:SUMMARY_W], bg=BG, fg=GOLD if good else DIM, anchor="w",
              font=("Consolas", 8)).pack(side="left")
 
-    _clickable(row, lambda: _fold(body, index), skip_buttons=True)
+    widgets.clickable(row, lambda: _fold(body, index), skip_buttons=True)
     tk.Frame(parent, bg=PANEL, height=1).pack(fill="x", padx=(0, 16), pady=(4, 0))
 
 
 def _bookmark_row(parent, body, record, picked, maps):
-    """One deposit inside its location: material, rigs, what is left of it.
-
-    One line. Where it is and when it was marked live on the card now, which is
-    what let the row lose its second line.
-    """
+    """One deposit row: material, rigs, bearing and distance from the map centre, mined, left, Edit."""
     lit = picked is not None and _key(record) == _key(picked)
-    dead = _worked_out(record)
+    dead = cards.depleted(record)
     bg = PANEL if lit else BG
     row = tk.Frame(parent, bg=bg)
     row.pack(fill="x", padx=(0, 16), pady=1)
@@ -1173,14 +997,13 @@ def _bookmark_row(parent, body, record, picked, maps):
     _rows[_key(record)] = row
     # Packed before the labels: pack gives out width in call order, so a
     # narrow pane clips Est. left instead of dropping the button.
-    _button(row, "Edit", lambda: _edit_bookmark(record)).pack(side="right", padx=(6, 0))
+    widgets.button(row, "Edit", lambda: _edit_bookmark(record)).pack(side="right", padx=(6, 0))
 
     rigs = record.get("rigs")
     left = deposit.describe(rigs, record.get("amount"), record.get("density"))
-    if record.get("depleted_at"):
+    if dead:
         left = _spent(record, "depleted")
-    # Two labels rather than one line: the material is the accent colour and
-    # what is left of the deposit is a verdict, and a label carries one colour.
+    # One label per colour.
     material = _short(record.get("commodity"))
     mark = HERE_MARK if _key(record) == _state["here"] else INDENT
     tk.Label(row, text=mark + f"{material[:MATERIAL_W]:<{MATERIAL_W}} "
@@ -1191,8 +1014,7 @@ def _bookmark_row(parent, body, record, picked, maps):
     tk.Label(row, text=f"{bearing:>{BEARING_W}} {away:>{FROM_W}} ", bg=bg,
              fg=DIM if dead else FG_SOFT, anchor="e",
              font=("Consolas", 9)).pack(side="left")
-    # Its own label: a label carries one colour, and the tons measured here are
-    # not the estimate beside them.
+    # Own label: refresh_mined() sets it in place.
     mined = yields.short(record)
     label = tk.Label(row, text=f"{mined or '-':>{MINED_W}} ", bg=bg,
                      fg=GOOD if mined else DIM, anchor="e", font=("Consolas", 9))
@@ -1202,10 +1024,10 @@ def _bookmark_row(parent, body, record, picked, maps):
                           fg=ALERT if dead else (WARN if left else DIM), anchor="e",
                           font=("Consolas", 9))
     left_label.pack(side="left")
-    if record.get("depleted_at"):
+    if dead:
         _spent_labels.append((_key(record), left_label, "depleted"))
 
-    _clickable(row, lambda: _pick_record(record), skip_buttons=True)
+    widgets.clickable(row, lambda: _pick_record(record), skip_buttons=True)
 
 
 def _spent(record, word):
@@ -1214,15 +1036,8 @@ def _spent(record, word):
     return f"{word} ({tons:,} t)" if tons else word
 
 
-def _worked_out(record):
-    """Mined out, however it was said: marked Depleted here, or read Depleted
-    off the HUD when the bookmark was made."""
-    return bool(record.get("depleted_at")) or record.get("amount") == "Depleted"
-
-
 def _columns(material, rigs, bearing, away, mined, left):
-    """The one place the bookmark table's column widths live, so the header
-    cannot drift away from the rows it names."""
+    """A bookmark table line at MATERIAL_W .. LEFT_W; the header and the rows both use it."""
     return (f"{material[:MATERIAL_W]:<{MATERIAL_W}} {rigs:>{RIGS_W}} "
             f"{bearing:>{BEARING_W}} {away:>{FROM_W}} "
             f"{mined:>{MINED_W}} {left:>{LEFT_W}}")
@@ -1247,12 +1062,9 @@ def _from_centre(maps, body, record):
 
 
 def _mapped_list(parent, body, mapped, unknown):
-    """The locations of this body with a saved map, and the maps tied to none.
+    """Locations with a saved map, then the maps tied to none. Returns the map row the card shows.
 
-    Returns the map row the card is to show. Every row carries its own key - the
-    untied ones are keyed by the map's name, because "-" is the same string for
-    all of them, and three maps that cannot be told apart is three maps of which
-    only the first can ever be opened.
+    Untied rows are keyed by map name: their location is "-" for all of them.
     """
     header = tk.Frame(parent, bg=BG)
     header.pack(fill="x", padx=16, pady=(12, 0))
@@ -1298,16 +1110,11 @@ def _mapped_row(parent, row, lit):
     tk.Label(frame, text="   " + _map_columns(row["location"], ", ".join(row["names"]),
                                               marks),
              bg=bg, fg=FG_SOFT, anchor="w", font=("Consolas", 9)).pack(side="left")
-    _clickable(frame, lambda: _pick_map(row["key"]))
+    widgets.clickable(frame, lambda: _pick_map(row["key"]))
 
 
 def _empty(parent, register, focus):
-    """What to do, then why - in that order.
-
-    The empty window is where everybody meets this plugin for the first time,
-    and the thing they have just done is honk. The instruction has to be the
-    first line, not the conclusion of a paragraph about journal events.
-    """
+    """The empty middle pane: what to do in bold, then why."""
     if register.system and focus:
         action = f"No ground here carries {_short(focus)}"
         why = ("Set the material back to All to see what this system does have, "
@@ -1329,23 +1136,14 @@ def _empty(parent, register, focus):
     label = tk.Label(box, text=why, bg=BG, fg=DIM, justify="left", anchor="w",
                      font=("Segoe UI", 9))
     label.pack(fill="x")
-    label.bind("<Configure>", _wrap_to_width, add="+")
+    label.bind("<Configure>", widgets.wrap_to_width, add="+")
 
 
 # ------------------------------------------------------------------- the card
 
 
 def _card(parent, register, sheet, body, picked, maps):
-    """The bookmark that is picked, and every button that acts on it.
-
-    A card rather than buttons on the row: there are five things to do to a
-    bookmark and four numbers worth reading about it, and neither fits beside a
-    row that also has to line its columns up with the row under it.
-
-    The ground the bookmark sits on goes above the card, packed first. Picking
-    a bookmark in the middle asks "where is this" before it asks "what is it",
-    and the answer was two clicks away on the other tab.
-    """
+    """The location map (bookmarks view), then the card of `picked`: bookmark, map row or empty."""
     if picked is not None and body is not None and _state["view"] == "bookmarks":
         _location_map(parent, sheet, body, picked, maps)
     box = tk.Frame(parent, bg=PANEL, highlightthickness=1,
@@ -1362,8 +1160,7 @@ def _card(parent, register, sheet, body, picked, maps):
 
 
 def _empty_card(box, body):
-    """Why there is nothing to show - a different sentence in each of the three
-    cases, because the wrong one reads as a broken window."""
+    """'Nothing picked' and which case: no body, no map, no bookmark, all folded."""
     if body is None:
         hint = "No bodies in this system yet. The middle pane says what to do."
     elif _state["view"] == "mapped":
@@ -1377,12 +1174,13 @@ def _empty_card(box, body):
     label = tk.Label(box, text=hint, bg=PANEL, fg=DIM, anchor="w", justify="left",
                      font=("Segoe UI", 9))
     label.pack(fill="x", padx=13, pady=(0, 13))
-    label.bind("<Configure>", _wrap_to_width, add="+")
+    label.bind("<Configure>", widgets.wrap_to_width, add="+")
 
 
 def _bookmark_card(box, register, sheet, body, record, maps):
+    """The card of `record`: coordinates, deposit, tons, ground rates, dates, buttons."""
     index = record.get("location_index")
-    dead = _worked_out(record)
+    dead = cards.depleted(record)
     rigs = record.get("rigs")
 
     head = tk.Frame(box, bg=PANEL)
@@ -1414,7 +1212,8 @@ def _bookmark_card(box, register, sheet, body, record, maps):
     tk.Label(box, text=read or "no HUD readings", bg=PANEL, fg=FG, anchor="w",
              font=("Consolas", 9)).pack(fill="x", padx=13)
     left = deposit.describe(rigs, amount, density)
-    left_label = tk.Label(box, text=_spent(record, "worked out") if dead else (left or "tons left unknown"),
+    left_label = tk.Label(box, text=_spent(record, "worked out") if dead
+                          else (left or "tons left unknown"),
                           bg=PANEL, fg=ALERT if dead else WARN, anchor="w",
                           font=("Consolas", 9))
     left_label.pack(fill="x", padx=13, pady=(2, 0))
@@ -1438,30 +1237,38 @@ def _bookmark_card(box, register, sheet, body, record, maps):
     marked = str(record.get("marked_at") or "").replace("T", " ")[:16]
     depleted = str(record.get("depleted_at") or "")[:10]
     tk.Label(box, text=(marked or "unknown")
-                       + (f"  ·  depleted {depleted}" if depleted else "  ·  active"),
+                       + (f"  ·  depleted {depleted}" if depleted
+                          else "  ·  depleted" if dead else "  ·  active"),
              bg=PANEL, fg=FG_SOFT, anchor="w",
              font=("Consolas", 8)).pack(fill="x", padx=13)
-    # yields.regrow() takes the mark off at REGEN_DAYS, on start and each jump.
+    # yields.regrow() takes the mark off at REGEN_DAYS, or RECHECK_DAYS after a
+    # recheck, on start and each jump.
     days = yields.days_since_depleted(record)
-    if days is not None:
+    check = yields.last_check(record)
+    if check:
+        at = yields.days_since_depleted(record, check)
+        left = max(0.0, yields.RECHECK_DAYS - (days - at))
+        tk.Label(box, text=f"still depleted at {at:.0f} d, look again in {left:.0f} d",
+                 bg=PANEL, fg=DIM, anchor="w",
+                 font=("Consolas", 8)).pack(fill="x", padx=13)
+    elif days is not None:
         tk.Label(box, text=f"{days:.0f} d since, back after {yields.REGEN_DAYS} d (assumed)",
                  bg=PANEL, fg=DIM, anchor="w",
                  font=("Consolas", 8)).pack(fill="x", padx=13)
 
-    _card_buttons(box, record, bool(record.get("depleted_at")))
+    _card_buttons(box, record, dead)
 
 
 def _card_buttons(box, record, dead):
-    """Guide across the top, then a 2 x 2 grid. Delete is last and red under the
-    pointer: it is the one that destroys something."""
+    """Guide me there, then a 2 x 2 grid; Delete last, ALERT under the pointer."""
     buttons = tk.Frame(box, bg=PANEL)
     buttons.pack(fill="x", padx=13, pady=(12, 13))
 
     running = overlay.guiding(record)
     # No coordinates (bookmarks older than the sidecar): no Guide, Share or Copy.
     has_fix = record.get("latitude") is not None and record.get("longitude") is not None
-    arrow = _button(buttons, "Stop the arrow" if running else "Guide me there",
-                    (lambda: _toggle_guide(record)) if has_fix else None)
+    arrow = widgets.button(buttons, "Stop the arrow" if running else "Guide me there",
+                           (lambda: _toggle_guide(record)) if has_fix else None)
     arrow.config(fg=GOOD if running else ACCENT, font=("Segoe UI", 9))
     arrow.pack(fill="x")
 
@@ -1469,15 +1276,15 @@ def _card_buttons(box, record, dead):
     grid = tk.Frame(buttons, bg=PANEL)
     grid.pack(fill="x", pady=(6, 0))
     grid.columnconfigure((0, 1), weight=1, uniform="card")
-    depleted = _button(grid, "Set active" if dead else "Mark depleted",
-                       lambda: _toggle_depleted(record))
+    depleted = widgets.button(grid, "Set active" if dead else "Mark depleted",
+                              lambda: _toggle_depleted(record))
     depleted.config(fg=WARN)
     for index, button in enumerate((
-            _button(grid, "Share bookmark",
-                    (lambda: _share_bookmark(record)) if share.shareable(record) else None),
+            widgets.button(grid, "Share bookmark",
+                           (lambda: _share_bookmark(record)) if share.shareable(record) else None),
             depleted,
-            _button(grid, "Copy coords", (lambda: _copy_coords(record)) if has_fix else None),
-            _button(grid, "Delete", lambda: _delete_bookmark(record), active=ALERT))):
+            widgets.button(grid, "Copy coords", (lambda: _copy_coords(record)) if has_fix else None),
+            widgets.button(grid, "Delete", lambda: _delete_bookmark(record), active=ALERT))):
         row, column = divmod(index, 2)
         # 3 px either side of the gap: padding on one column only made it 6 px narrower.
         button.grid(row=row, column=column, sticky="ew",
@@ -1504,34 +1311,23 @@ def _map_card(box, body, row):
                               "on it.",
                     bg=PANEL, fg=DIM, anchor="w", justify="left", font=("Segoe UI", 8))
     note.pack(fill="x", padx=13, pady=(6, 0))
-    note.bind("<Configure>", _wrap_to_width, add="+")
+    note.bind("<Configure>", widgets.wrap_to_width, add="+")
 
     picture = _newest_picture(body["name"], row["names"])
-    button = _button(box, "Open the picture",
-                     (lambda: _open_card(picture)) if picture else None)
+    button = widgets.button(box, "Open the picture",
+                            (lambda: _open_card(picture)) if picture else None)
     button.config(font=("Segoe UI", 9))
     button.pack(fill="x", padx=13, pady=(12, 13))
 
 
-# One render, kept: (what it is of, the PhotoImage). Picking a bookmark redraws
-# the whole window, and repainting a map from its points and drawing it is
-# 70-160 ms measured - too long to spend again on a picture that has not
-# changed. Tk also drops an image nothing holds a reference to.
+# (key, PhotoImage) of the last card map: a render is 70-160 ms, and Tk drops an unreferenced image.
 _map_picture = None
 
 
 def _location_map(parent, sheet, body, record, maps):
-    """The saved map the picked bookmark lies on, above its card.
+    """Above the card: the saved map nearest the bookmark (coverage.map_at), no title or legend.
 
-    Of the maps that reach the bookmark, the one whose centre is nearest -
-    coverage.map_at, the same tie the Mapped tab counts with.
-
-    Bare: no title, no legend. The card directly under it already says the
-    body, the location and the material, and a legend of five bookmarks would
-    be taller than the picture at this width.
-
-    Nothing at all when the bookmark lies on no saved map, rather than an empty
-    frame where a picture sometimes is - that reads as a failed load.
+    Nothing at all when no saved map reaches it.
     """
     global _map_picture
     lat, lon = record.get("latitude"), record.get("longitude")
@@ -1544,9 +1340,10 @@ def _location_map(parent, sheet, body, record, maps):
     if not name:
         return
     px = _grown(MAP_PX)
+    data = dict(maps)[name]
     key = (body["name"], name, _marks_key(body), coverage.golden_m, px)
     if _map_picture is None or _map_picture[0] != key:
-        photo = _draw_location_map(parent, sheet, body, name, dict(maps)[name], px)
+        photo = _draw_location_map(parent, sheet, body, name, data, px)
         if photo is None:
             return
         _map_picture = (key, photo)
@@ -1556,7 +1353,6 @@ def _location_map(parent, sheet, body, record, maps):
     canvas.image = _map_picture[1]
     # The picked bookmark: a diamond on the canvas, not in the picture, so a
     # pick costs no re-render. Metres -> px as coverage.picture over 2 * REACH_M.
-    data = dict(maps)[name]
     try:
         centre = data.get("center") or data["origin"]
         probe = coverage.Coverage(body["name"], float(centre[0]), float(centre[1]),
@@ -1574,49 +1370,30 @@ def _location_map(parent, sheet, body, record, maps):
 
 
 def _marks_key(body):
-    """The bookmark fields _draw_location_map puts on the picture.
+    """The bookmark fields the card map draws: its cache key.
 
-    Not database.revision(): the tally writes a bookmark row every
-    yields.FLUSH_S while mining and none of these move, which threw the
-    70-160 ms repaint away once every 30 s.
+    Not database.revision(): the tally writes the rows every yields.FLUSH_S while mining.
     """
     return tuple((mark.get("latitude"), mark.get("longitude"),
-                  mark.get("commodity"), bool(mark.get("depleted_at")),
+                  mark.get("commodity"), cards.depleted(mark),
                   mark.get("rigs")) for mark in body["marks"])
 
 
 def _draw_location_map(parent, sheet, body, name, data, px=MAP_PX):
-    """That map repainted from its points, the bookmarks it reaches on it.
+    """Map `name` repainted with the body's bookmarks it reaches, as a PhotoImage.
 
-    Only those the map reaches, as _map_marks for Share map: golden_groups'
-    4-rig fallback depends on every spot it is given, so another map's
-    5-rig cluster must not be in the list.
-
-    A failure is logged and None - the card is the thing that has to work.
+    None on a failure, logged.
     """
     try:
         cover = coverage.Coverage.from_dict(body["name"], data, name)
         if cover is None:
             return None
-        codes, values = sheet.codes(), sheet.values()
-        marks = []
-        for mark in body["marks"]:
-            lat, lon = mark.get("latitude"), mark.get("longitude")
-            if lat is None or lon is None or not cover.reaches(float(lat), float(lon)):
-                continue
-            material = (mark.get("commodity") or "").lower()
-            marks.append((*cover.xy(float(lat), float(lon)), codes.get(material),
-                          bool(mark.get("depleted_at")), values.get(material, 0),
-                          mark.get("rigs")))
-        # The best coverage.GOLDEN_SHOWN by Cr/h, as Share map and the minimap draw them.
-        spots = [(x, y, rigs, value or 0) for x, y, _, spent, value, rigs in marks if not spent]
-        golden = [group[:4] for group in
-                  coverage.golden_best(coverage.golden_groups(spots), spots)]
+        marks, golden = _map_marks(cover, body["marks"], sheet)
         image = coverage.picture(cover.mask, marks, (), (), cover.border_m, golden)
         out = io.BytesIO()
         image.resize((px, px), Image.LANCZOS).save(out, format="PNG")
         return tk.PhotoImage(master=parent, data=out.getvalue())
-    except Exception:
+    except Exception:       # PIL and coverage: any raise must not cost the card
         logger.exception(f"scan: could not draw {name} on {body['name']}")
         return None
 
@@ -1627,11 +1404,7 @@ def _field(parent, name):
 
 
 def _ground_lines(sheet, body, material):
-    """What this ground reads for the bookmark's material, and what it pays.
-
-    Two short lines rather than one long one: the card is 310px wide, and a
-    sentence that wraps is a sentence that pushed the buttons down.
-    """
+    """Two lines: % of the ground's locations with `material`, and its median Cr/t; [] without a sheet."""
     if not material or not sheet.loaded or not body.get("ground"):
         return []
     rate = sheet.rate(body["ground"], material)
@@ -1647,22 +1420,9 @@ def _ground_lines(sheet, body, material):
 
 
 def _rates(parent, sheet, body, focus, materials=()):
-    """What that ground pays, most per location first, with its prices.
+    """The ground's best TOP_MATERIALS by % of locations, with prices; GOOD: bookmarked on this body.
 
-    Green is a material this body already has a bookmark for: somebody has stood
-    on it here. The rest are what the ground has read elsewhere. One label a
-    material rather than one line, because a line carries one colour and the
-    whole point is telling the two apart without reading it.
-
-    A picked material leads the line whatever its rate: the question has become
-    "where is the jadeite", and a ground listed because it carries it at 4% has
-    to say so.
-
-    `materials` is what the picker offers. The three shown are the best three
-    of those, not the best three of the ground: a line recommending copper
-    while copper cannot be picked is a dead end. Filtered before the limit, so
-    the next ones up are promoted - on a thin ground the line still comes out
-    shorter than three, which is what that ground has to offer.
+    `materials` (the picker's) filter before the limit. `focus` leads whatever its rate.
     """
     row = tk.Frame(parent, bg=BG)
     row.pack(fill="x", pady=(8, 0))
@@ -1681,9 +1441,7 @@ def _rates(parent, sheet, body, focus, materials=()):
         if rate is not None:
             rows = [{"material": focus, "pct": rate}] + rows[:TOP_MATERIALS - 1]
     if not rows:
-        # Two different answers. A ground with no rows has never been measured;
-        # a ground whose every row is under the low value line has been, and
-        # saying "nothing measured" about it is a lie the settings tab fixes.
+        # No rows: never measured, or every row under the low value line (Settings).
         tk.Label(row, text="every material here is under the low value line - "
                            "Settings offers them" if measured
                       else "nothing measured on this ground yet",
@@ -1777,17 +1535,15 @@ def _fold_all(body, groups, fold):
 
 
 def _toggle_depleted(record):
-    """Flip the bookmark between worked out and still worth flying to.
-
-    Said in the status line either way: the row dims and one line of the card
-    changes, both of which are easy to miss, and a write that failed must not
-    look the same as one that worked.
-    """
-    depleted = not record.get("depleted_at")
+    """Mark depleted or Set active; the result on the status line, a failed write also in a dialog."""
+    depleted = not cards.depleted(record)
+    checks = len(record.get("rechecks") or [])
     if cards.set_depleted(record, depleted):
+        still = len(record.get("rechecks") or []) > checks
         _state["status"] = (f"{_loc(record.get('location_index'))}, "
                             f"{_short(record.get('commodity'))}, "
-                            + ("marked depleted." if depleted else "is active again."))
+                            + (f"still depleted, look again in {yields.RECHECK_DAYS} d." if still
+                               else "marked depleted." if depleted else "is active again."))
     else:
         messagebox.showwarning(
             "Depleted", "The bookmark could not be written - see the EDMC log.",
@@ -1797,12 +1553,7 @@ def _toggle_depleted(record):
 
 
 def _toggle_guide(record):
-    """Start the arrow, or take it down, then draw again.
-
-    Drawn again because the button that was pressed is not the only thing that
-    changes: starting on a second bookmark has to turn the first one's Stop back
-    into Guide.
-    """
+    """Start or stop the arrow, then _draw: another card's Stop turns back into Guide."""
     if overlay.guiding(record):
         overlay.stop()
         _state["status"] = "The arrow is down."
@@ -1823,34 +1574,10 @@ def _stop_guide():
     _draw()
 
 
-# The Edit dialog: what an unset Amount or Density reads, how wide the value
-# column is, and how far the body name wraps.
+# Edit dialog: unset Amount/Density label, value column minsize px, body name wraplength px.
 NOT_SET = "-"
 EDIT_FIELD_PX = 170
 EDIT_WIDTH_PX = 300
-
-
-def _style_field(widget):
-    """A dialog control in the window's colours.
-
-    Tk draws Menubutton, Spinbox and Entry in the system theme - grey and white
-    - which is what they were against the dark dialog. Menu entries are on the
-    Menu widget, not the Menubutton, so the dropdown is configured separately.
-    """
-    widget.config(bg=PANEL, fg=FG, relief="solid", borderwidth=1,
-                  highlightthickness=0, font=("Consolas", 9))
-    if isinstance(widget, tk.Menubutton):
-        widget.config(anchor="w", padx=6, pady=2, indicatoron=True,
-                      activebackground=PANEL, activeforeground=ACCENT)
-        widget["menu"].config(bg=PANEL, fg=FG, activebackground=BG,
-                              activeforeground=ACCENT, borderwidth=1,
-                              activeborderwidth=0, tearoff=False)
-        return
-    widget.config(insertbackground=FG, disabledbackground=PANEL,
-                  readonlybackground=PANEL, selectbackground=RULE,
-                  selectforeground=FG)
-    if isinstance(widget, tk.Spinbox):
-        widget.config(buttonbackground=PANEL)
 
 
 def _pickable(record):
@@ -1864,11 +1591,7 @@ def _pickable(record):
 
 
 def _edit_bookmark(record):
-    """Change what was typed at the press: material, rigs, amount, density,
-    location. Coordinates, heading and marked_at are readings and stay.
-
-    Modal over the window, because the list under it is rebuilt on save.
-    """
+    """Modal Edit dialog: material, rigs, amount, density, location; coordinates, heading, marked_at stay."""
     if _window is None:
         return
     box = tk.Toplevel(_window, bg=BG)
@@ -1896,11 +1619,11 @@ def _edit_bookmark(record):
     def field(row, text, widget):
         tk.Label(box, text=text, bg=BG, fg=FG_SOFT, anchor="w",
                  font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", padx=(14, 8), pady=3)
-        _style_field(widget)
+        widgets.style_field(widget)
         widget.grid(row=row, column=1, sticky="we", padx=(0, 14), pady=3)
 
     picker = tk.OptionMenu(box, material, *_pickable(record))
-    letter_jump(picker)
+    widgets.letter_jump(picker)
     field(2, "Material", picker)
     field(3, "Rigs", tk.Spinbox(box, from_=0, to=deposit.MAX_RIGS, textvariable=rigs))
     field(4, "Amount", tk.OptionMenu(box, amount, NOT_SET, *deposit.AMOUNTS))
@@ -1913,35 +1636,19 @@ def _edit_bookmark(record):
 
     buttons = tk.Frame(box, bg=BG)
     buttons.grid(row=7, column=0, columnspan=2, sticky="e", padx=14, pady=(10, 14))
-    _button(buttons, "Cancel", box.destroy).pack(side="right")
-    _button(buttons, "Save",
+    widgets.button(buttons, "Cancel", box.destroy).pack(side="right")
+    widgets.button(buttons, "Save",
             lambda: _save_edit(box, record, material.get(), rigs.get(),
                                amount.get(), density.get(), location.get())
             ).pack(side="right", padx=(0, 6))
 
-    _centre_over(box, _window)
+    widgets.centre_over(box, _window)
     box.grab_set()
     box.wait_window()
 
 
-def _centre_over(box, parent):
-    """Put `box` in the middle of `parent`.
-
-    update_idletasks first: a Toplevel reports 1x1 until Tk has laid it out,
-    and the sum would centre it off the top left corner.
-    """
-    box.update_idletasks()
-    x = parent.winfo_rootx() + (parent.winfo_width() - box.winfo_width()) // 2
-    y = parent.winfo_rooty() + (parent.winfo_height() - box.winfo_height()) // 2
-    box.geometry(f"+{max(0, x)}+{max(0, y)}")
-
-
 def _save_edit(box, record, material, rigs, amount, density, location):
-    """Write the dialog back to the bookmark, then redraw.
-
-    An unparsable Rigs or Location is left as it was rather than refused: the
-    dialog has no room for an error line, and the field shows what was kept.
-    """
+    """Write the dialog back, then _draw. An unparsable Rigs or Location keeps the old value."""
     fields = {
         "commodity": material or record.get("commodity"),
         "rigs": _int_or(rigs, record.get("rigs")),
@@ -1951,7 +1658,7 @@ def _save_edit(box, record, material, rigs, amount, density, location):
     }
     try:
         spotcard.save(cards.edited(record, fields), id=record["id"])
-    except Exception as err:
+    except Exception as err:        # any raise: the dialog says Not saved, the row is unchanged
         logger.exception("scan: could not save the edit")
         messagebox.showwarning("Edit bookmark", f"Not saved: {err}", parent=box)
         return
@@ -1973,12 +1680,7 @@ def _int_or(text, fallback):
 
 
 def _delete_bookmark(record):
-    """Ask, then remove the bookmark from disk.
-
-    Asked because it is the one button here that destroys something, and the
-    thing it destroys cannot be taken again - the patch is findable, the reading
-    of what was on it is not.
-    """
+    """Ask, then delete the bookmark row; its arrow is stopped first."""
     what = _loc(record.get("location_index"))
     material = record.get("commodity") or "no material"
     if not messagebox.askyesno(
@@ -2024,16 +1726,7 @@ def _share_bookmark(record):
 
 
 def _share_map(body, group):
-    """The picture of the saved map these bookmarks lie on, opened.
-
-    Found on the press rather than on the draw: it rebuilds a mask for every
-    saved map of the body, and doing that for every location of every draw cost
-    more than the whole rest of the window.
-
-    Drawn again on every press, then saved: a picture holds the bookmarks, the
-    prices and the golden groups as they were when it was written, and all
-    three move. The PNG already on disk is the fallback when the redraw fails.
-    """
+    """Redraw the map picture these bookmarks lie on, save and open it; the saved PNG if the redraw fails."""
     maps = coverstore.maps(body, system_address=_system_address())
     picture = _drawn_now(body, group, maps) or _picture(body, group, maps)
     if picture:
@@ -2044,9 +1737,7 @@ def _share_map(body, group):
 
 
 def _drawn_now(body, group, maps):
-    """The map under these bookmarks, drawn from its points and saved. Or None
-    when no saved map reaches them, or the draw fails - both leave the caller
-    with the same "nothing to open" it had before."""
+    """The map under these bookmarks drawn from its points and saved: its path, or None."""
     data = next((data for record in group
                  for data in [_map_data(body, record, maps)] if data), None)
     if data is None:
@@ -2056,14 +1747,18 @@ def _drawn_now(body, group, maps):
         cover = coverage.Coverage.from_dict(body, stored, name)
         if cover is None:
             return None
-        system = _scan[0].system if _scan and _scan[0] else None
+        # The shown register, not the live one; `is None`: a Register with no bodies is falsy (__len__).
+        register = _shown_register(_scan[0]) if _scan else None
+        system = register.system if register is not None else None
         sheet = _scan[1] if _scan else None
-        marks, golden = _map_marks(cover, system, body, sheet)
+        records = [r for r in (cards.for_system(system) if system else ())
+                   if r.get("planet_name") == body]
+        marks, golden = _map_marks(cover, records, sheet)
         title, legend = minimap.picture_text(cover, system)
-        ground = _scan[0].ground(system, body) if _scan and _scan[0] else None
+        ground = register.ground(system, body) if register is not None else None
         image = coverage.picture(cover.mask, marks, title, legend, cover.border_m, golden,
                                  ground)
-    except Exception:
+    except Exception:       # PIL and coverage: any raise must not cost Share map
         logger.exception(f"scan: could not draw {name} on {body}")
         return None
     saved = coverstore.save_png(body, name, image)
@@ -2084,24 +1779,23 @@ def _map_data(body, record, maps):
     return (name, dict(maps)[name]) if name else None
 
 
-def _map_marks(cover, system, body, sheet):
-    """(marks, golden groups) for every bookmark of the body the map reaches.
+def _map_marks(cover, records, sheet):
+    """(marks, golden groups) of the `records` that `cover` reaches, as coverage.picture takes them.
 
-    Same shape minimap hands coverage.picture: metres east and north of the
-    origin, the material's code, whether it is worked out, what it is worth and
-    how many rigs are on it.
+    marks: (x m east, y m north, code, depleted, Cr/t, rigs). Only those it reaches:
+    golden_groups' 4-rig fallback depends on every spot it is given.
     """
     codes = sheet.codes() if sheet is not None else {}
     values = sheet.values() if sheet is not None else {}
     marks = []
-    for record in (cards.for_system(system) if system else ()):
+    for record in records:
         lat, lon = record.get("latitude"), record.get("longitude")
-        if (record.get("planet_name") != body or not isinstance(lat, (int, float))
-                or not isinstance(lon, (int, float)) or not cover.reaches(lat, lon)):
+        if (not isinstance(lat, (int, float)) or not isinstance(lon, (int, float))
+                or not cover.reaches(lat, lon)):
             continue
         material = (record.get("commodity") or "").lower()
         marks.append((*cover.xy(lat, lon), codes.get(material),
-                      bool(record.get("depleted_at")), values.get(material, 0),
+                      cards.depleted(record), values.get(material, 0),
                       record.get("rigs")))
     spots = [(x, y, rigs, value or 0) for x, y, _, spent, value, rigs in marks if not spent]
     golden = coverage.golden_best(coverage.golden_groups(spots), spots)
@@ -2109,9 +1803,7 @@ def _map_marks(cover, system, body, sheet):
 
 
 def refresh_rail():
-    """The rail rebuilt with the register's bodies, the rest left standing (a
-    _draw rebuilds every widget and flickers): for a Spansh answer. _draw when
-    the picked body is not the one the middle pane shows, or none was."""
+    """Rebuild only the rail, for a Spansh answer; _draw when the picked body is not the one shown."""
     if _window is None or not _window.winfo_exists() or _scan is None:
         return
     rail, shown = _panes.get("rail"), _panes.get("body")
@@ -2119,7 +1811,8 @@ def refresh_rail():
     register = _shown_register(live)
     listed = _bodies(register, sheet, focus)
     body = _current(listed)
-    if rail is None or not rail.winfo_exists() or shown is None or body is None             or body["name"] != shown["name"]:
+    if (rail is None or not rail.winfo_exists() or shown is None or body is None
+            or body["name"] != shown["name"]):
         _draw()
         return
     _remember_scroll()
@@ -2129,10 +1822,10 @@ def refresh_rail():
 
 
 def refresh_mined():
-    """The Mined labels and the card's tons line set in place, no redraw (a
-    redraw rebuilds every widget and flickers). One cards.for_system read.
-    Falls back to _draw when a label is missing: a card whose first ton just
-    came has no tons line to set."""
+    """Mined, card tons and spent labels set in place from one cards.for_system read.
+
+    _draw when a label is missing, e.g. a card whose first ton just came.
+    """
     if _window is None or not _window.winfo_exists() or not _scan:
         return
     system = _shown_register(_scan[0]).system
@@ -2157,11 +1850,9 @@ def refresh_mined():
 
 
 def refresh():
-    """Draw again, if the window is still there. Does not raise it.
+    """_draw if the window exists, without raising it; clears a stale 'Arrow on' status line.
 
-    main calls this after a bookmark is saved. The overlay calls this when it takes itself down, which can be minutes after
-    the press and with the window long since gone - so the line that said an
-    arrow was up goes with it.
+    Called by main after a save, and by the overlay when it takes itself down.
     """
     if _window is None or not _window.winfo_exists():
         return
@@ -2181,23 +1872,75 @@ def _system_address():
     return _shown_register(_scan[0]).system_address
 
 
-def _by_location(records):
-    """[(location, [bookmark, ...]), ...], by location, unnumbered last."""
+def _by_location(records, body):
+    """[(location, [bookmark, ...]), ...]: marked good, unmarked, unnumbered, marked bad;
+    each by location."""
     groups = {}
     for record in records:
         groups.setdefault(record.get("location_index"), []).append(record)
     return sorted(((index, _clustered(group)) for index, group in groups.items()),
-                  key=lambda item: (item[0] is None, item[0] or 0))
+                  key=lambda item: (-_spot_mark(body, item[0]), item[0] is None, item[0] or 0))
+
+
+def _spot_mark(body, index):
+    """cards.GOOD_SPOT, BAD_SPOT or UNMARKED of location `index` of `body` in the shown system."""
+    if index is None or not _scan:
+        return cards.UNMARKED
+    return _spots.get(cards.spot_key(_shown_register(_scan[0]).system, body, index),
+                      cards.UNMARKED)
+
+
+def _spot_button(row, body, index, mark, lit, tall):
+    """Thumb up (GOOD_SPOT) / down (BAD_SPOT): GOLD / ALERT when lit, FG unlit; the lit one unmarks.
+
+    `tall`: px inside the border; an image button is image + border high, Tk ignores pady.
+    Unnumbered (index None): disabled, no key to keep the mark under.
+    """
+    colour, word, effect = {cards.GOOD_SPOT: (GOLD, "good", "listed first"),
+                            cards.BAD_SPOT: (ALERT, "bad", "listed last")}[mark]
+    button = widgets.button(row, "", (lambda: _set_spot_mark(body, index, mark))
+                            if index is not None else None, active=colour)
+    button.config(image=_thumb(row, colour if lit else FG, mark == cards.BAD_SPOT), padx=4,
+                  height=tall)
+    widgets.tooltip(button, "Set a loc number in Edit to mark it" if index is None
+                    else f"Unmark {word}" if lit else f"Mark {word}: {effect}")
+    return button
+
+
+def _thumb(parent, colour, down):
+    """thumb.image() as a PhotoImage, built once per (colour, down): Tk drops an unreferenced image."""
+    key = (colour, down)
+    if key not in _thumbs:
+        out = io.BytesIO()
+        thumb.image(colour, down).save(out, format="PNG")
+        _thumbs[key] = tk.PhotoImage(master=parent, data=out.getvalue())
+    return _thumbs[key]
+
+
+def _set_spot_mark(body, index, mark):
+    """👍 / 👎 pressed; pressed on the mark the location has, unmark. A failed write on the status line."""
+    if _spot_mark(body, index) == mark:
+        mark = cards.UNMARKED
+    key = cards.spot_key(_shown_register(_scan[0]).system, body, index)
+    if cards.set_spot_mark(key, mark):
+        _state["status"] = f"{_loc(index)} " + {cards.GOOD_SPOT: "marked good.",
+                                                cards.BAD_SPOT: "marked bad.",
+                                                cards.UNMARKED: "unmarked."}[mark]
+    else:
+        _state["status"] = "The mark could not be written - see the EDMC log."
+    _draw()
 
 
 def _clustered(group):
-    """One location's bookmarks in coverage.clusters() order - the golden groups'
-    rule - worked out last. No coordinates or planet_radius: by rigs after them."""
+    """One location's bookmarks in coverage.clusters() order, depleted last.
+
+    No coordinates or planet_radius: after the placed ones, most rigs first.
+    """
     def rigs(record):
         return int(record.get("rigs") or 0)
 
-    live = [r for r in group if not _worked_out(r)]
-    gone = [r for r in group if _worked_out(r)]
+    live = [r for r in group if not cards.depleted(r)]
+    gone = [r for r in group if cards.depleted(r)]
     radius = next((r["planet_radius"] for r in group if r.get("planet_radius")), None)
     placed = [r for r in live if radius and r.get("latitude") is not None
               and r.get("longitude") is not None]
@@ -2211,33 +1954,24 @@ def _clustered(group):
 
 
 def _picture(body, group, maps):
-    """The saved map picture the first of these bookmarks lies on, or None."""
+    """The saved PNG of the map the first placed bookmark of `group` lies on, or None."""
     for record in group:
-        lat, lon = record.get("latitude"), record.get("longitude")
-        if lat is None or lon is None:
-            continue
-        name = coverage.map_at(maps, body, float(lat), float(lon))
-        picture = _newest_picture(body, [name]) if name else None
+        found = _map_data(body, record, maps)
+        picture = _newest_picture(body, [found[0]]) if found else None
         if picture:
             return picture
     return None
 
 
 def _newest_picture(body, names):
-    """The newest PNG of these maps, or None - two maps of one location are two
-    drives, and the later one is the one worth sending."""
+    """The newest saved PNG of these maps, or None."""
     paths = [os.path.join(coverstore.folder(body), f"{name}.png") for name in names]
     paths = [path for path in paths if os.path.isfile(path)]
     return max(paths, key=os.path.getmtime) if paths else None
 
 
 def _nearest(group, status):
-    """How far the closest bookmark of one location is, or '-'.
-
-    On the location line rather than on every row: the deposits of one location
-    are a few dozen metres apart, and the question the list answers is which
-    location to drive to. Guide answers the last hundred metres.
-    """
+    """Distance to the location's nearest bookmark, or '-'."""
     best = None
     for record in group:
         metres = guide.fix(status, record).get("distance_m")
@@ -2247,8 +1981,7 @@ def _nearest(group, status):
 
 
 def _away_text(record):
-    """'821 m away', or what is in the way of knowing - another body, orbit,
-    supercruise."""
+    """'821 m away', or why there is no fix: another body, supercruise or docked, too high."""
     reading = guide.fix(spotmark.read_status(), record)
     if reading.get("distance_m") is not None:
         return f"{guide.metres(reading['distance_m'])} away"
@@ -2288,20 +2021,14 @@ def _price(credits):
 def _volcanism(body):
     """What kind of volcanism and how much of it - "major metallic magma"."""
     words = " ".join((body.get("volcanism") or "").lower().split())
-    # The journal's own suffix - "major rocky magma volcanism". The line already
-    # says it once.
+    # Journal suffix " volcanism" dropped: "major rocky magma volcanism".
     if words.endswith(" volcanism"):
         words = words[:-len(" volcanism")]
     return words
 
 
 def _open_card(path):
-    """The PNG, in whatever shows PNGs here.
-
-    Opened rather than drawn into this window: it is a picture made to be sent
-    to somebody, and the viewer that opens it is the thing that can save it,
-    zoom it and copy it.
-    """
+    """Open the PNG in the system viewer: os.startfile, webbrowser where that is missing."""
     try:
         os.startfile(path)                       # Windows, which is where EDMC runs
     except AttributeError:
@@ -2311,44 +2038,6 @@ def _open_card(path):
 
 
 # ------------------------------------------------------------------ the parts
-
-
-def _button(parent, text, command=None, active=ACCENT):
-    """The window has one button style, and this is it.
-
-    Without a command the button is disabled rather than silently dead: a button
-    that does nothing when pressed reads as a bug, and a greyed one reads as not
-    finished. `active` is what it turns under the pointer - the one button that
-    destroys something says so there rather than by sitting in red all the time.
-    """
-    return tk.Button(parent, text=text, command=command,
-                     bg=BG, fg=FG, activebackground=BG,
-                     activeforeground=active, disabledforeground=DIM,
-                     relief="solid", borderwidth=1, highlightthickness=0,
-                     padx=8, pady=1, font=("Segoe UI", 8),
-                     cursor="hand2" if command else "arrow",
-                     state="normal" if command else "disabled")
-
-
-def _clickable(widget, command, skip_buttons=False):
-    """A whole row, clickable.
-
-    Tk hands a click to the widget under the pointer and does not pass it up to
-    the parent, so a row is only clickable if every label in it is. Buttons keep
-    their own command - which is what skip_buttons is for on the location line,
-    where Share map must not fold it.
-    """
-    def press(event):
-        command()
-
-    pending = [widget]
-    while pending:
-        current = pending.pop()
-        if skip_buttons and isinstance(current, tk.Button):
-            continue
-        current.config(cursor="hand2")
-        current.bind("<Button-1>", press)
-        pending.extend(current.winfo_children())
 
 
 def _remember_scroll():
@@ -2363,11 +2052,7 @@ def _remember_scroll():
 
 
 def _scrollable(parent, name, bg=BG, padx=(16, 0)):
-    """A canvas with a frame in it, because Tk has no scrolling frame.
-
-    Returns the inner frame. `name` is what the scroll position is remembered
-    under, so a draw puts the list back where it was rather than at the top.
-    """
+    """A scrolling frame (canvas + inner frame), returned; `name` keys its scroll position across draws."""
     box = tk.Frame(parent, bg=bg)
     box.pack(side="top", fill="both", expand=True, padx=padx, pady=(4, 0))
     canvas = tk.Canvas(box, bg=bg, highlightthickness=0)
@@ -2384,7 +2069,7 @@ def _scrollable(parent, name, bg=BG, padx=(16, 0)):
     bar.pack(side="right", fill="y")
 
     _canvases[name] = canvas
-    _wheel(canvas)
+    widgets.wheel(canvas)
     # After the layout: the scrollregion comes from the <Configure> about to fire.
     # On the root: destroying the canvas deletes the pending command, and tkinter
     # can reuse its "<id><lambda>" name for a bind lambda Tcl then calls bare.
@@ -2398,30 +2083,3 @@ def _restore_scroll(canvas, name):
             canvas.yview_moveto(_scroll.get(name, 0.0))
     except tk.TclError:
         pass
-
-
-def _wheel(canvas):
-    """The wheel scrolls whichever list the pointer is over.
-
-    bind_all while the pointer is inside, because the rows live in frames inside
-    the canvas and the event goes to the widget under the pointer rather than to
-    the canvas. Whatever was bound is put back on the way out: EDMC and the
-    other plugins bind the wheel the same way, and unbind_all takes theirs with
-    it.
-    """
-    def scroll(event):
-        canvas.yview_scroll(-int(event.delta / 120), "units")
-
-    def enter(event):
-        canvas.rs_previous = canvas.bind_all("<MouseWheel>")
-        canvas.bind_all("<MouseWheel>", scroll)
-
-    def leave(event):
-        canvas.unbind_all("<MouseWheel>")
-        if getattr(canvas, "rs_previous", None):
-            canvas.bind_all("<MouseWheel>", canvas.rs_previous)
-            canvas.rs_previous = None
-
-    canvas.bind("<Enter>", enter, add="+")
-    canvas.bind("<Leave>", leave, add="+")
-    canvas.bind("<Destroy>", leave, add="+")

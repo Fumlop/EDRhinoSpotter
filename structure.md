@@ -280,14 +280,15 @@ Everything in here imports tkinter.
   the SRV with Elite in front every press is a row in `trace\presses-<date>.csv`, only with
   `RHINOSPOTTER_DEBUG` set;
   nothing at all with `rhinospotter_rig_radar` off (Settings, default on). A press of
-  `RIG_PRESS_S` (0.5 s) in the Rhino with Elite in
+  `RIG_PRESS_S` (2.0 s) in the Rhino with Elite in
   front calls `rigradar.placed()`; the rig button is `rhinospotter_rig_button`
   (`left` / `right`, Settings) when set, else the first such press sets `_rig_button`
-  for the EDMC session; a long press on the other button is not a rig. Two short presses on it within
-  `DOUBLE_S` (0.4 s) call `rigradar.close()`.
+  for the EDMC session; a long press on the other button is not a rig. Two presses under
+  `SCAN_PRESS_S` (0.5 s) on it within `DOUBLE_S` (0.4 s) call `rigradar.close()`;
+  0.5 to 2.0 s is neither.
 - **[rigradar.py](rs_ui/rigradar.py)** - 250 m across, north up, the SRV in the
-  middle, a `rigplan.SPACING_M` ring per rig placed on the body; border GOOD and
-  "Next rig: OK here" once clear of every ring. Centred under the guide arrow,
+  middle, a band from `measure.RIG_SPACING` (76 m) to `rigplan.SPACING_M` (80 m) per rig
+  placed on the body, ALERT or GOOD mixed 55% into BG; "Next rig: OK here" once clear of every band. Centred under the guide arrow,
   click-through, hidden while Elite is not in front; closes and forgets the
   rigs when the SRV fix ends or the body changes. `placed()` is the one way in,
   for a journal event as well.
@@ -324,6 +325,8 @@ Everything in here imports tkinter.
   the map's: `rhinospotter_materials` and `materials_shown()` (the Select...
   dialog; `rhinospotter_low_value` only seeds its default) are a materials
   setting that lives here because this is the file with the tab in it.
+  RhinoData's gear opens the same dialog with `on_ok`: saved at once
+  (`save_materials`), not on Settings OK.
   Built once, hidden, and made click-through and no-activate before it is
   first shown; then shown, moved and hidden with Win32 calls that do not take
   the foreground, because it comes up mid-game on its own. A draw that raises
@@ -416,6 +419,9 @@ mapping the unit tests it replaced.
 - **scan_arrive_e2e.py** - an open RhinoData window redrawn on FSDJump and on a
   saved bookmark without `scan.show()`; a browsed system kept; no-op controls.
 - **totals_e2e.py** - the RhinoData rail's totals against the db's own rows.
+- **gear_e2e.py** - the gear beside MATERIAL FILTER: placement, tooltip, the
+  dialog saving `rhinospotter_materials` and refilling both lists; the
+  Settings path of the same dialog.
 - **rigradar_e2e.py** - scripted button state through the real press thread,
   `_on_ui`, Status.json, CSV and radar window; checks run on a driver thread
   because `_on_ui` needs the mainloop.

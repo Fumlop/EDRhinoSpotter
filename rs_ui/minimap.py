@@ -221,10 +221,22 @@ def seed_materials(worth, marked):
     return seeded
 
 
-def _select_materials(parent, worth):
-    """Checkbox per material; OK keeps the ticks in _picked for prefs_changed."""
+def save_materials(picked):
+    """Store `picked` under MATERIALS_KEY; empty deletes the key (the default)."""
+    if config is None:
+        logger.warning("materials: no EDMC config, pick not saved")
+        return
+    if picked:
+        config.set(MATERIALS_KEY, list(picked))
+    else:
+        config.delete(MATERIALS_KEY, suppress=True)
+
+
+def select_materials(parent, worth, on_ok=None):
+    """Checkbox per material. OK: on_ok(ticked names), or without one the ticks
+    go to _picked for prefs_changed."""
     global _picked
-    shown = set(_picked if _picked is not None else materials_shown(worth))
+    shown = set(_picked if _picked is not None and on_ok is None else materials_shown(worth))
     box = tk.Toplevel(parent)
     box.title("RhinoSpotter materials")
     box.transient(parent)
@@ -240,8 +252,12 @@ def _select_materials(parent, worth):
 
     def ok():
         global _picked
-        _picked = [name for name, var in ticks.items() if var.get()]
+        picked = [name for name, var in ticks.items() if var.get()]
         box.destroy()
+        if on_ok is not None:
+            on_ok(picked)
+        else:
+            _picked = picked
 
     buttons = tk.Frame(box)
     buttons.grid(row=rows, column=0, columnspan=3, sticky="w", padx=8, pady=8)
@@ -473,7 +489,7 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
         # alt-tab, not through a minimise - a minimised game has no corner for
         # the map to sit in.
         _down(f"game window {rect} is minimised" if minimised
-              else f"Elite not in front ({overlay.foreground_title()!r})")
+              else "Elite not in front")
         return
     if not _build(root):
         _down("no window could be built")
@@ -572,7 +588,7 @@ def _bookmarks(system, body):
                 if (record.get("planet_name") == body and isinstance(lat, (int, float))
                         and isinstance(lon, (int, float))):
                     points.append((lat, lon, _code(record.get("commodity")),
-                                   bool(record.get("depleted_at")),
+                                   cards.depleted(record),
                                    _value(record.get("commodity")), record.get("rigs")))
             _marks = (key, points)
     # While a read fails: the last good read of this body, nothing for another.
@@ -713,9 +729,9 @@ def picture_text(cover, system, when=None):
         parts = [r.get("commodity") or "?", f"{float(r['latitude']):.6f} / {float(r['longitude']):.6f}"]
         if r.get("rigs") is not None:
             parts.append(f"{r['rigs']} rig" + ("" if r["rigs"] == 1 else "s"))
-        if r.get("depleted_at"):
+        if cards.depleted(r):
             parts.append("depleted")
-        legend.append((_code(r.get("commodity")), "  ·  ".join(parts), bool(r.get("depleted_at"))))
+        legend.append((_code(r.get("commodity")), "  ·  ".join(parts), cards.depleted(r)))
     return title, legend
 
 
@@ -866,7 +882,7 @@ def prefs(parent, worth=(), panel=True):
     # being mined right now. See rs_ui/main._materials.
     line(lambda f: nb.Label(f, text="Materials in the lists"),
          lambda f: nb.Button(f, text="Select...",
-                             command=lambda: _select_materials(frame.winfo_toplevel(), worth)),
+                             command=lambda: select_materials(frame.winfo_toplevel(), worth)),
          pady=(6, 10))
 
     # The hotkeys: a modifier set and a key each. Taken on OK and registered
@@ -1092,10 +1108,8 @@ def prefs_changed():
                 rigradar.close()
         if _rig_choice is not None:
             config.set(RIG_BUTTON_KEY, RIG_BUTTONS.get(_rig_choice.get(), ""))
-        if _picked:
-            config.set(MATERIALS_KEY, list(_picked))
-        elif _picked is not None:
-            config.delete(MATERIALS_KEY, suppress=True)       # none ticked: the default
+        if _picked is not None:
+            save_materials(_picked)
         if _golden is not None:
             config.set(GOLDEN_KEY, int(_golden.get()))
             apply_golden()

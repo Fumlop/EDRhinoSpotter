@@ -332,18 +332,6 @@ def _reset(event=None):
     _place()
 
 
-def foreground_title():
-    """The title of the window in front, for a log line. '' when unknown."""
-    try:
-        import ctypes
-        user32 = ctypes.windll.user32
-    except (ImportError, AttributeError, OSError):
-        return ""
-    buffer = ctypes.create_unicode_buffer(64)
-    user32.GetWindowTextW(user32.GetForegroundWindow(), buffer, 64)
-    return buffer.value
-
-
 def game_focused():
     """Whether Elite is the window in front. Not running counts as not in
     front; off Windows there is no asking, so it is always in front."""

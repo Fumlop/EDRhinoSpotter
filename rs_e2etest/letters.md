@@ -2,7 +2,7 @@
 
 `python rs_e2etest/letters_e2e.py`. One Tk process, the real material lists
 (`main._materials()` over `mining_sheet.json`), menus built by
-`scan.letter_jump`, keystrokes sent with `keybd_event` to the posted native
+`widgets.letter_jump`, keystrokes sent with `keybd_event` to the posted native
 menu. Needs the desktop: the menu is really opened and typed into.
 
 ## Ways it can fail, each checked
