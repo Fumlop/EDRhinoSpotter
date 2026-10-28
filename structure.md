@@ -221,7 +221,7 @@ No tkinter anywhere in here.
   anything else; the file text names the holder. An older plugin still exiting
   is waited for up to `main.LOCK_WAIT_S`; any other holder refuses at once.
   Refused, the plugin shows the holder in its panel and Settings tab and does
-  nothing else. The standalone (branch `standalone`) takes the same lock and
+  nothing else. The standalone (`standalone.py`) takes the same lock and
   draws RhinoData into its own root through `scan.host()`.
 - **[system.py](rs_core/system.py)** - what it runs on, read once: `WINDOWS`,
   `LINUX`, `FLATPAK`, `SESSION` (wayland/x11). `main.start` logs `describe()`.

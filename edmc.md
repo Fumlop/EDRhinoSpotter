@@ -202,7 +202,7 @@ to exist first.
    The standalone Setup.exe goes on the same release, never on one of its
    own: the plugin's updater follows `releases/latest` and downloads that
    tag's source, so a standalone release marked latest would be installed as
-   the plugin. Built on the standalone branch from `installer/.venv`
+   the plugin. Built from `installer/.venv`
    (`python installer/build.py`), checked with `rs_e2etest/installer_e2e.py`,
    uploaded as `Standalone_RhinoSpotter-X.Y.Z-Setup.exe`.
 6. **Update the registry entry.** Edit the same JSON: `pluginVer`,

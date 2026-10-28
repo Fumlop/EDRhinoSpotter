@@ -4,7 +4,7 @@ Harness: `rs_e2etest/lock_e2e.py`. Child processes call the real
 `load.plugin_start3` / `plugin_app` / `plugin_prefs` / `journal_entry` /
 `plugin_stop` on a bare Tk root, `LOCALAPPDATA` at `out/<timestamp>/`. The
 standalone side (standalone.py refusing, the dialog) is tested on the
-standalone branch in `standalone_e2e.py`; here the other holder is a child
+standalone in `standalone_e2e.py`; here the other holder is a child
 that takes the lock as "RhinoSpotter standalone" through `instance.acquire`.
 Output: `report.txt`.
 
@@ -27,7 +27,7 @@ Output: `report.txt`.
 | Replaced | By | Failures it cannot see |
 |---|---|---|
 | EDMC | a child calling load.py's hooks on a bare Tk root; `myNotebook` stood in by tkinter | EDMC's loader, its nb.Frame type check |
-| standalone.py | a child holding the lock as "RhinoSpotter standalone" | the standalone's own start and dialog (standalone branch) |
+| standalone.py | a child holding the lock as "RhinoSpotter standalone" | the standalone's own start and dialog |
 | a crash | `TerminateProcess` on the holder | a hang that keeps the process alive |
 
 ## Checks
