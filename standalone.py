@@ -38,7 +38,7 @@ sys.modules["myNotebook"] = tk
 from rs_core import database, paths                # noqa: E402
 from rs_core.logging import logger                 # noqa: E402
 from rs_standalone.journal import POLL_MS, Journal, newest  # noqa: E402
-from rs_ui import main, scan                       # noqa: E402
+from rs_ui import main, scan, widgets              # noqa: E402
 
 LOG_PATH = os.path.join(database.ROOT, "log", "rhinospotter.log")
 
@@ -64,7 +64,7 @@ class App:
         main.build(self.dock, updates=False, docked=True).pack(fill="x")
         tk.Button(self.dock, text="Settings", width=13, command=self.open_settings).pack(
             anchor="w", padx=4, pady=(0, 6))
-        scan.restyle(self.dock)
+        widgets.restyle(self.dock)
         scan.host(root, self.dock)
         root.protocol("WM_DELETE_WINDOW", self.close)
         self.journal = Journal(paths.journal_dir(), main.journal_entry)
