@@ -180,7 +180,8 @@ to exist first.
    `%TEMP%`: this checkout is often the live plugin folder.
 
    ```bash
-   git archive --format=zip --prefix=RhinoSpotter/ \n       -o "$TEMP/EDMC_RhinoSpotter-X.Y.Z.zip" vX.Y.Z
+   git archive --format=zip --prefix=RhinoSpotter/ \
+       -o "$TEMP/EDMC_RhinoSpotter-X.Y.Z.zip" vX.Y.Z
    sha256sum "$TEMP/EDMC_RhinoSpotter-X.Y.Z.zip"
    ```
 

@@ -1,11 +1,11 @@
 .github export-ignore
 .gitattributes export-ignore
-# Standalone only: kept out of the plugin zip and the updater's zipball.
+# Kept out of the plugin zip and the updater's zipball: standalone-only
+# files and the tests.
 STANDALONE.md export-ignore
 standalone.py export-ignore
 installer/ export-ignore
 rs_standalone/ export-ignore
-rs_e2etest/installer.md export-ignore
-rs_e2etest/installer_e2e.py export-ignore
-rs_e2etest/standalone.md export-ignore
-rs_e2etest/standalone_e2e.py export-ignore
+rs_e2etest/ export-ignore
+rs_tests/ export-ignore
+pytest.ini export-ignore
