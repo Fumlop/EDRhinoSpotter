@@ -128,8 +128,15 @@ Linux: top middle of the screen; drag it where you want it, right-click puts it 
 | Ctrl+Alt+B | Set the border (needs a center); shows drive rings, drops ground outside |
 | Ctrl+Alt+M | Zoom 1x / 2x / 4x |
 | Ctrl+Alt+D | Open RhinoData |
+| Ctrl+Alt+R | Plan rigs: drive the deposit border once, back to where you started |
+| Ctrl+Alt+P | Next rig (skip the one the arrow points at) |
 
 Keys are changeable in Settings.
+
+**Plan rigs:** in the SRV, press Ctrl+Alt+R and drive round the purple border.
+The lap closes by itself when you are back within 10 m of the start (or press
+Ctrl+Alt+R again). Rigs are planned 80 m apart inside it and the arrow points at
+rig 1. Place the rig there; the arrow moves on to the next one.
 
 Each dock saves a map picture; **Share map** on a location line opens it.
 Gold circles mark the best 3 golden groups: 5+ rigs within 1.25 km of the spot with the most
@@ -188,6 +195,7 @@ Debug log: `RHINOSPOTTER_DEBUG=1` before starting EDMC. Code layout: [structure.
 - **Clusters:** a location's bookmarks grouped by the spot with the most rigs and everything within the golden radius.
 - **Golden circles:** the best 3 one-stop groups (5+ rigs, else 4+) circled on the maps, radius set in Settings.
 - **Guide:** an arrow over the game back to any bookmark, from orbit down to the SRV.
+- **Plan rigs:** drive the deposit border once; rigs planned 80 m apart inside it, the arrow guides to each in turn.
 - **Minimap:** the ground you drove in the SRV, your bookmarks on it, center, border and drive rings, 3 zoom steps.
 - **Map pictures:** saved per body, shareable with a legend and the golden circles.
 - **Tons mined:** counted per bookmark from the journal, refreshed 5 s after the last ton.

@@ -167,14 +167,19 @@ def border():
     c = rigradar._canvas
     if c is None:
         return None
-    return next((c.itemcget(i, "outline") for i in c.find_all() if c.type(i) == "rectangle"), None)
+    return next((c.itemcget(i, "outline") for i in c.find_all()
+                 if c.type(i) == "rectangle" and "mask" not in c.gettags(i)), None)   # mask: BG clip strips
 
 
 def hint():
-    c = rigradar._canvas
-    if c is None:
-        return None
-    return next((c.itemcget(i, "text") for i in c.find_withtag("hint")), None)
+    """The hide line, or None. Read on the Tk thread: from this one it can land
+    between _draw()'s delete("all") and its create_text()."""
+    def read():
+        c = rigradar._canvas
+        if c is None:
+            return None
+        return next((c.itemcget(i, "text") for i in c.find_withtag("hint")), None)
+    return on_tk(read)
 
 
 def grid():

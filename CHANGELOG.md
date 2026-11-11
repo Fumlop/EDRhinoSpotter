@@ -1,5 +1,18 @@
 # Changelog
 
+## 6.6.5
+
+**Added**
+
+- Plan rigs, out of lab: Ctrl+Alt+R in the SRV, drive the deposit border once; the lap closes within 10 m of the start after 60 m. Rigs planned on an 80 m hex grid inside it (`rs_core/rigplan.py`), the arrow guides to rig 1. Keys in Settings as "Plan rigs (drive the border)" and "Next rig"; Linux `!rs trace` / `!rs placed`. Was behind `RHINOSPOTTER_DEBUG`.
+- A rig placed in the game (2 s press in the Rhino, the rig radar's press) within 40 m of the spot moves the arrow to the next rig. Ctrl+Alt+P skips one. Caption: "rig 1 of 4: place it here, or Ctrl+Alt+P to skip".
+- Minimap: "Ctrl+Alt+R  plan rigs" right of the zoom row; dropped on a 180 px map (720 px window), where it does not fit.
+
+**Changed**
+
+- Rig radar: the 76-80 m rings stop at the map square; they ran over the text under it and the border.
+- Trace CSV and summary (`trace/trace-<ts>.csv` / `.txt`) only with `RHINOSPOTTER_DEBUG`; the log names the lap, not the path.
+
 ## 6.6.0
 
 **Fixed**

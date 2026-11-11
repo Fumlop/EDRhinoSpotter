@@ -1296,8 +1296,14 @@ def _draw(side, x, y, heading, in_reach, header, marks=(), distances=False, base
                             fill=palette.MUTED, font=keys, anchor="w")
     _canvas.create_text(pad, foot + 2 * band, text=f"{hotkey.label(hotkey.BORDER)}  set border",
                         fill=palette.MUTED, font=keys, anchor="w")
-    _canvas.create_text(pad, foot + 3 * band, text=f"{hotkey.label(hotkey.SIZE)}  zoom",
-                        fill=palette.MUTED, font=keys, anchor="w")
+    zoom = _canvas.create_text(pad, foot + 3 * band, text=f"{hotkey.label(hotkey.SIZE)}  zoom",
+                               fill=palette.MUTED, font=keys, anchor="w")
+    plan = _canvas.create_text(width - pad, foot + 3 * band,
+                               text=f"{hotkey.label(hotkey.TRACE)}  plan rigs",
+                               fill=palette.MUTED, font=keys, anchor="e", tags="plan_rigs")
+    # 180 px map (720 px window): 5 px short with the default keys; dropped, not overlapped.
+    if _canvas.bbox(zoom)[2] + 4 > _canvas.bbox(plan)[0]:
+        _canvas.delete(plan)
     if in_reach:
         _canvas.create_text(width - pad, foot, text=f"{_coverage.painted_km2():.0f} km²",
                             fill=palette.ACCENT, font=bold, anchor="e")

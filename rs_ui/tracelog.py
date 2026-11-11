@@ -1,14 +1,15 @@
-"""Lab, Ctrl+Alt+R: trace a deposit border, then guide to planned rig spots.
+"""Ctrl+Alt+R: trace a deposit border, then guide to planned rig spots.
 
 Press once, drive the border. The lap closes itself when the SRV comes back
 within SNAP_M of the first fix after SNAP_PATH_M of driving; a second press
 closes it early. rs_core.rigplan then plans the spots off the Tk thread and
-rs_ui.overlay points at rig 1 and holds HERE (RIG_ARRIVE_M) until the placed key (Ctrl+Alt+P) moves it to the next.
+rs_ui.overlay points at rig 1 and holds HERE (RIG_ARRIVE_M) until the next rig:
+the placed key (Ctrl+Alt+P), or a rig press (rs_ui.press) within ADVANCE_M of the spot.
 
-Status.json mtime polled every POLL_MS; each new mtime is one CSV row.
+Status.json mtime polled every POLL_MS. With RHINOSPOTTER_DEBUG each new mtime
+is one CSV row, and the lap's summary and spots go to a .txt:
 
-    %LOCALAPPDATA%\\RhinoSpotter\\trace\\trace-<YYYYmmdd-HHMMSS>.csv
-    %LOCALAPPDATA%\\RhinoSpotter\\trace\\trace-<YYYYmmdd-HHMMSS>.txt   rate summary + spots
+    %LOCALAPPDATA%\\RhinoSpotter\\trace\\trace-<YYYYmmdd-HHMMSS>.csv / .txt
 
 Overlay while tracing: click-through text centred on the Elite window, upper third.
 """
@@ -23,7 +24,7 @@ import time
 import tkinter as tk
 
 from rs_core import database, paths, rigplan
-from rs_core.logging import logger
+from rs_core.logging import DEBUG, logger
 from rs_ui import overlay
 
 POLL_MS = 20         # two writes within 20 ms count as one
@@ -31,6 +32,7 @@ STILL_M = 0.5        # per-write step below this counts as standing
 SNAP_M = 10.0        # lap closes this close to the first fix
 SNAP_PATH_M = 60.0   # ... after at least this much driving
 RIG_ARRIVE_M = 3.0   # arrow shows HERE inside this, m
+ADVANCE_M = 40.0     # rig press this close to the spot counts as placed: half rigplan.SPACING_M
 NOTE_MS = 8000       # "no rig fits" stays up this long
 DIR = os.path.join(database.ROOT, "trace")
 FONT = ("Consolas", 16, "bold")
@@ -39,7 +41,8 @@ TEXT = "#ff8c0d"
 _window = None
 _label = None
 _after = None
-_handle = None       # open CSV file
+_on = False          # a lap is being traced
+_handle = None       # open CSV file, DEBUG only
 _writer = None
 _rows = []
 _last_mtime = None
@@ -51,7 +54,7 @@ _step = 0            # index into _plan being guided to
 
 
 def active():
-    return _handle is not None
+    return _on
 
 
 def toggle(root):
@@ -63,21 +66,23 @@ def toggle(root):
 
 
 def start(root):
-    global _handle, _writer, _rows, _last_mtime, _bad_reads, _stem, _root, _plan
+    global _on, _handle, _writer, _rows, _last_mtime, _bad_reads, _stem, _root, _plan
     _root = root
     if _plan:
         _plan = []           # before overlay.stop(): _next() then ends instead of advancing
         overlay.stop()
-    os.makedirs(DIR, exist_ok=True)
-    _stem = os.path.join(DIR, time.strftime("trace-%Y%m%d-%H%M%S"))
-    _handle = open(_stem + ".csv", "w", newline="", encoding="utf-8")
-    _writer = csv.writer(_handle)
-    _writer.writerow(["t", "mtime", "game_ts", "lat", "lon", "heading", "altitude", "radius", "flags"])
+    _on = True
+    _stem = time.strftime("trace-%Y%m%d-%H%M%S")
+    if DEBUG:
+        os.makedirs(DIR, exist_ok=True)
+        _handle = open(os.path.join(DIR, _stem + ".csv"), "w", newline="", encoding="utf-8")
+        _writer = csv.writer(_handle)
+        _writer.writerow(["t", "mtime", "game_ts", "lat", "lon", "heading", "altitude", "radius", "flags"])
     _rows, _last_mtime, _bad_reads = [], None, 0
     _cancel()                # a pending "no rig fits" close
     _open_window(root)
     _show(_live_text())
-    logger.info(f"trace: recording to {_stem}.csv")
+    logger.info(f"trace: lap started{f', recording trace/{_stem}.csv' if DEBUG else ''}")
     _poll()
 
 
@@ -97,13 +102,15 @@ def shutdown():
 
 def stop():
     """Close the lap: CSV closed, spots planned, arrow to rig 1."""
-    global _handle, _writer
+    global _on, _handle, _writer
     _cancel()
-    if _handle is None:
+    if not _on:
         return
-    _handle.close()
+    _on = False
+    if _handle is not None:
+        _handle.close()
     _handle = _writer = None
-    lines = summary(_rows) + [f"reads failed mid-write {_bad_reads}", f"csv {_stem}.csv"]
+    lines = summary(_rows) + [f"reads failed mid-write {_bad_reads}", f"lap {_stem}"]
     for line in lines:
         logger.info(f"trace: {line}")
     fixes = [r for r in _rows if r["lat"] is not None and r["radius"]]
@@ -140,8 +147,10 @@ def stop():
 
 
 def _write_txt(lines, spots):
+    if not DEBUG:
+        return
     spot_lines = [f"rig {i}: {lat:.6f}, {lon:.6f}" for i, (lat, lon) in enumerate(spots, 1)]
-    with open(_stem + ".txt", "w", encoding="utf-8") as f:
+    with open(os.path.join(DIR, _stem + ".txt"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines + [f"rigs {len(spots)} (spacing {rigplan.SPACING_M:.0f} m, "
                                    f"inset {rigplan.INSET_M:.0f} m)"] + spot_lines) + "\n")
 
@@ -160,7 +169,7 @@ def _planned(lines, body, spots):
     key = _key(PLACED)
     _plan = [{"planet_name": body, "latitude": lat, "longitude": lon, "arrive_m": RIG_ARRIVE_M,
               "hold": True, "marked_at": f"rig-{stamp}-{i}",
-              "caption": f"rig {i} of {len(spots)} - {key} when placed"}
+              "caption": f"rig {i} of {len(spots)}: place it here, or {key} to skip"}
              for i, (lat, lon) in enumerate(spots, 1)]
     _step = 0
     overlay.start(_root, _plan[0], on_stop=_ended)
@@ -180,6 +189,17 @@ def placed():
     overlay.start(_root, _plan[_step], on_stop=_ended)    # retargets, no stop()
 
 
+def rig_down(body, lat, lon, radius):
+    """Rig press in the game (rs_ui.press): placed() when within ADVANCE_M of the spot guided to."""
+    if not _plan or _root is None or _step >= len(_plan):
+        return
+    spot = _plan[_step]
+    if body != spot["planet_name"] or not radius:
+        return
+    if metres((lat, lon), (spot["latitude"], spot["longitude"]), radius) <= ADVANCE_M:
+        placed()
+
+
 def _ended():
     """overlay closed by itself (Stop pressed, wrong body for NOTICE_MS): plan dropped."""
     global _plan
@@ -191,7 +211,7 @@ def _ended():
 def _poll():
     global _after, _last_mtime, _bad_reads
     _after = None
-    if _handle is None:
+    if not _on:
         return
     path = os.path.join(paths.journal_dir(), "Status.json")
     try:
@@ -210,10 +230,11 @@ def _poll():
             row = {"t": now, "lat": status.get("Latitude"), "lon": status.get("Longitude"),
                    "radius": status.get("PlanetRadius"), "body": status.get("BodyName")}
             _rows.append(row)
-            _writer.writerow([f"{now:.4f}", mtime, status.get("timestamp"), row["lat"], row["lon"],
-                              status.get("Heading"), status.get("Altitude"), row["radius"],
-                              status.get("Flags")])
-            _handle.flush()
+            if _writer is not None:
+                _writer.writerow([f"{now:.4f}", mtime, status.get("timestamp"), row["lat"], row["lon"],
+                                  status.get("Heading"), status.get("Altitude"), row["radius"],
+                                  status.get("Flags")])
+                _handle.flush()
             if _closed():
                 stop()
                 return

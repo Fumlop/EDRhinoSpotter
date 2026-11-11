@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 
 from rs_core import coverage, database, spotmark
 from rs_core.logging import DEBUG, logger
-from rs_ui import minimap, overlay, rigradar
+from rs_ui import minimap, overlay, rigradar, tracelog
 
 POLL_S = 0.02            # 20 ms: press lengths to +-20 ms
 BUTTONS = {"left": 0x01, "right": 0x02}     # VK_LBUTTON, VK_RBUTTON
@@ -113,6 +113,7 @@ def released(root, button, when, seconds):
     if rig:
         logger.info(f"press: rig placed on {body} at {lat:.6f}, {lon:.6f} ({seconds:.2f} s press)")
         rigradar.placed(root, body, lat, lon, radius, button)
+        tracelog.rig_down(body, lat, lon, radius)
     elif rhino and SCAN_PRESS_S <= seconds < RIG_PRESS_S:
         logger.info(f"press: {button} {seconds:.2f} s, neither scan nor rig (rig >= {RIG_PRESS_S:g} s)")
     elif button == chosen and seconds < SCAN_PRESS_S:

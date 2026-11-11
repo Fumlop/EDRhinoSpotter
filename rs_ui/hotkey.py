@@ -36,7 +36,7 @@ import string
 import threading
 
 from rs_core import system
-from rs_core.logging import DEBUG, logger
+from rs_core.logging import logger
 from rs_ui import hotkey_x11, overlay
 
 try:
@@ -55,26 +55,23 @@ CENTER = 0x5253             # 'RS'
 BORDER = 0x5254
 SCAN = 0x5255
 SIZE = 0x5256
-TRACE = 0x5257              # lab: rs_ui/tracelog.py
-PLACED = 0x5258             # lab: rs_ui/tracelog.placed
+TRACE = 0x5257              # rs_ui/tracelog.toggle
+PLACED = 0x5258             # rs_ui/tracelog.placed
 
 # What each key does, its default, and where a change is kept in EDMC's
-# config. In the order Settings lists them. The lab keys write trace files:
-# RHINOSPOTTER_DEBUG only.
+# config. In the order Settings lists them.
 ACTIONS = ((CENTER, "Set center", "Ctrl+Alt+Z", "rhinospotter_hotkey_center"),
            (BORDER, "Set border", "Ctrl+Alt+B", "rhinospotter_hotkey_border"),
            (SIZE, "Zoom", "Ctrl+Alt+M", "rhinospotter_hotkey_zoom"),
-           (SCAN, "Open RhinoData", "Ctrl+Alt+D", "rhinospotter_hotkey_data"))
-if DEBUG:
-    ACTIONS += ((TRACE, "Trace log (lab)", "Ctrl+Alt+R", "rhinospotter_hotkey_trace"),
-                (PLACED, "Rig placed (lab)", "Ctrl+Alt+P", "rhinospotter_hotkey_placed"))
+           (SCAN, "Open RhinoData", "Ctrl+Alt+D", "rhinospotter_hotkey_data"),
+           (TRACE, "Plan rigs (drive the border)", "Ctrl+Alt+R", "rhinospotter_hotkey_trace"),
+           (PLACED, "Next rig", "Ctrl+Alt+P", "rhinospotter_hotkey_placed"))
 IDS = {key_id for key_id, _, _, _ in ACTIONS}
 
 # Off Windows: the chat command per key, typed in any chat channel.
 CHAT_PREFIX = "!rs"
-CHAT = {CENTER: "center", BORDER: "border", SIZE: "zoom", SCAN: "data"}
-if DEBUG:
-    CHAT.update({TRACE: "trace", PLACED: "placed"})
+CHAT = {CENTER: "center", BORDER: "border", SIZE: "zoom", SCAN: "data",
+        TRACE: "trace", PLACED: "placed"}
 
 # What Settings offers: a modifier set and a key. Every set has two modifiers
 # at least - one alone would steal ordinary typing.

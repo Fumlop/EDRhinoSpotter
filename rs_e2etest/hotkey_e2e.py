@@ -213,10 +213,8 @@ def body():
               f"tid {tid1}")
         for kid, combo in defaults().items():
             check(f"1 {combo} held after start", held(combo), f"probe error {probe(combo)}")
-        if not DEBUG:
-            for kid, combo in ((hotkey.TRACE, "Ctrl+Alt+R"), (hotkey.PLACED, "Ctrl+Alt+P")):
-                check(f"1 {combo} (lab) not held without RHINOSPOTTER_DEBUG",
-                      not held(combo) and kid not in hotkey._callbacks, f"probe error {probe(combo)}")
+        check("1 Ctrl+Alt+R / Ctrl+Alt+P among the defaults (plan rigs, next rig)",
+              {hotkey.TRACE, hotkey.PLACED} <= set(defaults()), sorted(defaults().values()))
 
         # 2. WM_HOTKEY posted to the module's thread: callback on the hotkey thread, function on Tk.
         for kid, combo in defaults().items():

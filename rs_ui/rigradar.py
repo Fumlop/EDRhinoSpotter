@@ -153,6 +153,11 @@ def _draw(fix):
         c.create_oval(cx - r, cy - r, cx + r, cy + r, outline=GOOD_BAND if _clear else ALERT_BAND,
                       width=band, tags="ring")
         c.create_oval(cx - 4, cy - 4, cx + 4, cy + 4, fill=palette.FG_SOFT, outline="")
+    # A Tk canvas does not clip: BG strips cut rings and rig dots off at the map square.
+    width, height = SIZE + 2 * BORDER, SIZE + BAND + HINT + 2 * BORDER
+    for box in ((0, 0, width, BORDER), (0, BORDER + SIZE, width, height),
+                (0, 0, BORDER, height), (BORDER + SIZE, 0, width, height)):
+        c.create_rectangle(*box, fill=palette.BG, outline="", tags="mask")
     if heading is None:
         c.create_oval(mid - 6, mid - 6, mid + 6, mid + 6, fill=palette.SRV, outline=palette.BG)
     else:
