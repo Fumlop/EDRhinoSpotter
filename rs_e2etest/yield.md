@@ -33,8 +33,8 @@ coordinates.
   deposit held; header and row the same width.
 - A cycle past 14 d: the Mined column empties, the next ton ends it `expired`,
   Mark depleted on it ends it `expired` too; expired never measures.
-- `regrow()`: a 15 d old mark comes off with its date kept in `regrown`, a
-  16 d old HUD-read Amount Depleted too; a fresh mark stays.
+- `regrow()`: a 41 d old mark comes off with its date kept in `regrown`, a
+  42 d old HUD-read Amount Depleted too; a fresh mark stays.
 - Edit and re-mark (`cards.edited` / `cards.updated` -> `spotcard.save`) keep
   the cycles a dict and take the tons pending at the time with them.
 - Amount Depleted set through the Edit dialog closes the cycle and stamps

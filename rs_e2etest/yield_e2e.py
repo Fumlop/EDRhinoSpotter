@@ -276,10 +276,10 @@ def child():
     check("8 it ended expired, not a measurement",
           (yields.cycles(stale)[0]["ended"], yields.measured(stale)), ("expired", []))
 
-    # 9. regrow(): a Depleted mark 15 days old comes off, Amount 'Depleted'
+    # 9. regrow(): a Depleted mark 41 days old comes off, Amount 'Depleted'
     #    becomes unread, the cycles stay; a fresh mark stays.
     spotcard.save(dict(row(diamond), depleted_at=_stamp(0)), id=diamond)   # 6a took it off
-    spotcard.save(dict(row(alex), depleted_at=_stamp(-15 * 86400), amount="Depleted"), id=alex)
+    spotcard.save(dict(row(alex), depleted_at=_stamp(-41 * 86400), amount="Depleted"), id=alex)
     check("9 regrow takes off the old mark only", yields.regrow(), 1)
     check("9 old mark gone", row(alex).get("depleted_at"), None)
     check("9 Amount Depleted -> unread", row(alex).get("amount"), None)
@@ -287,11 +287,11 @@ def child():
     check("9 fresh mark stays", bool(row(diamond).get("depleted_at")), True)
     check("9 the old date is kept in regrown",
           [entry["depleted_at"][:10] for entry in row(alex).get("regrown", [])],
-          [_stamp(-15 * 86400)[:10]])
+          [_stamp(-41 * 86400)[:10]])
     hud = spotcard.save({"system": SYSTEM, "planet_name": BODY, "latitude": LAT,
                          "longitude": LON, "planet_radius": RADIUS, "commodity": "Opal",
-                         "amount": "Depleted", "marked_at": _stamp(-16 * 86400)})
-    check("9 Amount Depleted off the HUD, 16 d old, regrows too", yields.regrow(), 1)
+                         "amount": "Depleted", "marked_at": _stamp(-42 * 86400)})
+    check("9 Amount Depleted off the HUD, 42 d old, regrows too", yields.regrow(), 1)
     check("9 and reads unread", row(hud).get("amount"), None)
 
     # 10. RhinoData open while mining: Mined set in place once the tons stop.

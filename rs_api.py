@@ -133,6 +133,7 @@ def _bookmark(id, record):
         "depleted": bool(record.get("depleted_at")),
         "depleted_at": record.get("depleted_at"),
         "marked_at": record.get("marked_at"),
+        "updated_at": record.get("updated_at"),
         "commander": record.get("commander"),
         "id": id,
     }

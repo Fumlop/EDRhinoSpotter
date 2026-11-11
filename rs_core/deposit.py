@@ -3,24 +3,28 @@
 Model: tons = rig positions * tons-per-position * share-left. Tons-per-position
 depends on Density, share-left on Amount.
 
-TONS_PER_RIG = TONS_BASE (125-175 t a rig position) * DENSITY_FACTOR
-(High 1, Medium 2, Low 3), set 29 Sep 2026 from six deposits mined High Amount
-to Depleted:
+TONS_PER_RIG = TONS_BASE (110-175 t a rig position) * DENSITY_FACTOR
+(High 1, Medium 2, Low 3), set 11 Nov 2026 from nine deposits mined High Amount
+to Depleted; "guide" rows are Rhino Field Guide v0.7 5.1, rigs used:
 
   High    Aramo AB 1 a loc 10 Alexandrite  4 positions    538 t  134 t/pos
   High    Aramo AB 1 a loc 11 Monazite     4 positions    612 t  153 t/pos
+  High    Dunn Actual Iridium (guide)      6 rigs         675 t  112 t/pos
   Medium  Eme A 1 a loc 9 Monazite         4 positions  1,537 t  384 t/pos
+  Medium  Kaadan77 Iridium A (guide)       6 rigs       1,539 t  257 t/pos
+  Medium  Kaadan77 Iridium B (guide)       6 rigs       1,312 t  219 t/pos
   Low     Monazite, 13 Sep                 4 positions  1,150 t  288 t/pos
   Low     Col 285 XT-Q c5-21 6 a loc 13    1 position     446 t  446 t/pos
   Low     Col 285 XT-Q c5-21 6 a loc 13    4 positions  1,892 t  473 t/pos
 
-Outside the bands: Medium 384 t/pos (band 250-350), Low 288 t/pos (band
-375-525). Order matches Rhino Evidence Register PE-071 (Low ~2,600 / Medium
+Outside the bands: Medium 384 and 219 t/pos (band 220-350), Low 288 t/pos
+(band 330-525). Order matches Rhino Evidence Register PE-071 (Low ~2,600 / Medium
 ~1,500 / High ~500 chunks a deposit). A missing Density takes High's low end
 to Low's high end.
 
-SHARE_LEFT, from the label transitions in the same traces: High -> Medium after
-33.5-43.4% mined, Medium -> Low after 65.8-73.3%.
+SHARE_LEFT, from the label transitions in the same traces and guide v0.7
+5.1 / 12.6 (Dunn Iridium 632 t, zrice03 Thortveitite 2,500 t): High -> Medium
+after 32.0-43.4% mined, Medium -> Low after 64.4-73.3%.
 
 No tkinter. Tests in rs_tests/test_deposit.py.
 """
@@ -35,7 +39,7 @@ DENSITIES = ("Low", "Medium", "High")
 AMOUNTS = ("High", "Medium", "Low", "Depleted")
 
 # Tons per rig position in a full deposit. See module docstring.
-TONS_BASE = (125, 175)
+TONS_BASE = (110, 175)
 DENSITY_FACTOR = {"High": 1, "Medium": 2, "Low": 3}
 TONS_PER_RIG = {density: (TONS_BASE[0] * factor, TONS_BASE[1] * factor)
                 for density, factor in DENSITY_FACTOR.items()}
@@ -44,8 +48,8 @@ TONS_PER_RIG_UNKNOWN = (TONS_PER_RIG["High"][0], TONS_PER_RIG["Low"][1])
 
 SHARE_LEFT = {
     "High": (0.566, 1.0),
-    "Medium": (0.267, 0.665),
-    "Low": (0.0, 0.342),
+    "Medium": (0.267, 0.680),
+    "Low": (0.0, 0.356),
     "Depleted": (0.0, 0.0),
 }
 

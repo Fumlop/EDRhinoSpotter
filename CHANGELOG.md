@@ -1,5 +1,22 @@
 # Changelog
 
+## 6.6.0
+
+**Fixed**
+
+- RhinoData: a body that holds bookmarks but is missing from the system's body data is listed, under "unknown", after the known grounds. Was left out: the search said "5 bm", the rail "0 bookmarks" (issue #23).
+- A ton refined at a bookmark 14 d or more after its Depleted mark takes the mark off (date kept in `regrown`) and opens a new cycle. The next Mark depleted is a new depletion, was restored as "still depleted". Under 14 d the tons still go into the closed cycle.
+
+**Added**
+
+- `rs_api.bookmarks()`: `updated_at`, the last Edit or re-mark on the card; `None` when never edited (issue #25).
+
+**Changed**
+
+- Depleted marks come off after 40 days, were 14. From day 14 the card reads "20 d: may be Low (unlikely), back at 40 d". A recheck still lifts 7 days after the look, never before day 40. Rhino Field Guide v0.7 9.3: first returns seen ~11-39 d. Cycle expiry and leftover tons stay at 14 d (`REGEN_DAYS`); the lift is `yields.RETURN_DAYS`.
+- Tons left: `deposit.TONS_BASE` 110-175 t a rig position, was 125-175 (High 110-175, Medium 220-350, Low 330-525). Three guide v0.7 mine-outs added to the six own ones.
+- Tons left: `deposit.SHARE_LEFT` Medium 26.7-68.0 %, was 26.7-66.5; Low 0-35.6 %, was 0-34.2. Transitions from guide v0.7 (Dunn Iridium, zrice03 Thortveitite) added.
+
 ## 6.5.2
 
 **Changed**

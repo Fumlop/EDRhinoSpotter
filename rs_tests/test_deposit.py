@@ -7,8 +7,9 @@ from rs_core import deposit
 
 class TestTonsLeft:
     # (rig positions, Density, tons mined High Amount -> Depleted); deposit.py docstring
-    MEASURED = [(4, "High", 538), (4, "High", 612), (4, "Low", 1150),
-                (1, "Low", 446), (4, "Low", 1892)]
+    MEASURED = [(4, "High", 538), (4, "High", 612), (6, "High", 675),
+                (6, "Medium", 1312), (6, "Medium", 1539),
+                (4, "Low", 1150), (1, "Low", 446), (4, "Low", 1892)]
 
     @pytest.mark.parametrize("rigs,density,tons", MEASURED)
     def test_measured_deposits_sit_inside_their_range(self, rigs, density, tons):
@@ -21,11 +22,11 @@ class TestTonsLeft:
 
     def test_density_factor_orders_the_bands(self):
         high, medium, low = (deposit.tons_left(4, "High", d) for d in ("High", "Medium", "Low"))
-        assert high == (280, 700) and medium == (570, 1400) and low == (850, 2100)
+        assert high == (250, 700) and medium == (500, 1400) and low == (750, 2100)
 
     @pytest.mark.parametrize("density", [None, "Plenty"])
     def test_unread_density_spans_all_bands(self, density):
-        assert deposit.tons_left(4, "High", density) == (280, 2100)
+        assert deposit.tons_left(4, "High", density) == (250, 2100)
 
     def test_six_low_density_positions_hold_the_public_traces(self):
         """Register PE-042/043/044: 1,716-1,841 t, Density not recorded."""
@@ -33,7 +34,7 @@ class TestTonsLeft:
         assert low <= 1716 and 1841 <= high
 
     def test_low_amount_can_be_nearly_empty(self):
-        assert deposit.tons_left(6, "Low", "Low") == (0, 1080)
+        assert deposit.tons_left(6, "Low", "Low") == (0, 1120)
 
     def test_depleted_is_nothing(self):
         assert deposit.tons_left(4, "Depleted", "Medium") == (0, 0)
@@ -48,13 +49,13 @@ class TestTonsLeft:
 
 class TestDescribe:
     def test_range(self):
-        assert deposit.describe(4, "High", "Low") == "≈ 850-2,100 t left"
+        assert deposit.describe(4, "High", "Low") == "≈ 750-2,100 t left"
 
     def test_density_moves_the_range(self):
-        assert deposit.describe(4, "High", "Medium") == "≈ 570-1,400 t left"
+        assert deposit.describe(4, "High", "Medium") == "≈ 500-1,400 t left"
 
     def test_open_lower_end(self):
-        assert deposit.describe(2, "Low", "Low") == "≈ up to 360 t left"
+        assert deposit.describe(2, "Low", "Low") == "≈ up to 370 t left"
 
     def test_depleted_needs_no_rigs(self):
         assert deposit.describe(None, "Depleted") == "depleted"

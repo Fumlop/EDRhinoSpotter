@@ -575,7 +575,7 @@ def scenario_api(expect_docs):
                "material": "commodity", "rigs": "rigs", "latitude": "latitude",
                "longitude": "longitude", "heading": "heading", "planet_radius": "planet_radius",
                "amount": "amount", "density": "density", "depleted_at": "depleted_at",
-               "marked_at": "marked_at", "commander": "commander"}
+               "marked_at": "marked_at", "updated_at": "updated_at", "commander": "commander"}
     wrong = [m["id"] for m, v in zip(got, valid)
              if any(m[k] != v[4].get(c) for k, c in mapping.items())
              or m["depleted"] != bool(v[4].get("depleted_at"))]

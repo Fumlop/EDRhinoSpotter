@@ -67,7 +67,7 @@ The same material within 100 m updates the existing bookmark instead of adding o
 - **Right:** the saved map around the bookmark and its card:
   **Guide me there**, **Share bookmark**, **Mark depleted**, **Copy coords**, **Delete**.
 - In the SRV, the bookmark you stand at (175 m) is marked and preselected - Mark depleted is one click.
-- A depleted mark comes off by itself after 14 days.
+- A depleted mark comes off by itself after 40 days; from day 14 the card says it may be back at Low (unlikely).
 - **Systems with bookmarks:** type three letters to jump to another system.
 
 <table align="center">
@@ -191,7 +191,7 @@ Debug log: `RHINOSPOTTER_DEBUG=1` before starting EDMC. Code layout: [structure.
 - **Minimap:** the ground you drove in the SRV, your bookmarks on it, center, border and drive rings, 3 zoom steps.
 - **Map pictures:** saved per body, shareable with a legend and the golden circles.
 - **Tons mined:** counted per bookmark from the journal, refreshed 5 s after the last ton.
-- **Depleted marks:** set on the card, taken off after 14 days.
+- **Depleted marks:** set on the card, "may be Low" from day 14, taken off after 40 days.
 - **You are here:** the bookmark within 175 m of the SRV marked and picked; locations within 5 km unfolded.
 - **Share bookmark:** one line for Discord; paste it into the import box in another RhinoData window.
 - **Spansh:** bodies of a new system filled in on the honk.

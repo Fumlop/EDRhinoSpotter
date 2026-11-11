@@ -18,7 +18,7 @@ Depleted were not greyed on the map. `_render_card` saved a new spot without
 - New bookmark at Amount Depleted saved without `depleted_at`.
 - `depleted_at` not the `marked_at` of the mark (a later or unparsable date).
 - Bookmarks already saved that way (no `depleted_at`) stay un-greyed.
-- Backfill stamps an old one (over 14 d) instead of letting `regrow()` lift it.
+- Backfill stamps an old one (over 40 d) instead of letting `regrow()` lift it.
 - Minimap and card map disagree on the flag.
 - Dot drawn filled instead of the hollow MARK_DEPLETED ring.
 - Set active comes back as depleted at the next `regrow()` (Amount still Depleted).
@@ -37,7 +37,7 @@ Depleted were not greyed on the map. `_render_card` saved a new spot without
 
 1. Panel Amount Depleted, new spot, `main.make_card`: row has `depleted_at` equal to `marked_at`.
 1b. Panel Amount High, new spot: no `depleted_at`.
-2. Old-shape rows (Amount Depleted, no `depleted_at`): 2 d old gets `depleted_at` = `marked_at` from `regrow()`; 20 d old is lifted (Amount None, `regrown` entry), not stamped. A second `regrow()` lifts nothing and leaves both rows as they were.
-3. `minimap._bookmarks` and `scan._map_marks`: depleted True for the new and the 2 d one, False for the 20 d one and the High one.
+2. Old-shape rows (Amount Depleted, no `depleted_at`): 2 d old gets `depleted_at` = `marked_at` from `regrow()`; 45 d old is lifted (Amount None, `regrown` entry), not stamped. A second `regrow()` lifts nothing and leaves both rows as they were.
+3. `minimap._bookmarks` and `scan._map_marks`: depleted True for the new and the 2 d one, False for the 45 d one and the High one.
 4. `coverage.render` at 480 px: the new one is a hollow MARK_DEPLETED ring.
 5. Card button on the new one reads Set active; pressed: `depleted_at` gone, Amount None; `regrow()` after: still not depleted.

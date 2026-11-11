@@ -606,7 +606,7 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
         _refresh_scan_count()
         # scan.show() would raise the window over the game on every jump.
         if _register.system != before:
-            yields.regrow()     # a session can outlast REGEN_DAYS
+            yields.regrow()     # a session can outlast RETURN_DAYS
             scan.arrived()
 
     # The honk: ask Spansh for the bodies the journal will not describe until

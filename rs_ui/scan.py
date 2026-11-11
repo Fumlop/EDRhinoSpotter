@@ -458,6 +458,16 @@ def _bodies(register, sheet, focus):
                             if not focus
                             or (r.get("commodity") or "").lower() == focus.lower()]
             listed.append(row)
+    # Bookmarked bodies the register lacks (issue 23): listed last, ground None.
+    known = {body["name"] for _, found in by_ground for body in found}
+    for name in sorted(set(marked) - known - {None}):
+        marks = marked[name]
+        shown = [r for r in marks
+                 if not focus or (r.get("commodity") or "").lower() == focus.lower()]
+        if focus and not shown and name != _state["body"]:
+            continue
+        listed.append({"name": name, "ground": None, "marks": marks, "shown": shown,
+                       "short": name[len(prefix):] if name.startswith(prefix) else name})
     return listed
 
 
@@ -1241,18 +1251,20 @@ def _bookmark_card(box, register, sheet, body, record, maps):
                           else "  ·  depleted" if dead else "  ·  active"),
              bg=PANEL, fg=FG_SOFT, anchor="w",
              font=("Consolas", 8)).pack(fill="x", padx=13)
-    # yields.regrow() takes the mark off at REGEN_DAYS, or RECHECK_DAYS after a
-    # recheck, on start and each jump.
+    # yields.regrow() takes the mark off at yields.days_to_lift() 0, on start and each jump.
     days = yields.days_since_depleted(record)
     check = yields.last_check(record)
     if check:
         at = yields.days_since_depleted(record, check)
-        left = max(0.0, yields.RECHECK_DAYS - (days - at))
+        left = yields.days_to_lift(record)
         tk.Label(box, text=f"still depleted at {at:.0f} d, look again in {left:.0f} d",
                  bg=PANEL, fg=DIM, anchor="w",
                  font=("Consolas", 8)).pack(fill="x", padx=13)
     elif days is not None:
-        tk.Label(box, text=f"{days:.0f} d since, back after {yields.REGEN_DAYS} d (assumed)",
+        text = (f"{days:.0f} d: may be Low (unlikely), back at {yields.RETURN_DAYS} d"
+                if days >= yields.REGEN_DAYS else
+                f"{days:.0f} d since, back after {yields.RETURN_DAYS} d (assumed)")
+        tk.Label(box, text=text,
                  bg=PANEL, fg=DIM, anchor="w",
                  font=("Consolas", 8)).pack(fill="x", padx=13)
 
@@ -1542,7 +1554,7 @@ def _toggle_depleted(record):
         still = len(record.get("rechecks") or []) > checks
         _state["status"] = (f"{_loc(record.get('location_index'))}, "
                             f"{_short(record.get('commodity'))}, "
-                            + (f"still depleted, look again in {yields.RECHECK_DAYS} d." if still
+                            + (f"still depleted, look again in {yields.days_to_lift(record):.0f} d." if still
                                else "marked depleted." if depleted else "is active again."))
     else:
         messagebox.showwarning(

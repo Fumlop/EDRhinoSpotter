@@ -188,10 +188,13 @@ No tkinter anywhere in here.
   runs from the first ton to the Depleted mark, or expires `REGEN_DAYS` (14)
   after its first ton, and keeps the rigs, Density and Amount it opened at.
   `current()` is the open cycle under 14 d old - the Mined column. `regrow()`
-  takes Depleted marks 14 d old off, keeping the date in `regrown` (main: at
+  takes Depleted marks `RETURN_DAYS` (40) old off, or `RECHECK_DAYS` (7) after a
+  later recheck, keeping the date in `regrown` (main: at
   start and on each jump). `measured()` is the cycles that opened at Amount
   High and ended depleted - what the deposit held; anything else bounds it
-  from below. `REGEN_DAYS` (14) is an assumption, not measured.
+  from below. `REGEN_DAYS` (14) and `RETURN_DAYS` (40) follow Rhino Field
+  Guide v0.7 9.3 (first returns ~11-39 d); the card says "may be Low
+  (unlikely)" between them.
   `python -m rs_core.yields` prints t/rig per Density band against
   `deposit.TONS_PER_RIG`; it never edits it.
 - **[measure.py](rs_core/measure.py)** - area and rig count for a border

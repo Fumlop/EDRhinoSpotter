@@ -11,7 +11,7 @@ REGEN_DAYS after its first ton ("expired"). Tons refined while the Depleted
 mark is on and under REGEN_DAYS old go into the cycle it closed (leftover
 fragments). A cycle that opened at Amount High
 and ended depleted is the deposit's capacity; any other cycle bounds it from
-below. A Depleted mark older than REGEN_DAYS is taken off by regrow().
+below. A Depleted mark older than RETURN_DAYS is taken off by regrow().
 A Depleted press after that with no ton since puts it back (recheck()).
 
 No tkinter and no PIL. `python -m rs_core.yields` prints what the closed cycles
@@ -31,10 +31,14 @@ from rs_core.logging import logger
 # collected off it. How far they scatter is unmeasured.
 ATTRIBUTE_M = 175.0
 
-# Days before a depleted deposit is assumed to carry material again, and after
-# which an open cycle expires. Assumed, not measured: Amount was not back at
-# High immediately after a depletion.
+# Days after the Depleted mark from which the deposit may be back at Low (low
+# chance), and after which an open cycle expires. Rhino Field Guide v0.7 9.3:
+# first returns ~11 d (partial) to ~39 d (High).
 REGEN_DAYS = 14
+
+# Days after the Depleted mark before regrow() takes it off. Guide v0.7 9.3
+# revisit default; first High seen at 22-39 d.
+RETURN_DAYS = 40
 
 # Days after a recheck() before regrow() takes the restored mark off again.
 RECHECK_DAYS = 7
@@ -135,6 +139,11 @@ def add(record, tons, when=None):
     if cycle is not None and _expired(cycle, when):
         _expire(cycle)
         cycle = None
+    if cycle is None and regenerated(record, when):
+        # A ton REGEN_DAYS or more after the Depleted mark: the deposit is back.
+        _take_off(record, record["depleted_at"], when)
+        logger.info(f"ton at a mark {REGEN_DAYS} d+ old, active again: "
+                    f"{record.get('planet_name')} {record.get('commodity')}")
     found = cycles(record)
     if (cycle is None and regenerated(record, when) is False
             and found and found[-1].get("ended") == "depleted"):
@@ -262,6 +271,22 @@ def last_check(record):
     return max(later, key=_parse) if later else None
 
 
+def _lift(start, check):
+    """Lift time: max(`start` + RETURN_DAYS, `check` + RECHECK_DAYS); None without `start`."""
+    if start is None:
+        return None
+    due = start + timedelta(days=RETURN_DAYS)
+    return max(due, check + timedelta(days=RECHECK_DAYS)) if check else due
+
+
+def days_to_lift(record):
+    """Days until regrow() takes the Depleted mark off, 0.0 when past, None with no `depleted_at`."""
+    lift = _lift(_parse(record.get("depleted_at")), _parse(last_check(record)))
+    if lift is None:
+        return None
+    return max(0.0, (lift - datetime.now(timezone.utc)).total_seconds() / 86400.0)
+
+
 def recheck(record, when=None):
     """Put back the Depleted mark regrow() took off. True when put back.
 
@@ -285,14 +310,24 @@ def recheck(record, when=None):
     return True
 
 
+def _take_off(record, since, at):
+    """Move the Depleted mark to `regrown` [{depleted_at: since, regrown_at: at}];
+    Amount 'Depleted' becomes None. recheck() can put it back while no cycle
+    starts at or after `at`."""
+    record.setdefault("regrown", []).append({"depleted_at": since, "regrown_at": at})
+    record.pop("depleted_at", None)
+    if record.get("amount") == "Depleted":
+        record["amount"] = None
+
+
 def regrow(db=None, now=None):
-    """Take the Depleted mark off every bookmark depleted REGEN_DAYS or more ago,
-    or rechecked RECHECK_DAYS or more ago.
+    """Take the Depleted mark off every bookmark past _lift(): depleted
+    RETURN_DAYS or more ago, and rechecked RECHECK_DAYS or more ago if rechecked.
 
     Depleted = `depleted_at`, or Amount 'Depleted' read off the HUD (dated by
     `marked_at`). The mark moves to `regrown` [{depleted_at, regrown_at}], so the
     date survives; Amount 'Depleted' becomes None (unread). Returns the count.
-    Amount 'Depleted' under REGEN_DAYS with no `depleted_at` gets `marked_at`
+    Amount 'Depleted' not yet lifted with no `depleted_at` gets `marked_at`
     as `depleted_at`: the maps and the card button read only `depleted_at`.
     """
     moment = _parse(now) or datetime.now(timezone.utc)
@@ -309,10 +344,7 @@ def regrow(db=None, now=None):
                     continue
                 since = record.get("depleted_at") or (
                     record.get("marked_at") if record.get("amount") == "Depleted" else None)
-                start = _parse(since)
-                check = _parse(last_check(record))
-                due = (check + timedelta(days=RECHECK_DAYS) if check else
-                       start + timedelta(days=REGEN_DAYS) if start else None)
+                due = _lift(_parse(since), _parse(last_check(record)))
                 if due is None:
                     continue
                 if moment < due:
@@ -321,11 +353,7 @@ def regrow(db=None, now=None):
                         database.write_bookmark(conn, record, id)
                         stamped.append(f"{record.get('planet_name')} {record.get('commodity')}")
                     continue
-                record.setdefault("regrown", []).append(
-                    {"depleted_at": since, "regrown_at": _stamp(moment)})
-                record.pop("depleted_at", None)
-                if record.get("amount") == "Depleted":
-                    record["amount"] = None
+                _take_off(record, since, _stamp(moment))
                 database.write_bookmark(conn, record, id)
                 names.append(f"{record.get('planet_name')} {record.get('commodity')}")
     except (sqlite3.Error, OSError) as err:
@@ -336,7 +364,7 @@ def regrow(db=None, now=None):
     if stamped:
         logger.info(f"Amount Depleted dated by marked_at: {', '.join(stamped)}")
     if names:
-        logger.info(f"past the {REGEN_DAYS} d regen, active again: {', '.join(names)}")
+        logger.info(f"past the {RETURN_DAYS} d return, active again: {', '.join(names)}")
     return len(names)
 
 

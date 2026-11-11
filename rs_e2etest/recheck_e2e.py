@@ -153,17 +153,31 @@ try:
     main._cancel_landed()
     hud_material = main._materials()[0]
 
-    one = seed("Opal", east(0), 15)
-    two = seed("Diamond", east(300), 15)
-    three_a = seed("Opal", east(600), 30, rechecks_days=(8,))
-    three_b = seed("Painite", east(900), 30, rechecks_days=(6,))
-    four = seed(hud_material, east(1200), 15)
-    five = seed("Ruby", east(1500), 15)
-    original = {id: row(id)["depleted_at"] for id in (one, two, three_a, three_b, four, five)}
+    one = seed("Opal", east(0), 41)
+    two = seed("Diamond", east(300), 41)
+    three_a = seed("Opal", east(600), 50, rechecks_days=(8,))
+    three_b = seed("Painite", east(900), 50, rechecks_days=(6,))
+    four = seed(hud_material, east(1200), 41)
+    five = seed("Ruby", east(1500), 41)
+    six = seed("Opal", east(1800), 20)
+    seven = seed("Painite", east(2100), 3)
+    eight = seed("Ruby", east(2400), 30, rechecks_days=(8,))
+    edge13, edge14 = seed("Opal", east(2700), 13.9), seed("Opal", east(3000), 14.01)
+    edge39, edge40 = seed("Diamond", east(3300), 39.9), seed("Diamond", east(3600), 40.01)
+    original = {id: row(id)["depleted_at"]
+                for id in (one, two, three_a, three_b, four, five, six, seven, eight,
+                           edge13, edge14, edge39, edge40)}
 
     lifted = yields.regrow()
-    check("0 regrow lifts 15 d marks and the 8 d look, not the 6 d look", lifted == 5,
-          f"{lifted} lifted")
+    check("0 regrow lifts 41 d / 40.01 d marks and the 8 d look on 50 d, nothing else",
+          lifted == 6, f"{lifted} lifted")
+    check("8 30 d mark, 8 d look: stays until 40 d",
+          row(eight).get("depleted_at") == original[eight], row(eight).get("depleted_at"))
+    check("edge 39.9 d stays, 40.01 d lifted",
+          (row(edge39).get("depleted_at") == original[edge39], row(edge40).get("depleted_at"))
+          == (True, None), (row(edge39).get("depleted_at"), row(edge40).get("depleted_at")))
+    check("6 20 d mark stays", row(six).get("depleted_at") == original[six],
+          row(six).get("depleted_at"))
     check("3 6 d look: mark stays", row(three_b).get("depleted_at") == original[three_b],
           row(three_b).get("depleted_at"))
     check("3 8 d look: lifted, regrown keeps the original date",
@@ -190,7 +204,7 @@ try:
     check("1 status line", scan._state["status"].endswith("still depleted, look again in 7 d."),
           scan._state["status"])
     text, fits = card_line("still depleted")
-    check("1 card line", text == "still depleted at 15 d, look again in 7 d", text)
+    check("1 card line", text == "still depleted at 41 d, look again in 7 d", text)
     check("1 card line fits the card", fits, text)
     check("1 card button now Set active", any(isinstance(w, tk.Button) and w.cget("text") == "Set active"
                                               for w in widgets(window)))
@@ -199,7 +213,7 @@ try:
     # 3. the 6 d look on the card, the 8 d one pressed again
     show(three_b)
     text, _ = card_line("still depleted")
-    check("3 6 d look card line", text == "still depleted at 24 d, look again in 1 d", text)
+    check("3 6 d look card line", text == "still depleted at 44 d, look again in 1 d", text)
     press(three_a, "Mark depleted")
     r = row(three_a)
     check("3 second round: original date back", r.get("depleted_at") == original[three_a],
@@ -253,6 +267,59 @@ try:
     check("5 undo: depleted_at today", (r.get("depleted_at") or "")[:10] == stamp()[:10],
           r.get("depleted_at"))
     check("5 undo: no look logged", not r.get("rechecks"), r.get("rechecks"))
+
+    # 6. 14-40 d: still depleted, card says it may be back at Low; under 14 d: countdown
+    show(six)
+    text, fits = card_line("20 d")
+    check("6 card line", text == "20 d: may be Low (unlikely), back at 40 d", text)
+    check("6 card line fits the card", fits, text)
+    check("6 card button Set active", any(isinstance(w, tk.Button) and w.cget("text") == "Set active"
+                                          for w in widgets(window)))
+    show(seven)
+    text, fits = card_line("3 d")
+    check("7 card line", text == "3 d since, back after 40 d (assumed)", text)
+    check("7 card line fits the card", fits, text)
+
+    show(eight)
+    text, fits = card_line("still depleted")
+    check("8 card line: count to day 40, not look + 7",
+          text == "still depleted at 22 d, look again in 10 d", text)
+    check("8 card line fits the card", fits, text)
+    show(edge13)
+    check("edge 13.9 d: countdown, not the hint",
+          (card_line("14 d since")[0], card_line("14 d:")[0])
+          == ("14 d since, back after 40 d (assumed)", None), card_line("14 d")[0])
+    show(edge14)
+    check("edge 14.01 d: hint", card_line("14 d:")[0] == "14 d: may be Low (unlikely), back at 40 d",
+          card_line("14 d")[0])
+    show(edge39)
+    text, fits = card_line("40 d:")
+    check("edge 39.9 d: hint, fits", text == "40 d: may be Low (unlikely), back at 40 d" and fits, text)
+
+    # 10. a ton at a still-marked bookmark: from REGEN_DAYS it lifts the mark, under it is leftover
+    late = seed("Monazite", east(5000), 20)
+    early = seed("Bromellite", east(5300), 10)
+    was = {id: row(id)["depleted_at"] for id in (late, early)}
+    refine("Monazite", east(5000), 3)
+    r = row(late)
+    check("10 20 d mark, 3 t: mark lifted", r.get("depleted_at") is None, r.get("depleted_at"))
+    check("10 regrown keeps the original date",
+          [e.get("depleted_at") for e in r.get("regrown") or []] == [was[late]], r.get("regrown"))
+    check("10 3 t in a new open cycle, the closed one untouched",
+          [(c.get("ended"), sum(c["tons"].values())) for c in yields.cycles(r)]
+          == [("depleted", 50), (None, 3)], yields.cycles(r))
+    press(late, "Mark depleted")
+    r = row(late)
+    check("10 Depleted press after: new depleted_at today, no look",
+          ((r.get("depleted_at") or "")[:10], r.get("rechecks")) == (stamp()[:10], None),
+          (r.get("depleted_at"), r.get("rechecks")))
+    check("10 status says marked depleted", scan._state["status"].endswith("marked depleted."),
+          scan._state["status"])
+    refine("Bromellite", east(5300), 3)
+    r = row(early)
+    check("11 10 d mark, 3 t: mark stays, tons are leftovers in the closed cycle",
+          (r.get("depleted_at"), [(c.get("ended"), sum(c["tons"].values())) for c in yields.cycles(r)])
+          == (was[early], [("depleted", 53)]), (r.get("depleted_at"), yields.cycles(r)))
 
     # 1b. the look pressed in 1, 6 d and 8 d on
     yields.regrow(now=stamp(6 * DAY))

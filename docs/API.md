@@ -51,8 +51,9 @@ Linux plugin folder: `~/.local/share/EDMarketConnector/plugins/RhinoSpotter`.
 | `planet_radius` | number / None | metres; `None` on bookmarks made before Sept 2026 |
 | `amount`, `density` | str / None | HUD reading at marking |
 | `depleted` | bool | `depleted_at` is set |
-| `depleted_at` | str / None | ISO 8601; cleared automatically 14 days later (assumed regen time) |
+| `depleted_at` | str / None | ISO 8601; cleared automatically 40 days later (assumed return time) |
 | `marked_at` | str | ISO 8601 |
+| `updated_at` | str / None | ISO 8601; last Edit or re-mark on the card. Tons mined, Mark depleted and the automatic lift leave it unchanged. `None`: never edited |
 | `commander` | str | |
 | `id` | int | stable while the bookmark exists |
 

@@ -157,11 +157,11 @@ try:
           high and row(high).get("depleted_at"))
 
     # 2. rows saved before the fix
-    young, old = legacy(east(2000), 2), legacy(east(-2000), 20)
+    young, old = legacy(east(2000), 2), legacy(east(-2000), 45)
     yields.regrow()
     check("2 2 d old: depleted_at = marked_at",
           row(young).get("depleted_at") == row(young).get("marked_at"), row(young))
-    check("2 20 d old: lifted, not stamped",
+    check("2 45 d old: lifted, not stamped",
           (row(old).get("depleted_at"), row(old).get("amount"), len(row(old).get("regrown") or []))
           == (None, None, 1), row(old))
     before = (row(young), row(old))
