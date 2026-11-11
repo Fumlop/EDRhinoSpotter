@@ -43,4 +43,4 @@ with Status.json written into the run folder.
 Not covered: what the game really writes (1 Hz on one lap), arrow pixels,
 RegisterHotKey on EDMC's hotkey thread, the mouse polling thread in
 `press.py` (released() is called directly), exclusive fullscreen, the
-`RHINOSPOTTER_DEBUG` CSV/TXT content (was F14 in `lab/rigtrace_replay.md`).
+`RHINOSPOTTER_DEBUG` CSV/TXT content.
