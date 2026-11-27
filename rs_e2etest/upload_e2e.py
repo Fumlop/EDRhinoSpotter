@@ -157,8 +157,9 @@ try:
     check("4 enabled: uploaded in batches of 50", got and len(posts) == -(-expected // 50), f"{len(posts)} posts")
     check("4 every bookmark sent", len(sent) == expected, f"{len(sent)} of {expected}")
     check("4 access key sent", got and posts[0].get("access_key") == "e2e-key")
-    check("4 commander anonymous by default",
-          bool(sent) and all(b.get("commander") == "anonymous" for b in sent))
+    stored = [b.get("commander") for b in rs_api.bookmarks()]
+    check("4 CMDR names sent as stored by default",
+          bool(sent) and [b.get("commander") for b in sent] == stored)
     check("4 upload_data.json written",
           wait_for(lambda: upload.UPLOAD_DATA_FILEPATH.exists(), 2.0))
 
@@ -169,16 +170,15 @@ try:
     core.stop()
     check("5 stop() while idle", time.monotonic() - t0 < 1.5, f"{time.monotonic() - t0:.2f} s")
 
-    # 6. CMDR name on
+    # 6. CMDR name off
     upload.UPLOAD_DATA_FILEPATH.unlink()
     posts.clear()
-    config.set(upload.UPLOAD_INCLUDE_CMDR_NAME_KEY, True)
+    config.set(upload.UPLOAD_INCLUDE_CMDR_NAME_KEY, False)
     named = upload.UploadCore()
     named.update(True)
     got = done(named)
-    stored = [b.get("commander") for b in rs_api.bookmarks()]
     sent = [b.get("commander") for b in deposits()]
-    check("6 CMDR name on: names sent as stored", got and sent == stored,
+    check("6 CMDR name off: commander anonymous", got and bool(sent) and all(c == "anonymous" for c in sent),
           f"{sum(1 for c in sent if c == 'anonymous')} anonymous of {len(sent)}")
     named.stop()
 
@@ -212,10 +212,10 @@ try:
     config.set(upload.UPLOAD_URL_KEY, URL + "/401")
     denied = upload.UploadCore()
     denied.update(True)
-    said = wait_for(lambda: "access key" in denied.status_msg, 3.0)
+    said = wait_for(lambda: "Access Key" in denied.status_msg, 3.0)
     denied.stop()
     check("12 401: says check the access key in Settings",
-          said and "check the access key in Settings" in denied.status_msg, denied.status_msg)
+          said and "check Access Key in Settings" in denied.status_msg, denied.status_msg)
     check("12 401: no HTTP code on the panel line", "401" not in denied.status_msg)
 
     # 13. 401: one POST per check, no retries; once the server takes it, the next check uploads
@@ -392,7 +392,7 @@ try:
     check("14 hidden again when turned off", line.winfo_manager() == "")
     main._upload_core = main._upload_status = None
 
-    # 10. Settings tab: "Include CMDR name" unticked with nothing stored
+    # 10. Settings tab: "Send my CMDR name" ticked with nothing stored
     sys.modules["myNotebook"] = types.SimpleNamespace(Checkbutton=tk.Checkbutton, Label=tk.Label)
     del config.values[upload.UPLOAD_INCLUDE_CMDR_NAME_KEY]
     import importlib                                     # noqa: E402
@@ -402,8 +402,8 @@ try:
     shown = ui_upload._upload_include_cmdr_name.get()
     ui_upload.prefs_changed()
     stored = config.get_bool(upload.UPLOAD_INCLUDE_CMDR_NAME_KEY)
-    check("10 settings tab: CMDR name unticked by default", shown is False, repr(shown))
-    check("10 OK without touching it stores False", stored is False, repr(stored))
+    check("10 settings tab: CMDR name ticked by default", shown is True, repr(shown))
+    check("10 OK without touching it stores True", stored is True, repr(stored))
 
     # 19. Settings OK with uploads on and no access key: a warning names it
     warned = []
