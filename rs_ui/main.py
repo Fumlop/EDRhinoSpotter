@@ -78,9 +78,8 @@ _status = None
 _done_after = None       # the pending return of the button to "Bookmark"
 _scan_count = None       # how many landable bodies the current system has
 
-# Upload Core object
-_upload_core = None
-_upload_status = None    # the panel's upload line; None while uploads were off at build
+_upload_core = None      # rs_core.upload.UploadCore, made by start() when EDMC config is there
+_upload_status = None    # the panel's upload line, built by _panel
 
 # What the dropdown says before anything is picked. A real string rather than
 # an empty one: an OptionMenu with "" in it draws as a blank sunken box with a
@@ -148,12 +147,12 @@ def start(plugin_dir, owner=OWNER):
     if not _sheet.loaded:
         logger.warning(f"no mining_sheet.json: {_sheet.error}")
     minimap.seed_materials(_worth(), cards.materials_marked())
-    
+
     if config:
         upload_enabled = config.get_bool(rs_core.upload.UPLOAD_ENABLED_KEY, default=False)
         _upload_core = rs_core.upload.UploadCore(enabled=upload_enabled)
         _upload_core.start()
-    
+
     return "RhinoSpotter"
 
 
@@ -167,7 +166,7 @@ def refused():
 def build(parent, updates=True, docked=False):
     """The panel. `updates`: look for a release once, at start; standalone.py passes False.
     `docked`: standalone.py, the panel inside RhinoData: no version, count or RhinoData button."""
-    global _frame, _status,  _upload_status, _scan_count, _card_button, _landed_after, _hint
+    global _frame, _status, _upload_status, _scan_count, _card_button, _landed_after, _hint
     global _loc, _rigs, _material, _density, _amount, _search, _menu, _filter
 
     if _refused is not None:
@@ -502,10 +501,10 @@ def stop():
     rigradar.close()
     tracelog.shutdown()      # closes the CSV, writes the summary, plans nothing
     minimap.stop()
-    
+
     if _upload_core:
         _upload_core.stop()
-        
+
     # Last, and not through the timer: EDMC is going, and a scan waiting on a
     # two-second thread would go with it.
     _writes.flush()
@@ -579,12 +578,11 @@ def prefs(parent):
         frame = nb.Frame(parent)
         nb.Label(frame, text=refused()).grid(row=0, column=0, sticky="w", padx=10, pady=10)
         return frame
-    
+
     frame = minimap.prefs(parent, worth=_worth(), panel=not scan.hosted())
 
-    # Add upload widgets to existing frame
     frame = rs_ui.upload.prefs(frame)
-    
+
     return frame
 
 

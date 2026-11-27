@@ -1,9 +1,4 @@
-"""
-Main code for uploading bookmarks data to a shared "team" server. Optionally
-configured in plugin settings/prefs.
-
-vScourge
-"""
+"""Bookmark upload to a team server: a daemon thread posts new and changed bookmarks. See docs/UPLOAD.md."""
 
 import enum
 import hashlib
@@ -26,9 +21,7 @@ try:
     from config import config
 except ImportError:         # running outside EDMC
     config = None
-    
 
-### CONSTANTS ###
 
 DEBUG = False
 
@@ -39,16 +32,15 @@ UPLOAD_DATA_VERSION = 1
 NEW_BOOKMARKS_CHECK_INTERVAL        = 8 if DEBUG else 60 * 5    # s between checks
 UPLOAD_RETRY_WAIT                   = 5         # s between attempts
 STOP_JOIN_TIMEOUT                   = 1         # s stop() waits; a request in flight ends on the daemon thread
-
-UPLOAD_TIMEOUT                      = 20        # 20 seconds
+UPLOAD_TIMEOUT                      = 20        # s per request
 MAX_UPLOAD_ATTEMPTS                 = 3
+
 
 class Status(enum.Enum):
     IDLE            = 0
-    UPLOAD_PENDING  = 1
     UPLOADING       = 2
     SHUTTING_DOWN   = 3
-    NO_CREDS        = 4
+
 
 UPLOAD_ENABLED_KEY              = 'rhinospotter_uploading_enabled'
 UPLOAD_INCLUDE_CMDR_NAME_KEY    = 'rhinospotter_upload_cmdr_name'
@@ -58,6 +50,7 @@ UPLOAD_ACCESS_KEY_KEY           = 'rhinospotter_upload_access_key'
 # Hosts allowed over http; every other URL must be https (the access key is in the body).
 LOOPBACK_HOSTS = ('localhost', '127.0.0.1', '::1')
 
+# rs_api.bookmarks() keys whose change sends a bookmark again.
 BOOKMARK_CHECKSUM_FIELDS = [
     'system',
     'body',
@@ -74,122 +67,81 @@ BOOKMARK_CHECKSUM_FIELDS = [
 ]
 
 
-### CLASSES ###
-
 class UploadError(IOError):
     """A failed upload; str() is the panel line, saying what to do."""
 
 
 class UploadCore():
-    """
-    Manage data and process of uploading bookmarks to a shared team server.
-    This will be disabled and do nothing if user has not opted-into uploads in the EDMC RhinoSpotter plugin settings.
-    """
+    """Worker thread and upload state. Uploads only while `enabled`; main sets it from UPLOAD_ENABLED_KEY."""
+
     def __init__(self, enabled=False):
         self.enabled = enabled
         self.status = Status.IDLE
-        self.status_msg = ''
+        self.status_msg = ''            # the panel's upload line, read by main._poll_landed
 
-        self._uploaded_bookmarks_checksums = { }
-        
+        self._uploaded_bookmarks_checksums = {}     # _get_bookmark_dict_key -> checksum of the last upload
         self._upload_thread = None
         self._stop = threading.Event()
 
         self._load_upload_data()
-        
-    # PRIVATE
-    
+
     def _load_upload_data(self) -> None:
-        """
-        Load the JSON file containing data for bookmarks that have been uploaded already.
-        """
+        """Checksums from UPLOAD_DATA_FILEPATH; empty when it is missing or not JSON."""
         if not UPLOAD_DATA_FILEPATH.exists():
-            # Make folder if needed
             os.makedirs(UPLOAD_DATA_FILEPATH.parent, exist_ok=True)
-            
             self._uploaded_bookmarks_checksums.clear()
             return
-        
+
         with open(UPLOAD_DATA_FILEPATH, 'r') as in_file:
             try:
                 data = json.load(in_file)
-            except json.decoder.JSONDecodeError as exc:
-                logger.error('Failed to decode session data JSON file. Starting new one.')
-                data = { }
+            except json.decoder.JSONDecodeError:
+                logger.error('Upload: upload_data.json is not JSON, starting empty')
+                data = {}
 
-        self._uploaded_bookmarks_checksums = data.get('uploaded_bookmark_checksums', { })
-        
+        self._uploaded_bookmarks_checksums = data.get('uploaded_bookmark_checksums', {})
 
     def _save_upload_data(self) -> None:
-        """
-        Save data for bookmarks that have been uploaded already.
-        """
+        """Checksums to UPLOAD_DATA_FILEPATH."""
         data = {
             'version': UPLOAD_DATA_VERSION,
             'uploaded_bookmark_checksums': self._uploaded_bookmarks_checksums,
         }
-        
         with open(UPLOAD_DATA_FILEPATH, 'w') as out_file:
             json.dump(data, out_file, indent=4)
-    
 
     def _get_bookmark_checksum(self, bookmark) -> str:
-        """
-        Create checksum string from specific fields in a bookmark. This is used to uniquely identify its
-        state, so we don't upload the same data for a bookmark twice.
-        """
+        """MD5 hex of the BOOKMARK_CHECKSUM_FIELDS values, in that order."""
         md5 = hashlib.md5()
-        
         for field_name in BOOKMARK_CHECKSUM_FIELDS:
             md5.update(str(bookmark[field_name]).encode('utf-8'))
-        
-        checksum = md5.hexdigest()
-        
-        return checksum
-
+        return md5.hexdigest()
 
     def _get_bookmark_dict_key(self, bookmark) -> str:
-        """
-        Generate the key string used in the uploaded bookmarks dictionary. This is used to separate the checksums
-        by deposit body + location.
-        """
+        """'<system>, <body without the system prefix> (<lat>, <lon>)'."""
         body_name = bookmark['body'][len(bookmark['system'])+1:]
-        key = f"{bookmark['system']}, {body_name} ({bookmark['latitude']}, {bookmark['longitude']})"
-        return key
-        
+        return f"{bookmark['system']}, {body_name} ({bookmark['latitude']}, {bookmark['longitude']})"
 
     def _get_new_bookmarks(self) -> list:
-        """
-        Fetch all bookmarks from the RhinoSpotter API. Then filter it down to only those bookmarks that are new,
-        or have a different checksum indicating something in their data has been updated/changed.
-        """
-        bookmarks = [ ]
-        
-        # Revision changed, so get new bookmarks
+        """rs_api.bookmarks() not uploaded yet, or changed since their last upload."""
+        bookmarks = []
         for bookmark in rs_api.bookmarks():
             key = self._get_bookmark_dict_key(bookmark)
-            checksum = self._get_bookmark_checksum(bookmark)
-            
-            uploaded_checksum = self._uploaded_bookmarks_checksums.get(key)
-            
-            if not uploaded_checksum or uploaded_checksum != checksum:
-                # This is a new bookmark, or an existing one we've uploaded but its data has changed
+            if self._uploaded_bookmarks_checksums.get(key) != self._get_bookmark_checksum(bookmark):
                 bookmarks.append(bookmark)
-                
         return bookmarks
-    
-    
+
     def _send_to_server(self, data) -> None:
-        """
-        Send bookmarks' data to shared server. Raises errors when there's a problem.
-        Uploaded bookmarks have their checksums stored, so they aren't uploaded again in the same state.
+        """One POST of `data`; on 200 their checksums are recorded.
+
+        Raises UploadError with the panel line, or requests' ConnectionError / Timeout.
         """
         if not data:
             return
 
         upload_url = config.get_str(UPLOAD_URL_KEY, default='')
         access_key = config.get_str(UPLOAD_ACCESS_KEY_KEY, default='')
-        
+
         if not upload_url:
             logger.error('Upload: no URL set')
             raise UploadError('Set the upload server URL in Settings')
@@ -198,7 +150,7 @@ class UploadCore():
             'access_key':   access_key,
             'deposits':     data,
         }
-        
+
         host = urllib.parse.urlsplit(upload_url).hostname
         if not upload_url.lower().startswith('https://') and host not in LOOPBACK_HOSTS:
             logger.error('Upload: URL is not https, not sent')
@@ -206,21 +158,13 @@ class UploadCore():
 
         # Host only: path or query of the URL can carry a token.
         logger.info(f'Upload: POST to {host}')
-        
-        response = requests.post(
-            upload_url,
-            json=json_data,
-            timeout=UPLOAD_TIMEOUT
-        )
-
+        response = requests.post(upload_url, json=json_data, timeout=UPLOAD_TIMEOUT)
         logger.info(f'Upload: Response = {response.status_code} {response}')
-        
+
         if response.status_code == 200:
             for bookmark in data:
                 key = self._get_bookmark_dict_key(bookmark)
-                checksum = self._get_bookmark_checksum(bookmark)
-                self._uploaded_bookmarks_checksums[key] = checksum
-
+                self._uploaded_bookmarks_checksums[key] = self._get_bookmark_checksum(bookmark)
             logger.info(f'Bookmarks successfully uploaded: {len(data)}')
             return
 
@@ -231,7 +175,6 @@ class UploadCore():
             # Cloudflare Tunnel up, server behind it down.
             raise UploadError('Upload server offline - ask whoever runs it')
         raise UploadError('Upload server error - ask whoever runs it')
-            
 
     def _upload(self, bookmarks) -> None:
         """Up to MAX_UPLOAD_ATTEMPTS tries; after the last, the next check tries again."""
@@ -268,7 +211,6 @@ class UploadCore():
         logger.error(f'Upload failed {MAX_UPLOAD_ATTEMPTS} times, next try in {NEW_BOOKMARKS_CHECK_INTERVAL} s')
         self.status = Status.IDLE
 
-
     def _upload_worker(self) -> None:
         """Every NEW_BOOKMARKS_CHECK_INTERVAL s while enabled: upload new or changed bookmarks."""
         logger.info('Starting _upload_worker...')
@@ -284,16 +226,12 @@ class UploadCore():
             if self._stop.wait(NEW_BOOKMARKS_CHECK_INTERVAL):
                 return
 
-
-    # PUBLIC
-
     def start(self) -> None:
         """Start the daemon worker thread."""
         logger.info('Starting upload thread...')
         self._upload_thread = threading.Thread(target=self._upload_worker, name='RhinoSpotter upload thread')
         self._upload_thread.daemon = True
         self._upload_thread.start()
-
 
     def stop(self) -> None:
         """Signal the worker, wait up to STOP_JOIN_TIMEOUT s. Upload data is saved after each upload."""
