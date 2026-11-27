@@ -49,18 +49,6 @@ class _NoHome(logging.Filter):
             record.exc_text = logging.Formatter().formatException(record.exc_info)
         if record.exc_text:
             record.exc_text = _scrub(record.exc_text)
-            
-        # Add osthreadid field if missing (EDMC formatter requirement)
-        if not hasattr(record, 'osthreadid'):
-            # Use current thread's native ID if available (Python 3.8+)
-            try:
-                record.osthreadid = getattr(os, 'gettid', lambda: 0)()
-            except:
-                record.osthreadid = 0  
-                
-        if not hasattr(record, 'qualname'):
-            record.qualname = ''
-                
         return True
 
 
