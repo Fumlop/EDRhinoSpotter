@@ -78,8 +78,8 @@ _status = None
 _done_after = None       # the pending return of the button to "Bookmark"
 _scan_count = None       # how many landable bodies the current system has
 
-_upload_core = None      # rs_core.upload.UploadCore, made by start() when EDMC config is there
-_upload_status = None    # the panel's upload line, built by _panel
+_upload_core = None
+_upload_status = None
 
 # What the dropdown says before anything is picked. A real string rather than
 # an empty one: an OptionMenu with "" in it draws as a blank sunken box with a
@@ -314,7 +314,6 @@ def _panel(parent, docked=False):
     status = tk.Label(frame, text="", anchor="w", wraplength=320, justify="left")
     status.grid(row=8, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
 
-    # Upload status: gridded by _set_upload_status while uploads are on.
     upload_status = tk.Label(frame, text="", anchor="w", wraplength=320, justify="left")
     upload_status.grid(row=9, column=0, columnspan=4, sticky="w", padx=2)
     upload_status.grid_remove()
@@ -1004,7 +1003,7 @@ def _set_status(text):
         _mirror("status", _status, text=text)
 
 def _set_upload_status(text):
-    """The upload line: shown with `text` while uploads are on, else removed."""
+    """Show `text` while uploads are on, else hide the line."""
     if not _upload_status:
         return
     if _upload_core and _upload_core.enabled and text:

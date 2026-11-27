@@ -1,4 +1,4 @@
-"""Bookmark upload to a team server: a daemon thread posts new and changed bookmarks. See docs/UPLOAD.md."""
+"""Bookmark upload to a team server. docs/UPLOAD.md."""
 
 import enum
 import hashlib
@@ -25,13 +25,12 @@ except ImportError:         # running outside EDMC
 
 DEBUG = False
 
-# Beside the db: %LOCALAPPDATA%/RhinoSpotter, $XDG_DATA_HOME/RhinoSpotter on Linux.
 UPLOAD_DATA_FILEPATH = pathlib.Path(database.ROOT, 'upload_data.json')
 UPLOAD_DATA_VERSION = 1
 
 NEW_BOOKMARKS_CHECK_INTERVAL        = 8 if DEBUG else 60 * 5    # s between checks
 UPLOAD_RETRY_WAIT                   = 5         # s between attempts
-STOP_JOIN_TIMEOUT                   = 1         # s stop() waits; a request in flight ends on the daemon thread
+STOP_JOIN_TIMEOUT                   = 1
 UPLOAD_TIMEOUT                      = 20        # s per request
 MAX_UPLOAD_ATTEMPTS                 = 3
 
@@ -47,10 +46,9 @@ UPLOAD_INCLUDE_CMDR_NAME_KEY    = 'rhinospotter_upload_cmdr_name'
 UPLOAD_URL_KEY                  = 'rhinospotter_upload_url'
 UPLOAD_ACCESS_KEY_KEY           = 'rhinospotter_upload_access_key'
 
-# Hosts allowed over http; every other URL must be https (the access key is in the body).
+# http allowed only to these.
 LOOPBACK_HOSTS = ('localhost', '127.0.0.1', '::1')
 
-# rs_api.bookmarks() keys whose change sends a bookmark again.
 BOOKMARK_CHECKSUM_FIELDS = [
     'system',
     'body',
@@ -68,28 +66,25 @@ BOOKMARK_CHECKSUM_FIELDS = [
 
 
 class UploadError(IOError):
-    """A failed upload; str() is the panel line, saying what to do."""
+    """str() is the panel line."""
 
 
 class UploadCore():
-    """Worker thread and upload state. Uploads only while `enabled`; main sets it from UPLOAD_ENABLED_KEY."""
+    """Upload worker; uploads while `enabled`."""
 
     def __init__(self, enabled=False):
         self.enabled = enabled
         self.status = Status.IDLE
-        self.status_msg = ''            # the panel's upload line, read by main._poll_landed
+        self.status_msg = ''
 
-        self._uploaded_bookmarks_checksums = {}     # _get_bookmark_dict_key -> checksum of the last upload
+        self._uploaded_bookmarks_checksums = {}
         self._upload_thread = None
         self._stop = threading.Event()
 
         self._load_upload_data()
 
     def _load_upload_data(self) -> None:
-        """Checksums from UPLOAD_DATA_FILEPATH; empty when it is missing, unreadable or not a JSON object.
-
-        Never raises: main.start() builds UploadCore with uploads off too.
-        """
+        """Checksums from UPLOAD_DATA_FILEPATH; {} on any read error."""
         self._uploaded_bookmarks_checksums = {}
         if not UPLOAD_DATA_FILEPATH.exists():
             return
@@ -111,7 +106,6 @@ class UploadCore():
             'uploaded_bookmark_checksums': self._uploaded_bookmarks_checksums,
         }
         os.makedirs(UPLOAD_DATA_FILEPATH.parent, exist_ok=True)
-        # Temp file + replace: a kill mid-write leaves the old file, not half a new one.
         atomic.write_text(str(UPLOAD_DATA_FILEPATH), json.dumps(data, indent=4))
 
     def _get_bookmark_checksum(self, bookmark) -> str:
@@ -122,7 +116,7 @@ class UploadCore():
         return md5.hexdigest()
 
     def _get_bookmark_dict_key(self, bookmark) -> str:
-        """'<system>, <body without the system prefix> (<lat>, <lon>)'. system or body None: ''."""
+        """Checksum key: system, body, lat, lon."""
         system, body = bookmark['system'] or '', bookmark['body'] or ''
         body_name = body[len(system)+1:] if system and body.startswith(system) else body
         return f"{system}, {body_name} ({bookmark['latitude']}, {bookmark['longitude']})"
@@ -137,14 +131,11 @@ class UploadCore():
         return bookmarks
 
     def _send_to_server(self, data) -> None:
-        """One POST of `data`; on 200 their checksums are recorded.
-
-        Raises UploadError with the panel line, or requests' ConnectionError / Timeout.
-        """
+        """One POST. Raises UploadError or requests' ConnectionError / Timeout."""
         if not data:
             return
 
-        upload_url = (config.get_str(UPLOAD_URL_KEY, default='') or '').strip()   # pasted with spaces or a newline
+        upload_url = (config.get_str(UPLOAD_URL_KEY, default='') or '').strip()
         access_key = config.get_str(UPLOAD_ACCESS_KEY_KEY, default='')
 
         if not upload_url:
@@ -161,7 +152,6 @@ class UploadCore():
             logger.error('Upload: URL is not https, not sent')
             raise UploadError('Upload server URL must start with https:// - fix it in Settings')
 
-        # Host only: path or query of the URL can carry a token.
         logger.info(f'Upload: POST to {host}')
         response = requests.post(upload_url, json=json_data, timeout=UPLOAD_TIMEOUT)
         logger.info(f'Upload: Response = {response.status_code} {response}')
@@ -177,13 +167,11 @@ class UploadCore():
         if response.status_code == 401:
             raise UploadError('Upload refused - check the access key in Settings')
         if response.status_code == 502:
-            # Cloudflare Tunnel up, server behind it down.
             raise UploadError('Upload server offline - ask whoever runs it')
         raise UploadError('Upload server error - ask whoever runs it')
 
     def _upload(self, bookmarks) -> None:
-        """Up to MAX_UPLOAD_ATTEMPTS tries on connect errors and timeouts, one on an UploadError; the next check tries again."""
-        # Read on every upload: the setting can change while EDMC runs.
+        """Retries connect errors and timeouts only."""
         if not config.get_bool(UPLOAD_INCLUDE_CMDR_NAME_KEY, default=False):
             for bookmark in bookmarks:
                 bookmark['commander'] = 'anonymous'
@@ -200,10 +188,8 @@ class UploadCore():
                 return
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
                 msg = 'Upload server unreachable - check the URL in Settings'
-                # Type only: the requests message repeats the URL path.
                 logger.error(f'Upload attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: {type(exc).__name__}')
             except UploadError as exc:
-                # The server's answer or the settings: a retry 5 s later gets the same.
                 self.status_msg = str(exc)
                 logger.error(f'Upload: {exc}; next try in {NEW_BOOKMARKS_CHECK_INTERVAL} s')
                 self.status = Status.IDLE
@@ -215,7 +201,6 @@ class UploadCore():
             if attempt < MAX_UPLOAD_ATTEMPTS and self._stop.wait(UPLOAD_RETRY_WAIT):
                 return
 
-        # status_msg keeps the last attempt's line: it says what to fix.
         logger.error(f'Upload failed {MAX_UPLOAD_ATTEMPTS} times, next try in {NEW_BOOKMARKS_CHECK_INTERVAL} s')
         self.status = Status.IDLE
 
@@ -242,7 +227,7 @@ class UploadCore():
         self._upload_thread.start()
 
     def stop(self) -> None:
-        """Signal the worker, wait up to STOP_JOIN_TIMEOUT s. Upload data is saved after each upload."""
+        """Signal the worker, join up to STOP_JOIN_TIMEOUT s."""
         logger.info('Shutting down...')
         self.enabled = False
         self.status = Status.SHUTTING_DOWN

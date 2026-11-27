@@ -1,4 +1,4 @@
-"""Settings tab rows for bookmark upload (rs_core/upload.py). See docs/UPLOAD.md."""
+"""Settings rows for bookmark upload."""
 
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -12,13 +12,12 @@ except ImportError:      # running outside EDMC
     nb = config = None
 
 
-# Settings tab variables; None until prefs() built them.
 _upload_enabled = None
 _upload_include_cmdr_name = None
 _upload_url = None
 _upload_access_key = None
 
-_data_warning_shown = False     # the notice shows once per EDMC session
+_data_warning_shown = False
 
 
 def prefs(frame: tk.Frame) -> tk.Frame:
@@ -65,11 +64,10 @@ def prefs_changed() -> None:
 
 
 def _upload_enabled_changed(parent):
-    """The data notice, on the first tick of the upload box this session."""
+    """Data notice, once per session."""
     global _data_warning_shown
 
     if _upload_enabled.get() and not _data_warning_shown:
-        # Fields as rs_api.bookmarks() returns them; that dict is what is sent.
         msg = ("Every bookmark goes to the upload server, checked every 5 minutes:\n\n"
                "  system, body, location number, latitude, longitude, heading,\n"
                "  planet radius, material, rigs, density, amount,\n"
