@@ -56,7 +56,7 @@ def prefs(frame: tk.Frame, panel: bool=True) -> tk.Frame:
     _upload_access_key = tk.StringVar(value=val)
 
     nb.Label(frame, text='Access Key').grid(row=cur_row+3, column=0, sticky='w', padx=25, pady=2)
-    tk.ttk.Entry(frame, textvariable=_upload_access_key, width=40).grid(row=cur_row+3, column=1, sticky='w', padx=5, pady=2)
+    tk.ttk.Entry(frame, textvariable=_upload_access_key, width=40, show='*').grid(row=cur_row+3, column=1, sticky='w', padx=5, pady=2)
 
     # Include CMDR name
     val = config.get_bool(rs_core.upload.UPLOAD_INCLUDE_CMDR_NAME_KEY, default=False) if config is not None else False
