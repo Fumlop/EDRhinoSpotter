@@ -22,6 +22,8 @@ Output: `report.txt`. No grabs. Needs the live db at
   upload check and a Tk label update on that thread.
 - Access key sent over plain http; the full URL (token in path or query)
   written to the log.
+- Panel upload line only built when uploads were on at EDMC start: turned
+  on in Settings, nothing shows until a restart.
 - One failed round (3 attempts) stops uploads until EDMC restarts.
 - Panel line shows an HTTP code or "Attempt 1/3" instead of what to do.
 - Settings tab shows "Include CMDR name" ticked with nothing stored (UI
@@ -47,6 +49,9 @@ Output: `report.txt`. No grabs. Needs the live db at
 12. Server answers 401: panel line says to check the access key in Settings,
     without the HTTP code.
 13. Server refuses 3 attempts, then accepts: the next check uploads.
+14. Panel upload line (a Label gridded and removed as `_panel` does; `_panel`
+    needs `build()` state): hidden while off, shown with the text once
+    `_upload_core.enabled` is set, hidden again when turned off.
 
 ## Not covered
 

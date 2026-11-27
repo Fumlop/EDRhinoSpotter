@@ -248,6 +248,24 @@ try:
     check("9 _on_ui from a worker thread: upload core not touched", not touched, ",".join(touched))
     main._upload_core = None
 
+    # 14. Panel upload line: hidden while off, shown once enabled without a restart
+    line = tk.Label(tk.Frame(root), text="")
+    line.grid(row=9, column=0)
+    line.grid_remove()                                   # as _panel leaves it
+    main._upload_status = line
+    main._upload_core = types.SimpleNamespace(enabled=False, status_msg="")
+    main._set_upload_status("12 bookmarks uploaded")
+    hidden = line.winfo_manager() == ""
+    main._upload_core.enabled = True                     # what prefs_changed sets
+    main._set_upload_status("12 bookmarks uploaded")
+    shown = line.winfo_manager() == "grid" and line.cget("text") == "12 bookmarks uploaded"
+    main._upload_core.enabled = False
+    main._set_upload_status("12 bookmarks uploaded")
+    check("14 upload line hidden while off", hidden)
+    check("14 shown once enabled, no restart", shown, line.cget("text"))
+    check("14 hidden again when turned off", line.winfo_manager() == "")
+    main._upload_core = main._upload_status = None
+
     # 10. Settings tab: "Include CMDR name" unticked with nothing stored
     sys.modules["myNotebook"] = types.SimpleNamespace(Checkbutton=tk.Checkbutton, Label=tk.Label)
     del config.values[upload.UPLOAD_INCLUDE_CMDR_NAME_KEY]

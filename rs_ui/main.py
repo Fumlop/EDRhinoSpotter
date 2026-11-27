@@ -315,15 +315,10 @@ def _panel(parent, docked=False):
     status = tk.Label(frame, text="", anchor="w", wraplength=320, justify="left")
     status.grid(row=8, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
 
-    # Add upload status, if bookmark uploading is enabled
-    upload_status = None
-    
-    if config:
-        upload_enabled = config.get_bool(rs_core.upload.UPLOAD_ENABLED_KEY, default=False)
-        
-        if upload_enabled:
-            upload_status = tk.Label(frame, text="", anchor="w", wraplength=320, justify="left")
-            upload_status.grid(row=9, column=0, columnspan=4, sticky="w", padx=2)
+    # Upload status: gridded by _set_upload_status while uploads are on.
+    upload_status = tk.Label(frame, text="", anchor="w", wraplength=320, justify="left")
+    upload_status.grid(row=9, column=0, columnspan=4, sticky="w", padx=2)
+    upload_status.grid_remove()
 
     return {"frame": frame, "status": status, "upload_status": upload_status, "count": count, "card": card,
             "hint": hint, "menu": menu}
@@ -1011,8 +1006,14 @@ def _set_status(text):
         _mirror("status", _status, text=text)
 
 def _set_upload_status(text):
-    if _upload_status:
+    """The upload line: shown with `text` while uploads are on, else removed."""
+    if not _upload_status:
+        return
+    if _upload_core and _upload_core.enabled and text:
+        _upload_status.grid()
         _mirror("upload_status", _upload_status, text=text)
+    else:
+        _upload_status.grid_remove()
 
 
 # How long a passing note stays on the status line. Errors and updates stay
