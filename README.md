@@ -163,18 +163,21 @@ the same groups, most rigs first.
 - Hotkeys: modifier + key for each of the four. Linux (beta): they work while Elite has the
   focus (X11/XWayland). Fallback on Linux: type `!rs center`, `!rs border`, `!rs zoom` or
   `!rs data` in chat. It is sent as chat: others on that channel see it.
-- **Upload Bookmarks**: This is an experimental feature currently in testing. More details soon.
+- **Upload bookmarks to a team server** (off): sends new and changed bookmarks every 5 min to a
+  server your team runs, URL and access key from its admin: [docs/UPLOAD.md](docs/UPLOAD.md).
 
 ## Data
 
 Local only. Network: Spansh on honk (once a session per system, not again for 30 days, never for
-undiscovered systems, paused 1 h after a failed request), GitHub for updates.
+undiscovered systems, paused 1 h after a failed request), GitHub for updates, and the team server
+when bookmark upload is on ([docs/UPLOAD.md](docs/UPLOAD.md)).
 
 | What | Where |
 |---|---|
 | Bookmarks, bodies, maps | `%LOCALAPPDATA%\RhinoSpotter\db\rhinospotter.db` |
 | Backups (last 2) | `%LOCALAPPDATA%\RhinoSpotter\db\backups\` |
 | Map pictures | `%LOCALAPPDATA%\RhinoSpotter\coverage\<Body>\map N.png` |
+| What was uploaded | `%LOCALAPPDATA%\RhinoSpotter\upload_data.json` |
 | Material rates | `mining_sheet.json` in the plugin folder |
 
 Linux: `$XDG_DATA_HOME/RhinoSpotter` instead of `%LOCALAPPDATA%\RhinoSpotter`
