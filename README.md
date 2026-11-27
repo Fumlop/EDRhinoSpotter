@@ -163,7 +163,7 @@ the same groups, most rigs first.
 - Hotkeys: modifier + key for each of the four. Linux (beta): they work while Elite has the
   focus (X11/XWayland). Fallback on Linux: type `!rs center`, `!rs border`, `!rs zoom` or
   `!rs data` in chat. It is sent as chat: others on that channel see it.
-- **Upload bookmarks to a team server** (off): sends new and changed bookmarks every 5 min to a
+- **Upload bookmarks to a team server** (off): sends new and changed bookmarks every 30 min to a
   server your team runs, URL and access key from its admin: [docs/UPLOAD.md](docs/UPLOAD.md).
 
 ## Data

@@ -7,7 +7,7 @@ sees each other's deposits. RhinoSpotter does not run or provide a server.
 
 EDMC > File > Settings > RhinoSpotter, under the separator:
 
-1. Tick **Upload bookmarks to a team server** (checked every 5 min). A notice
+1. Tick **Upload bookmarks to a team server** (checked every 30 min). A notice
    lists what is sent.
 2. **Server URL (https required)**: the address the server's admin gave you.
    `http://` is refused except to localhost / 127.0.0.1 / ::1.
@@ -33,11 +33,11 @@ EDMC > File > Settings > RhinoSpotter, under the separator:
 | `Upload failed - details in the EDMC log` | send the log to whoever runs the server |
 
 A connect error or timeout is tried 3 times, 5 s apart; any other failure
-once. Either way the next check (5 min) tries again.
+once. Either way the next check (30 min) tries again.
 
 ## What is sent
 
-Every 5 min, the bookmarks that are new or changed since their last
+Every 30 min, the bookmarks that are new or changed since their last
 successful upload, as `rs_api.bookmarks()` returns them ([API.md](API.md),
 Bookmark keys): system, body, location, latitude, longitude, heading,
 planet_radius, material, rigs, density, amount, depleted, depleted_at,
