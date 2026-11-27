@@ -225,6 +225,18 @@ try:
     check("13 3 attempts refused", failed_round, f"{len(posts)} posts")
     check("13 next check uploads once the server takes it", recovered, again.status_msg)
 
+    # 15. upload_data.json broken: UploadCore() still builds, starts empty (plugin start depends on it)
+    for label, content in (("not JSON", b"{oops"), ("a JSON list", b"[]"),
+                           ("checksums a list", b'{"uploaded_bookmark_checksums": []}')):
+        upload.UPLOAD_DATA_FILEPATH.write_bytes(content)
+        try:
+            built = upload.UploadCore(enabled=False)
+            check(f"15 upload_data.json {label}: builds, empty",
+                  built._uploaded_bookmarks_checksums == {}, repr(built._uploaded_bookmarks_checksums)[:60])
+        except Exception as err:
+            check(f"15 upload_data.json {label}: builds, empty", False, repr(err))
+    upload.UPLOAD_DATA_FILEPATH.unlink()
+
     # 8. _on_ui without an upload core
     import tkinter as tk                                 # noqa: E402
     from rs_ui import main                               # noqa: E402

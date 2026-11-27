@@ -24,6 +24,9 @@ Output: `report.txt`. No grabs. Needs the live db at
   written to the log.
 - Panel upload line only built when uploads were on at EDMC start: turned
   on in Settings, nothing shows until a restart.
+- A broken `upload_data.json` (valid JSON but not an object, unreadable)
+  raises in `UploadCore()`, which `main.start()` builds with uploads off too:
+  the plugin does not start.
 - One failed round (3 attempts) stops uploads until EDMC restarts.
 - Panel line shows an HTTP code or "Attempt 1/3" instead of what to do.
 - Settings tab shows "Include CMDR name" ticked with nothing stored (UI
@@ -52,6 +55,8 @@ Output: `report.txt`. No grabs. Needs the live db at
 14. Panel upload line (a Label gridded and removed as `_panel` does; `_panel`
     needs `build()` state): hidden while off, shown with the text once
     `_upload_core.enabled` is set, hidden again when turned off.
+15. `upload_data.json` holding `{oops`, `[]`, or a list of checksums:
+    `UploadCore()` builds with empty checksums.
 
 ## Not covered
 

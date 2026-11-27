@@ -86,20 +86,23 @@ class UploadCore():
         self._load_upload_data()
 
     def _load_upload_data(self) -> None:
-        """Checksums from UPLOAD_DATA_FILEPATH; empty when it is missing or not JSON."""
+        """Checksums from UPLOAD_DATA_FILEPATH; empty when it is missing, unreadable or not a JSON object.
+
+        Never raises: main.start() builds UploadCore with uploads off too.
+        """
+        self._uploaded_bookmarks_checksums = {}
         if not UPLOAD_DATA_FILEPATH.exists():
-            os.makedirs(UPLOAD_DATA_FILEPATH.parent, exist_ok=True)
-            self._uploaded_bookmarks_checksums.clear()
             return
-
-        with open(UPLOAD_DATA_FILEPATH, 'r') as in_file:
-            try:
+        try:
+            with open(UPLOAD_DATA_FILEPATH, 'r', encoding='utf-8') as in_file:
                 data = json.load(in_file)
-            except json.decoder.JSONDecodeError:
-                logger.error('Upload: upload_data.json is not JSON, starting empty')
-                data = {}
-
-        self._uploaded_bookmarks_checksums = data.get('uploaded_bookmark_checksums', {})
+            checksums = data.get('uploaded_bookmark_checksums', {})
+            if not isinstance(checksums, dict):
+                raise ValueError('uploaded_bookmark_checksums is not an object')
+        except (OSError, ValueError, AttributeError) as exc:
+            logger.error(f'Upload: upload_data.json unreadable, starting empty: {exc!r}')
+            return
+        self._uploaded_bookmarks_checksums = checksums
 
     def _save_upload_data(self) -> None:
         """Checksums to UPLOAD_DATA_FILEPATH."""
@@ -107,6 +110,7 @@ class UploadCore():
             'version': UPLOAD_DATA_VERSION,
             'uploaded_bookmark_checksums': self._uploaded_bookmarks_checksums,
         }
+        os.makedirs(UPLOAD_DATA_FILEPATH.parent, exist_ok=True)
         with open(UPLOAD_DATA_FILEPATH, 'w') as out_file:
             json.dump(data, out_file, indent=4)
 
