@@ -12,17 +12,26 @@ worker fails minutes later somewhere unrelated.
 import threading
 import time
 import tkinter as tk
+from tkinter import ttk
 from datetime import datetime, timezone
 
 from rs_core import (bodies, cards, coverage, database, deposit, grounds, instance, migrate,
                      palette, spansh, spotcard, spotmark, store, system, update, yields)
+
 from rs_core.logging import logger
 from rs_ui import hotkey, minimap, press, rigradar, scan, tracelog, widgets
+import rs_core.upload
+import rs_ui.upload
 
 try:
     from theme import theme
 except ImportError:      # running outside EDMC
     theme = None
+
+try:
+    from config import config
+except ImportError:      # running outside EDMC
+    config = None
 
 # Who holds rs_core.instance when this process does, and the holder's text
 # when another one does: then no panel, journal, hotkeys or writes here.
@@ -68,6 +77,11 @@ _frame = None
 _status = None
 _done_after = None       # the pending return of the button to "Bookmark"
 _scan_count = None       # how many landable bodies the current system has
+
+_upload_core = None
+_upload_status = None
+_upload_bar = None
+
 # What the dropdown says before anything is picked. A real string rather than
 # an empty one: an OptionMenu with "" in it draws as a blank sunken box with a
 # marker floating in it, which reads as a broken text field.
@@ -97,7 +111,7 @@ NOT_READ = "-"
 
 
 def start(plugin_dir, owner=OWNER):
-    global _sheet, _refused, _started_at
+    global _sheet, _refused, _started_at, _upload_core
     logger.info(f"running on {system.describe()}")
     # Before the lock: acquire() creates the data folder, and adopt_legacy()
     # copies only into a folder that is not there yet.
@@ -134,6 +148,12 @@ def start(plugin_dir, owner=OWNER):
     if not _sheet.loaded:
         logger.warning(f"no mining_sheet.json: {_sheet.error}")
     minimap.seed_materials(_worth(), cards.materials_marked())
+
+    if config:
+        upload_enabled = config.get_bool(rs_core.upload.UPLOAD_ENABLED_KEY, default=False)
+        _upload_core = rs_core.upload.UploadCore()
+        _upload_core.update(upload_enabled)
+
     return "RhinoSpotter"
 
 
@@ -147,7 +167,7 @@ def refused():
 def build(parent, updates=True, docked=False):
     """The panel. `updates`: look for a release once, at start; standalone.py passes False.
     `docked`: standalone.py, the panel inside RhinoData: no version, count or RhinoData button."""
-    global _frame, _status, _scan_count, _card_button, _landed_after, _hint
+    global _frame, _status, _upload_status, _upload_bar, _scan_count, _card_button, _landed_after, _hint
     global _loc, _rigs, _material, _density, _amount, _search, _menu, _filter
 
     if _refused is not None:
@@ -169,7 +189,8 @@ def build(parent, updates=True, docked=False):
     _search = tk.StringVar(value="")
 
     widgets = _panel(parent, docked=docked)
-    _frame, _status, _scan_count = widgets["frame"], widgets["status"], widgets["count"]
+    _frame, _status, _upload_status, _scan_count = widgets["frame"], widgets["status"], widgets["upload_status"], widgets["count"]
+    _upload_bar = widgets["upload_bar"]
     _card_button, _hint, _menu = widgets["card"], widgets["hint"], widgets["menu"]
 
     if theme:
@@ -295,7 +316,15 @@ def _panel(parent, docked=False):
     status = tk.Label(frame, text="", anchor="w", wraplength=320, justify="left")
     status.grid(row=8, column=0, columnspan=4, sticky="w", padx=2, pady=(2, 4))
 
-    return {"frame": frame, "status": status, "count": count, "card": card,
+    upload_status = tk.Label(frame, text="", anchor="w", wraplength=320, justify="left")
+    upload_status.grid(row=9, column=0, columnspan=4, sticky="w", padx=2)
+    upload_status.grid_remove()
+    upload_bar = ttk.Progressbar(frame, mode="determinate", length=200)
+    upload_bar.grid(row=10, column=0, columnspan=4, sticky="w", padx=2, pady=(0, 2))
+    upload_bar.grid_remove()
+
+    return {"frame": frame, "status": status, "upload_status": upload_status, "upload_bar": upload_bar,
+            "count": count, "card": card,
             "hint": hint, "menu": menu}
 
 
@@ -441,6 +470,8 @@ def _poll_landed():
         # The same reading, so the minimap costs no second parse.
         minimap.update(_frame.winfo_toplevel(), status, _system, ids=_register.ids,
                        ground=_register.ground)
+        if _upload_core:
+            _set_upload_status(_upload_core.status_msg)
         _poll_error = None
     except Exception as err:
         # Once per kind of failure, not once a second.
@@ -475,6 +506,10 @@ def stop():
     rigradar.close()
     tracelog.shutdown()      # closes the CSV, writes the summary, plans nothing
     minimap.stop()
+
+    if _upload_core:
+        _upload_core.stop()
+
     # Last, and not through the timer: EDMC is going, and a scan waiting on a
     # two-second thread would go with it.
     _writes.flush()
@@ -548,13 +583,19 @@ def prefs(parent):
         frame = nb.Frame(parent)
         nb.Label(frame, text=refused()).grid(row=0, column=0, sticky="w", padx=10, pady=10)
         return frame
-    return minimap.prefs(parent, worth=_worth(), panel=not scan.hosted())
+
+    frame = minimap.prefs(parent, worth=_worth(), panel=not scan.hosted())
+    rs_ui.upload.prefs(frame)
+    return frame
 
 
 def prefs_changed():
     if _refused is not None:
         return
     minimap.prefs_changed()
+    rs_ui.upload.prefs_changed()
+    if _upload_core and config:
+        _upload_core.update(config.get_bool(rs_core.upload.UPLOAD_ENABLED_KEY, default=False))
     # The pick may have taken materials out of the list or put them back, and
     # _on_material_changed only fires when the picked one moves.
     _fill_menu()
@@ -889,7 +930,7 @@ def _show_update(tag, newer):
     if not _card_button or not newer:
         return
     if str(_card_button.cget("text")) in ("Updating...", "Restart EDMC"):
-        return          # an hourly check must not undo an install under way
+        return          # a late check must not undo an install under way
     # "Update", not "Update v2.1.0": the tag would be the one string wider
     # than the button, and widening the panel is what this design avoids. The
     # version it is going to goes in the status line instead.
@@ -964,6 +1005,22 @@ def _refresh_hint():
 def _set_status(text):
     if _status:
         _mirror("status", _status, text=text)
+
+def _set_upload_status(text):
+    """Show `text` while uploads are on, else hide the line; the bar while _upload_core.progress."""
+    if not _upload_status:
+        return
+    if _upload_core and _upload_core.enabled and text:
+        _upload_status.grid()
+        _mirror("upload_status", _upload_status, text=text)
+    else:
+        _upload_status.grid_remove()
+    progress = getattr(_upload_core, "progress", None)
+    if _upload_bar and progress:
+        _upload_bar.config(maximum=progress[1], value=progress[0])
+        _upload_bar.grid()
+    elif _upload_bar:
+        _upload_bar.grid_remove()
 
 
 # How long a passing note stays on the status line. Errors and updates stay

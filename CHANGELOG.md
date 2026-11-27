@@ -1,5 +1,16 @@
 # Changelog
 
+## 6.8.0
+
+**Added**
+
+- Bookmark upload to a team server (PR #29, vScourge), off by default: Settings > RhinoSpotter, server URL (https) and access key. New or changed bookmarks every 30 min and at Settings OK, 50 per request, progress bar on the panel. CMDR name sent unless unticked. [docs/UPLOAD.md](docs/UPLOAD.md).
+
+**Fixed**
+
+- Update check: reads the releases/latest redirect instead of the 145 KB tag page, which ran past the 10 s timeout. Runs once at EDMC start.
+- RhinoData: docking the panel raised TclError `unknown option "-bg"` on the upload progress bar.
+
 ## 6.7.0
 
 **Added**
