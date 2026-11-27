@@ -30,21 +30,21 @@ def prefs(frame: tk.Frame) -> tk.Frame:
 
     val = config.get_bool(rs_core.upload.UPLOAD_ENABLED_KEY, default=False) if config is not None else False
     _upload_enabled = tk.BooleanVar(value=val)
-    nb.Checkbutton(frame, text=f'Upload bookmarks to a team server, checked every {rs_core.upload.NEW_BOOKMARKS_CHECK_INTERVAL // 60} min', variable=_upload_enabled, command=lambda: _upload_enabled_changed(frame)).grid(row=cur_row+1, column=0, sticky='w', padx=5, pady=2)
+    nb.Checkbutton(frame, text=f'Upload bookmarks to a team server', variable=_upload_enabled, command=lambda: _upload_enabled_changed(frame)).grid(row=cur_row+1, column=0, sticky='w', padx=5, pady=2)
 
     val = config.get_str(rs_core.upload.UPLOAD_URL_KEY, default='') if config is not None else ''
     _upload_url = tk.StringVar(value=val)
-    nb.Label(frame, text='Server URL (https://)').grid(row=cur_row+2, column=0, sticky='w', padx=25, pady=2)
+    nb.Label(frame, text='Server URL (https required)').grid(row=cur_row+2, column=0, sticky='w', padx=25, pady=2)
     ttk.Entry(frame, textvariable=_upload_url, width=40).grid(row=cur_row+2, column=1, sticky='w', padx=5, pady=2)
 
     val = config.get_str(rs_core.upload.UPLOAD_ACCESS_KEY_KEY, default='') if config is not None else ''
     _upload_access_key = tk.StringVar(value=val)
     nb.Label(frame, text='Access Key').grid(row=cur_row+3, column=0, sticky='w', padx=25, pady=2)
-    ttk.Entry(frame, textvariable=_upload_access_key, width=40, show='*').grid(row=cur_row+3, column=1, sticky='w', padx=5, pady=2)
+    ttk.Entry(frame, textvariable=_upload_access_key, width=40).grid(row=cur_row+3, column=1, sticky='w', padx=5, pady=2)
 
-    val = config.get_bool(rs_core.upload.UPLOAD_INCLUDE_CMDR_NAME_KEY, default=False) if config is not None else False
+    val = config.get_bool(rs_core.upload.UPLOAD_INCLUDE_CMDR_NAME_KEY, default=True) if config is not None else False
     _upload_include_cmdr_name = tk.BooleanVar(value=val)
-    nb.Checkbutton(frame, text='Send my CMDR name with them', variable=_upload_include_cmdr_name).grid(row=cur_row+4, column=0, sticky='w', padx=25, pady=2)
+    nb.Checkbutton(frame, text='Send my CMDR name', variable=_upload_include_cmdr_name).grid(row=cur_row+4, column=0, sticky='w', padx=25, pady=2)
 
     return frame
 
@@ -72,11 +72,11 @@ def _upload_enabled_changed(parent):
     global _data_warning_shown
 
     if _upload_enabled.get() and not _data_warning_shown:
-        msg = (f"Every bookmark goes to the upload server, checked every {rs_core.upload.NEW_BOOKMARKS_CHECK_INTERVAL // 60} min:\n\n"
+        msg = (f"Every bookmark is uploaded to your team server, checked every {rs_core.upload.NEW_BOOKMARKS_CHECK_INTERVAL // 60} minutes. Data sent includes:\n\n"
                "  system, body, location number, latitude, longitude, heading,\n"
                "  planet radius, material, rigs, density, amount,\n"
-               "  when it was marked, edited and marked depleted,\n"
-               "  your CMDR name only with \"Send my CMDR name with them\" ticked.\n\n"
-               "Whoever runs the server can share it. Ask them how it is used.")
+               "  when it was marked, edited and marked depleted.\n\n"
+               "  Your CMDR name included if you enabled that option.\n\n"
+               "The person running the server manages the shared data. Please ask them for info on how it is used.")
         messagebox.showinfo('Data Sharing Notice', msg, parent=parent.winfo_toplevel())
         _data_warning_shown = True

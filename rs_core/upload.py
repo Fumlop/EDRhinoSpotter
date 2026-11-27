@@ -171,14 +171,14 @@ class UploadCore():
 
         logger.error(f'Upload: HTTP {response.status_code} {response.text[:200]!r}')
         if response.status_code == 401:
-            raise UploadError('Upload refused - check the access key in Settings')
+            raise UploadError('Upload refused - check Access Key in Settings')
         if response.status_code == 502:
-            raise UploadError('Upload server offline - ask whoever runs it')
-        raise UploadError('Upload server error - ask whoever runs it')
+            raise UploadError('Upload server offline - Contact owner')
+        raise UploadError('Upload server error - Contact owner')
 
     def _upload(self, bookmarks, stop) -> None:
         """UPLOAD_BATCH bookmarks per POST; `progress` is (sent, total) meanwhile, else None."""
-        if not config.get_bool(UPLOAD_INCLUDE_CMDR_NAME_KEY, default=False):
+        if not config.get_bool(UPLOAD_INCLUDE_CMDR_NAME_KEY, default=True):
             for bookmark in bookmarks:
                 bookmark['commander'] = 'anonymous'
 
