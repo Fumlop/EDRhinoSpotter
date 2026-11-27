@@ -163,6 +163,7 @@ the same groups, most rigs first.
 - Hotkeys: modifier + key for each of the four. Linux (beta): they work while Elite has the
   focus (X11/XWayland). Fallback on Linux: type `!rs center`, `!rs border`, `!rs zoom` or
   `!rs data` in chat. It is sent as chat: others on that channel see it.
+- **Upload Bookmarks**: This is an experimental feature currently in testing. More details soon.
 
 ## Data
 
