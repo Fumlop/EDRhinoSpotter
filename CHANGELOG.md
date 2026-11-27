@@ -1,6 +1,6 @@
 # Changelog
 
-## 6.8.0-beta.1
+## 6.8.0
 
 **Added**
 
