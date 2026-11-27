@@ -68,7 +68,7 @@ def _upload_enabled_changed(parent):
     global _data_warning_shown
 
     if _upload_enabled.get() and not _data_warning_shown:
-        msg = ("Every bookmark goes to the upload server, checked every 5 minutes:\n\n"
+        msg = (f"Every bookmark goes to the upload server, checked every {rs_core.upload.NEW_BOOKMARKS_CHECK_INTERVAL // 60} min:\n\n"
                "  system, body, location number, latitude, longitude, heading,\n"
                "  planet radius, material, rigs, density, amount,\n"
                "  when it was marked, edited and marked depleted,\n"

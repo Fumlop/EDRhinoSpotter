@@ -19,9 +19,8 @@ from rs_core import (bodies, cards, coverage, database, deposit, grounds, instan
 
 from rs_core.logging import logger
 from rs_ui import hotkey, minimap, press, rigradar, scan, tracelog, widgets
-
-import rs_ui.upload
 import rs_core.upload
+import rs_ui.upload
 
 try:
     from theme import theme
@@ -579,9 +578,7 @@ def prefs(parent):
         return frame
 
     frame = minimap.prefs(parent, worth=_worth(), panel=not scan.hosted())
-
-    frame = rs_ui.upload.prefs(frame)
-
+    rs_ui.upload.prefs(frame)
     return frame
 
 

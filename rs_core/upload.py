@@ -1,6 +1,5 @@
 """Bookmark upload to a team server. docs/UPLOAD.md."""
 
-import enum
 import hashlib
 import json
 import os
@@ -23,22 +22,14 @@ except ImportError:         # running outside EDMC
     config = None
 
 
-DEBUG = False
-
 UPLOAD_DATA_FILEPATH = pathlib.Path(database.ROOT, 'upload_data.json')
 UPLOAD_DATA_VERSION = 1
 
-NEW_BOOKMARKS_CHECK_INTERVAL        = 8 if DEBUG else 60 * 5    # s between checks
+NEW_BOOKMARKS_CHECK_INTERVAL        = 60 * 5    # s between checks
 UPLOAD_RETRY_WAIT                   = 5         # s between attempts
 STOP_JOIN_TIMEOUT                   = 1
 UPLOAD_TIMEOUT                      = 20        # s per request
 MAX_UPLOAD_ATTEMPTS                 = 3
-
-
-class Status(enum.Enum):
-    IDLE            = 0
-    UPLOADING       = 2
-    SHUTTING_DOWN   = 3
 
 
 UPLOAD_ENABLED_KEY              = 'rhinospotter_uploading_enabled'
@@ -74,7 +65,6 @@ class UploadCore():
 
     def __init__(self, enabled=False):
         self.enabled = enabled
-        self.status = Status.IDLE
         self.status_msg = ''
 
         self._uploaded_bookmarks_checksums = {}
@@ -176,14 +166,12 @@ class UploadCore():
             for bookmark in bookmarks:
                 bookmark['commander'] = 'anonymous'
 
-        self.status = Status.UPLOADING
         self.status_msg = f'Uploading {len(bookmarks)} bookmarks...'
 
         for attempt in range(1, MAX_UPLOAD_ATTEMPTS + 1):
             try:
                 self._send_to_server(bookmarks)
                 self._save_upload_data()
-                self.status = Status.IDLE
                 self.status_msg = f'{len(bookmarks)} bookmarks uploaded'
                 return
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
@@ -192,7 +180,6 @@ class UploadCore():
             except UploadError as exc:
                 self.status_msg = str(exc)
                 logger.error(f'Upload: {exc}; next try in {NEW_BOOKMARKS_CHECK_INTERVAL} s')
-                self.status = Status.IDLE
                 return
             except Exception as exc:
                 msg = 'Upload failed - details in the EDMC log'
@@ -202,7 +189,6 @@ class UploadCore():
                 return
 
         logger.error(f'Upload failed {MAX_UPLOAD_ATTEMPTS} times, next try in {NEW_BOOKMARKS_CHECK_INTERVAL} s')
-        self.status = Status.IDLE
 
     def _upload_worker(self) -> None:
         """Every NEW_BOOKMARKS_CHECK_INTERVAL s while enabled: upload new or changed bookmarks."""
@@ -230,7 +216,6 @@ class UploadCore():
         """Signal the worker, join up to STOP_JOIN_TIMEOUT s."""
         logger.info('Shutting down...')
         self.enabled = False
-        self.status = Status.SHUTTING_DOWN
         self._stop.set()
         if self._upload_thread:
             self._upload_thread.join(STOP_JOIN_TIMEOUT)
