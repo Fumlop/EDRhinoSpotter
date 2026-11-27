@@ -7,6 +7,16 @@ the real `rs_ui.main._on_ui`. Output: `rs_e2etest/out/<timestamp>/report.txt`.
 Replaces the unit tests in `rs_tests/test_hotkey.py`; mapping in
 `coverage-hotkey.md`.
 
+## Refuses to run
+
+SendInput reaches whichever process holds the combo. With EDMC running, its
+plugin got Ctrl+Alt+Z then Ctrl+Alt+B at one spot: border 0 m, the live map's
+painting dropped (2026-11-27).
+
+- `EDMarketConnector.exe` in tasklist: exit 2, nothing registered, nothing sent.
+- Check 0 finds a default combo held by another process (standalone, another
+  tool): FAIL, the run stops before `hotkey.start` and any SendInput.
+
 ## Isolation: what the harness replaces, and what that hides
 
 | Replaced | By | Failures it cannot see |
