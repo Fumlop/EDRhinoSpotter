@@ -5,7 +5,7 @@ vScourge
 """
 
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 
 import rs_core.upload
 from rs_core.logging import logger
@@ -37,7 +37,7 @@ def prefs(frame: tk.Frame, panel: bool=True) -> tk.Frame:
     
     cur_row = frame.grid_size()[1] + 1
     
-    tk.ttk.Separator(frame, orient='horizontal').grid(row=cur_row, column=0, columnspan=2, sticky='ew', padx=5, pady=2)
+    ttk.Separator(frame, orient='horizontal').grid(row=cur_row, column=0, columnspan=2, sticky='ew', padx=5, pady=2)
     
     # Enable uploading
     val = config.get_bool(rs_core.upload.UPLOAD_ENABLED_KEY, default=False) if config is not None else True
@@ -49,14 +49,14 @@ def prefs(frame: tk.Frame, panel: bool=True) -> tk.Frame:
     _upload_url = tk.StringVar(value=val)
 
     nb.Label(frame, text='Server URL (https://)').grid(row=cur_row+2, column=0, sticky='w', padx=25, pady=2)
-    tk.ttk.Entry(frame, textvariable=_upload_url, width=40).grid(row=cur_row+2, column=1, sticky='w', padx=5, pady=2)
+    ttk.Entry(frame, textvariable=_upload_url, width=40).grid(row=cur_row+2, column=1, sticky='w', padx=5, pady=2)
 
     # Access Key
     val = config.get_str(rs_core.upload.UPLOAD_ACCESS_KEY_KEY, default='') if config is not None else True
     _upload_access_key = tk.StringVar(value=val)
 
     nb.Label(frame, text='Access Key').grid(row=cur_row+3, column=0, sticky='w', padx=25, pady=2)
-    tk.ttk.Entry(frame, textvariable=_upload_access_key, width=40, show='*').grid(row=cur_row+3, column=1, sticky='w', padx=5, pady=2)
+    ttk.Entry(frame, textvariable=_upload_access_key, width=40, show='*').grid(row=cur_row+3, column=1, sticky='w', padx=5, pady=2)
 
     # Include CMDR name
     val = config.get_bool(rs_core.upload.UPLOAD_INCLUDE_CMDR_NAME_KEY, default=False) if config is not None else False

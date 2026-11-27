@@ -227,7 +227,6 @@ try:
 
     # 8. _on_ui without an upload core
     import tkinter as tk                                 # noqa: E402
-    import tkinter.ttk                                   # noqa: E402,F401 - EDMC has it loaded; rs_ui/upload.py uses tk.ttk
     from rs_ui import main                               # noqa: E402
     root = tk.Tk()
     root.withdraw()
