@@ -87,7 +87,13 @@ def _upload_enabled_changed(parent):
     global _data_warning_shown
     
     if _upload_enabled.get() and not _data_warning_shown:
-        msg = """NOTICE: Enabling uploads will share bookmark data with other users, including:\n\n  Location, material, density, amount, rigs,\n  current time and (optionally) your CMDR name.\n\nSpeak with the manager of your server if you have questions about how this data is used."""
+        # Fields as rs_api.bookmarks() returns them; that dict is what is sent.
+        msg = ("Every bookmark goes to the upload server, checked every 5 minutes:\n\n"
+               "  system, body, location number, latitude, longitude, heading,\n"
+               "  planet radius, material, rigs, density, amount,\n"
+               "  when it was marked, edited and marked depleted,\n"
+               "  your CMDR name only with \"Include CMDR name\" ticked.\n\n"
+               "Whoever runs the server can share it. Ask them how it is used.")
         messagebox.showinfo('Data Sharing Notice', msg, parent=parent.winfo_toplevel())
         _data_warning_shown = True
         
