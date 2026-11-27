@@ -70,6 +70,9 @@ MAGMA_SPLIT = ('rock 80%+ [metallic magma]', 'rock 80%+ [rocky magma]')
 # a material with no locations.
 UNSHEETED = {'bromellite': 33396}
 
+# Minimap codes pinned regardless of price rank; codes() assigns the rest around them.
+FIXED_CODES = {'helium': 'H', 'helium-3': 'H3', 'haematite': 'HT'}
+
 # Low-value threshold in Cr/t, measured against values() (median, best across
 # grounds). Sheet.worth() drops everything below it. The default of the
 # rhinospotter_materials setting.
@@ -214,16 +217,19 @@ class Sheet:
     def codes(self):
         """{lowercased material: 1-3 letter code} for minimap dot labels.
 
-        Codes are unique. Assigned by descending values(), ties by name: first
-        letter, else first letter plus the first free letter of the name, else
+        Codes are unique. FIXED_CODES first; the rest by descending
+        values(), ties by name: first letter, else first letter plus the first free letter of the name, else
         first letter plus a digit. Thortveitite T, Thorium TH, Titanium TI.
 
         Upper case throughout: lowercase l reads as 1 at 12 px. A sheet refresh
         that re-ranks prices can reassign codes.
         """
         price = {name: value for name, value in self.values().items()}
-        taken, codes = set(), {}
+        codes = {name: FIXED_CODES[name] for name in price if name in FIXED_CODES}
+        taken = set(FIXED_CODES.values())
         for name in sorted(price, key=lambda n: (-price[n], n)):
+            if name in codes:
+                continue
             first = name[0].upper()
             wanted = [first] + [first + ch.upper() for ch in name[1:] if ch.isalpha()]
             code = next((c for c in wanted if c not in taken), None)

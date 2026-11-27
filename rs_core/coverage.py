@@ -796,6 +796,20 @@ def _dotted(draw, a, b, fill, width):
         at = end + off
 
 
+# Ship ring dashes, degrees: 24 dashes of 8 on, 7 off.
+SHIP_DASH_DEG = (8, 7)
+
+
+def _ship_ring(image, side, r):
+    """Dashed circle of radius r px around the map's middle, in FG, 2 px."""
+    c = side / 2
+    draw = ImageDraw.Draw(image)
+    on, off = SHIP_DASH_DEG
+    for start in range(0, 360, on + off):
+        draw.arc([c - r, c - r, c + r, c + r], start, start + on,
+                 fill=palette.rgb(palette.FG), width=2)
+
+
 def _centre_radius(side):
     """The dot on the centre. _distances keeps its numbers off it: the dot is
     drawn last and would otherwise sit on top of one."""
@@ -1116,7 +1130,8 @@ def _marker(heading, size):
     return sprite
 
 
-def render(coverage, x, y, heading, side, marks=(), distances=False, view=VIEW_M, base=None):
+def render(coverage, x, y, heading, side, marks=(), distances=False, view=VIEW_M, base=None,
+           ship=False):
     """The map, side x side, the SRV at (x, y) in the middle, north up.
 
     A crop of the kept layer with the bookmarks and the marker on top - the
@@ -1129,6 +1144,8 @@ def render(coverage, x, y, heading, side, marks=(), distances=False, view=VIEW_M
 
     `base` is the side at 1x: the SRV marker is sized from it, so zooming grows
     the ground and not the marker.
+
+    `ship` draws a dashed SCAN_RADIUS_M ring around (x, y): where an SRV dropped here scans (#27).
     """
     # The painted ground is never drawn finer than the full view needs: zoomed
     # in, a smaller crop of it is scaled up. Drawn at the zoomed scale, the
@@ -1154,6 +1171,8 @@ def render(coverage, x, y, heading, side, marks=(), distances=False, view=VIEW_M
     _bookmarks(image, spots, side)
     if centre is not None:
         _centre_mark(image, centre[0], centre[1], side)
+    if ship:
+        _ship_ring(image, side, SCAN_RADIUS_M * scale)
     marker = _marker(heading, size)
     image.paste(marker, ((side - size) // 2, (side - size) // 2), marker)
     return image

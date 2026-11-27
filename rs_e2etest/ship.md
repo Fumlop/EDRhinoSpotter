@@ -49,7 +49,8 @@ second way into it once the switch is on.
 
 ## Checks
 
-1. Switch off: ship at 500 m over the SRV's map: not shown.
+1. Nothing stored: `ship_view()` is True (default on). Switch set off: ship at
+   500 m over the SRV's map: not shown.
 2. Switch on (via `prefs_changed`): stored under `rhinospotter_minimap_ship`.
 3. SRV drives 3 fixes (paints), docks: ship at 30 m on the same spot: shown,
    same map, `version` and launches unchanged after 5 ship fixes.

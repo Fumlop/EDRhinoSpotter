@@ -317,9 +317,10 @@ Everything in here imports tkinter.
 - **[minimap.py](rs_ui/minimap.py)** - the minimap window and its settings
   tab. No timer of its own: `main._poll_landed` hands it the Status.json it
   already read, and nothing raises back into that poll. Shown while the InSRV
-  flag is set; with `rhinospotter_minimap_ship` also in the ship under
-  `SHIP_CEILING_M` (radar range) over a map with a centre or a drop
-  (`_over_map`, never painted); hidden otherwise and while the game is
+  flag is set; with `rhinospotter_minimap_ship` (default on) also in the
+  ship under `SHIP_CEILING_M` (radar range) over a map with a centre or a
+  drop (`_over_map`, never painted, dashed `SCAN_RADIUS_M` ring around the
+  ship); hidden otherwise and while the game is
   minimised - and while it is not in front, unless the setting keeps it up
   through an alt-tab -
   sized from the game window's height and parked in the corner picked under

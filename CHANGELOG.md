@@ -1,5 +1,16 @@
 # Changelog
 
+## 6.7.0
+
+**Added**
+
+- Minimap in the ship: a dashed 2 km ring around the ship, the area an SRV dropped there scans (issue #27).
+
+**Changed**
+
+- Minimap in the ship (under 2 km over a saved map) is on by default; a setting already saved is kept.
+- Minimap codes: Helium H, Helium-3 H3, Haematite HT, fixed. Were assigned by price rank (Helium-3 was HE, Haematite HA).
+
 ## 6.6.5
 
 **Added**

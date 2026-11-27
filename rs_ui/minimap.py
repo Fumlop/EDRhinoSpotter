@@ -162,8 +162,8 @@ def panel_in_scan():
 
 
 def ship_view():
-    """Whether the map shows in the ship (SHIP_KEY). Off unless asked for."""
-    return config.get_bool(SHIP_KEY, default=False) if config is not None else False
+    """Whether the map shows in the ship (SHIP_KEY). On by default."""
+    return config.get_bool(SHIP_KEY, default=True) if config is not None else True
 
 
 def ship_fix(status):
@@ -475,11 +475,11 @@ def _over_map(root, status, system, ids):
     if found.system_address is None:
         found.system_address = address
     _coverage = found
-    _show_map(root, status, system, lat, lon, heading, True, body)
+    _show_map(root, status, system, lat, lon, heading, True, body, ship=True)
     return True
 
 
-def _show_map(root, status, system, lat, lon, heading, in_reach, body):
+def _show_map(root, status, system, lat, lon, heading, in_reach, body, ship=False):
     global _drawn
     rect = overlay._game_rect()
     minimised = bool(rect) and rect[3] - rect[1] < MIN_GAME_HEIGHT
@@ -513,9 +513,9 @@ def _show_map(root, status, system, lat, lon, heading, in_reach, body):
              side, zoom(), where, in_reach, header, _coverage.version,
              _distances_shown(),
              tuple(round(v) for v in _coverage.anchor()), _coverage.centered,
-             _coverage.border_m, _hint(), marks)
+             _coverage.border_m, _hint(), marks, ship)
     if state != _drawn:
-        _draw(side, x, y, heading, in_reach, header, marks, _distances_shown(), base, view)
+        _draw(side, x, y, heading, in_reach, header, marks, _distances_shown(), base, view, ship)
         _drawn = state
     _place(side, where, rect, base)
 
@@ -1249,10 +1249,10 @@ def _header(status, body, system):
 
 
 def _draw(side, x, y, heading, in_reach, header, marks=(), distances=False, base=None,
-          view=coverage.VIEW_M):
+          view=coverage.VIEW_M, ship=False):
     global _photo
     unit, pad, band, width, height = _layout(side, base)
-    image = coverage.render(_coverage, x, y, heading, side, marks, distances, view, base)
+    image = coverage.render(_coverage, x, y, heading, side, marks, distances, view, base, ship)
     data = io.BytesIO()
     image.save(data, "PNG", compress_level=1)
     _photo = tk.PhotoImage(data=base64.b64encode(data.getvalue()))

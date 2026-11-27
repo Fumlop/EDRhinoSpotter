@@ -118,6 +118,7 @@ Linux: top middle of the screen; drag it where you want it, right-click puts it 
 
 - Shown in the SRV while Elite is in front. Paints 2 km (scanner range) around your track; 12 km across, north up.
 - Bookmarks are dots with material codes: green active, red depleted.
+- In the ship, under 2 km over a saved map: the map with a dashed 2 km ring around the ship, where an SRV dropped there scans.
 - At 2x: solid line to the nearest same material, dotted to the next cheaper one, with distances.
 - Saved per body; relaunching within 10 km continues the same map.
 - "Painted" means driven within 2 km, not proven scanned - the game logs no scan.

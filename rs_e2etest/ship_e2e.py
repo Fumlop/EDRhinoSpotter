@@ -132,7 +132,9 @@ try:
     check("setup: the SRV painted and showed the map", shown() and minimap._coverage.version > 0,
           f"shown {shown()}, version {minimap._coverage.version}")
 
-    # 1. switch off (default): the ship over the map shows nothing
+    # 1. switch off: the ship over the map shows nothing. Default is on.
+    check("1 default on: nothing stored reads True", minimap.ship_view() is True)
+    minimap.config.values[minimap.SHIP_KEY] = False
     tick(ship(north(200), altitude=500))
     check("1 switch off: not shown in the ship", not shown())
 
