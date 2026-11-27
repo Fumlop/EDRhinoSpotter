@@ -18,6 +18,14 @@ import traceback
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN = os.path.dirname(HERE)
+
+# SendInput reaches whoever holds Ctrl+Alt+Z/B: a running EDMC's plugin recentres and
+# clips the live map (border 0 m wiped a drive, 2026-11-27). Refuse before anything runs.
+_edmc = subprocess.run(["tasklist", "/FI", "IMAGENAME eq EDMarketConnector.exe", "/NH"],
+                       capture_output=True, text=True).stdout
+if "EDMarketConnector.exe" in _edmc:
+    print("REFUSED: EDMarketConnector.exe is running; close EDMC and rerun. Nothing sent.")
+    raise SystemExit(2)
 LIVE_DB = os.path.join(os.environ["LOCALAPPDATA"], "RhinoSpotter", "db", "rhinospotter.db")
 OUT = os.path.join(HERE, "out", time.strftime("%Y%m%d-%H%M%S"))
 DATA = os.path.join(OUT, "localappdata")
@@ -205,6 +213,9 @@ def body():
         free_before = {c: probe(c) for c in defaults().values()}
         check("0 defaults free before start (premise)", all(v == 0 for v in free_before.values()),
               str(free_before))
+        if any(free_before.values()):            # another process holds them: SendInput would reach it
+            check("0 stopped: no key sent while another process holds the defaults", True)
+            return
 
         # 1. Defaults held after start().
         hotkey.start(callbacks())
