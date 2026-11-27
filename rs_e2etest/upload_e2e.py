@@ -75,6 +75,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         posts.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
         code = 401 if self.path.endswith("/401") else 200
+        if self.path.endswith("/slow"):
+            time.sleep(0.1)                              # s per POST, so progress can be sampled
         body = b'{"detail": "Invalid access key"}' if code == 401 else b'{"detail": "ok"}'
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
@@ -84,6 +86,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def log_message(self, *args):
         pass
+
+
+def deposits():
+    """Every bookmark posted so far, across batches."""
+    return [d for p in posts for d in p["deposits"]]
+
+
+def done(core, timeout=5.0):
+    """True once `core` reports a finished upload."""
+    return wait_for(lambda: core.status_msg.endswith("uploaded"), timeout)
 
 
 def free_port():
@@ -140,9 +152,9 @@ try:
 
     # 4. enabled
     core.update(True)
-    got = wait_for(lambda: posts, 3.0)
-    sent = posts[0]["deposits"] if got else []
-    check("4 enabled: one POST", got and len(posts) == 1, f"{len(posts)} posts")
+    got = done(core)
+    sent = deposits()
+    check("4 enabled: uploaded in batches of 50", got and len(posts) == -(-expected // 50), f"{len(posts)} posts")
     check("4 every bookmark sent", len(sent) == expected, f"{len(sent)} of {expected}")
     check("4 access key sent", got and posts[0].get("access_key") == "e2e-key")
     check("4 commander anonymous by default",
@@ -152,7 +164,7 @@ try:
 
     # 5. next check
     time.sleep(1.5)
-    check("5 nothing sent twice", len(posts) == 1, f"{len(posts)} posts")
+    check("5 nothing sent twice", len(deposits()) == expected, f"{len(deposits())} sent")
     t0 = time.monotonic()
     core.stop()
     check("5 stop() while idle", time.monotonic() - t0 < 1.5, f"{time.monotonic() - t0:.2f} s")
@@ -163,9 +175,9 @@ try:
     config.set(upload.UPLOAD_INCLUDE_CMDR_NAME_KEY, True)
     named = upload.UploadCore()
     named.update(True)
-    got = wait_for(lambda: posts, 3.0)
+    got = done(named)
     stored = [b.get("commander") for b in rs_api.bookmarks()]
-    sent = [b.get("commander") for b in posts[0]["deposits"]] if got else []
+    sent = [b.get("commander") for b in deposits()]
     check("6 CMDR name on: names sent as stored", got and sent == stored,
           f"{sum(1 for c in sent if c == 'anonymous')} anonymous of {len(sent)}")
     named.stop()
@@ -255,9 +267,9 @@ try:
     posts.clear()
     nameless = upload.UploadCore()
     nameless.update(True)
-    sent = wait_for(lambda: posts, 3.0)
+    done(nameless)
     nameless.stop()
-    count = len(posts[0]["deposits"]) if sent else 0
+    count = len(deposits())
     check("17 premise: rs_api returns a bookmark with system None", premise)
     check("17 bookmark without system: all uploaded", count == len(rs_api.bookmarks()),
           f"{count} of {len(rs_api.bookmarks())}")
@@ -286,23 +298,46 @@ try:
     posts.clear()
     awake = upload.UploadCore()
     awake.update(True)
-    first = wait_for(lambda: posts, 3.0)
-    time.sleep(0.3)
+    first = done(awake)
+    after_first = len(posts)
     with sqlite3.connect(database.PATH) as db:
         db.execute("UPDATE bookmarks SET rigs = 99, data = json_set(data, '$.rigs', 99) "
                    "WHERE id = (SELECT MAX(id) FROM bookmarks)")
     t0 = time.monotonic()
     awake.update(True)                                   # what Settings OK calls
-    second = wait_for(lambda: len(posts) >= 2, 3.0)
+    second = wait_for(lambda: len(posts) > after_first, 3.0)
     took = time.monotonic() - t0
     awake.stop()
     upload.NEW_BOOKMARKS_CHECK_INTERVAL = 0.5
     check("20 first upload on start", first)
     check("20 OK uploads the changed bookmark within 3 s (interval 60 s)",
-          second and len(posts[1]["deposits"]) == 1, f"{took:.2f} s, {len(posts)} posts")
+          second and len(posts[after_first]["deposits"]) == 1, f"{took:.2f} s, {len(posts)} posts")
+
+    # 21. batches of UPLOAD_BATCH, progress (sent, total) meanwhile, None after
+    upload.UPLOAD_DATA_FILEPATH.unlink(missing_ok=True)
+    posts.clear()
+    config.set(upload.UPLOAD_URL_KEY, URL + "/slow")
+    batched = upload.UploadCore()
+    seen = []
+    batched.update(True)
+    end = time.monotonic() + 5.0
+    while time.monotonic() < end and not batched.status_msg.endswith("uploaded"):
+        if batched.progress and batched.progress not in seen:
+            seen.append(batched.progress)
+        time.sleep(0.02)
+    batched.stop()
+    config.set(upload.UPLOAD_URL_KEY, URL)
+    total = len(rs_api.bookmarks())
+    sizes = [len(p["deposits"]) for p in posts]
+    check("21 one POST per 50 bookmarks", sizes == [min(50, total - i) for i in range(0, total, 50)], str(sizes))
+    check("21 progress seen rising, total right",
+          len(seen) >= 3 and all(b[0] > a[0] for a, b in zip(seen, seen[1:])) and seen[0][1] == total,
+          str(seen[:4]))
+    check("21 progress None when done", batched.progress is None, batched.status_msg)
 
     # 8. _on_ui without an upload core
     import tkinter as tk                                 # noqa: E402
+    import tkinter.ttk                                   # noqa: E402
     from rs_ui import main                               # noqa: E402
     root = tk.Tk()
     root.withdraw()
@@ -312,6 +347,22 @@ try:
         check("8 _on_ui with _upload_core None", True)
     except Exception as err:
         check("8 _on_ui with _upload_core None", False, repr(err))
+
+    # 22. panel bar: shown with the progress, hidden without
+    bar = tkinter.ttk.Progressbar(tk.Frame(root))
+    bar.grid(row=10, column=0)
+    bar.grid_remove()
+    line = tk.Label(tk.Frame(root), text="")
+    line.grid(row=9, column=0)
+    main._upload_status, main._upload_bar = line, bar
+    main._upload_core = types.SimpleNamespace(enabled=True, status_msg="", progress=(150, 379))
+    main._set_upload_status("Uploading 150 of 379 bookmarks")
+    shown = bar.winfo_manager() == "grid" and float(bar.cget("value")) == 150 and float(bar.cget("maximum")) == 379
+    main._upload_core.progress = None
+    main._set_upload_status("379 bookmarks uploaded")
+    check("22 bar shown at 150 of 379", shown)
+    check("22 bar hidden when done", bar.winfo_manager() == "")
+    main._upload_core = main._upload_status = main._upload_bar = None
 
     # 9. _on_ui (called from hotkey, press and Spansh threads) leaves the upload core alone
     touched = []

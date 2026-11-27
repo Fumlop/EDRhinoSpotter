@@ -33,6 +33,7 @@ Output: `report.txt`. No grabs. Needs the live db at
 - A bookmark with no system raises TypeError in the key on every check:
   nothing uploads, the panel stays blank.
 - Settings OK waits for the next check (up to 5 min) before the first upload.
+- Everything in one POST: no progress to show.
 - One failed round (3 attempts) stops uploads until EDMC restarts.
 - Panel line shows an HTTP code or "Attempt 1/3" instead of what to do.
 - Settings tab shows "Include CMDR name" ticked with nothing stored (UI
@@ -44,7 +45,7 @@ Output: `report.txt`. No grabs. Needs the live db at
    `$XDG_DATA_HOME/RhinoSpotter`.
 2. `UPLOAD_DATA_FILEPATH` under `out/<ts>/RhinoSpotter`.
 3. Disabled 2 s: no POST, no worker thread, < 50 ms CPU.
-4. Enabled: one POST with every bookmark `rs_api.bookmarks()` returns,
+4. Enabled: one POST per 50, together every bookmark `rs_api.bookmarks()` returns,
    access key sent, commander `anonymous`, `upload_data.json` written.
 5. Next check: no second POST.
 6. Fresh data, CMDR name on: names sent as stored.
@@ -74,6 +75,10 @@ Output: `report.txt`. No grabs. Needs the live db at
     access key; both set: none.
 20. Interval 60 s, worker asleep after its first upload; one bookmark's rigs
     changed, `update(True)` (Settings OK): that one bookmark posted within 3 s.
+21. Server answering in 0.1 s: one POST per 50 bookmarks, `progress` sampled
+    rising with the right total, None when done.
+22. Panel bar (a ttk.Progressbar as `_panel` grids it): shown at 150 of 379,
+    hidden once `progress` is None.
 
 ## Not covered
 

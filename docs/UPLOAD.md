@@ -13,7 +13,8 @@ EDMC > File > Settings > RhinoSpotter, under the separator:
    `http://` is refused except to localhost / 127.0.0.1 / ::1.
 3. **Access Key**: the key the admin gave you.
 4. **Send my CMDR name with them**: off sends `commander` as `anonymous`.
-5. OK. The panel shows an upload line while uploads are on.
+5. OK. The first upload starts at once; the panel shows an upload line and,
+   while it runs, a progress bar.
 
 ## What the panel line says
 
@@ -45,7 +46,7 @@ longitude, rigs, density, amount, depleted, depleted_at, marked_at, kept in
 
 ## Server contract
 
-One request per upload:
+One request per 50 bookmarks:
 
 ```
 POST <Server URL>

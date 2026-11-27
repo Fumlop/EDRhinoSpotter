@@ -30,6 +30,7 @@ UPLOAD_RETRY_WAIT                   = 5         # s between attempts
 STOP_JOIN_TIMEOUT                   = 1
 UPLOAD_TIMEOUT                      = 20        # s per request
 MAX_UPLOAD_ATTEMPTS                 = 3
+UPLOAD_BATCH                        = 50        # bookmarks per POST
 
 
 UPLOAD_ENABLED_KEY              = 'rhinospotter_uploading_enabled'
@@ -79,6 +80,7 @@ class UploadCore():
     def __init__(self, enabled=False):
         self.enabled = enabled
         self.status_msg = ''
+        self.progress = None
 
         self._uploaded_bookmarks_checksums = {}
         self._upload_thread = None
@@ -175,34 +177,44 @@ class UploadCore():
         raise UploadError('Upload server error - ask whoever runs it')
 
     def _upload(self, bookmarks, stop) -> None:
-        """Retries connect errors and timeouts only."""
+        """UPLOAD_BATCH bookmarks per POST; `progress` is (sent, total) meanwhile, else None."""
         if not config.get_bool(UPLOAD_INCLUDE_CMDR_NAME_KEY, default=False):
             for bookmark in bookmarks:
                 bookmark['commander'] = 'anonymous'
 
-        self.status_msg = f'Uploading {len(bookmarks)} bookmarks...'
+        total = len(bookmarks)
+        for sent in range(0, total, UPLOAD_BATCH):
+            self.progress = (sent, total)
+            self.status_msg = f'Uploading {sent} of {total} bookmarks'
+            if not self._send_batch(bookmarks[sent:sent + UPLOAD_BATCH], stop):
+                self.progress = None
+                return
+        self.progress = None
+        self.status_msg = f'{total} bookmarks uploaded'
 
+    def _send_batch(self, batch, stop) -> bool:
+        """True once sent. Retries connect errors and timeouts only."""
         for attempt in range(1, MAX_UPLOAD_ATTEMPTS + 1):
             try:
-                self._send_to_server(bookmarks)
+                self._send_to_server(batch)
                 self._save_upload_data()
-                self.status_msg = f'{len(bookmarks)} bookmarks uploaded'
-                return
+                return True
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
                 msg = 'Upload server unreachable - check the URL in Settings'
                 logger.error(f'Upload attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: {type(exc).__name__}')
             except UploadError as exc:
                 self.status_msg = str(exc)
                 logger.error(f'Upload: {exc}; next try in {NEW_BOOKMARKS_CHECK_INTERVAL} s')
-                return
+                return False
             except Exception as exc:
                 msg = 'Upload failed - details in the EDMC log'
                 logger.error(f'Upload attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: {exc!r}')
             self.status_msg = msg
             if attempt < MAX_UPLOAD_ATTEMPTS and stop.wait(UPLOAD_RETRY_WAIT):
-                return
+                return False
 
         logger.error(f'Upload failed {MAX_UPLOAD_ATTEMPTS} times, next try in {NEW_BOOKMARKS_CHECK_INTERVAL} s')
+        return False
 
     def _upload_worker(self, stop) -> None:
         """Every NEW_BOOKMARKS_CHECK_INTERVAL s until `stop`: upload new or changed bookmarks."""

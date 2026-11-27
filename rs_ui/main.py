@@ -12,6 +12,7 @@ worker fails minutes later somewhere unrelated.
 import threading
 import time
 import tkinter as tk
+from tkinter import ttk
 from datetime import datetime, timezone
 
 from rs_core import (bodies, cards, coverage, database, deposit, grounds, instance, migrate,
@@ -79,6 +80,7 @@ _scan_count = None       # how many landable bodies the current system has
 
 _upload_core = None
 _upload_status = None
+_upload_bar = None
 
 # What the dropdown says before anything is picked. A real string rather than
 # an empty one: an OptionMenu with "" in it draws as a blank sunken box with a
@@ -165,7 +167,7 @@ def refused():
 def build(parent, updates=True, docked=False):
     """The panel. `updates`: look for a release once, at start; standalone.py passes False.
     `docked`: standalone.py, the panel inside RhinoData: no version, count or RhinoData button."""
-    global _frame, _status, _upload_status, _scan_count, _card_button, _landed_after, _hint
+    global _frame, _status, _upload_status, _upload_bar, _scan_count, _card_button, _landed_after, _hint
     global _loc, _rigs, _material, _density, _amount, _search, _menu, _filter
 
     if _refused is not None:
@@ -188,6 +190,7 @@ def build(parent, updates=True, docked=False):
 
     widgets = _panel(parent, docked=docked)
     _frame, _status, _upload_status, _scan_count = widgets["frame"], widgets["status"], widgets["upload_status"], widgets["count"]
+    _upload_bar = widgets["upload_bar"]
     _card_button, _hint, _menu = widgets["card"], widgets["hint"], widgets["menu"]
 
     if theme:
@@ -316,8 +319,12 @@ def _panel(parent, docked=False):
     upload_status = tk.Label(frame, text="", anchor="w", wraplength=320, justify="left")
     upload_status.grid(row=9, column=0, columnspan=4, sticky="w", padx=2)
     upload_status.grid_remove()
+    upload_bar = ttk.Progressbar(frame, mode="determinate", length=200)
+    upload_bar.grid(row=10, column=0, columnspan=4, sticky="w", padx=2, pady=(0, 2))
+    upload_bar.grid_remove()
 
-    return {"frame": frame, "status": status, "upload_status": upload_status, "count": count, "card": card,
+    return {"frame": frame, "status": status, "upload_status": upload_status, "upload_bar": upload_bar,
+            "count": count, "card": card,
             "hint": hint, "menu": menu}
 
 
@@ -1000,7 +1007,7 @@ def _set_status(text):
         _mirror("status", _status, text=text)
 
 def _set_upload_status(text):
-    """Show `text` while uploads are on, else hide the line."""
+    """Show `text` while uploads are on, else hide the line; the bar while _upload_core.progress."""
     if not _upload_status:
         return
     if _upload_core and _upload_core.enabled and text:
@@ -1008,6 +1015,12 @@ def _set_upload_status(text):
         _mirror("upload_status", _upload_status, text=text)
     else:
         _upload_status.grid_remove()
+    progress = getattr(_upload_core, "progress", None)
+    if _upload_bar and progress:
+        _upload_bar.config(maximum=progress[1], value=progress[0])
+        _upload_bar.grid()
+    elif _upload_bar:
+        _upload_bar.grid_remove()
 
 
 # How long a passing note stays on the status line. Errors and updates stay
