@@ -55,6 +55,8 @@ def restyle(widget):
         style_field(widget)
         return
     options = widget.keys()
+    if "bg" not in options:                         # ttk widgets, e.g. the upload Progressbar
+        return
     widget.config(bg=BG)
     if "fg" in options and str(widget.cget("fg")).startswith("System"):
         widget.config(fg=FG)

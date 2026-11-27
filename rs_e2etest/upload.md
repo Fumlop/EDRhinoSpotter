@@ -46,14 +46,14 @@ Output: `report.txt`. No grabs. Needs the live db at
 2. `UPLOAD_DATA_FILEPATH` under `out/<ts>/RhinoSpotter`.
 3. Disabled 2 s: no POST, no worker thread, < 50 ms CPU.
 4. Enabled: one POST per 50, together every bookmark `rs_api.bookmarks()` returns,
-   access key sent, commander `anonymous`, `upload_data.json` written.
+   access key sent, CMDR names as stored, `upload_data.json` written.
 5. Next check: no second POST.
-6. Fresh data, CMDR name on: names sent as stored.
+6. Fresh data, CMDR name off: commander `anonymous`.
 7. Server down: `stop()` returns within 1.5 s while in a retry wait; panel
    line says to check the URL in Settings.
 8. `rs_ui.main._on_ui` with `_upload_core` None: no raise.
 9. `_on_ui` from a worker thread: the upload core is not called.
-10. Settings tab built with nothing stored: CMDR name unticked; OK stores False.
+10. Settings tab built with nothing stored: CMDR name ticked; OK stores True.
 11. `http://` URL to a non-loopback host: refused before any request, status
     says to fix it in Settings; the URL path is not in `upload.log`.
 12. Server answers 401: panel line says to check the access key in Settings,

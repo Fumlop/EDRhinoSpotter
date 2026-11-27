@@ -7,12 +7,12 @@ sees each other's deposits. RhinoSpotter does not run or provide a server.
 
 EDMC > File > Settings > RhinoSpotter, under the separator:
 
-1. Tick **Upload bookmarks to a team server, checked every 5 min**. A notice
+1. Tick **Upload bookmarks to a team server** (checked every 5 min). A notice
    lists what is sent.
-2. **Server URL (https://)**: the address the server's admin gave you.
+2. **Server URL (https required)**: the address the server's admin gave you.
    `http://` is refused except to localhost / 127.0.0.1 / ::1.
 3. **Access Key**: the key the admin gave you.
-4. **Send my CMDR name with them**: off sends `commander` as `anonymous`.
+4. **Send my CMDR name**: on by default; off sends `commander` as `anonymous`.
 5. OK. The first upload starts at once; the panel shows an upload line and,
    while it runs, a progress bar.
 
@@ -25,11 +25,11 @@ EDMC > File > Settings > RhinoSpotter, under the separator:
 | `Set the upload server URL and access key in Settings` | enter both; nothing runs until then |
 | `Set the upload server URL in Settings` | enter the URL |
 | `Set the upload access key in Settings` | enter the key |
-| `Upload refused - check the access key in Settings` | fix the key (server answered 401) |
+| `Upload refused - check Access Key in Settings` | fix the key (server answered 401) |
 | `Upload server unreachable - check the URL in Settings` | fix the URL, or the server is down |
 | `Upload server URL must start with https:// - fix it in Settings` | fix the URL |
-| `Upload server offline - ask whoever runs it` | server answered 502 |
-| `Upload server error - ask whoever runs it` | any other answer; code in the EDMC log |
+| `Upload server offline - Contact owner` | server answered 502 |
+| `Upload server error - Contact owner` | any other answer; code in the EDMC log |
 | `Upload failed - details in the EDMC log` | send the log to whoever runs the server |
 
 A connect error or timeout is tried 3 times, 5 s apart; any other failure
@@ -63,7 +63,7 @@ Content-Type: application/json
 | Answer | Plugin |
 |---|---|
 | 200 | marks the bookmarks sent; body ignored |
-| 401 | "check the access key" |
+| 401 | "check Access Key" |
 | 502 | "server offline" |
 | other | "server error"; code and first 200 chars of the body to the log |
 
