@@ -20,6 +20,8 @@ Output: `report.txt`. No grabs. Needs the live db at
   `_upload_core.upload_bookmarks()` unconditionally).
 - `_on_ui`, called from the hotkey, press and Spansh threads, runs the
   upload check and a Tk label update on that thread.
+- Access key sent over plain http; the full URL (token in path or query)
+  written to the log.
 - Settings tab shows "Include CMDR name" ticked with nothing stored (UI
   default True, core default False): OK stores True.
 
@@ -37,6 +39,8 @@ Output: `report.txt`. No grabs. Needs the live db at
 8. `rs_ui.main._on_ui` with `_upload_core` None: no raise.
 9. `_on_ui` from a worker thread: the upload core is not called.
 10. Settings tab built with nothing stored: CMDR name unticked; OK stores False.
+11. `http://` URL to a non-loopback host: refused before any request, status
+    says to fix it in Settings; the URL path is not in `upload.log`.
 
 ## Not covered
 

@@ -11,6 +11,7 @@ import json
 import os
 import pathlib
 import threading
+import urllib.parse
 
 from rs_core import database
 from rs_core.logging import logger
@@ -53,6 +54,9 @@ UPLOAD_ENABLED_KEY              = 'rhinospotter_uploading_enabled'
 UPLOAD_INCLUDE_CMDR_NAME_KEY    = 'rhinospotter_upload_cmdr_name'
 UPLOAD_URL_KEY                  = 'rhinospotter_upload_url'
 UPLOAD_ACCESS_KEY_KEY           = 'rhinospotter_upload_access_key'
+
+# Hosts allowed over http; every other URL must be https (the access key is in the body).
+LOOPBACK_HOSTS = ('localhost', '127.0.0.1', '::1')
 
 BOOKMARK_CHECKSUM_FIELDS = [
     'system',
@@ -193,7 +197,14 @@ class UploadCore():
             'deposits':     data,
         }
         
-        logger.info(f'Upload: Connecting to "{upload_url}"...')
+        host = urllib.parse.urlsplit(upload_url).hostname
+        if not upload_url.lower().startswith('https://') and host not in LOOPBACK_HOSTS:
+            self.status_msg = 'Upload server URL must start with https:// - fix it in Settings'
+            logger.error('Upload: URL is not https, not sent')
+            raise IOError(self.status_msg)
+
+        # Host only: path or query of the URL can carry a token.
+        logger.info(f'Upload: POST to {host}')
         
         response = requests.post(
             upload_url,

@@ -7,6 +7,7 @@ LOCALAPPDATA points at the run folder before rs_core loads; db copied from the l
 
 import http.server
 import json
+import logging
 import os
 import shutil
 import socket
@@ -51,6 +52,10 @@ from rs_core import database                             # noqa: E402
 from rs_core import upload                               # noqa: E402
 
 assert database.PATH.startswith(OUT), database.PATH
+logging.getLogger().handlers.clear()
+_log = logging.FileHandler(os.path.join(OUT, "upload.log"), encoding="utf-8")
+logging.getLogger().addHandler(_log)
+logging.getLogger().setLevel(logging.INFO)
 config = upload.config
 lines, failed = [], 0
 
@@ -180,6 +185,18 @@ try:
     took = time.monotonic() - t0
     check("7 server down: in a retry wait", in_retry, down.status_msg)
     check("7 stop() within 1.5 s", took < 1.5, f"{took:.2f} s")
+
+    # 11. plain http to a non-loopback host: refused before any request
+    upload.UPLOAD_DATA_FILEPATH.unlink(missing_ok=True)
+    config.set(upload.UPLOAD_URL_KEY, "http://upload.invalid/upload")
+    plain = upload.UploadCore(enabled=True)
+    plain.start()
+    refused = wait_for(lambda: "https://" in plain.status_msg, 3.0)
+    plain.stop()
+    log = open(os.path.join(OUT, "upload.log"), encoding="utf-8").read() if os.path.exists(
+        os.path.join(OUT, "upload.log")) else ""
+    check("11 http URL refused, says what to do", refused, plain.status_msg)
+    check("11 URL path not in the log", "/upload" not in log)
 
     # 8. _on_ui without an upload core
     import tkinter as tk                                 # noqa: E402
