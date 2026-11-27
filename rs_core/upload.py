@@ -181,7 +181,7 @@ class UploadCore():
         raise UploadError('Upload server error - ask whoever runs it')
 
     def _upload(self, bookmarks) -> None:
-        """Up to MAX_UPLOAD_ATTEMPTS tries; after the last, the next check tries again."""
+        """Up to MAX_UPLOAD_ATTEMPTS tries on connect errors and timeouts, one on an UploadError; the next check tries again."""
         # Read on every upload: the setting can change while EDMC runs.
         if not config.get_bool(UPLOAD_INCLUDE_CMDR_NAME_KEY, default=False):
             for bookmark in bookmarks:
@@ -202,8 +202,11 @@ class UploadCore():
                 # Type only: the requests message repeats the URL path.
                 logger.error(f'Upload attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: {type(exc).__name__}')
             except UploadError as exc:
-                msg = str(exc)
-                logger.error(f'Upload attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: {msg}')
+                # The server's answer or the settings: a retry 5 s later gets the same.
+                self.status_msg = str(exc)
+                logger.error(f'Upload: {exc}; next try in {NEW_BOOKMARKS_CHECK_INTERVAL} s')
+                self.status = Status.IDLE
+                return
             except Exception as exc:
                 msg = 'Upload failed - details in the EDMC log'
                 logger.error(f'Upload attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: {exc!r}')

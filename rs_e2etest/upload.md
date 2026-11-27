@@ -27,6 +27,8 @@ Output: `report.txt`. No grabs. Needs the live db at
 - A broken `upload_data.json` (valid JSON but not an object, unreadable)
   raises in `UploadCore()`, which `main.start()` builds with uploads off too:
   the plugin does not start.
+- A 401, non-https URL or missing URL retried 3 times 5 s apart: the answer
+  cannot change within a check.
 - One failed round (3 attempts) stops uploads until EDMC restarts.
 - Panel line shows an HTTP code or "Attempt 1/3" instead of what to do.
 - Settings tab shows "Include CMDR name" ticked with nothing stored (UI
@@ -51,7 +53,8 @@ Output: `report.txt`. No grabs. Needs the live db at
     says to fix it in Settings; the URL path is not in `upload.log`.
 12. Server answers 401: panel line says to check the access key in Settings,
     without the HTTP code.
-13. Server refuses 3 attempts, then accepts: the next check uploads.
+13. Server answers 401: one POST, no retry within the check; then accepts:
+    the next check uploads.
 14. Panel upload line (a Label gridded and removed as `_panel` does; `_panel`
     needs `build()` state): hidden while off, shown with the text once
     `_upload_core.enabled` is set, hidden again when turned off.

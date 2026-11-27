@@ -26,7 +26,8 @@ EDMC > File > Settings > RhinoSpotter, under the separator:
 | `Upload server offline - ask whoever runs it` | server answered 502 |
 | `Upload server error - ask whoever runs it` | any other answer; code in the EDMC log |
 
-After 3 failed attempts 5 s apart, the next check (5 min) tries again.
+A connect error or timeout is tried 3 times, 5 s apart; any other failure
+once. Either way the next check (5 min) tries again.
 
 ## What is sent
 
