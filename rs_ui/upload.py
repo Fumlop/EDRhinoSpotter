@@ -24,6 +24,8 @@ def prefs(frame: tk.Frame) -> tk.Frame:
     """Add the upload rows under the rows already in `frame`; returns `frame`."""
     global _upload_enabled, _upload_include_cmdr_name, _upload_url, _upload_access_key
 
+    if nb is None:          # outside EDMC: no myNotebook
+        return frame
     cur_row = frame.grid_size()[1] + 1
 
     ttk.Separator(frame, orient='horizontal').grid(row=cur_row, column=0, columnspan=2, sticky='ew', padx=5, pady=2)
