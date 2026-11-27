@@ -160,7 +160,7 @@ class UploadCore():
             raise UploadError('Upload server offline - ask whoever runs it')
         raise UploadError('Upload server error - ask whoever runs it')
 
-    def _upload(self, bookmarks) -> None:
+    def _upload(self, bookmarks, stop) -> None:
         """Retries connect errors and timeouts only."""
         if not config.get_bool(UPLOAD_INCLUDE_CMDR_NAME_KEY, default=False):
             for bookmark in bookmarks:
@@ -185,39 +185,64 @@ class UploadCore():
                 msg = 'Upload failed - details in the EDMC log'
                 logger.error(f'Upload attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: {exc!r}')
             self.status_msg = msg
-            if attempt < MAX_UPLOAD_ATTEMPTS and self._stop.wait(UPLOAD_RETRY_WAIT):
+            if attempt < MAX_UPLOAD_ATTEMPTS and stop.wait(UPLOAD_RETRY_WAIT):
                 return
 
         logger.error(f'Upload failed {MAX_UPLOAD_ATTEMPTS} times, next try in {NEW_BOOKMARKS_CHECK_INTERVAL} s')
 
-    def _upload_worker(self) -> None:
-        """Every NEW_BOOKMARKS_CHECK_INTERVAL s while enabled: upload new or changed bookmarks."""
+    def _upload_worker(self, stop) -> None:
+        """Every NEW_BOOKMARKS_CHECK_INTERVAL s until `stop`: upload new or changed bookmarks."""
         logger.info('Starting _upload_worker...')
         while True:
-            if self.enabled:
-                try:
-                    bookmarks = self._get_new_bookmarks()
-                    if bookmarks:
-                        logger.info(f'Uploading {len(bookmarks)} bookmarks...')
-                        self._upload(bookmarks)
-                except Exception as exc:
-                    logger.error(f'Upload check failed: {exc!r}')
-            if self._stop.wait(NEW_BOOKMARKS_CHECK_INTERVAL):
+            try:
+                bookmarks = self._get_new_bookmarks()
+                if bookmarks:
+                    logger.info(f'Uploading {len(bookmarks)} bookmarks...')
+                    self._upload(bookmarks, stop)
+            except Exception as exc:
+                logger.error(f'Upload check failed: {exc!r}')
+            if stop.wait(NEW_BOOKMARKS_CHECK_INTERVAL):
                 return
 
+    def missing(self) -> str:
+        """'' when URL and access key are set, else the panel line naming what to set."""
+        url = (config.get_str(UPLOAD_URL_KEY, default='') or '').strip()
+        key = (config.get_str(UPLOAD_ACCESS_KEY_KEY, default='') or '').strip()
+        if not url and not key:
+            return 'Set the upload server URL and access key in Settings'
+        if not url:
+            return 'Set the upload server URL in Settings'
+        if not key:
+            return 'Set the upload access key in Settings'
+        return ''
+
+    def running(self) -> bool:
+        return bool(self._upload_thread and self._upload_thread.is_alive())
+
+    def update(self, enabled) -> None:
+        """Worker runs only while `enabled` and missing() is ''. Called at start and on Settings OK."""
+        self.enabled = enabled
+        missing = self.missing() if enabled else ''
+        if enabled and not missing:
+            if not self.running():
+                self.start()
+        else:
+            self.stop()
+            self.status_msg = missing
+
     def start(self) -> None:
-        """Start the daemon worker thread."""
+        """Start the daemon worker thread with a fresh stop event."""
         logger.info('Starting upload thread...')
-        self._upload_thread = threading.Thread(target=self._upload_worker, name='RhinoSpotter upload thread')
+        self._stop = threading.Event()
+        self._upload_thread = threading.Thread(target=self._upload_worker, args=(self._stop,),
+                                               name='RhinoSpotter upload thread')
         self._upload_thread.daemon = True
         self._upload_thread.start()
 
     def stop(self) -> None:
         """Signal the worker, join up to STOP_JOIN_TIMEOUT s."""
-        logger.info('Shutting down...')
-        self.enabled = False
         self._stop.set()
         if self._upload_thread:
+            logger.info('Stopping upload thread')
             self._upload_thread.join(STOP_JOIN_TIMEOUT)
             self._upload_thread = None
-        logger.info('Done')

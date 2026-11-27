@@ -10,7 +10,7 @@ Output: `report.txt`. No grabs. Needs the live db at
 
 - Import raises without LOCALAPPDATA (Linux): `pathlib.Path(None)`.
 - Upload data written outside the RhinoSpotter data folder.
-- Worker busy while uploads are off: wakes every 10 ms instead of blocking.
+- Worker running while uploads are off or URL / access key are empty.
 - Nothing uploaded once enabled; or a POST while disabled.
 - Commander name sent while "Include CMDR name" was never set.
 - The same bookmarks sent again on the next check.
@@ -42,7 +42,7 @@ Output: `report.txt`. No grabs. Needs the live db at
 1. Subprocess without LOCALAPPDATA, XDG_DATA_HOME set: import ok, path under
    `$XDG_DATA_HOME/RhinoSpotter`.
 2. `UPLOAD_DATA_FILEPATH` under `out/<ts>/RhinoSpotter`.
-3. Disabled 2 s: no POST, worker parked in `Event.wait`, < 50 ms CPU.
+3. Disabled 2 s: no POST, no worker thread, < 50 ms CPU.
 4. Enabled: one POST with every bookmark `rs_api.bookmarks()` returns,
    access key sent, commander `anonymous`, `upload_data.json` written.
 5. Next check: no second POST.
@@ -66,6 +66,9 @@ Output: `report.txt`. No grabs. Needs the live db at
 16. URL saved with spaces / a newline around it: uploaded.
 17. One bookmark's `system` column NULL and `system` removed from its `data`
     JSON in the test db (`planet_name` is NOT NULL): `rs_api` returns it with system None; every bookmark still uploaded.
+18. Uploads on, no access key: no worker thread, panel line says set it; key
+    set and `update(True)`: worker runs; URL cleared: worker stops; uploads
+    off: no worker, no line.
 
 ## Not covered
 

@@ -101,11 +101,6 @@ def wait_for(cond, timeout):
     return cond()
 
 
-def parked(core):
-    """True when the worker thread's innermost frame is in threading's wait."""
-    frame = sys._current_frames().get(core._upload_thread.ident)
-    return frame is not None and frame.f_code.co_name == "wait"
-
 
 server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
 threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -134,17 +129,17 @@ try:
     # 3. disabled
     config.set(upload.UPLOAD_URL_KEY, URL)
     config.set(upload.UPLOAD_ACCESS_KEY_KEY, "e2e-key")
-    core = upload.UploadCore(enabled=False)
+    core = upload.UploadCore()
     proc0 = time.process_time()
-    core.start()
+    core.update(False)
     time.sleep(2.0)
     proc = time.process_time() - proc0
     check("3 disabled: no POST", not posts, f"{len(posts)} posts")
-    check("3 disabled: worker parked in wait", parked(core))
+    check("3 disabled: no worker thread", not core.running())
     check("3 disabled: < 50 ms CPU in 2 s", proc < 0.05, f"{proc * 1000:.0f} ms")
 
     # 4. enabled
-    core.enabled = True
+    core.update(True)
     got = wait_for(lambda: posts, 3.0)
     sent = posts[0]["deposits"] if got else []
     check("4 enabled: one POST", got and len(posts) == 1, f"{len(posts)} posts")
@@ -166,8 +161,8 @@ try:
     upload.UPLOAD_DATA_FILEPATH.unlink()
     posts.clear()
     config.set(upload.UPLOAD_INCLUDE_CMDR_NAME_KEY, True)
-    named = upload.UploadCore(enabled=True)
-    named.start()
+    named = upload.UploadCore()
+    named.update(True)
     got = wait_for(lambda: posts, 3.0)
     stored = [b.get("commander") for b in rs_api.bookmarks()]
     sent = [b.get("commander") for b in posts[0]["deposits"]] if got else []
@@ -178,8 +173,8 @@ try:
     # 7. server down
     upload.UPLOAD_DATA_FILEPATH.unlink()
     config.set(upload.UPLOAD_URL_KEY, f"http://127.0.0.1:{free_port()}/upload")
-    down = upload.UploadCore(enabled=True)
-    down.start()
+    down = upload.UploadCore()
+    down.update(True)
     in_retry = wait_for(lambda: "unreachable" in down.status_msg, 5.0)
     t0 = time.monotonic()
     down.stop()
@@ -191,8 +186,8 @@ try:
     # 11. plain http to a non-loopback host: refused before any request
     upload.UPLOAD_DATA_FILEPATH.unlink(missing_ok=True)
     config.set(upload.UPLOAD_URL_KEY, "http://upload.invalid/upload")
-    plain = upload.UploadCore(enabled=True)
-    plain.start()
+    plain = upload.UploadCore()
+    plain.update(True)
     refused = wait_for(lambda: "https://" in plain.status_msg, 3.0)
     plain.stop()
     log = open(os.path.join(OUT, "upload.log"), encoding="utf-8").read() if os.path.exists(
@@ -203,8 +198,8 @@ try:
     # 12. 401: the panel line says to check the access key, no HTTP code on it
     upload.UPLOAD_DATA_FILEPATH.unlink(missing_ok=True)
     config.set(upload.UPLOAD_URL_KEY, URL + "/401")
-    denied = upload.UploadCore(enabled=True)
-    denied.start()
+    denied = upload.UploadCore()
+    denied.update(True)
     said = wait_for(lambda: "access key" in denied.status_msg, 3.0)
     denied.stop()
     check("12 401: says check the access key in Settings",
@@ -216,8 +211,8 @@ try:
     upload.UPLOAD_RETRY_WAIT = 0.1
     posts.clear()
     config.set(upload.UPLOAD_URL_KEY, URL + "/401")
-    again = upload.UploadCore(enabled=True)
-    again.start()
+    again = upload.UploadCore()
+    again.update(True)
     wait_for(lambda: posts, 3.0)
     time.sleep(0.35)                                     # 3 retries 0.1 s apart fit; the 0.5 s check does not
     one_post = len(posts)
@@ -232,7 +227,7 @@ try:
                            ("checksums a list", b'{"uploaded_bookmark_checksums": []}')):
         upload.UPLOAD_DATA_FILEPATH.write_bytes(content)
         try:
-            built = upload.UploadCore(enabled=False)
+            built = upload.UploadCore()
             check(f"15 upload_data.json {label}: builds, empty",
                   built._uploaded_bookmarks_checksums == {}, repr(built._uploaded_bookmarks_checksums)[:60])
         except Exception as err:
@@ -243,8 +238,8 @@ try:
     upload.UPLOAD_DATA_FILEPATH.unlink(missing_ok=True)
     posts.clear()
     config.set(upload.UPLOAD_URL_KEY, "  " + URL + " " + chr(10))
-    spaced = upload.UploadCore(enabled=True)
-    spaced.start()
+    spaced = upload.UploadCore()
+    spaced.update(True)
     sent = wait_for(lambda: posts, 3.0)
     spaced.stop()
     check("16 URL with spaces around it: uploaded", sent, spaced.status_msg)
@@ -258,14 +253,32 @@ try:
     premise = any(b["system"] is None for b in rs_api.bookmarks())
     upload.UPLOAD_DATA_FILEPATH.unlink(missing_ok=True)
     posts.clear()
-    nameless = upload.UploadCore(enabled=True)
-    nameless.start()
+    nameless = upload.UploadCore()
+    nameless.update(True)
     sent = wait_for(lambda: posts, 3.0)
     nameless.stop()
     count = len(posts[0]["deposits"]) if sent else 0
     check("17 premise: rs_api returns a bookmark with system None", premise)
     check("17 bookmark without system: all uploaded", count == len(rs_api.bookmarks()),
           f"{count} of {len(rs_api.bookmarks())}")
+
+    # 18. worker only with URL and access key set
+    config.set(upload.UPLOAD_URL_KEY, URL)
+    config.set(upload.UPLOAD_ACCESS_KEY_KEY, "")
+    keyless = upload.UploadCore()
+    keyless.update(True)
+    check("18 no access key: no worker, says set it", not keyless.running()
+          and keyless.status_msg == "Set the upload access key in Settings", keyless.status_msg)
+    config.set(upload.UPLOAD_ACCESS_KEY_KEY, "e2e-key")
+    keyless.update(True)
+    check("18 key set, OK again: worker runs", keyless.running())
+    config.set(upload.UPLOAD_URL_KEY, "")
+    keyless.update(True)
+    check("18 URL cleared: worker stops, says set it", not keyless.running()
+          and keyless.status_msg == "Set the upload server URL in Settings", keyless.status_msg)
+    keyless.update(False)
+    check("18 uploads off: no worker, no line", not keyless.running() and keyless.status_msg == "")
+    config.set(upload.UPLOAD_URL_KEY, URL)
 
     # 8. _on_ui without an upload core
     import tkinter as tk                                 # noqa: E402

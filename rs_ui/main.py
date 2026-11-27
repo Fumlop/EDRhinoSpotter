@@ -149,8 +149,8 @@ def start(plugin_dir, owner=OWNER):
 
     if config:
         upload_enabled = config.get_bool(rs_core.upload.UPLOAD_ENABLED_KEY, default=False)
-        _upload_core = rs_core.upload.UploadCore(enabled=upload_enabled)
-        _upload_core.start()
+        _upload_core = rs_core.upload.UploadCore()
+        _upload_core.update(upload_enabled)
 
     return "RhinoSpotter"
 
@@ -588,7 +588,7 @@ def prefs_changed():
     minimap.prefs_changed()
     rs_ui.upload.prefs_changed()
     if _upload_core and config:
-        _upload_core.enabled = config.get_bool(rs_core.upload.UPLOAD_ENABLED_KEY, default=False)
+        _upload_core.update(config.get_bool(rs_core.upload.UPLOAD_ENABLED_KEY, default=False))
     # The pick may have taken materials out of the list or put them back, and
     # _on_material_changed only fires when the picked one moves.
     _fill_menu()
