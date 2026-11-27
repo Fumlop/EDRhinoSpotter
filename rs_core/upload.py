@@ -25,7 +25,7 @@ except ImportError:         # running outside EDMC
 UPLOAD_DATA_FILEPATH = pathlib.Path(database.ROOT, 'upload_data.json')
 UPLOAD_DATA_VERSION = 1
 
-NEW_BOOKMARKS_CHECK_INTERVAL        = 60 * 5    # s between checks
+NEW_BOOKMARKS_CHECK_INTERVAL        = 60 * 30   # s between checks
 UPLOAD_RETRY_WAIT                   = 5         # s between attempts
 STOP_JOIN_TIMEOUT                   = 1
 UPLOAD_TIMEOUT                      = 20        # s per request
