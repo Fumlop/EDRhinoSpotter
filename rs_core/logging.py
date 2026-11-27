@@ -1,4 +1,4 @@
-"""The plugin's logger, named f"{appname}.RhinoSpotter" as EDMC expects.
+"""The plugin's logger, named f"{appname}.<plugin folder name>" as EDMC expects.
 
 EDMC installs a handler per plugin under that name. Outside EDMC the logger
 gets a NullHandler so test runs stay clean.
@@ -12,7 +12,9 @@ PLUGIN_NAME = "RhinoSpotter"
 
 try:
     from config import appname                       # EDMC
-    logger = logging.getLogger(f"{appname}.{PLUGIN_NAME}")
+    # EDMC sets up f"{appname}.<plugin folder name>"; the folder may be EDRhinoSpotter (git clone).
+    _folder = os.path.basename(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    logger = logging.getLogger(f"{appname}.{_folder}")
 except ImportError:                                  # bare interpreter, tests
     logger = logging.getLogger(PLUGIN_NAME)
     if not logger.handlers:

@@ -10,6 +10,7 @@
 
 - Update check: reads the releases/latest redirect instead of the 145 KB tag page, which ran past the 10 s timeout. Runs once at EDMC start.
 - RhinoData: docking the panel raised TclError `unknown option "-bg"` on the upload progress bar.
+- Plugin folder not named RhinoSpotter (git clone: EDRhinoSpotter): every log line raised `--- Logging error --- osthreadid`. The logger takes the folder name.
 
 ## 6.7.0
 
