@@ -122,9 +122,10 @@ class UploadCore():
         return md5.hexdigest()
 
     def _get_bookmark_dict_key(self, bookmark) -> str:
-        """'<system>, <body without the system prefix> (<lat>, <lon>)'."""
-        body_name = bookmark['body'][len(bookmark['system'])+1:]
-        return f"{bookmark['system']}, {body_name} ({bookmark['latitude']}, {bookmark['longitude']})"
+        """'<system>, <body without the system prefix> (<lat>, <lon>)'. system or body None: ''."""
+        system, body = bookmark['system'] or '', bookmark['body'] or ''
+        body_name = body[len(system)+1:] if system and body.startswith(system) else body
+        return f"{system}, {body_name} ({bookmark['latitude']}, {bookmark['longitude']})"
 
     def _get_new_bookmarks(self) -> list:
         """rs_api.bookmarks() not uploaded yet, or changed since their last upload."""

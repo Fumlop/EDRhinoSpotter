@@ -30,6 +30,8 @@ Output: `report.txt`. No grabs. Needs the live db at
 - A 401, non-https URL or missing URL retried 3 times 5 s apart: the answer
   cannot change within a check.
 - URL pasted with a leading space: refused as not https.
+- A bookmark with no system raises TypeError in the key on every check:
+  nothing uploads, the panel stays blank.
 - One failed round (3 attempts) stops uploads until EDMC restarts.
 - Panel line shows an HTTP code or "Attempt 1/3" instead of what to do.
 - Settings tab shows "Include CMDR name" ticked with nothing stored (UI
@@ -62,6 +64,8 @@ Output: `report.txt`. No grabs. Needs the live db at
 15. `upload_data.json` holding `{oops`, `[]`, or a list of checksums:
     `UploadCore()` builds with empty checksums.
 16. URL saved with spaces / a newline around it: uploaded.
+17. One bookmark's `system` column NULL and `system` removed from its `data`
+    JSON in the test db (`planet_name` is NOT NULL): `rs_api` returns it with system None; every bookmark still uploaded.
 
 ## Not covered
 

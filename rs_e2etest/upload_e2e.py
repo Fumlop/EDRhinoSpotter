@@ -250,6 +250,23 @@ try:
     check("16 URL with spaces around it: uploaded", sent, spaced.status_msg)
     config.set(upload.UPLOAD_URL_KEY, URL)
 
+    # 17. a bookmark with no system in the db (planet_name is NOT NULL): all still upload
+    import sqlite3                                       # noqa: E402
+    with sqlite3.connect(database.PATH) as db:
+        db.execute("UPDATE bookmarks SET system = NULL, data = json_remove(data, '$.system') "
+                   "WHERE id = (SELECT MIN(id) FROM bookmarks)")
+    premise = any(b["system"] is None for b in rs_api.bookmarks())
+    upload.UPLOAD_DATA_FILEPATH.unlink(missing_ok=True)
+    posts.clear()
+    nameless = upload.UploadCore(enabled=True)
+    nameless.start()
+    sent = wait_for(lambda: posts, 3.0)
+    nameless.stop()
+    count = len(posts[0]["deposits"]) if sent else 0
+    check("17 premise: rs_api returns a bookmark with system None", premise)
+    check("17 bookmark without system: all uploaded", count == len(rs_api.bookmarks()),
+          f"{count} of {len(rs_api.bookmarks())}")
+
     # 8. _on_ui without an upload core
     import tkinter as tk                                 # noqa: E402
     from rs_ui import main                               # noqa: E402
