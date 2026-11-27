@@ -143,7 +143,7 @@ class UploadCore():
         if not data:
             return
 
-        upload_url = config.get_str(UPLOAD_URL_KEY, default='')
+        upload_url = (config.get_str(UPLOAD_URL_KEY, default='') or '').strip()   # pasted with spaces or a newline
         access_key = config.get_str(UPLOAD_ACCESS_KEY_KEY, default='')
 
         if not upload_url:

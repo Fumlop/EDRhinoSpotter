@@ -239,6 +239,18 @@ try:
             check(f"15 upload_data.json {label}: builds, empty", False, repr(err))
     upload.UPLOAD_DATA_FILEPATH.unlink()
 
+    # 16. URL pasted with spaces around it: still sent
+    upload.UPLOAD_DATA_FILEPATH.unlink(missing_ok=True)
+    posts.clear()
+    config.set(upload.UPLOAD_URL_KEY, "  " + URL + " 
+")
+    spaced = upload.UploadCore(enabled=True)
+    spaced.start()
+    sent = wait_for(lambda: posts, 3.0)
+    spaced.stop()
+    check("16 URL with spaces around it: uploaded", sent, spaced.status_msg)
+    config.set(upload.UPLOAD_URL_KEY, URL)
+
     # 8. _on_ui without an upload core
     import tkinter as tk                                 # noqa: E402
     from rs_ui import main                               # noqa: E402

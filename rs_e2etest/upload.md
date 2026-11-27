@@ -29,6 +29,7 @@ Output: `report.txt`. No grabs. Needs the live db at
   the plugin does not start.
 - A 401, non-https URL or missing URL retried 3 times 5 s apart: the answer
   cannot change within a check.
+- URL pasted with a leading space: refused as not https.
 - One failed round (3 attempts) stops uploads until EDMC restarts.
 - Panel line shows an HTTP code or "Attempt 1/3" instead of what to do.
 - Settings tab shows "Include CMDR name" ticked with nothing stored (UI
@@ -60,6 +61,7 @@ Output: `report.txt`. No grabs. Needs the live db at
     `_upload_core.enabled` is set, hidden again when turned off.
 15. `upload_data.json` holding `{oops`, `[]`, or a list of checksums:
     `UploadCore()` builds with empty checksums.
+16. URL saved with spaces / a newline around it: uploaded.
 
 ## Not covered
 
