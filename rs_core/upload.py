@@ -90,7 +90,6 @@ class UploadCore():
         self.status = Status.IDLE
         self.status_msg = ''
 
-        self._fatal_error = False
         self._uploaded_bookmarks_checksums = { }
         
         self._upload_thread = None
@@ -235,7 +234,7 @@ class UploadCore():
             
 
     def _upload(self, bookmarks) -> None:
-        """Up to MAX_UPLOAD_ATTEMPTS tries; after the last, uploads stay off until EDMC restarts."""
+        """Up to MAX_UPLOAD_ATTEMPTS tries; after the last, the next check tries again."""
         # Read on every upload: the setting can change while EDMC runs.
         if not config.get_bool(UPLOAD_INCLUDE_CMDR_NAME_KEY, default=False):
             for bookmark in bookmarks:
@@ -265,17 +264,16 @@ class UploadCore():
             if attempt < MAX_UPLOAD_ATTEMPTS and self._stop.wait(UPLOAD_RETRY_WAIT):
                 return
 
-        logger.error('Upload failed, disabling uploads until EDMC restart')
+        # status_msg keeps the last attempt's line: it says what to fix.
+        logger.error(f'Upload failed {MAX_UPLOAD_ATTEMPTS} times, next try in {NEW_BOOKMARKS_CHECK_INTERVAL} s')
         self.status = Status.IDLE
-        self.status_msg = 'Upload failed'
-        self._fatal_error = True
 
 
     def _upload_worker(self) -> None:
         """Every NEW_BOOKMARKS_CHECK_INTERVAL s while enabled: upload new or changed bookmarks."""
         logger.info('Starting _upload_worker...')
         while True:
-            if self.enabled and not self._fatal_error:
+            if self.enabled:
                 try:
                     bookmarks = self._get_new_bookmarks()
                     if bookmarks:

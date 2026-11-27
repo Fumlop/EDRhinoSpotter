@@ -211,6 +211,20 @@ try:
           said and "check the access key in Settings" in denied.status_msg, denied.status_msg)
     check("12 401: no HTTP code on the panel line", "401" not in denied.status_msg)
 
+    # 13. 3 failed attempts, then the server works: the next check uploads (was off until restart)
+    upload.UPLOAD_DATA_FILEPATH.unlink(missing_ok=True)
+    upload.UPLOAD_RETRY_WAIT = 0.1
+    posts.clear()
+    config.set(upload.UPLOAD_URL_KEY, URL + "/401")
+    again = upload.UploadCore(enabled=True)
+    again.start()
+    failed_round = wait_for(lambda: len(posts) >= upload.MAX_UPLOAD_ATTEMPTS, 3.0)
+    config.set(upload.UPLOAD_URL_KEY, URL)
+    recovered = wait_for(lambda: upload.UPLOAD_DATA_FILEPATH.exists(), 3.0)
+    again.stop()
+    check("13 3 attempts refused", failed_round, f"{len(posts)} posts")
+    check("13 next check uploads once the server takes it", recovered, again.status_msg)
+
     # 8. _on_ui without an upload core
     import tkinter as tk                                 # noqa: E402
     import tkinter.ttk                                   # noqa: E402,F401 - EDMC has it loaded; rs_ui/upload.py uses tk.ttk
