@@ -8,7 +8,7 @@ import pathlib
 import threading
 import urllib.parse
 
-from rs_core import database
+from rs_core import atomic, database
 from rs_core.logging import logger
 import rs_api
 
@@ -111,8 +111,8 @@ class UploadCore():
             'uploaded_bookmark_checksums': self._uploaded_bookmarks_checksums,
         }
         os.makedirs(UPLOAD_DATA_FILEPATH.parent, exist_ok=True)
-        with open(UPLOAD_DATA_FILEPATH, 'w') as out_file:
-            json.dump(data, out_file, indent=4)
+        # Temp file + replace: a kill mid-write leaves the old file, not half a new one.
+        atomic.write_text(str(UPLOAD_DATA_FILEPATH), json.dumps(data, indent=4))
 
     def _get_bookmark_checksum(self, bookmark) -> str:
         """MD5 hex of the BOOKMARK_CHECKSUM_FIELDS values, in that order."""
