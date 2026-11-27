@@ -87,9 +87,10 @@ def is_newer(latest, current=None):
     return rank(latest) > rank(current)
 
 
-def _open(url, timeout):
-    """GET `url`, following redirects, as a context manager with read() and
-    geturl() - the shape urlopen has, so tests hand in either.
+def _open(url, timeout, follow=True):
+    """GET `url` as a context manager with read() and geturl() - the shape
+    urlopen has, so tests hand in either. follow=False: geturl() is the
+    redirect's Location, the target page is not fetched (urllib always follows).
 
     Through `requests` when it is there, as EliteMeritTracker does: EDMC ships
     it with certifi and the system proxy settings, which is the path players'
@@ -97,7 +98,7 @@ def _open(url, timeout):
     """
     if requests is None:
         return urllib.request.urlopen(url, timeout=timeout)
-    response = requests.get(url, timeout=timeout, allow_redirects=True)
+    response = requests.get(url, timeout=timeout, allow_redirects=follow)
     response.raise_for_status()
 
     class Answer:
@@ -112,7 +113,7 @@ def _open(url, timeout):
             return response.content
 
         def geturl(self):
-            return response.url
+            return response.url if follow else response.headers.get("Location", response.url)
     return Answer()
 
 
@@ -125,12 +126,11 @@ def fetch_latest(page=RELEASES_PAGE, opener=_open):
 
     None covers every failure the same way: no network, no releases yet, a page
     that did not land on a tag. The plugin works offline. A failure is a warning
-    once a session - the check repeats hourly, and an offline evening is not
-    worth 24 lines in EDMC's log.
+    once a session; the check runs once, at EDMC start.
     """
     global _warned
     try:
-        with opener(page, timeout=TIMEOUT) as response:
+        with opener(page, timeout=TIMEOUT, follow=False) as response:  # tag page: 145 KB, 3.4 s uncached
             final = response.geturl()
     except Exception as err:                        # noqa: BLE001 - see docstring
         final = None
@@ -141,7 +141,7 @@ def fetch_latest(page=RELEASES_PAGE, opener=_open):
     if match:
         return match.group(1)
     if not _warned:
-        logger.warning(f"update check failed: {reason}; it tries again every hour")
+        logger.warning(f"update check failed: {reason}; next try at EDMC start")
         _warned = True
     else:
         logger.debug(f"update check failed: {reason}")

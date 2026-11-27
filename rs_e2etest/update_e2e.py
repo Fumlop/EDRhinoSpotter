@@ -241,13 +241,14 @@ try:
         tree[path] = meta.split()[2]
     # export-ignore paths (.gitattributes: .github, itself) are left out of
     # GitHub's source zip by design.
-    # check-attr does not pass a directory's attribute on to the files in it.
-    parents = {"/".join(p.split("/")[:i]) for p in tree for i in range(1, p.count("/") + 1)}
+    # check-attr does not pass a directory's attribute on to the files in it;
+    # a "dir/" pattern matches only when asked with the trailing slash.
+    parents = {"/".join(p.split("/")[:i]) + "/" for p in tree for i in range(1, p.count("/") + 1)}
     ignored = set()
     for line in git("check-attr", "export-ignore", "--", *tree, *parents).decode().splitlines():
         path, _, value = line.rsplit(": ", 2)
         if value == "set":
-            ignored.add(path)
+            ignored.add(path.rstrip("/"))
     for path in list(tree):
         if any(path == i or path.startswith(i + "/") for i in ignored):
             tree.pop(path)

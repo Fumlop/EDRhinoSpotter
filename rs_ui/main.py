@@ -930,7 +930,7 @@ def _show_update(tag, newer):
     if not _card_button or not newer:
         return
     if str(_card_button.cget("text")) in ("Updating...", "Restart EDMC"):
-        return          # an hourly check must not undo an install under way
+        return          # a late check must not undo an install under way
     # "Update", not "Update v2.1.0": the tag would be the one string wider
     # than the button, and widening the panel is what this design avoids. The
     # version it is going to goes in the status line instead.
