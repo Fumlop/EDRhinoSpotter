@@ -20,12 +20,17 @@ EDMC > File > Settings > RhinoSpotter, under the separator:
 
 | Line | Do |
 |---|---|
+| `Uploading N of M bookmarks` | nothing; the bar below shows progress |
 | `N bookmarks uploaded` | nothing |
+| `Set the upload server URL and access key in Settings` | enter both; nothing runs until then |
+| `Set the upload server URL in Settings` | enter the URL |
+| `Set the upload access key in Settings` | enter the key |
 | `Upload refused - check the access key in Settings` | fix the key (server answered 401) |
 | `Upload server unreachable - check the URL in Settings` | fix the URL, or the server is down |
 | `Upload server URL must start with https:// - fix it in Settings` | fix the URL |
 | `Upload server offline - ask whoever runs it` | server answered 502 |
 | `Upload server error - ask whoever runs it` | any other answer; code in the EDMC log |
+| `Upload failed - details in the EDMC log` | send the log to whoever runs the server |
 
 A connect error or timeout is tried 3 times, 5 s apart; any other failure
 once. Either way the next check (5 min) tries again.
