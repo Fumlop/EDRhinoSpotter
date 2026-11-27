@@ -104,6 +104,9 @@ _amount = None           # tk.StringVar - the deposit's HUD Amount (starts High)
 _search = None           # tk.StringVar - bookmark search text, not used yet
 _menu = None             # the Material OptionMenu, refilled when the settings change
 _docked = {}             # the panel copy in RhinoData (_panel's dict) while that window has one
+_fields = {}             # Location and Rigs Spinbox -> their Tk colours before _theme_fields
+# EDMC config "theme": 0 default, 1 dark, 2 transparent.
+THEME_DEFAULT = 0
 SEARCH_SHOWN = False     # the Search row under Bookmark, off until search works
 # Density and Amount before anything is picked. Not required: a bookmark without
 # them is still a bookmark, it just cannot say how many tons are left.
@@ -168,7 +171,7 @@ def build(parent, updates=True, docked=False):
     """The panel. `updates`: look for a release once, at start; standalone.py passes False.
     `docked`: standalone.py, the panel inside RhinoData: no version, count or RhinoData button."""
     global _frame, _status, _upload_status, _upload_bar, _scan_count, _card_button, _landed_after, _hint
-    global _loc, _rigs, _material, _density, _amount, _search, _menu, _filter
+    global _loc, _rigs, _material, _density, _amount, _search, _menu, _filter, _fields
 
     if _refused is not None:
         frame = tk.Frame(parent)
@@ -192,6 +195,9 @@ def build(parent, updates=True, docked=False):
     _frame, _status, _upload_status, _scan_count = widgets["frame"], widgets["status"], widgets["upload_status"], widgets["count"]
     _upload_bar = widgets["upload_bar"]
     _card_button, _hint, _menu = widgets["card"], widgets["hint"], widgets["menu"]
+    if not docked:
+        _fields = {spin: {key: spin.cget(key) for key in FIELD_KEYS} for spin in widgets["fields"]}
+        _theme_fields()
 
     if theme:
         theme.update(_frame)
@@ -258,14 +264,15 @@ def _panel(parent, docked=False):
     tk.Label(frame, text="Location", anchor="w").grid(row=1, column=0, sticky="w", padx=2)
     # tk.Spinbox writes from_ into an empty variable; empty = not typed, so put it back.
     typed = _loc.get()
-    tk.Spinbox(frame, from_=spotmark.NO_LOCATION, to=spotmark.MAX_LOCATION, textvariable=_loc,
-               width=4).grid(row=1, column=1, sticky="w", padx=2)
+    loc_box = tk.Spinbox(frame, from_=spotmark.NO_LOCATION, to=spotmark.MAX_LOCATION, textvariable=_loc,
+                         width=4)
+    loc_box.grid(row=1, column=1, sticky="w", padx=2)
     _loc.set(typed)
     tk.Label(frame, text="Rigs", anchor="w").grid(row=1, column=2, sticky="e", padx=2)
     # Ten is what a deposit can hold; the box used to go to twelve, which was
     # a number nobody can enter in the game.
-    tk.Spinbox(frame, from_=0, to=deposit.MAX_RIGS, textvariable=_rigs, width=4).grid(
-        row=1, column=3, sticky="w", padx=2)
+    rigs_box = tk.Spinbox(frame, from_=0, to=deposit.MAX_RIGS, textvariable=_rigs, width=4)
+    rigs_box.grid(row=1, column=3, sticky="w", padx=2)
 
     tk.Label(frame, text="Material", anchor="w").grid(row=2, column=0, sticky="w", padx=2)
     menu = tk.OptionMenu(frame, _material, NO_MATERIAL, *_materials())
@@ -325,7 +332,28 @@ def _panel(parent, docked=False):
 
     return {"frame": frame, "status": status, "upload_status": upload_status, "upload_bar": upload_bar,
             "count": count, "card": card,
-            "hint": hint, "menu": menu}
+            "hint": hint, "menu": menu, "fields": (loc_box, rigs_box)}
+
+
+# The options widgets.style_field sets on a Spinbox.
+FIELD_KEYS = ("bg", "fg", "relief", "borderwidth", "highlightthickness", "font", "insertbackground",
+              "disabledbackground", "readonlybackground", "selectbackground", "selectforeground",
+              "buttonbackground")
+
+
+def _theme_fields():
+    """EDMC theme dark/transparent: Location and Rigs in widgets.style_field colours; default: Tk's.
+
+    EDMC's theme.register compares a tk.Spinbox to Label defaults: on Linux it recolours
+    fg and keeps the white bg (issue #28). Explicit colours make it skip both."""
+    dark = config is not None and config.get_int("theme", default=THEME_DEFAULT) != THEME_DEFAULT
+    for spin, original in _fields.items():
+        if not spin.winfo_exists():
+            continue
+        if dark:
+            widgets.style_field(spin)
+        else:
+            spin.config(**original)
 
 
 def _dock_panel(window):
@@ -594,6 +622,7 @@ def prefs_changed():
         return
     minimap.prefs_changed()
     rs_ui.upload.prefs_changed()
+    _theme_fields()
     if _upload_core and config:
         _upload_core.update(config.get_bool(rs_core.upload.UPLOAD_ENABLED_KEY, default=False))
     # The pick may have taken materials out of the list or put them back, and

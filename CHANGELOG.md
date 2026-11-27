@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.8.1
+
+**Fixed**
+
+- EDMC dark / transparent theme: Location and Rigs boxes in the RhinoData field colours; on Linux they were light text on white (issue #28). Back to Tk's colours on the default theme after Settings OK.
+
 ## 6.8.0
 
 **Added**
