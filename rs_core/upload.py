@@ -83,6 +83,7 @@ class UploadCore():
         self._uploaded_bookmarks_checksums = {}
         self._upload_thread = None
         self._stop = threading.Event()
+        self._wake = threading.Event()     # set by update(): check now
 
         self._load_upload_data()
 
@@ -214,7 +215,9 @@ class UploadCore():
                     self._upload(bookmarks, stop)
             except Exception as exc:
                 logger.error(f'Upload check failed: {exc!r}')
-            if stop.wait(NEW_BOOKMARKS_CHECK_INTERVAL):
+            self._wake.wait(NEW_BOOKMARKS_CHECK_INTERVAL)
+            self._wake.clear()
+            if stop.is_set():
                 return
 
     def running(self) -> bool:
@@ -225,7 +228,9 @@ class UploadCore():
         self.enabled = enabled
         missing = missing_settings() if enabled else ''
         if enabled and not missing:
-            if not self.running():
+            if self.running():
+                self._wake.set()
+            else:
                 self.start()
         else:
             self.stop()
@@ -235,6 +240,7 @@ class UploadCore():
         """Start the daemon worker thread with a fresh stop event."""
         logger.info('Starting upload thread...')
         self._stop = threading.Event()
+        self._wake.clear()
         self._upload_thread = threading.Thread(target=self._upload_worker, args=(self._stop,),
                                                name='RhinoSpotter upload thread')
         self._upload_thread.daemon = True
@@ -243,6 +249,7 @@ class UploadCore():
     def stop(self) -> None:
         """Signal the worker, join up to STOP_JOIN_TIMEOUT s."""
         self._stop.set()
+        self._wake.set()
         if self._upload_thread:
             logger.info('Stopping upload thread')
             self._upload_thread.join(STOP_JOIN_TIMEOUT)

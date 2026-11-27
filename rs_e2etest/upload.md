@@ -32,6 +32,7 @@ Output: `report.txt`. No grabs. Needs the live db at
 - URL pasted with a leading space: refused as not https.
 - A bookmark with no system raises TypeError in the key on every check:
   nothing uploads, the panel stays blank.
+- Settings OK waits for the next check (up to 5 min) before the first upload.
 - One failed round (3 attempts) stops uploads until EDMC restarts.
 - Panel line shows an HTTP code or "Attempt 1/3" instead of what to do.
 - Settings tab shows "Include CMDR name" ticked with nothing stored (UI
@@ -71,6 +72,8 @@ Output: `report.txt`. No grabs. Needs the live db at
     off: no worker, no line.
 19. Settings OK with uploads on, URL set, key empty: one warning naming the
     access key; both set: none.
+20. Interval 60 s, worker asleep after its first upload; one bookmark's rigs
+    changed, `update(True)` (Settings OK): that one bookmark posted within 3 s.
 
 ## Not covered
 

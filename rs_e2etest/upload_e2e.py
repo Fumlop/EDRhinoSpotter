@@ -280,6 +280,27 @@ try:
     check("18 uploads off: no worker, no line", not keyless.running() and keyless.status_msg == "")
     config.set(upload.UPLOAD_URL_KEY, URL)
 
+    # 20. Settings OK while the worker sleeps: checks at once, not at the next interval
+    upload.NEW_BOOKMARKS_CHECK_INTERVAL = 60
+    upload.UPLOAD_DATA_FILEPATH.unlink(missing_ok=True)
+    posts.clear()
+    awake = upload.UploadCore()
+    awake.update(True)
+    first = wait_for(lambda: posts, 3.0)
+    time.sleep(0.3)
+    with sqlite3.connect(database.PATH) as db:
+        db.execute("UPDATE bookmarks SET rigs = 99, data = json_set(data, '$.rigs', 99) "
+                   "WHERE id = (SELECT MAX(id) FROM bookmarks)")
+    t0 = time.monotonic()
+    awake.update(True)                                   # what Settings OK calls
+    second = wait_for(lambda: len(posts) >= 2, 3.0)
+    took = time.monotonic() - t0
+    awake.stop()
+    upload.NEW_BOOKMARKS_CHECK_INTERVAL = 0.5
+    check("20 first upload on start", first)
+    check("20 OK uploads the changed bookmark within 3 s (interval 60 s)",
+          second and len(posts[1]["deposits"]) == 1, f"{took:.2f} s, {len(posts)} posts")
+
     # 8. _on_ui without an upload core
     import tkinter as tk                                 # noqa: E402
     from rs_ui import main                               # noqa: E402
