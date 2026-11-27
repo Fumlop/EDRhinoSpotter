@@ -76,6 +76,10 @@ BOOKMARK_CHECKSUM_FIELDS = [
 
 ### CLASSES ###
 
+class UploadError(IOError):
+    """A failed upload; str() is the panel line, saying what to do."""
+
+
 class UploadCore():
     """
     Manage data and process of uploading bookmarks to a shared team server.
@@ -188,9 +192,8 @@ class UploadCore():
         access_key = config.get_str(UPLOAD_ACCESS_KEY_KEY, default='')
         
         if not upload_url:
-            self.status_msg = f'Upload Server URL not found in Settings'
-            logger.error(self.status_msg)
-            raise IOError(self.status_msg)
+            logger.error('Upload: no URL set')
+            raise UploadError('Set the upload server URL in Settings')
 
         json_data = {
             'access_key':   access_key,
@@ -199,9 +202,8 @@ class UploadCore():
         
         host = urllib.parse.urlsplit(upload_url).hostname
         if not upload_url.lower().startswith('https://') and host not in LOOPBACK_HOSTS:
-            self.status_msg = 'Upload server URL must start with https:// - fix it in Settings'
             logger.error('Upload: URL is not https, not sent')
-            raise IOError(self.status_msg)
+            raise UploadError('Upload server URL must start with https:// - fix it in Settings')
 
         # Host only: path or query of the URL can carry a token.
         logger.info(f'Upload: POST to {host}')
@@ -215,24 +217,21 @@ class UploadCore():
         logger.info(f'Upload: Response = {response.status_code} {response}')
         
         if response.status_code == 200:
-            # Success!
             for bookmark in data:
                 key = self._get_bookmark_dict_key(bookmark)
                 checksum = self._get_bookmark_checksum(bookmark)
                 self._uploaded_bookmarks_checksums[key] = checksum
 
             logger.info(f'Bookmarks successfully uploaded: {len(data)}')
-            
-        elif response.status_code == 502:
-            # Cloudflare Tunnel is responding, but the DB server on the other side is not
-            self.status_msg = f'Error 502: Server offline'
-            logger.error(self.status_msg)
-            response.raise_for_status()
-        else:
-            msg = response.json().get('detail')
-            self.status_msg = f'Error {response.status_code} {msg}'
-            logger.error(self.status_msg)
-            response.raise_for_status()
+            return
+
+        logger.error(f'Upload: HTTP {response.status_code} {response.text[:200]!r}')
+        if response.status_code == 401:
+            raise UploadError('Upload refused - check the access key in Settings')
+        if response.status_code == 502:
+            # Cloudflare Tunnel up, server behind it down.
+            raise UploadError('Upload server offline - ask whoever runs it')
+        raise UploadError('Upload server error - ask whoever runs it')
             
 
     def _upload(self, bookmarks) -> None:
@@ -252,11 +251,16 @@ class UploadCore():
                 self.status = Status.IDLE
                 self.status_msg = f'{len(bookmarks)} bookmarks uploaded'
                 return
-            except requests.exceptions.ConnectionError:
-                msg = f'Attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: Server connect failed'
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
+                msg = 'Upload server unreachable - check the URL in Settings'
+                # Type only: the requests message repeats the URL path.
+                logger.error(f'Upload attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: {type(exc).__name__}')
+            except UploadError as exc:
+                msg = str(exc)
+                logger.error(f'Upload attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: {msg}')
             except Exception as exc:
-                msg = 'Invalid upload access key' if str(exc).startswith('401') else f'{exc}'
-            logger.error(f'Upload attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: {msg}')
+                msg = 'Upload failed - details in the EDMC log'
+                logger.error(f'Upload attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: {exc!r}')
             self.status_msg = msg
             if attempt < MAX_UPLOAD_ATTEMPTS and self._stop.wait(UPLOAD_RETRY_WAIT):
                 return

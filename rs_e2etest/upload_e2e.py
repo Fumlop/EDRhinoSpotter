@@ -74,8 +74,9 @@ posts = []
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         posts.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
-        body = b'{"detail": "ok"}'
-        self.send_response(200)
+        code = 401 if self.path.endswith("/401") else 200
+        body = b'{"detail": "Invalid access key"}' if code == 401 else b'{"detail": "ok"}'
+        self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -179,11 +180,12 @@ try:
     config.set(upload.UPLOAD_URL_KEY, f"http://127.0.0.1:{free_port()}/upload")
     down = upload.UploadCore(enabled=True)
     down.start()
-    in_retry = wait_for(lambda: down.status_msg.startswith("Attempt"), 5.0)
+    in_retry = wait_for(lambda: "unreachable" in down.status_msg, 5.0)
     t0 = time.monotonic()
     down.stop()
     took = time.monotonic() - t0
-    check("7 server down: in a retry wait", in_retry, down.status_msg)
+    check("7 server down: in a retry wait, says check the URL",
+          in_retry and "check the URL in Settings" in down.status_msg, down.status_msg)
     check("7 stop() within 1.5 s", took < 1.5, f"{took:.2f} s")
 
     # 11. plain http to a non-loopback host: refused before any request
@@ -197,6 +199,17 @@ try:
         os.path.join(OUT, "upload.log")) else ""
     check("11 http URL refused, says what to do", refused, plain.status_msg)
     check("11 URL path not in the log", "/upload" not in log)
+
+    # 12. 401: the panel line says to check the access key, no HTTP code on it
+    upload.UPLOAD_DATA_FILEPATH.unlink(missing_ok=True)
+    config.set(upload.UPLOAD_URL_KEY, URL + "/401")
+    denied = upload.UploadCore(enabled=True)
+    denied.start()
+    said = wait_for(lambda: "access key" in denied.status_msg, 3.0)
+    denied.stop()
+    check("12 401: says check the access key in Settings",
+          said and "check the access key in Settings" in denied.status_msg, denied.status_msg)
+    check("12 401: no HTTP code on the panel line", "401" not in denied.status_msg)
 
     # 8. _on_ui without an upload core
     import tkinter as tk                                 # noqa: E402

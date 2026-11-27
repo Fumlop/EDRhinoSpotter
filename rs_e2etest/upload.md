@@ -22,6 +22,7 @@ Output: `report.txt`. No grabs. Needs the live db at
   upload check and a Tk label update on that thread.
 - Access key sent over plain http; the full URL (token in path or query)
   written to the log.
+- Panel line shows an HTTP code or "Attempt 1/3" instead of what to do.
 - Settings tab shows "Include CMDR name" ticked with nothing stored (UI
   default True, core default False): OK stores True.
 
@@ -35,12 +36,15 @@ Output: `report.txt`. No grabs. Needs the live db at
    access key sent, commander `anonymous`, `upload_data.json` written.
 5. Next check: no second POST.
 6. Fresh data, CMDR name on: names sent as stored.
-7. Server down: `stop()` returns within 1.5 s while in a retry wait.
+7. Server down: `stop()` returns within 1.5 s while in a retry wait; panel
+   line says to check the URL in Settings.
 8. `rs_ui.main._on_ui` with `_upload_core` None: no raise.
 9. `_on_ui` from a worker thread: the upload core is not called.
 10. Settings tab built with nothing stored: CMDR name unticked; OK stores False.
 11. `http://` URL to a non-loopback host: refused before any request, status
     says to fix it in Settings; the URL path is not in `upload.log`.
+12. Server answers 401: panel line says to check the access key in Settings,
+    without the HTTP code.
 
 ## Not covered
 
