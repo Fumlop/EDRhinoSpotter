@@ -242,8 +242,7 @@ try:
     # 16. URL pasted with spaces around it: still sent
     upload.UPLOAD_DATA_FILEPATH.unlink(missing_ok=True)
     posts.clear()
-    config.set(upload.UPLOAD_URL_KEY, "  " + URL + " 
-")
+    config.set(upload.UPLOAD_URL_KEY, "  " + URL + " " + chr(10))
     spaced = upload.UploadCore(enabled=True)
     spaced.start()
     sent = wait_for(lambda: posts, 3.0)
