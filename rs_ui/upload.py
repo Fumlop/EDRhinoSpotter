@@ -42,13 +42,13 @@ def prefs(frame: tk.Frame, panel: bool=True) -> tk.Frame:
     # Enable uploading
     val = config.get_bool(rs_core.upload.UPLOAD_ENABLED_KEY, default=False) if config is not None else True
     _upload_enabled = tk.BooleanVar(value=val)
-    nb.Checkbutton(frame, text='Upload Bookmarks', variable=_upload_enabled, command=lambda: _upload_enabled_changed(frame)).grid(row=cur_row+1, column=0, sticky='w', padx=5, pady=2)
+    nb.Checkbutton(frame, text=f'Upload bookmarks to a team server, checked every {rs_core.upload.NEW_BOOKMARKS_CHECK_INTERVAL // 60} min', variable=_upload_enabled, command=lambda: _upload_enabled_changed(frame)).grid(row=cur_row+1, column=0, sticky='w', padx=5, pady=2)
 
     # Upload URL
     val = config.get_str(rs_core.upload.UPLOAD_URL_KEY, default='') if config is not None else True
     _upload_url = tk.StringVar(value=val)
 
-    nb.Label(frame, text='Upload Server URL').grid(row=cur_row+2, column=0, sticky='w', padx=25, pady=2)
+    nb.Label(frame, text='Server URL (https://)').grid(row=cur_row+2, column=0, sticky='w', padx=25, pady=2)
     tk.ttk.Entry(frame, textvariable=_upload_url, width=40).grid(row=cur_row+2, column=1, sticky='w', padx=5, pady=2)
 
     # Access Key
@@ -61,7 +61,7 @@ def prefs(frame: tk.Frame, panel: bool=True) -> tk.Frame:
     # Include CMDR name
     val = config.get_bool(rs_core.upload.UPLOAD_INCLUDE_CMDR_NAME_KEY, default=False) if config is not None else False
     _upload_include_cmdr_name = tk.BooleanVar(value=val)
-    nb.Checkbutton(frame, text='Include CMDR name', variable=_upload_include_cmdr_name).grid(row=cur_row+4, column=0, sticky='w', padx=25, pady=2)
+    nb.Checkbutton(frame, text='Send my CMDR name with them', variable=_upload_include_cmdr_name).grid(row=cur_row+4, column=0, sticky='w', padx=25, pady=2)
 
     return frame
 
@@ -92,7 +92,7 @@ def _upload_enabled_changed(parent):
                "  system, body, location number, latitude, longitude, heading,\n"
                "  planet radius, material, rigs, density, amount,\n"
                "  when it was marked, edited and marked depleted,\n"
-               "  your CMDR name only with \"Include CMDR name\" ticked.\n\n"
+               "  your CMDR name only with \"Send my CMDR name with them\" ticked.\n\n"
                "Whoever runs the server can share it. Ask them how it is used.")
         messagebox.showinfo('Data Sharing Notice', msg, parent=parent.winfo_toplevel())
         _data_warning_shown = True
