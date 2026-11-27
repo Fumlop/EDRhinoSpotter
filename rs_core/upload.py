@@ -56,6 +56,19 @@ BOOKMARK_CHECKSUM_FIELDS = [
 ]
 
 
+def missing_settings() -> str:
+    """'' when URL and access key are set, else the line naming what to set."""
+    url = (config.get_str(UPLOAD_URL_KEY, default='') or '').strip()
+    key = (config.get_str(UPLOAD_ACCESS_KEY_KEY, default='') or '').strip()
+    if not url and not key:
+        return 'Set the upload server URL and access key in Settings'
+    if not url:
+        return 'Set the upload server URL in Settings'
+    if not key:
+        return 'Set the upload access key in Settings'
+    return ''
+
+
 class UploadError(IOError):
     """str() is the panel line."""
 
@@ -204,25 +217,13 @@ class UploadCore():
             if stop.wait(NEW_BOOKMARKS_CHECK_INTERVAL):
                 return
 
-    def missing(self) -> str:
-        """'' when URL and access key are set, else the panel line naming what to set."""
-        url = (config.get_str(UPLOAD_URL_KEY, default='') or '').strip()
-        key = (config.get_str(UPLOAD_ACCESS_KEY_KEY, default='') or '').strip()
-        if not url and not key:
-            return 'Set the upload server URL and access key in Settings'
-        if not url:
-            return 'Set the upload server URL in Settings'
-        if not key:
-            return 'Set the upload access key in Settings'
-        return ''
-
     def running(self) -> bool:
         return bool(self._upload_thread and self._upload_thread.is_alive())
 
     def update(self, enabled) -> None:
         """Worker runs only while `enabled` and missing() is ''. Called at start and on Settings OK."""
         self.enabled = enabled
-        missing = self.missing() if enabled else ''
+        missing = missing_settings() if enabled else ''
         if enabled and not missing:
             if not self.running():
                 self.start()

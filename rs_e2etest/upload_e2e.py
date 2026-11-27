@@ -332,6 +332,20 @@ try:
     stored = config.get_bool(upload.UPLOAD_INCLUDE_CMDR_NAME_KEY)
     check("10 settings tab: CMDR name unticked by default", shown is False, repr(shown))
     check("10 OK without touching it stores False", stored is False, repr(stored))
+
+    # 19. Settings OK with uploads on and no access key: a warning names it
+    warned = []
+    ui_upload.messagebox = types.SimpleNamespace(showwarning=lambda title, text: warned.append(text))
+    ui_upload._upload_enabled.set(True)
+    ui_upload._upload_url.set(URL)
+    ui_upload._upload_access_key.set("")
+    ui_upload.prefs_changed()
+    check("19 OK, key empty: warning names the access key",
+          len(warned) == 1 and "Set the upload access key in Settings" in warned[0], repr(warned))
+    warned.clear()
+    ui_upload._upload_access_key.set("e2e-key")
+    ui_upload.prefs_changed()
+    check("19 OK, both set: no warning", not warned, repr(warned))
     root.destroy()
 except Exception:
     failed += 1

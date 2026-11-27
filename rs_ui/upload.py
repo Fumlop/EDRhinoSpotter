@@ -61,6 +61,10 @@ def prefs_changed() -> None:
         config.set(rs_core.upload.UPLOAD_URL_KEY, str(_upload_url.get()))
     if _upload_access_key is not None:
         config.set(rs_core.upload.UPLOAD_ACCESS_KEY_KEY, str(_upload_access_key.get()))
+    if _upload_enabled is not None and _upload_enabled.get():
+        missing = rs_core.upload.missing_settings()
+        if missing:
+            messagebox.showwarning('Upload bookmarks', f'Upload is on, but nothing is sent yet.\n\n{missing}.')
 
 
 def _upload_enabled_changed(parent):

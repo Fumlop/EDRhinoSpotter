@@ -69,6 +69,8 @@ Output: `report.txt`. No grabs. Needs the live db at
 18. Uploads on, no access key: no worker thread, panel line says set it; key
     set and `update(True)`: worker runs; URL cleared: worker stops; uploads
     off: no worker, no line.
+19. Settings OK with uploads on, URL set, key empty: one warning naming the
+    access key; both set: none.
 
 ## Not covered
 
