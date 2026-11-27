@@ -80,6 +80,7 @@ _scan_count = None       # how many landable bodies the current system has
 
 # Upload Core object
 _upload_core = None
+_upload_status = None    # the panel's upload line; None while uploads were off at build
 
 # What the dropdown says before anything is picked. A real string rather than
 # an empty one: an OptionMenu with "" in it draws as a blank sunken box with a
@@ -399,9 +400,6 @@ def _on_ui(function, *args):
         _frame.after(0, function, *args)
     except (RuntimeError, tk.TclError):
         pass
-    
-    _upload_core.upload_bookmarks()
-    _set_upload_status(_upload_core.status_msg)
 
 
 def open_scan():
@@ -473,6 +471,8 @@ def _poll_landed():
         # The same reading, so the minimap costs no second parse.
         minimap.update(_frame.winfo_toplevel(), status, _system, ids=_register.ids,
                        ground=_register.ground)
+        if _upload_core:
+            _set_upload_status(_upload_core.status_msg)
         _poll_error = None
     except Exception as err:
         # Once per kind of failure, not once a second.
@@ -598,6 +598,8 @@ def prefs_changed():
         return
     minimap.prefs_changed()
     rs_ui.upload.prefs_changed()
+    if _upload_core and config:
+        _upload_core.enabled = config.get_bool(rs_core.upload.UPLOAD_ENABLED_KEY, default=False)
     # The pick may have taken materials out of the list or put them back, and
     # _on_material_changed only fires when the picked one moves.
     _fill_menu()

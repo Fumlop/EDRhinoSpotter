@@ -10,10 +10,9 @@ import hashlib
 import json
 import os
 import pathlib
-import queue
 import threading
-import time
 
+from rs_core import database
 from rs_core.logging import logger
 import rs_api
 
@@ -32,15 +31,13 @@ except ImportError:         # running outside EDMC
 
 DEBUG = False
 
-UPLOAD_DATA_FILEPATH = pathlib.Path(pathlib.Path(os.getenv('LOCALAPPDATA')), r'EDRhinoSpotter\upload_data.json')
+# Beside the db: %LOCALAPPDATA%/RhinoSpotter, $XDG_DATA_HOME/RhinoSpotter on Linux.
+UPLOAD_DATA_FILEPATH = pathlib.Path(database.ROOT, 'upload_data.json')
 UPLOAD_DATA_VERSION = 1
 
-if DEBUG:
-    NEW_BOOKMARKS_CHECK_INTERVAL    = 8         # 8 seconds
-    UPLOAD_MIN_TIME_BETWEEN_UPLOADS = 10        # 10 seconds
-else:
-    NEW_BOOKMARKS_CHECK_INTERVAL    = 60 * 5    # 5 minutes
-    UPLOAD_MIN_TIME_BETWEEN_UPLOADS = 60 * 1    # 1 minute
+NEW_BOOKMARKS_CHECK_INTERVAL        = 8 if DEBUG else 60 * 5    # s between checks
+UPLOAD_RETRY_WAIT                   = 5         # s between attempts
+STOP_JOIN_TIMEOUT                   = 1         # s stop() waits; a request in flight ends on the daemon thread
 
 UPLOAD_TIMEOUT                      = 20        # 20 seconds
 MAX_UPLOAD_ATTEMPTS                 = 3
@@ -87,11 +84,9 @@ class UploadCore():
 
         self._fatal_error = False
         self._uploaded_bookmarks_checksums = { }
-        self._last_new_bookmarks_check_time = 0
-        self._last_upload_time = time.time()
         
         self._upload_thread = None
-        self._upload_queue = queue.Queue()
+        self._stop = threading.Event()
 
         self._load_upload_data()
         
@@ -229,146 +224,71 @@ class UploadCore():
             response.raise_for_status()
             
 
-    def _upload_worker(self) -> None:
-        """
-        Monitor the queue for bookmarks. 
-        If it contains any, upload them. Will wait a bit, if the last upload was too recent.
-        """
-        logger.info('Starting _upload_worker...')
-        
-        while True:
-            if self._fatal_error:
-                # Do nothing until EDMC is restarted
-                break
-            
-            time.sleep(0.01)    # yeild to main thread
+    def _upload(self, bookmarks) -> None:
+        """Up to MAX_UPLOAD_ATTEMPTS tries; after the last, uploads stay off until EDMC restarts."""
+        # Read on every upload: the setting can change while EDMC runs.
+        if not config.get_bool(UPLOAD_INCLUDE_CMDR_NAME_KEY, default=False):
+            for bookmark in bookmarks:
+                bookmark['commander'] = 'anonymous'
 
-            if self.status == Status.SHUTTING_DOWN:
-                return
+        self.status = Status.UPLOADING
+        self.status_msg = f'Uploading {len(bookmarks)} bookmarks...'
 
-            if self._upload_queue.empty():
-                # Nothing to upload
-                continue
-
-            # We have bookmarks to upload, but it may not be time yet
-            self.status = Status.UPLOAD_PENDING
-
-            # There's bookmarks in the queue, and it's time to upload them
-            bookmarks = self._upload_queue.get()
-
-            self.status_msg = f'Upload {len(bookmarks)} pending...'
-
-            if time.time() < self._last_upload_time + UPLOAD_MIN_TIME_BETWEEN_UPLOADS:
-                # Too soon. Put them back in queue for now
-                self._upload_queue.put(bookmarks)
-                continue
-            
-            # If CMDR name option is disabled, clear that value in the bookmarks data
-            upload_cmdr_name = config.get_bool(UPLOAD_INCLUDE_CMDR_NAME_KEY, default=False)
-            
-            if not upload_cmdr_name:
-                for bookmark in bookmarks:
-                    bookmark['commander'] = 'anonymous'
-            
-            # Starting a new upload
-            self.status = Status.UPLOADING
-            self.status_msg = f'Uploading {len(bookmarks)} bookmarks...'
-
-            attempt = 1
-            success = False
-            
-            while attempt <= MAX_UPLOAD_ATTEMPTS:
-                try:
-                    self._send_to_server(bookmarks)
-                    self.status_msg = f'{len(bookmarks)} bookmarks uploaded'
-                    success = True
-                    break
-                except requests.exceptions.ConnectionError:
-                    msg = f'Attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: Server connect failed'
-                    logger.error(msg)
-                    self.status_msg = msg
-                    attempt += 1
-                except Exception as exc:
-                    if str(exc).startswith('401'):
-                        msg = 'Invalid upload access key'
-                    else:
-                        msg = f'{exc}'
-                        
-                    logger.error(f'Upload attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: {msg}')
-                    self.status_msg = msg
-                    
-                    attempt += 1
-                    
-                if attempt <= MAX_UPLOAD_ATTEMPTS:
-                    # Wait a bit before retry
-                    time.sleep(5)
-
-            # Success or failure, we're idle or pending
-            self._last_upload_time = time.time()
-            
-            if success:
+        for attempt in range(1, MAX_UPLOAD_ATTEMPTS + 1):
+            try:
+                self._send_to_server(bookmarks)
                 self._save_upload_data()
                 self.status = Status.IDLE
-                #self.status_msg = ''
-            else:
-                # Put these bookmarks back in the queue, to retry next time
-                logger.error('Upload failed, disabling uploads until EDMC restart')
-                self.status = Status.IDLE
-                self.status_msg = f'Upload failed'
-                self._upload_queue.put(bookmarks)
-                self._fatal_error = True
+                self.status_msg = f'{len(bookmarks)} bookmarks uploaded'
+                return
+            except requests.exceptions.ConnectionError:
+                msg = f'Attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: Server connect failed'
+            except Exception as exc:
+                msg = 'Invalid upload access key' if str(exc).startswith('401') else f'{exc}'
+            logger.error(f'Upload attempt {attempt}/{MAX_UPLOAD_ATTEMPTS}: {msg}')
+            self.status_msg = msg
+            if attempt < MAX_UPLOAD_ATTEMPTS and self._stop.wait(UPLOAD_RETRY_WAIT):
+                return
+
+        logger.error('Upload failed, disabling uploads until EDMC restart')
+        self.status = Status.IDLE
+        self.status_msg = 'Upload failed'
+        self._fatal_error = True
+
+
+    def _upload_worker(self) -> None:
+        """Every NEW_BOOKMARKS_CHECK_INTERVAL s while enabled: upload new or changed bookmarks."""
+        logger.info('Starting _upload_worker...')
+        while True:
+            if self.enabled and not self._fatal_error:
+                try:
+                    bookmarks = self._get_new_bookmarks()
+                    if bookmarks:
+                        logger.info(f'Uploading {len(bookmarks)} bookmarks...')
+                        self._upload(bookmarks)
+                except Exception as exc:
+                    logger.error(f'Upload check failed: {exc!r}')
+            if self._stop.wait(NEW_BOOKMARKS_CHECK_INTERVAL):
+                return
 
 
     # PUBLIC
 
     def start(self) -> None:
-        """
-        Start the worker thread that watches for queued bookmarks to upload
-        """
+        """Start the daemon worker thread."""
         logger.info('Starting upload thread...')
         self._upload_thread = threading.Thread(target=self._upload_worker, name='RhinoSpotter upload thread')
         self._upload_thread.daemon = True
         self._upload_thread.start()
-        
-        
-    def stop(self) -> None:
-        """
-        Shut down the thread, queue, and save our upload data
-        """
-        logger.info('Shutting down...')
 
+
+    def stop(self) -> None:
+        """Signal the worker, wait up to STOP_JOIN_TIMEOUT s. Upload data is saved after each upload."""
+        logger.info('Shutting down...')
         self.enabled = False
         self.status = Status.SHUTTING_DOWN
-        
-        self._upload_queue.put(None)  # Still necessary to get `this.queue.get()` to unblock
-        self._upload_thread.join()
-        self._upload_thread = None
-        
-        self._save_upload_data()
-        
+        self._stop.set()
+        if self._upload_thread:
+            self._upload_thread.join(STOP_JOIN_TIMEOUT)
+            self._upload_thread = None
         logger.info('Done')
-
-
-    def upload_bookmarks(self) -> None:
-        """
-        This is the main function called from elsewhere, that checks a few conditions before checking for
-        new bookmarks, and adding any to the queue to be uploaded.
-        """
-        self.enabled = config.get_bool(UPLOAD_ENABLED_KEY, default=False)
-
-        if not self.enabled or self._fatal_error:
-            return
-
-        cur_time = time.time()
-        
-        if cur_time < self._last_new_bookmarks_check_time + NEW_BOOKMARKS_CHECK_INTERVAL:
-            # Too soon
-            return
-            
-        bookmarks = self._get_new_bookmarks()
-
-        if bookmarks:
-            logger.info(f'Queuing {len(bookmarks)} bookmarks for upload...')
-            self._upload_queue.put(bookmarks)
-            
-        self._last_new_bookmarks_check_time = cur_time

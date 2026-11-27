@@ -59,7 +59,7 @@ def prefs(frame: tk.Frame, panel: bool=True) -> tk.Frame:
     tk.ttk.Entry(frame, textvariable=_upload_access_key, width=40).grid(row=cur_row+3, column=1, sticky='w', padx=5, pady=2)
 
     # Include CMDR name
-    val = config.get_bool(rs_core.upload.UPLOAD_INCLUDE_CMDR_NAME_KEY, default=True) if config is not None else True
+    val = config.get_bool(rs_core.upload.UPLOAD_INCLUDE_CMDR_NAME_KEY, default=False) if config is not None else False
     _upload_include_cmdr_name = tk.BooleanVar(value=val)
     nb.Checkbutton(frame, text='Include CMDR name', variable=_upload_include_cmdr_name).grid(row=cur_row+4, column=0, sticky='w', padx=25, pady=2)
 
