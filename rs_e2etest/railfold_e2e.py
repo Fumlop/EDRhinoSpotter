@@ -55,8 +55,9 @@ def jump(system):
 
 
 def texts(widget):
-    """Label texts of a frame's children, in pack order."""
-    return [str(w.cget("text")) for w in widget.winfo_children() if isinstance(w, tk.Label)]
+    """Label texts of a frame's children, in pack order; the rig medal (image Label) left out."""
+    return [str(w.cget("text")) for w in widget.winfo_children()
+            if isinstance(w, tk.Label) and not str(w.cget("image"))]
 
 
 def rail_rows():
@@ -72,7 +73,7 @@ def rail_rows():
             continue
         # _rail_body: row -> inner -> labels, name first
         inner = texts(children[0]) if len(children) == 1 else []
-        if len(inner) == 4 and (inner[1].endswith(" Ls") or inner[1] == "-"):
+        if len(inner) == 3 and (inner[1].endswith(" Ls") or inner[1] == "-"):
             rows.append(("body", inner, widget))
             continue
         stack[0:0] = children

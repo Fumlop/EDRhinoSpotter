@@ -30,6 +30,10 @@ ALERT = "#ff8080"
 # Bookmark groups from coverage.golden_groups.
 GOLD = "#f5c542"
 
+# Rig-count medal (rs_core/medal.py): 4 rigs, 5 rigs; 6+ is GOLD.
+BRONZE = "#cd7f32"
+SILVER = "#c4ccd6"
+
 # The ring of a depleted bookmark.
 SPENT = "#8a96a3"
 

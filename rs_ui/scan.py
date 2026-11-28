@@ -14,7 +14,7 @@ from tkinter import messagebox
 from PIL import Image
 
 from rs_core import (bodies, cards, coverage, coverstore, database, deposit, grounds, guide,
-                     measure, palette, share, spotcard, spotmark, store, thumb, yields)
+                     measure, medal, palette, share, spotcard, spotmark, store, thumb, yields)
 from rs_core.logging import logger
 from rs_ui import clipboard, minimap, overlay, rhino, widgets
 
@@ -124,6 +124,8 @@ _panes = {}
 _spots = {}
 # thumb.image() PhotoImages by (colour, down), see _thumb().
 _thumbs = {}
+# medal.image() PhotoImages by (rigs, background), see _medal().
+_medals = {}
 
 # On open, a location with a bookmark this close to the ship is unfolded, m.
 UNFOLD_M = 5000.0
@@ -722,26 +724,29 @@ def _toggle_ground(ground):
 
 
 def _rail_body(parent, entry, chosen):
-    """One rail row: name, distance, locations, bookmarks; the whole row picks the body."""
+    """One rail row: name, rig medal, distance, bookmarks; the whole row picks the body."""
     row = tk.Frame(parent, bg=PANEL)
     row.pack(fill="x")
     inner = tk.Frame(row, bg=PANEL)
     inner.pack(side="left", fill="x", expand=True, padx=(13, 13), pady=5)
 
     marks = len(entry["shown"])
-    locations = entry.get("locations")
     distance = entry.get("distance")
     # The picked body: name bold in gold.
     tk.Label(inner, text=entry["short"][:NAME_WIDTH], bg=PANEL,
              fg=GOLD if chosen else FG_SOFT, anchor="w", width=NAME_WIDTH,
              font=("Consolas", 10, "bold" if chosen else "normal")).pack(side="left")
+    # Medal slot medal.SIZE px wide on every row: the distance column stays aligned.
+    best = _best_rigs(entry["shown"])
+    if best is not None:
+        tk.Label(inner, image=_medal(inner, best, PANEL), bg=PANEL, bd=0).pack(side="left")
+    else:
+        tk.Frame(inner, bg=PANEL, width=medal.SIZE, height=1).pack(side="left")
     tk.Label(inner, text=f"{distance:,.0f} Ls" if distance is not None else "-",
              bg=PANEL, fg=DIM, anchor="e", width=9,
              font=("Consolas", 9)).pack(side="left")
     tk.Label(inner, text=f"{marks} bm" if marks else "", bg=PANEL, fg=GOLD, anchor="e",
              font=("Consolas", 9)).pack(side="right")
-    tk.Label(inner, text=f"{locations} loc" if locations is not None else "unprobed",
-             bg=PANEL, fg=DIM, anchor="e", font=("Consolas", 9)).pack(side="right", padx=6)
 
     widgets.clickable(row, lambda: _pick_body(entry["name"]))
 
@@ -967,6 +972,9 @@ def _location_header(parent, body, index, group, maps, status, open_here):
              font=("Segoe UI", 7)).pack(side="left")
     tk.Label(row, text=_loc(index), bg=BG, fg=GOLD if good else DIM if bad else FG,
              anchor="w", width=8, font=("Segoe UI", 10, "bold")).pack(side="left")
+    best = _best_rigs(group)
+    if best is not None:
+        tk.Label(row, image=_medal(row, best, BG), bg=BG).pack(side="left", padx=(0, 6))
 
     # The picture is found on the press: that rebuilds a mask per saved map of the body.
     share = widgets.button(row, "Share map", (lambda: _share_map(body, group)) if maps else None)
@@ -1016,9 +1024,11 @@ def _bookmark_row(parent, body, record, picked, maps):
     # One label per colour.
     material = _short(record.get("commodity"))
     mark = HERE_MARK if _key(record) == _state["here"] else INDENT
-    tk.Label(row, text=mark + f"{material[:MATERIAL_W]:<{MATERIAL_W}} "
-                                f"{(str(rigs) if rigs is not None else '-'):>{RIGS_W}} ",
+    tk.Label(row, text=mark + f"{material[:MATERIAL_W]:<{MATERIAL_W}} ",
              bg=bg, fg=DIM if dead else ACCENT, anchor="w",
+             font=("Consolas", 9)).pack(side="left")
+    tk.Label(row, text=f"{(str(rigs) if rigs is not None else '-'):>{RIGS_W}} ", bg=bg,
+             fg=DIM if dead else (medal.colour(rigs) or ACCENT), anchor="w",
              font=("Consolas", 9)).pack(side="left")
     bearing, away = _from_centre(maps, body, record)
     tk.Label(row, text=f"{bearing:>{BEARING_W}} {away:>{FROM_W}} ", bg=bg,
@@ -1769,7 +1779,7 @@ def _drawn_now(body, group, maps):
         title, legend = minimap.picture_text(cover, system)
         ground = register.ground(system, body) if register is not None else None
         image = coverage.picture(cover.mask, marks, title, legend, cover.border_m, golden,
-                                 ground)
+                                 ground, body)
     except Exception:       # PIL and coverage: any raise must not cost Share map
         logger.exception(f"scan: could not draw {name} on {body}")
         return None
@@ -1917,6 +1927,23 @@ def _spot_button(row, body, index, mark, lit, tall):
     widgets.tooltip(button, "Set a loc number in Edit to mark it" if index is None
                     else f"Unmark {word}" if lit else f"Mark {word}: {effect}")
     return button
+
+
+def _best_rigs(records):
+    """Most rigs among `records` not depleted, if medal.MIN_RIGS or more; else None."""
+    best = max((r.get("rigs") for r in records
+                if isinstance(r.get("rigs"), int) and not cards.depleted(r)), default=None)
+    return best if medal.colour(best) else None
+
+
+def _medal(parent, rigs, background):
+    """medal.image() as a PhotoImage, once per (rigs, background): Tk drops an unreferenced image."""
+    key = (rigs, background)
+    if key not in _medals:
+        out = io.BytesIO()
+        medal.image(rigs, background).save(out, format="PNG")
+        _medals[key] = tk.PhotoImage(master=parent, data=out.getvalue())
+    return _medals[key]
 
 
 def _thumb(parent, colour, down):

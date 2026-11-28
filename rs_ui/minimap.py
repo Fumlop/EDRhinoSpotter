@@ -664,7 +664,7 @@ def _docked(system):
     def draw():
         try:
             coverstore.save_png(body, name, coverage.picture(mask, marks, title, legend, border_m,
-                                                             golden, ground))
+                                                             golden, ground, body))
         except Exception:
             logger.exception(f"minimap: could not draw the picture of {name} on {body}")
 
