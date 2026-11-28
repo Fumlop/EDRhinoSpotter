@@ -74,6 +74,9 @@ def child():
             was._last = None
             was.add(lat, lon)
         was.ground = cover.ground
+        # HEAD has one texture a family; it loads the body's pick here, so only
+        # the drawing is compared (the pick: texture_e2e.py).
+        old._texture = lambda ground, size: coverage._texture(ground, size, cover.body)
         stats["old_new"] += 1
         if ImageChops.difference(was.mask, cover.mask).getbbox():
             fails.append(f"{label}: mask differs from HEAD")
@@ -84,7 +87,8 @@ def child():
             if ImageChops.difference(a, b).getbbox():
                 fails.append(f"{label}: render() at {x:.0f},{y:.0f} differs from HEAD")
         a = old.picture(was.mask, border_m=was.border_m, ground=was.ground)
-        b = coverage.picture(cover.mask, border_m=cover.border_m, ground=cover.ground)
+        b = coverage.picture(cover.mask, border_m=cover.border_m, ground=cover.ground,
+                             body=cover.body)
         stats["old_new"] += 1
         if ImageChops.difference(a, b).getbbox():
             fails.append(f"{label}: picture() differs from HEAD")
@@ -103,7 +107,7 @@ def child():
         ring_at = tuple(round(v) for v in cover.anchor())
         t = time.perf_counter()
         full = coverage._draw_layer(cover.mask, lside, ring_at, cover.border_m, view=view,
-                                    ground=cover.ground)
+                                    ground=cover.ground, body=cover.body)
         t_full.setdefault(lside, []).append(time.perf_counter() - t)
         diff = ImageChops.difference(cover.layer(lside, view), full)
         checks += 1

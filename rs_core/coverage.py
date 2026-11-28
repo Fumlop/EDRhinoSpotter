@@ -19,6 +19,7 @@ rs_tests/test_coverage.py.
 """
 
 import math
+import zlib
 from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
@@ -370,7 +371,7 @@ class Coverage:
         key = (self.version, side, view, ring_at, self.border_m, self.ground)
         if self._layer is None or self._dirty is None or self._layer[0][1:] != key[1:]:
             self._layer = (key, _draw_layer(self.mask, side, ring_at, self.border_m, view=view,
-                                            ground=self.ground))
+                                            ground=self.ground, body=self.body))
         elif self._layer[0] != key:
             # Only discs painted since: redraw the layer around them, 4.5 x 4.5 km
             # a disc of 20 x 20 km. Same pixels as a full draw (rs_e2etest/layer.md).
@@ -383,7 +384,7 @@ class Coverage:
             box = (max(0, int(x0 * k)), max(0, int(y0 * k)),
                    min(image.width, int(x1 * k) + 1), min(image.height, int(y1 * k) + 1))
             image.paste(_draw_layer(self.mask, side, ring_at, self.border_m, view=view,
-                                    ground=self.ground, box=box), box[:2])
+                                    ground=self.ground, box=box, body=self.body), box[:2])
             self._layer = (key, image)
         self._dirty = []
         return self._layer[1]
@@ -518,7 +519,8 @@ def mapped_locations(found, body, records=()):
 PICTURE_SIDE = int(round(MASK_PX * VIEW_M / REACH_M))
 
 
-def picture(mask, marks=(), title=(), legend=(), border_m=None, golden=(), ground=None):
+def picture(mask, marks=(), title=(), legend=(), border_m=None, golden=(), ground=None,
+            body=None):
     """The whole map as a PIL image, north up, bookmarks on it.
 
     Takes a copy of the mask and the bookmarks (metres) rather than the
@@ -527,12 +529,13 @@ def picture(mask, marks=(), title=(), legend=(), border_m=None, golden=(), groun
     `title` is lines of text above the map, the first one larger; `legend` is
     (code, text) or (code, text, depleted) rows below it, one per bookmark. Both optional - without them
     the picture is the bare map. `golden` is golden_best() output, circled in
-    gold. `ground` is the body's ground key,
-    drawn under the painted area as on the live map; None is the plain
-    background.
+    gold. `ground` is the body's ground key and `body` its name, which pick
+    the texture drawn under the painted area as on the live map; ground None
+    is the plain background.
     """
     # No rings: the ground and the bookmarks are what the picture is kept for.
-    image = _draw_layer(mask, PICTURE_SIDE, border_m=border_m, drive=False, ground=ground)
+    image = _draw_layer(mask, PICTURE_SIDE, border_m=border_m, drive=False, ground=ground,
+                        body=body)
     scale = image.width / (2 * REACH_M)
     _golden(image, golden, scale, PICTURE_SIDE)
     _bookmarks(image, [(image.width / 2 + mx * scale, image.height / 2 - my * scale, *rest)
@@ -950,8 +953,9 @@ def _distances(image, points, side, centre, per_px, marker=None):
         label(a, b, LINE_LOWER)
 
 
-# The ground the SRV drives on, under the painted area: one picture a ground
-# family, made in EDIntel's lab/radar_backgrounds and shipped as PNGs.
+# The ground the SRV drives on, under the painted area: TEXTURE_VARIANTS pictures
+# a ground family, texture/<family>.jpg and <family>-2..6.jpg, made by
+# lab/blender_textures/seeds.py from EDIntel's hifi.py.
 TEXTURE_DIR = Path(__file__).resolve().parent.parent / "texture"
 TEXTURE_OF = {
     'metal-rich': 'metallic',
@@ -962,8 +966,9 @@ TEXTURE_OF = {
 # JPEG, not PNG: the same five textures are 15.1 MB as PNG and 2.3 MB at
 # quality 90 without chroma subsampling, within 3 of 255 a pixel once the
 # 1920 px file is drawn at the 330 px the map uses, and they decode in 19 ms
-# against 80.
+# against 80. 30 files (5 families x TEXTURE_VARIANTS): 15.1 MB.
 TEXTURE_EXT = ".jpg"
+TEXTURE_VARIANTS = 6
 _textures = {}           # (name, pixels) -> RGB image, or None when it would not load
 
 
@@ -992,19 +997,25 @@ def clear_old_textures():
         logger.warning(f"minimap: could not remove the old textures: {err}")
 
 
-def texture_name(ground):
-    """The texture file for a ground key, without the extension, or None."""
+def texture_name(ground, body=None):
+    """The texture file for a ground key, without the extension, or None.
+
+    `body` picks one of TEXTURE_VARIANTS by CRC-32 of the body name: the same
+    body gets the same file in every process (hash() is salted per process).
+    None gives variant 1, <family>.jpg.
+    """
     if not ground:
         return None
-    if ground.startswith('rock 80%+'):
-        return 'rocky'
-    return TEXTURE_OF.get(ground)
+    name = 'rocky' if ground.startswith('rock 80%+') else TEXTURE_OF.get(ground)
+    variant = zlib.crc32(body.encode('utf-8')) % TEXTURE_VARIANTS + 1 if name and body else 1
+    return name if variant == 1 else f"{name}-{variant}"
 
 
-def _texture(ground, size):
+def _texture(ground, size, body=None):
     """The ground's texture at size x size, or None: loaded and scaled once,
-    then kept - the layer is redrawn every STAMP_M driven."""
-    name = texture_name(ground)
+    then kept - the layer is redrawn every STAMP_M driven. A missing variant
+    file falls back to variant 1, <family>.jpg."""
+    name = texture_name(ground, body)
     if name is None:
         return None
     key = (name, size)
@@ -1013,13 +1024,17 @@ def _texture(ground, size):
             with Image.open(TEXTURE_DIR / f"{name}{TEXTURE_EXT}") as picture:
                 _textures[key] = picture.convert("RGB").resize((size, size), Image.BICUBIC)
         except OSError as err:
-            logger.warning(f"minimap: no {name} texture, plain ground instead: {err}")
-            _textures[key] = None
+            if name != texture_name(ground):
+                logger.warning(f"minimap: no {name} texture, variant 1 instead: {err}")
+                _textures[key] = _texture(ground, size)
+            else:
+                logger.warning(f"minimap: no {name} texture, plain ground instead: {err}")
+                _textures[key] = None
     return _textures[key]
 
 
 def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True, view=VIEW_M, ground=None,
-                box=None):
+                box=None, body=None):
     """Painted area, grid, the edge of the mask, the rings around `ring_at`
     (metres, or None for no rings) and the location's border around the centre
     (metres, or None), over all of REACH_M, at `side` pixels to 2 * view.
@@ -1049,7 +1064,7 @@ def _draw_layer(mask, side, ring_at=None, border_m=None, drive=True, view=VIEW_M
         return [math.floor(cx - r) - ox, math.floor(cy - r) - oy,
                 math.floor(cx + r) - ox, math.floor(cy + r) - oy]
 
-    texture = _texture(ground, big)
+    texture = _texture(ground, big, body)
     if texture:
         image = texture.crop((ox, oy, ox + w, oy + h))
     else:

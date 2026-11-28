@@ -26,7 +26,9 @@ the same mask. Any differing pixel fails.
 - Layer sizes: 180 px (fractional mask scale, 600 over 400 px) and 640 px
   (largest; 4x at 320 px / view 3000 draws the same 1067 px layer).
 - Old vs new: the committed coverage.py (git HEAD) replays the same points;
-  mask, `render()` and `picture()` must match it exactly.
+  mask, `render()` and `picture()` must match it exactly. HEAD's `_texture`
+  is pointed at the body's pick (6 variants a family); the pick
+  itself is checked in texture_e2e.py.
 
 ## Timings
 

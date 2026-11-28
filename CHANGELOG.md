@@ -1,5 +1,18 @@
 # Changelog
 
+## 7.0.0
+
+**Added**
+
+- Minimap ground: 6 textures a ground family, 30 in all. A body gets one by CRC-32 of its name, the same on every restart, on the live map and on the saved and shared picture. Rocky: 3 cratered, 3 fractured; icy: snowfield at 65% snow (3), 70%, 80%, 90%; metallic: 6 smelt; rocky ice: snow 40-70%, at least 30% rock showing; high metal content: ore 25/30/40% and 3 with metal-rich flow lines on 40/50/60%.
+- A variant file missing (hand-unzip over an older install) falls back to `texture/<family>.jpg`; a missing family file is plain ground as before.
+- RhinoData: rig medal on spots with 4+ rigs - 4 bronze, 5 silver, 6 and 7 gold, the count inside. On the body row between name and distance (the most rigs of its bookmarks), on the location line, and the Rigs column of the bookmark row in the same colour. Depleted bookmarks do not count.
+
+**Changed**
+
+- RhinoData body list: the "N loc" count is gone from the body row; the bookmark count stays.
+- `texture/` 2.3 MB -> 15.1 MB. Made by `lab/blender_textures/seeds.py` from EDIntel's `hifi.py`; `<family>.jpg` is unchanged and is variant 1.
+
 ## 6.8.1
 
 **Fixed**
